@@ -1,11 +1,10 @@
 openapi: 3.0.1
 info:
-  title: STIG Manager API
-  description: An API for managing evaluations of Security Technical Implementation
-    Guide (STIG) assessments.
+  title: Village Green API
+  description: An API for managing a federation of villages.
   contact:
-    name: STIG Manager OSS Project
-    url: https://github.com/NUWCDIVNPT/stig-manager
+    name: Village Green OSS Project
+    url: https://github.com/tvcri/village-green
   version: v1
 servers:
 - url: http://localhost:64001/api
@@ -394,31 +393,6 @@ paths:
       security:
       - oauth:
         - vg:op:read
-  /op/appinfo:
-    get:
-      tags:
-      - Operation
-      summary: Return information about the application deployment
-      operationId: getAppInfo
-      parameters:
-      - $ref: '#/components/parameters/ElevateQuery'
-      - name: includeRowCounts
-        in: query
-        description: Include exact row counts for each table (slower) or use estimated
-          counts (faster)
-        schema:
-          type: boolean
-          default: false
-      responses:
-        '200':
-          description: AppInfo response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AppInfo'
-      security:
-      - oauth:
-        - vg:op:read
   /op/configuration:
     get:
       tags:
@@ -449,24 +423,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiDefinition'
-  /op/details:
-    get:
-      tags:
-      - Operation
-      summary: 'DEPRECATED: replaced by /op/appinfo'
-      operationId: getDetails
-      parameters:
-      - $ref: '#/components/parameters/ElevateQuery'
-      responses:
-        '200':
-          description: Detail response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Detail'
-      security:
-      - oauth:
-        - vg:op:read
   /op/state:
     get:
       tags:
@@ -931,12 +887,6 @@ components:
       - type: array
     ApiVersion:
       $ref: '#/components/schemas/Version'
-    AppDataFormat:
-      type: string
-      default: gzip
-      enum:
-      - jsonl
-      - gzip
     AppDataTable:
       type: object
       properties:
@@ -946,896 +896,6 @@ components:
           type: number
         dataLength:
           type: number
-    AppInfo:
-      type: object
-      properties:
-        date:
-          $ref: '#/components/schemas/StringDateTime'
-        schema:
-          $ref: '#/components/schemas/AppInfoSchemaVersion'
-        version:
-          $ref: '#/components/schemas/ApiVersion'
-        collections:
-          type: object
-          additionalProperties:
-            $ref: '#/components/schemas/AppInfoCollection'
-        requests:
-          $ref: '#/components/schemas/AppInfoRequests'
-        users:
-          $ref: '#/components/schemas/AppInfoUsers'
-        groups:
-          type: object
-          additionalProperties:
-            $ref: '#/components/schemas/AppInfoGroups'
-        mysql:
-          $ref: '#/components/schemas/AppInfoMySql'
-        nodejs:
-          $ref: '#/components/schemas/AppInfoNodejs'
-      required:
-      - date
-      - schema
-      - version
-      - collections
-      - requests
-      - users
-      - mysql
-      - nodejs
-    AppInfoGroups:
-      type: object
-      properties:
-        name:
-          $ref: '#/components/schemas/String255'
-        members:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        created:
-          $ref: '#/components/schemas/Created'
-        modifiedDate:
-          $ref: '#/components/schemas/StringDateTime'
-        roles:
-          $ref: '#/components/schemas/AppInfoGroupsRoles'
-      required:
-      - name
-      - members
-      - created
-      - modifiedDate
-      - roles
-    AppInfoGroupsRoles:
-      type: object
-      properties:
-        full:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        owner:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        manage:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        restricted:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - full
-      - owner
-      - manage
-      - restricted
-    AppInfoSchemaVersion:
-      type: string
-      pattern: ^[a-zA-Z0-9_-]+-appinfo-v[0-9]+\.[0-9]+$
-    AppInfoNodejs:
-      type: object
-      properties:
-        version:
-          $ref: '#/components/schemas/ApiVersion'
-        uptime:
-          type: number
-          format: double
-        os:
-          $ref: '#/components/schemas/AppInfoNodeOs'
-        environment:
-          additionalProperties:
-            type: string
-        memory:
-          $ref: '#/components/schemas/AppInfoNodeMemory'
-        cpus:
-          type: array
-          items:
-            $ref: '#/components/schemas/AppInfoNodeCpus'
-      required:
-      - version
-      - uptime
-      - os
-      - environment
-      - memory
-      - cpus
-    AppInfoNodeOs:
-      type: object
-      properties:
-        platform:
-          $ref: '#/components/schemas/String255'
-        arch:
-          $ref: '#/components/schemas/String255'
-        osMachine:
-          $ref: '#/components/schemas/String255'
-        osName:
-          $ref: '#/components/schemas/String255'
-        osRelease:
-          $ref: '#/components/schemas/String255'
-        loadAverage:
-          $ref: '#/components/schemas/String255'
-      required:
-      - platform
-      - arch
-      - osMachine
-      - osName
-      - osRelease
-      - loadAverage
-    AppInfoNodeCpus:
-      type: object
-      properties:
-        model:
-          $ref: '#/components/schemas/String255'
-        speed:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - model
-      - speed
-    AppInfoNodeMemory:
-      type: object
-      properties:
-        rss:
-          $ref: '#/components/schemas/Integer64MinimumZero'
-        heapTotal:
-          $ref: '#/components/schemas/Integer64MinimumZero'
-        heapUsed:
-          $ref: '#/components/schemas/Integer64MinimumZero'
-        external:
-          $ref: '#/components/schemas/Integer64MinimumZero'
-        arrayBuffers:
-          $ref: '#/components/schemas/Integer64MinimumZero'
-        maxRss:
-          $ref: '#/components/schemas/Integer64MinimumZero'
-      required:
-      - rss
-      - heapTotal
-      - heapUsed
-      - external
-      - arrayBuffers
-      - maxRss
-    AppInfoMySql:
-      type: object
-      properties:
-        version:
-          $ref: '#/components/schemas/ApiVersion'
-        tables:
-          $ref: '#/components/schemas/AppInfoMysqlTableStats'
-        variables:
-          $ref: '#/components/schemas/AppInfoMysqlVariables'
-        status:
-          $ref: '#/components/schemas/AppInfoMysqlStatus'
-      required:
-      - version
-      - tables
-      - variables
-      - status
-    AppInfoMysqlStatus:
-      type: object
-      properties:
-        Bytes_received:
-          $ref: '#/components/schemas/String255'
-        Bytes_sent:
-          $ref: '#/components/schemas/String255'
-        Handler_commit:
-          $ref: '#/components/schemas/String255'
-        Handler_update:
-          $ref: '#/components/schemas/String255'
-        Handler_write:
-          $ref: '#/components/schemas/String255'
-        Innodb_buffer_pool_bytes_data:
-          $ref: '#/components/schemas/String255'
-        Innodb_buffer_pool_pages_total:
-          $ref: '#/components/schemas/String255'
-        Innodb_buffer_pool_pages_free:
-          $ref: '#/components/schemas/String255'
-        Innodb_buffer_pool_pages_dirty:
-          $ref: '#/components/schemas/String255'
-        Innodb_buffer_pool_pages_flushed:
-          $ref: '#/components/schemas/String255'
-        Innodb_buffer_pool_read_requests:
-          $ref: '#/components/schemas/String255'
-        Innodb_buffer_pool_reads:
-          $ref: '#/components/schemas/String255'
-        Innodb_buffer_pool_wait_free:
-          $ref: '#/components/schemas/String255'
-        Innodb_redo_log_current_lsn:
-          $ref: '#/components/schemas/String255'
-        Innodb_redo_log_checkpoint_lsn:
-          $ref: '#/components/schemas/String255'
-        Innodb_redo_log_flushed_to_disk_lsn:
-          $ref: '#/components/schemas/String255'
-        Innodb_log_waits:
-          $ref: '#/components/schemas/String255'
-        Innodb_log_writes:
-          $ref: '#/components/schemas/String255'
-        Innodb_os_log_fsyncs:
-          $ref: '#/components/schemas/String255'
-        Innodb_data_reads:
-          $ref: '#/components/schemas/String255'
-        Innodb_data_writes:
-          $ref: '#/components/schemas/String255'
-        Innodb_data_fsyncs:
-          $ref: '#/components/schemas/String255'
-        Innodb_pages_read:
-          $ref: '#/components/schemas/String255'
-        Innodb_pages_written:
-          $ref: '#/components/schemas/String255'
-        Innodb_pages_created:
-          $ref: '#/components/schemas/String255'
-        Innodb_rows_read:
-          $ref: '#/components/schemas/String255'
-        Innodb_rows_updated:
-          $ref: '#/components/schemas/String255'
-        Innodb_rows_inserted:
-          $ref: '#/components/schemas/String255'
-        Innodb_rows_deleted:
-          $ref: '#/components/schemas/String255'
-        Innodb_row_lock_waits:
-          $ref: '#/components/schemas/String255'
-        Innodb_row_lock_current_waits:
-          $ref: '#/components/schemas/String255'
-        Innodb_row_lock_time:
-          $ref: '#/components/schemas/String255'
-        Innodb_row_lock_time_avg:
-          $ref: '#/components/schemas/String255'
-        Innodb_row_lock_time_max:
-          $ref: '#/components/schemas/String255'
-        Created_tmp_tables:
-          $ref: '#/components/schemas/String255'
-        Created_tmp_disk_tables:
-          $ref: '#/components/schemas/String255'
-        Created_tmp_files:
-          $ref: '#/components/schemas/String255'
-        Open_tables:
-          $ref: '#/components/schemas/String255'
-        Opened_tables:
-          $ref: '#/components/schemas/String255'
-        Table_open_cache_hits:
-          $ref: '#/components/schemas/String255'
-        Table_open_cache_misses:
-          $ref: '#/components/schemas/String255'
-        Table_open_cache_overflows:
-          $ref: '#/components/schemas/String255'
-        Connections:
-          $ref: '#/components/schemas/String255'
-        Max_used_connections:
-          $ref: '#/components/schemas/String255'
-        Threads_connected:
-          $ref: '#/components/schemas/String255'
-        Threads_running:
-          $ref: '#/components/schemas/String255'
-        Threads_created:
-          $ref: '#/components/schemas/String255'
-        Threads_cached:
-          $ref: '#/components/schemas/String255'
-        Aborted_connects:
-          $ref: '#/components/schemas/String255'
-        Aborted_clients:
-          $ref: '#/components/schemas/String255'
-        Queries:
-          $ref: '#/components/schemas/String255'
-        Slow_queries:
-          $ref: '#/components/schemas/String255'
-        Select_scan:
-          $ref: '#/components/schemas/String255'
-        Select_full_join:
-          $ref: '#/components/schemas/String255'
-        Select_full_range_join:
-          $ref: '#/components/schemas/String255'
-        Sort_merge_passes:
-          $ref: '#/components/schemas/String255'
-        Sort_scan:
-          $ref: '#/components/schemas/String255'
-        Sort_range:
-          $ref: '#/components/schemas/String255'
-        Sort_rows:
-          $ref: '#/components/schemas/String255'
-        Table_locks_immediate:
-          $ref: '#/components/schemas/String255'
-        Table_locks_waited:
-          $ref: '#/components/schemas/String255'
-        Uptime:
-          $ref: '#/components/schemas/String255'
-        Uptime_since_flush_status:
-          $ref: '#/components/schemas/String255'
-      required:
-      - Bytes_received
-      - Bytes_sent
-      - Handler_commit
-      - Handler_update
-      - Handler_write
-      - Innodb_buffer_pool_bytes_data
-      - Innodb_buffer_pool_pages_total
-      - Innodb_buffer_pool_pages_free
-      - Innodb_buffer_pool_pages_dirty
-      - Innodb_buffer_pool_pages_flushed
-      - Innodb_buffer_pool_read_requests
-      - Innodb_buffer_pool_reads
-      - Innodb_buffer_pool_wait_free
-      - Innodb_log_waits
-      - Innodb_log_writes
-      - Innodb_os_log_fsyncs
-      - Innodb_data_reads
-      - Innodb_data_writes
-      - Innodb_data_fsyncs
-      - Innodb_pages_read
-      - Innodb_pages_written
-      - Innodb_pages_created
-      - Innodb_rows_read
-      - Innodb_rows_updated
-      - Innodb_rows_inserted
-      - Innodb_rows_deleted
-      - Innodb_row_lock_waits
-      - Innodb_row_lock_current_waits
-      - Innodb_row_lock_time
-      - Innodb_row_lock_time_avg
-      - Innodb_row_lock_time_max
-      - Created_tmp_tables
-      - Created_tmp_disk_tables
-      - Created_tmp_files
-      - Open_tables
-      - Opened_tables
-      - Table_open_cache_hits
-      - Table_open_cache_misses
-      - Table_open_cache_overflows
-      - Connections
-      - Max_used_connections
-      - Threads_connected
-      - Threads_running
-      - Threads_created
-      - Threads_cached
-      - Aborted_connects
-      - Aborted_clients
-      - Queries
-      - Slow_queries
-      - Select_scan
-      - Select_full_join
-      - Select_full_range_join
-      - Sort_merge_passes
-      - Sort_scan
-      - Sort_range
-      - Sort_rows
-      - Table_locks_immediate
-      - Table_locks_waited
-      - Uptime
-      - Uptime_since_flush_status
-    AppInfoMysqlVariables:
-      type: object
-      properties:
-        innodb_buffer_pool_size:
-          $ref: '#/components/schemas/String255'
-        innodb_buffer_pool_instances:
-          $ref: '#/components/schemas/String255'
-        innodb_log_buffer_size:
-          $ref: '#/components/schemas/String255'
-        innodb_log_file_size:
-          $ref: '#/components/schemas/String255'
-        innodb_redo_log_capacity:
-          $ref: '#/components/schemas/String255'
-        innodb_io_capacity:
-          $ref: '#/components/schemas/String255'
-        innodb_io_capacity_max:
-          $ref: '#/components/schemas/String255'
-        innodb_flush_sync:
-          $ref: '#/components/schemas/String255'
-        innodb_flush_log_at_trx_commit:
-          $ref: '#/components/schemas/String255'
-        innodb_doublewrite:
-          $ref: '#/components/schemas/String255'
-        innodb_lock_wait_timeout:
-          $ref: '#/components/schemas/String255'
-        innodb_change_buffering:
-          $ref: '#/components/schemas/String255'
-        tmp_table_size:
-          $ref: '#/components/schemas/String255'
-        max_heap_table_size:
-          $ref: '#/components/schemas/String255'
-        temptable_max_mmap:
-          $ref: '#/components/schemas/String255'
-        temptable_max_ram:
-          $ref: '#/components/schemas/String255'
-        key_buffer_size:
-          $ref: '#/components/schemas/String255'
-        sort_buffer_size:
-          $ref: '#/components/schemas/String255'
-        read_buffer_size:
-          $ref: '#/components/schemas/String255'
-        read_rnd_buffer_size:
-          $ref: '#/components/schemas/String255'
-        join_buffer_size:
-          $ref: '#/components/schemas/String255'
-        binlog_cache_size:
-          $ref: '#/components/schemas/String255'
-        max_connections:
-          $ref: '#/components/schemas/String255'
-        max_allowed_packet:
-          $ref: '#/components/schemas/String255'
-        thread_cache_size:
-          $ref: '#/components/schemas/String255'
-        table_open_cache:
-          $ref: '#/components/schemas/String255'
-        table_definition_cache:
-          $ref: '#/components/schemas/String255'
-        version:
-          $ref: '#/components/schemas/Version'
-        version_compile_machine:
-          $ref: '#/components/schemas/String255'
-        version_compile_os:
-          $ref: '#/components/schemas/String255'
-        long_query_time:
-          $ref: '#/components/schemas/String255'
-      required:
-      - innodb_buffer_pool_size
-      - innodb_buffer_pool_instances
-      - innodb_log_buffer_size
-      - innodb_log_file_size
-      - innodb_io_capacity
-      - innodb_io_capacity_max
-      - innodb_flush_sync
-      - innodb_flush_log_at_trx_commit
-      - innodb_doublewrite
-      - innodb_lock_wait_timeout
-      - innodb_change_buffering
-      - tmp_table_size
-      - max_heap_table_size
-      - temptable_max_mmap
-      - temptable_max_ram
-      - key_buffer_size
-      - sort_buffer_size
-      - read_buffer_size
-      - read_rnd_buffer_size
-      - join_buffer_size
-      - binlog_cache_size
-      - max_connections
-      - max_allowed_packet
-      - thread_cache_size
-      - table_open_cache
-      - table_definition_cache
-      - version
-      - version_compile_machine
-      - version_compile_os
-      - long_query_time
-    AppInfoMysqlTableStats:
-      type: object
-      additionalProperties:
-        $ref: '#/components/schemas/AppInfoTableInfo'
-    AppInfoTableInfo:
-      type: object
-      properties:
-        tableRows:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        tableCollation:
-          $ref: '#/components/schemas/String255'
-        avgRowLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        dataLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        indexLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        autoIncrement:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        createTime:
-          $ref: '#/components/schemas/Created'
-        updateTime:
-          $ref: '#/components/schemas/StringDateTimeNullable'
-        rowCount:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - tableRows
-      - tableCollation
-      - avgRowLength
-      - dataLength
-      - indexLength
-      - autoIncrement
-      - createTime
-      - rowCount
-    AppInfoUsers:
-      type: object
-      properties:
-        userInfo:
-          additionalProperties:
-            $ref: '#/components/schemas/AppInfoUserInfo'
-        userPrivilegeCounts:
-          type: object
-          additionalProperties:
-            $ref: '#/components/schemas/AppInfoUserPrivilegeCounts'
-      required:
-      - userInfo
-      - userPrivilegeCounts
-    AppInfoUserPrivilegeCounts:
-      type: object
-      properties:
-        overall:
-          $ref: '#/components/schemas/AppInfoPrivilegeTimeSeriesCounts'
-        activeInLast30Days:
-          type: object
-          additionalProperties:
-            $ref: '#/components/schemas/AppInfoPrivilegeTimeSeriesCounts'
-        activeInLast90Days:
-          type: object
-          additionalProperties:
-            $ref: '#/components/schemas/AppInfoPrivilegeTimeSeriesCounts'
-    AppInfoPrivilegeTimeSeriesCounts:
-      type: object
-      additionalProperties:
-        $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-    AppInfoUserInfo:
-      type: object
-      properties:
-        username:
-          $ref: '#/components/schemas/Username'
-        created:
-          $ref: '#/components/schemas/Created'
-        lastAccess:
-          $ref: '#/components/schemas/UserLastAccess'
-        privileges:
-          $ref: '#/components/schemas/AppInfoUserPrivileges'
-        roles:
-          $ref: '#/components/schemas/AppInfoUserRoles'
-      required:
-      - username
-      - created
-      - lastAccess
-      - privileges
-      - roles
-    AppInfoUserRoles:
-      type: object
-      properties:
-        full:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        owner:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        manage:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        restricted:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - full
-      - owner
-      - manage
-      - restricted
-    AppInfoUserPrivileges:
-      type: array
-      items:
-        $ref: '#/components/schemas/String255'
-    AppInfoRequests:
-      type: object
-      properties:
-        totalRequests:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        totalApiRequests:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        totalRequestDuration:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        operationIds:
-          additionalProperties:
-            $ref: '#/components/schemas/AppInfoOperation'
-      required:
-      - totalRequests
-      - totalApiRequests
-      - totalRequestDuration
-      - operationIds
-    AppInfoOperation:
-      type: object
-      properties:
-        totalRequests:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        totalDuration:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        elevatedRequests:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        minDuration:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        maxDuration:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        maxDurationUpdates:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        retried:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        averageRetries:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        totalResLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        minResLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        maxResLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        totalReqLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        minReqLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        maxReqLength:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        projections:
-          $ref: '#/components/schemas/AppInfoOperationIdProjections'
-        clients:
-          $ref: '#/components/schemas/AppInfoClients'
-        users:
-          $ref: '#/components/schemas/AppInfoUserRequests'
-        errors:
-          type: object
-          additionalProperties:
-            type: integer
-            format: int64
-            minimum: 0
-      required:
-      - totalRequests
-      - totalDuration
-      - elevatedRequests
-      - minDuration
-      - maxDuration
-      - maxDurationUpdates
-      - retried
-      - averageRetries
-      - totalResLength
-      - minResLength
-      - maxResLength
-      - clients
-      - users
-      - errors
-    AppInfoClients:
-      type: object
-      additionalProperties:
-        $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-    AppInfoUserRequests:
-      type: object
-      additionalProperties:
-        $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-    AppInfoOperationIdProjections:
-      type: object
-      additionalProperties:
-        $ref: '#/components/schemas/AppInfoOperationIdProjection'
-    AppInfoOperationIdProjection:
-      type: object
-      properties:
-        statusStats:
-          type: object
-          properties:
-            totalRequests:
-              $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-            minDuration:
-              $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-            maxDuration:
-              $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-            totalDuration:
-              $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-            retried:
-              $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-            averageRetries:
-              $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-            averageDuration:
-              $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-          required:
-          - totalRequests
-          - minDuration
-          - maxDuration
-          - totalDuration
-          - retried
-          - averageRetries
-          - averageDuration
-    AppInfoCollection:
-      type: object
-      properties:
-        name:
-          $ref: '#/components/schemas/CollectionName'
-        state:
-          $ref: '#/components/schemas/AppInfoCollectionState'
-        settings:
-          $ref: '#/components/schemas/CollectionSettings'
-        assets:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        assetsDisabled:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        uniqueStigs:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        stigAssignments:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        rules:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        reviews:
-          $ref: '#/components/schemas/Integer64MinimumZeroNullable'
-        reviewsDisabled:
-          $ref: '#/components/schemas/Integer64MinimumZeroNullable'
-        assetStigRanges:
-          $ref: '#/components/schemas/AppInfoAssetStigRanges'
-        grants:
-          $ref: '#/components/schemas/AppInfoCollectionGrants'
-        roleCounts:
-          $ref: '#/components/schemas/AppInfoCollectionRoleCounts'
-        labelCounts:
-          $ref: '#/components/schemas/AppInfoLabelCounts'
-      required:
-      - name
-      - state
-      - settings
-      - assets
-      - assetsDisabled
-      - uniqueStigs
-      - stigAssignments
-      - rules
-      - reviews
-      - reviewsDisabled
-      - assetStigRanges
-      - grants
-      - roleCounts
-      - labelCounts
-    AppInfoCollectionRoleCounts:
-      type: object
-      properties:
-        restricted:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        full:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        manage:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        owner:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - restricted
-      - full
-      - manage
-      - owner
-    AppInfoCollectionGrants:
-      type: object
-      additionalProperties:
-        $ref: '#/components/schemas/AppInfoCollectionGrant'
-    AppInfoCollectionGrant:
-      type: object
-      properties:
-        role:
-          $ref: '#/components/schemas/Roles'
-        grantee:
-          $ref: '#/components/schemas/AppInfoGrantee'
-        ruleCounts:
-          $ref: '#/components/schemas/AppInfoRuleCounts'
-        uniqueStigs:
-          type: integer
-          format: int64
-          minimum: 0
-        uniqueAssets:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        uniqueStigsDisabled:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        uniqueAssetsDisabled:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - role
-      - grantee
-      - ruleCounts
-      - uniqueStigs
-      - uniqueAssets
-      - uniqueStigsDisabled
-      - uniqueAssetsDisabled
-    AppInfoGrantee:
-      type: object
-      properties:
-        userId:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        userGroupId:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - userId
-      - userGroupId
-    AppInfoRuleCounts:
-      type: object
-      properties:
-        r:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        rw:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        none:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - r
-      - rw
-      - none
-    AppInfoCollectionSettings:
-      type: object
-      additionalProperties: false
-      properties:
-        fields:
-          $ref: '#/components/schemas/CollectionFieldSettings'
-        status:
-          $ref: '#/components/schemas/CollectionStatusSettings'
-        history:
-          $ref: '#/components/schemas/CollectionHistorySettings'
-        importOptions:
-          $ref: '#/components/schemas/CollectionImportOptions'
-    AppInfoCollectionState:
-      type: string
-      enum:
-      - enabled
-      - disabled
-    AppInfoLabelCounts:
-      type: object
-      properties:
-        collectionLabels:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        labeledAssets:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        assetLabels:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - collectionLabels
-      - labeledAssets
-      - assetLabels
-    AppInfoGrantCounts:
-      type: object
-      properties:
-        role1:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        role2:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        role3:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        role4:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-    AppInfoRestrictedUsers:
-      type: object
-      properties:
-        uniqueAssets:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        stigAsstCount:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-    AppInfoAssetStigRanges:
-      type: object
-      properties:
-        range00:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        range01to05:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        range06to10:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        range11to15:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-        range16plus:
-          $ref: '#/components/schemas/IntegerMinimumZeroNullable'
-      required:
-      - range00
-      - range01to05
-      - range06to10
-      - range11to15
-      - range16plus
-    Asset:
-      additionalProperties: false
-      type: object
-      properties:
-        assetId:
-          $ref: '#/components/schemas/AssetId'
-        collection:
-          $ref: '#/components/schemas/CollectionBasic'
-        description:
-          $ref: '#/components/schemas/AssetDescription'
-        fqdn:
-          $ref: '#/components/schemas/AssetFqdn'
-        ip:
-          $ref: '#/components/schemas/AssetIp'
-        labelIds:
-          type: array
-          items:
-            $ref: '#/components/schemas/LabelId'
-        mac:
-          $ref: '#/components/schemas/AssetMac'
-        metadata:
-          $ref: '#/components/schemas/Metadata'
-        name:
-          $ref: '#/components/schemas/AssetName'
-        noncomputing:
-          $ref: '#/components/schemas/AssetNoncomputing'
-      required:
-      - assetId
-      - name
-      - fqdn
-      - collection
-      - description
-      - ip
-      - mac
-      - noncomputing
     Attribution:
       type: object
       properties:
@@ -1852,30 +912,20 @@ components:
           $ref: '#/components/schemas/Attribution'
         modified:
           $ref: '#/components/schemas/Attribution'
-    CollectionGrant:
+    VillageGrant:
       additionalProperties: false
       type: object
       properties:
         roleId:
           $ref: '#/components/schemas/RoleId'
-        collectionId:
-          $ref: '#/components/schemas/CollectionId'
       required:
-      - collectionId
       - roleId
-    CollectionGrantProjected:
+    VillageGrantProjected:
       additionalProperties: false
       type: object
       properties:
         roleId:
           $ref: '#/components/schemas/RoleId'
-        collection:
-          type: object
-          properties:
-            collectionId:
-              $ref: '#/components/schemas/CollectionId'
-            name:
-              $ref: '#/components/schemas/CollectionName'
         grantees:
           $ref: '#/components/schemas/Grantees'
     CommitBranch:
@@ -1898,69 +948,6 @@ components:
       type: string
     CommitTag:
       type: string
-    Detail:
-      type: object
-      properties:
-        assetStig:
-          type: array
-          items:
-            $ref: '#/components/schemas/DetailAssetStig'
-        dbInfo:
-          $ref: '#/components/schemas/DetailMySqlInfo'
-    DetailAssetStig:
-      additionalProperties: false
-      type: object
-      properties:
-        assetCnt:
-          type: integer
-        collectionId:
-          $ref: '#/components/schemas/CollectionId'
-        range01to05:
-          type: integer
-        range06to10:
-          type: integer
-        range11to15:
-          type: integer
-        range16plus:
-          type: integer
-    DetailMySqlInfo:
-      type: object
-      properties:
-        tables:
-          type: object
-          additionalProperties:
-            $ref: '#/components/schemas/DetailMySqlTableInfo'
-    DetailMySqlTableInfo:
-      additionalProperties: false
-      type: object
-      properties:
-        autoIncrement:
-          nullable: true
-          type: integer
-        avgRowLength:
-          nullable: true
-          type: integer
-        createTime:
-          $ref: '#/components/schemas/StringDateTimeNullable'
-        dataLength:
-          nullable: true
-          type: integer
-        indexLength:
-          nullable: true
-          type: integer
-        maxDataLength:
-          nullable: true
-          type: integer
-        tableCollation:
-          nullable: true
-          type: string
-        tableName:
-          type: string
-        tableRows:
-          nullable: true
-          type: integer
-        updateTime:
-          $ref: '#/components/schemas/StringDateTimeNullable'
     Dependencies:
       type: object
       properties:
@@ -1985,15 +972,6 @@ components:
           type: string
     IntegerMinimumZeroNullable:
       type: integer
-      minimum: 0
-      nullable: true
-    Integer64MinimumZero:
-      type: integer
-      format: int64
-      minimum: 0
-    Integer64MinimumZeroNullable:
-      type: integer
-      format: int64
       minimum: 0
       nullable: true
     Job:
@@ -2247,13 +1225,6 @@ components:
     LastMigration:
       type: integer
       minimum: 0
-    Roles:
-      type: string
-      enum:
-      - restricted
-      - full
-      - manage
-      - owner
     State:
       type: string
       enum:
@@ -2291,41 +1262,6 @@ components:
       required:
       - userId
       - username
-    UserCreateOrReplace:
-      additionalProperties: false
-      type: object
-      properties:
-        collectionGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectionGrant'
-          uniqueItems: true
-        userGroups:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserGroupId'
-          uniqueItems: true
-          default: []
-        username:
-          $ref: '#/components/schemas/Username'
-        status:
-          $ref: '#/components/schemas/UserStatus'
-      required:
-      - username
-      - collectionGrants
-    UserGroupCollectionGrant:
-      additionalProperties: false
-      type: object
-      properties:
-        roleId:
-          $ref: '#/components/schemas/RoleId'
-        collection:
-          type: object
-          properties:
-            collectionId:
-              $ref: '#/components/schemas/CollectionId'
-            name:
-              $ref: '#/components/schemas/CollectionName'
     UserGroupPatch:
       type: object
       additionalProperties: false
@@ -2339,10 +1275,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserId'
-        collectionGrants:
+        villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/CollectionGrant'
+            $ref: '#/components/schemas/VillageGrant'
           uniqueItems: true
     UserGroupProjected:
       type: object
@@ -2362,10 +1298,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserBasicWithDisplayName'
-        collectionGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserGroupCollectionGrant'
         attributions:
           $ref: '#/components/schemas/Attributions'
     UserGroupPostOrPut:
@@ -2383,10 +1315,10 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/UserId'
-        collectionGrants:
+        villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/CollectionGrant'
+            $ref: '#/components/schemas/VillageGrant'
           uniqueItems: true
     UserIdNullable:
       $ref: '#/components/schemas/StringIntIdNullable'
@@ -2397,11 +1329,6 @@ components:
       minProperties: 1
       type: object
       properties:
-        collectionGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectionGrant'
-          uniqueItems: true
         userGroups:
           type: array
           items:
@@ -2411,15 +1338,15 @@ components:
           $ref: '#/components/schemas/Username'
         status:
           $ref: '#/components/schemas/UserStatus'
+        villageGrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/VillageGrant'
+          uniqueItems: true
     UserPost:
       additionalProperties: false
       type: object
       properties:
-        collectionGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectionGrant'
-          uniqueItems: true
         userGroups:
           type: array
           items:
@@ -2427,18 +1354,18 @@ components:
           uniqueItems: true
         username:
           $ref: '#/components/schemas/Username'
+        villageGrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/VillageGrant'
+          uniqueItems: true
       required:
-      - collectionGrants
       - username
+      - villageGrants
     UserPut:
       additionalProperties: false
       type: object
       properties:
-        collectionGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectionGrant'
-          uniqueItems: true
         userGroups:
           type: array
           items:
@@ -2448,9 +1375,14 @@ components:
           $ref: '#/components/schemas/Username'
         status:
           $ref: '#/components/schemas/UserStatus'
+        villageGrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/VillageGrant'
+          uniqueItems: true
       required:
-      - collectionGrants
       - username
+      - villageGrants
     UserPrivileges:
       type: object
       additionalProperties: false
@@ -2463,10 +1395,6 @@ components:
       additionalProperties: false
       type: object
       properties:
-        collectionGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectionGrantProjected'
         displayName:
           $ref: '#/components/schemas/DisplayName'
         email:
@@ -2494,6 +1422,10 @@ components:
           $ref: '#/components/schemas/Username'
         webPreferences:
           $ref: '#/components/schemas/WebPreferences'
+        villageGrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/VillageGrantProjected'
       required:
       - userId
       - username
@@ -2513,15 +1445,12 @@ components:
       additionalProperties: false
       type: object
       properties:
-        collectionGrantCount:
-          type: integer
         created:
           $ref: '#/components/schemas/Created'
         lastClaims:
           type: object
       required:
       - created
-      - collectionGrantCount
       - lastClaims
     UsernameNullable:
       $ref: '#/components/schemas/String255Nullable'
@@ -2553,6 +1482,103 @@ components:
         '
       pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$
       type: string
+    String255:
+      maxLength: 255
+      type: string
+    String255Nullable:
+      maxLength: 255
+      nullable: true
+      type: string
+    String45:
+      maxLength: 45
+      type: string
+    StringDateTime:
+      format: date-time
+      type: string
+    StringDateTimeNullable:
+      format: date-time
+      nullable: true
+      type: string
+    StringIntId:
+      maxLength: 10
+      minLength: 1
+      pattern: ^[0-9]{1,10}$
+      type: string
+    StringUuid:
+      pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      type: string
+    Created:
+      $ref: '#/components/schemas/StringDateTime'
+    DisplayName:
+      $ref: '#/components/schemas/String255Nullable'
+    RoleId:
+      maximum: 4
+      minimum: 1
+      type: integer
+    UserId:
+      $ref: '#/components/schemas/StringIntId'
+    Username:
+      $ref: '#/components/schemas/String255'
+    UserGroupId:
+      $ref: '#/components/schemas/StringIntId'
+    UserGroupBasic:
+      type: object
+      additionalProperties: false
+      required:
+      - userGroupId
+      - name
+      properties:
+        userGroupId:
+          $ref: '#/components/schemas/UserGroupId'
+        name:
+          $ref: '#/components/schemas/String255'
+        roleId:
+          $ref: '#/components/schemas/RoleId'
+    UserBasicWithDisplayName:
+      additionalProperties: false
+      type: object
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        username:
+          $ref: '#/components/schemas/Username'
+        displayName:
+          $ref: '#/components/schemas/DisplayName'
+      required:
+      - userId
+      - username
+      - displayName
+    Grantees:
+      type: array
+      items:
+        $ref: '#/components/schemas/Grantee'
+    VillageId:
+      $ref: '#/components/schemas/StringIntId'
+    VillageName:
+      $ref: '#/components/schemas/String45'
+    Grantee:
+      oneOf:
+      - $ref: '#/components/schemas/UserBasic'
+      - $ref: '#/components/schemas/UserGroupBasic'
+    UserBasic:
+      additionalProperties: false
+      type: object
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        username:
+          $ref: '#/components/schemas/Username'
+        roleId:
+          $ref: '#/components/schemas/RoleId'
+      required:
+      - userId
+      - username
+    AppDataFormat:
+      type: string
+      default: gzip
+      enum:
+      - jsonl
+      - gzip
   parameters:
     AppDataFormatQuery:
       name: format
@@ -2694,4 +1720,4 @@ components:
   securitySchemes:
     oauth:
       type: openIdConnect
-      openIdConnectUrl: http://localhost:8080/realms/stigman/.well-known/openid-configuration
+      openIdConnectUrl: http://localhost:8080/realms/village-green/.well-known/openid-configuration
