@@ -1651,7 +1651,7 @@ components:
           enum:
           - users
           - collections
-          - collectionGrants
+          - villageGrants
           - attributions
     UserIdPath:
       name: userId
@@ -1706,7 +1706,7 @@ components:
         items:
           type: string
           enum:
-          - collectionGrants
+          - villageGrants
           - statistics
           - userGroups
           - webPreferences
