@@ -35,7 +35,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
       x-elevation-required: true
     post:
       summary: Create a new job
@@ -65,7 +65,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op
+        - vg:op
       x-elevation-required: true
   /jobs/{jobId}:
     get:
@@ -91,7 +91,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
       x-elevation-required: true
     delete:
       summary: Delete job by ID
@@ -112,7 +112,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op
+        - vg:op
       x-elevation-required: true
     patch:
       summary: Update job by ID
@@ -143,7 +143,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op
+        - vg:op
       x-elevation-required: true
   /jobs/{jobId}/runs:
     get:
@@ -171,7 +171,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
       x-elevation-required: true
     post:
       summary: Start an immediate job run
@@ -196,7 +196,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op
+        - vg:op
       x-elevation-required: true
   /jobs/runs/{runId}:
     get:
@@ -222,7 +222,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
       x-elevation-required: true
     delete:
       summary: Delete a job run by ID
@@ -243,7 +243,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op
+        - vg:op
       x-elevation-required: true
   /jobs/runs/{runId}/output:
     get:
@@ -272,7 +272,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
       x-elevation-required: true
   /jobs/tasks:
     get:
@@ -299,7 +299,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
       x-elevation-required: true
   /op/appdata:
     get:
@@ -329,7 +329,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
     post:
       tags:
       - Operation
@@ -367,7 +367,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op
+        - vg:op
   /op/appdata/tables:
     get:
       tags:
@@ -393,7 +393,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
   /op/appinfo:
     get:
       tags:
@@ -418,7 +418,7 @@ paths:
                 $ref: '#/components/schemas/AppInfo'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
   /op/configuration:
     get:
       tags:
@@ -466,7 +466,7 @@ paths:
                 $ref: '#/components/schemas/Detail'
       security:
       - oauth:
-        - stig-manager:op:read
+        - vg:op:read
   /op/state:
     get:
       tags:
@@ -532,7 +532,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user:read
+        - vg:user:read
   /user/web-preferences:
     get:
       tags:
@@ -548,7 +548,7 @@ paths:
                 $ref: '#/components/schemas/WebPreferences'
       security:
       - oauth:
-        - stig-manager:user:read
+        - vg:user:read
     patch:
       tags:
       - User
@@ -575,7 +575,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user:read
+        - vg:user:read
   /users:
     parameters:
     - $ref: '#/components/parameters/ElevateQuery'
@@ -607,7 +607,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user:read
+        - vg:user:read
     post:
       tags:
       - User
@@ -634,7 +634,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user
+        - vg:user
   /users/{userId}:
     parameters:
     - $ref: '#/components/parameters/ElevateQuery'
@@ -660,7 +660,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user:read
+        - vg:user:read
     patch:
       tags:
       - User
@@ -687,7 +687,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user
+        - vg:user
     put:
       tags:
       - User
@@ -714,7 +714,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user
+        - vg:user
     delete:
       tags:
       - User
@@ -735,7 +735,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user
+        - vg:user
   /user-groups:
     post:
       tags:
@@ -766,7 +766,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user
+        - vg:user
     get:
       tags:
       - User
@@ -786,7 +786,7 @@ paths:
                   $ref: '#/components/schemas/UserGroupProjected'
       security:
       - oauth:
-        - stig-manager:user:read
+        - vg:user:read
   /user-groups/{userGroupId}:
     get:
       tags:
@@ -812,7 +812,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user:read
+        - vg:user:read
     patch:
       tags:
       - User
@@ -843,7 +843,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user
+        - vg:user
     put:
       tags:
       - User
@@ -874,7 +874,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user
+        - vg:user
     delete:
       tags:
       - User
@@ -899,7 +899,7 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - stig-manager:user
+        - vg:user
 components:
   schemas:
     ApiClassification:
