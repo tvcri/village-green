@@ -856,6 +856,578 @@ paths:
       security:
       - oauth:
         - vg:user
+  /persons:
+    get:
+      summary: List persons
+      tags:
+      - Person
+      operationId: getPersons
+      responses:
+        '200':
+          description: List of persons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Person'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person:read
+    post:
+      summary: Create a new person
+      tags:
+      - Person
+      operationId: createPerson
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonPost'
+      responses:
+        '201':
+          description: Person created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person
+  /persons/{personId}:
+    get:
+      summary: Get person by ID
+      tags:
+      - Person
+      operationId: getPerson
+      parameters:
+      - $ref: '#/components/parameters/PersonIdPath'
+      responses:
+        '200':
+          description: Person details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+        default:
+          description: Person not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person:read
+    patch:
+      summary: Update person by ID
+      tags:
+      - Person
+      operationId: patchPerson
+      parameters:
+      - $ref: '#/components/parameters/PersonIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonPatch'
+      responses:
+        '200':
+          description: Person updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person
+    delete:
+      summary: Delete person by ID
+      tags:
+      - Person
+      operationId: deletePerson
+      parameters:
+      - $ref: '#/components/parameters/PersonIdPath'
+      responses:
+        '200':
+          description: Person deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person
+  /persons/{personId}/villages:
+    put:
+      summary: Set villages for person
+      tags:
+      - Person
+      operationId: putPersonVillages
+      parameters:
+      - $ref: '#/components/parameters/PersonIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/VillageId'
+      responses:
+        '200':
+          description: Villages updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person
+  /members:
+    get:
+      summary: List members
+      tags:
+      - Member
+      operationId: getMembers
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:member:read
+    post:
+      summary: Create a new member
+      tags:
+      - Member
+      operationId: createMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberPost'
+      responses:
+        '201':
+          description: Member created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:member
+  /members/{memberId}:
+    get:
+      summary: Get member by ID
+      tags:
+      - Member
+      operationId: getMember
+      parameters:
+      - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '200':
+          description: Member details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        default:
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:member:read
+    patch:
+      summary: Update member by ID
+      tags:
+      - Member
+      operationId: patchMember
+      parameters:
+      - $ref: '#/components/parameters/MemberIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberPatch'
+      responses:
+        '200':
+          description: Member updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:member
+    delete:
+      summary: Delete member by ID
+      tags:
+      - Member
+      operationId: deleteMember
+      parameters:
+      - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '200':
+          description: Member deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:member
+  /volunteers:
+    get:
+      summary: List volunteers
+      tags:
+      - Volunteer
+      operationId: getVolunteers
+      responses:
+        '200':
+          description: List of volunteers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Volunteer'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:volunteer:read
+    post:
+      summary: Create a new volunteer
+      tags:
+      - Volunteer
+      operationId: createVolunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerPost'
+      responses:
+        '201':
+          description: Volunteer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Volunteer'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:volunteer
+  /volunteers/{volunteerId}:
+    get:
+      summary: Get volunteer by ID
+      tags:
+      - Volunteer
+      operationId: getVolunteer
+      parameters:
+      - $ref: '#/components/parameters/VolunteerIdPath'
+      responses:
+        '200':
+          description: Volunteer details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Volunteer'
+        default:
+          description: Volunteer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:volunteer:read
+    patch:
+      summary: Update volunteer by ID
+      tags:
+      - Volunteer
+      operationId: patchVolunteer
+      parameters:
+      - $ref: '#/components/parameters/VolunteerIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerPatch'
+      responses:
+        '200':
+          description: Volunteer updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Volunteer'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:volunteer
+    delete:
+      summary: Delete volunteer by ID
+      tags:
+      - Volunteer
+      operationId: deleteVolunteer
+      parameters:
+      - $ref: '#/components/parameters/VolunteerIdPath'
+      responses:
+        '200':
+          description: Volunteer deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Volunteer'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:volunteer
+  /volunteers/{volunteerId}/capabilities:
+    put:
+      summary: Set capabilities for volunteer
+      tags:
+      - Volunteer
+      operationId: putVolunteerCapabilities
+      parameters:
+      - $ref: '#/components/parameters/VolunteerIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CapabilityId'
+      responses:
+        '200':
+          description: Capabilities updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Volunteer'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:volunteer
+  /service-requests:
+    get:
+      summary: List service requests
+      tags:
+      - ServiceRequest
+      operationId: getServiceRequests
+      responses:
+        '200':
+          description: List of service requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceRequest'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+    post:
+      summary: Create a new service request
+      tags:
+      - ServiceRequest
+      operationId: createServiceRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRequestPost'
+      responses:
+        '201':
+          description: Service request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRequest'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
+  /service-requests/{serviceRequestId}:
+    get:
+      summary: Get service request by ID
+      tags:
+      - ServiceRequest
+      operationId: getServiceRequest
+      parameters:
+      - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: Service request details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRequest'
+        default:
+          description: Service request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+    patch:
+      summary: Update service request by ID
+      tags:
+      - ServiceRequest
+      operationId: patchServiceRequest
+      parameters:
+      - $ref: '#/components/parameters/ServiceRequestIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRequestPatch'
+      responses:
+        '200':
+          description: Service request updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRequest'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
+    delete:
+      summary: Delete service request by ID
+      tags:
+      - ServiceRequest
+      operationId: deleteServiceRequest
+      parameters:
+      - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: Service request deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRequest'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
 components:
   schemas:
     ApiClassification:
@@ -1579,6 +2151,496 @@ components:
       enum:
       - jsonl
       - gzip
+    PersonId:
+      $ref: '#/components/schemas/StringIntId'
+    MemberId:
+      $ref: '#/components/schemas/StringIntId'
+    VolunteerId:
+      $ref: '#/components/schemas/StringIntId'
+    ServiceRequestId:
+      $ref: '#/components/schemas/StringIntId'
+    CapabilityId:
+      $ref: '#/components/schemas/StringIntId'
+    Person:
+      additionalProperties: false
+      type: object
+      required:
+      - personId
+      - fullName
+      properties:
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        fullName:
+          type: string
+          maxLength: 200
+        lastName:
+          type: string
+          maxLength: 100
+          nullable: true
+        firstName:
+          type: string
+          maxLength: 100
+          nullable: true
+        nickname:
+          type: string
+          maxLength: 100
+          nullable: true
+        address:
+          type: string
+          maxLength: 300
+          nullable: true
+        city:
+          type: string
+          maxLength: 100
+          nullable: true
+        state:
+          type: string
+          maxLength: 50
+          nullable: true
+        zip:
+          type: string
+          maxLength: 20
+          nullable: true
+        email:
+          type: string
+          maxLength: 200
+          nullable: true
+        phone:
+          type: string
+          maxLength: 50
+          nullable: true
+        cell:
+          type: string
+          maxLength: 50
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        joinDate:
+          type: string
+          format: date
+          nullable: true
+        villageIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/VillageId'
+    PersonPost:
+      additionalProperties: false
+      type: object
+      required:
+      - fullName
+      properties:
+        fullName:
+          type: string
+          maxLength: 200
+        lastName:
+          type: string
+          maxLength: 100
+        firstName:
+          type: string
+          maxLength: 100
+        nickname:
+          type: string
+          maxLength: 100
+        address:
+          type: string
+          maxLength: 300
+        city:
+          type: string
+          maxLength: 100
+        state:
+          type: string
+          maxLength: 50
+        zip:
+          type: string
+          maxLength: 20
+        email:
+          type: string
+          maxLength: 200
+        phone:
+          type: string
+          maxLength: 50
+        cell:
+          type: string
+          maxLength: 50
+        birthDate:
+          type: string
+          format: date
+        joinDate:
+          type: string
+          format: date
+        villageIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/VillageId'
+    PersonPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        fullName:
+          type: string
+          maxLength: 200
+        lastName:
+          type: string
+          maxLength: 100
+          nullable: true
+        firstName:
+          type: string
+          maxLength: 100
+          nullable: true
+        nickname:
+          type: string
+          maxLength: 100
+          nullable: true
+        address:
+          type: string
+          maxLength: 300
+          nullable: true
+        city:
+          type: string
+          maxLength: 100
+          nullable: true
+        state:
+          type: string
+          maxLength: 50
+          nullable: true
+        zip:
+          type: string
+          maxLength: 20
+          nullable: true
+        email:
+          type: string
+          maxLength: 200
+          nullable: true
+        phone:
+          type: string
+          maxLength: 50
+          nullable: true
+        cell:
+          type: string
+          maxLength: 50
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        joinDate:
+          type: string
+          format: date
+          nullable: true
+    Member:
+      additionalProperties: false
+      type: object
+      required:
+      - memberId
+      - personId
+      properties:
+        memberId:
+          $ref: '#/components/schemas/MemberId'
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        memberNumber:
+          type: string
+          maxLength: 50
+          nullable: true
+        memberLevel:
+          type: string
+          maxLength: 100
+          nullable: true
+        serviceNotes:
+          type: string
+          nullable: true
+        emergencyContactName:
+          type: string
+          maxLength: 200
+          nullable: true
+        emergencyContactRelationship:
+          type: string
+          maxLength: 100
+          nullable: true
+        emergencyContactPhone:
+          type: string
+          maxLength: 50
+          nullable: true
+        emergencyContactEmail:
+          type: string
+          maxLength: 200
+          nullable: true
+    MemberPost:
+      additionalProperties: false
+      type: object
+      required:
+      - personId
+      properties:
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        memberNumber:
+          type: string
+          maxLength: 50
+        memberLevel:
+          type: string
+          maxLength: 100
+        serviceNotes:
+          type: string
+        emergencyContactName:
+          type: string
+          maxLength: 200
+        emergencyContactRelationship:
+          type: string
+          maxLength: 100
+        emergencyContactPhone:
+          type: string
+          maxLength: 50
+        emergencyContactEmail:
+          type: string
+          maxLength: 200
+    MemberPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        memberNumber:
+          type: string
+          maxLength: 50
+          nullable: true
+        memberLevel:
+          type: string
+          maxLength: 100
+          nullable: true
+        serviceNotes:
+          type: string
+          nullable: true
+        emergencyContactName:
+          type: string
+          maxLength: 200
+          nullable: true
+        emergencyContactRelationship:
+          type: string
+          maxLength: 100
+          nullable: true
+        emergencyContactPhone:
+          type: string
+          maxLength: 50
+          nullable: true
+        emergencyContactEmail:
+          type: string
+          maxLength: 200
+          nullable: true
+    Volunteer:
+      additionalProperties: false
+      type: object
+      required:
+      - volunteerId
+      - personId
+      properties:
+        volunteerId:
+          $ref: '#/components/schemas/VolunteerId'
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        emergencyPhone:
+          type: string
+          maxLength: 50
+          nullable: true
+        capabilityIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityId'
+    VolunteerPost:
+      additionalProperties: false
+      type: object
+      required:
+      - personId
+      properties:
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        emergencyPhone:
+          type: string
+          maxLength: 50
+        capabilityIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityId'
+    VolunteerPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        emergencyPhone:
+          type: string
+          maxLength: 50
+          nullable: true
+    ServiceRequest:
+      additionalProperties: false
+      type: object
+      required:
+      - serviceRequestId
+      - villageId
+      properties:
+        serviceRequestId:
+          $ref: '#/components/schemas/ServiceRequestId'
+        requestNumber:
+          type: integer
+          nullable: true
+        villageId:
+          $ref: '#/components/schemas/VillageId'
+        memberPersonId:
+          $ref: '#/components/schemas/PersonId'
+          nullable: true
+        volunteerPersonId:
+          $ref: '#/components/schemas/PersonId'
+          nullable: true
+        status:
+          type: string
+          maxLength: 50
+          nullable: true
+        serviceName:
+          type: string
+          maxLength: 200
+          nullable: true
+        transportationType:
+          type: string
+          maxLength: 100
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishAt:
+          type: string
+          format: date-time
+          nullable: true
+        instructions:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        destination:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          maxLength: 100
+          nullable: true
+        phone:
+          type: string
+          maxLength: 50
+          nullable: true
+    ServiceRequestPost:
+      additionalProperties: false
+      type: object
+      required:
+      - villageId
+      properties:
+        requestNumber:
+          type: integer
+        villageId:
+          $ref: '#/components/schemas/VillageId'
+        memberPersonId:
+          $ref: '#/components/schemas/PersonId'
+        volunteerPersonId:
+          $ref: '#/components/schemas/PersonId'
+        status:
+          type: string
+          maxLength: 50
+        serviceName:
+          type: string
+          maxLength: 200
+        transportationType:
+          type: string
+          maxLength: 100
+        createdAt:
+          type: string
+          format: date-time
+        startAt:
+          type: string
+          format: date-time
+        finishAt:
+          type: string
+          format: date-time
+        instructions:
+          type: string
+        description:
+          type: string
+        destination:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 50
+    ServiceRequestPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        requestNumber:
+          type: integer
+          nullable: true
+        villageId:
+          $ref: '#/components/schemas/VillageId'
+        memberPersonId:
+          $ref: '#/components/schemas/PersonId'
+          nullable: true
+        volunteerPersonId:
+          $ref: '#/components/schemas/PersonId'
+          nullable: true
+        status:
+          type: string
+          maxLength: 50
+          nullable: true
+        serviceName:
+          type: string
+          maxLength: 200
+          nullable: true
+        transportationType:
+          type: string
+          maxLength: 100
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishAt:
+          type: string
+          format: date-time
+          nullable: true
+        instructions:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        destination:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          maxLength: 100
+          nullable: true
+        phone:
+          type: string
+          maxLength: 50
+          nullable: true
   parameters:
     AppDataFormatQuery:
       name: format
@@ -1710,6 +2772,30 @@ components:
           - statistics
           - userGroups
           - webPreferences
+    PersonIdPath:
+      name: personId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/PersonId'
+    MemberIdPath:
+      name: memberId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/MemberId'
+    VolunteerIdPath:
+      name: volunteerId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/VolunteerId'
+    ServiceRequestIdPath:
+      name: serviceRequestId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ServiceRequestId'
   responses:
     Forbidden:
       description: The requesting User does not have access rights to the content
