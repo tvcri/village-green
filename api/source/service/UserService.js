@@ -504,52 +504,7 @@ exports.getUserObject = async function (username) {
     username,
     lastAccess,
     lastClaims,
-    status,
-    (select
-      coalesce(json_objectagg(
-        dt2.collectionId, json_object(
-          'collectionId', dt2.collectionId,
-          'name', dt2.name,
-          'roleId', dt2.roleId, 
-          'grantIds', dt2.grantIds)), json_object())
-    from   
-      (select 
-        cg.collectionId,
-        c.name,
-        cg.roleId,
-        json_array(cg.grantId) as grantIds
-      from
-        collection_grant cg
-        inner join enabled_collection c on (cg.collectionId = c.collectionId)
-        left join user_data ud2 on cg.userId = ud2.userId
-      where
-        ud2.userId = ud.userId
-      union 
-      select
-        collectionId,
-        name,
-        roleId,
-        grantIds
-      from
-        (select
-          ROW_NUMBER() OVER(PARTITION BY ugu.userId, cg.collectionId ORDER BY cg.roleId desc) as rn,
-          cg.collectionId,
-          c.name, 
-          cg.roleId,
-          json_arrayagg(cg.grantId) OVER (PARTITION BY ugu.userId, cg.collectionId, cg.roleId) as grantIds
-        from 
-          collection_grant cg
-          inner join enabled_collection c on (cg.collectionId = c.collectionId)
-          left join user_group_user_map ugu on cg.userGroupId = ugu.userGroupId
-          left join user_group ug on ugu.userGroupId = ug.userGroupId
-          left join user_data ud3 on ugu.userId = ud3.userId
-          left join collection_grant cgDirect on (cg.collectionId = cgDirect.collectionId and ugu.userId = cgDirect.userId)
-        where
-        cg.userGroupId is not null
-        and cgDirect.userId is null
-        and ud3.userId = ud.userId) dt
-    where
-      dt.rn = 1) dt2) as grants                               
+    status
   from
     user_data ud
   where
