@@ -2,8 +2,6 @@
 
 const config = require('../utils/config')
 const UserService = require(`../service/UserService`)
-const AssetService = require(`../service/AssetService`)
-const CollectionService = require(`../service/CollectionService`)
 const SmError = require('../utils/error')
 const dbUtils = require('../service/utils')
 
@@ -27,9 +25,6 @@ module.exports.createUser = async function createUser (req, res, next) {
     let body = req.body
     let projection = req.query.projection
 
-    if (body.hasOwnProperty('collectionGrants') ) {
-      await validateCollectionGrants(body.collectionGrants, {elevate})
-    }
     body.status = 'available'
     try {
       let response = await UserService.createUser(body, projection, elevate, req.userObject, res.svcStatus)
@@ -94,7 +89,7 @@ module.exports.exportUserGroups = async function exportUserGroups (projections, 
 
 module.exports.getUser = async function getUser (req, res, next) {
   try {
-    const projection = ['collectionGrants', 'statistics', 'userGroups']
+    const projection = ['statistics']
     if (req.query.projection) {
       projection.push(req.query.projection)
     }

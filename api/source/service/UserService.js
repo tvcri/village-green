@@ -56,11 +56,8 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
   }
 
   if (inProjection?.includes('statistics')) {
-    needsCollectionGrantees = true
-    joins.add('left join cteGrantees cgs on ud.userId = cgs.userId')
     columns.push(`json_object(
         'created', date_format(ud.created, '%Y-%m-%dT%TZ'),
-        'collectionGrantCount', count(distinct cgs.collectionId),
         'lastClaims', ud.lastClaims
       ) as statistics`)
     groupBy.push(
