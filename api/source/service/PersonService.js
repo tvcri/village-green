@@ -52,7 +52,7 @@ module.exports.getPerson = async function (personId) {
 }
 
 module.exports.createPerson = async function (body) {
-  return await dbUtils.retryOnDeadlock2({
+  const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const { villageIds, ...personFields } = body
       const mappedFields = {}
@@ -78,15 +78,15 @@ module.exports.createPerson = async function (body) {
         await connection.query('INSERT INTO person_village (person_id, village_id) VALUES ?', [villageValues])
       }
 
-      await connection.query('COMMIT')
-      return await queryPersons({personId: insertId})
+      return insertId
     },
     statusObj: undefined
   })
+  return await queryPersons({personId: insertId})
 }
 
 module.exports.patchPerson = async function (personId, body) {
-  return await dbUtils.retryOnDeadlock2({
+  await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const { villageIds, ...personFields } = body
 
@@ -108,12 +108,10 @@ module.exports.patchPerson = async function (personId, body) {
       if (Object.keys(mappedFields).length > 0) {
         await connection.query('UPDATE person SET ? WHERE id = ?', [mappedFields, personId])
       }
-
-      await connection.query('COMMIT')
-      return await queryPersons({personId})
     },
     statusObj: undefined
   })
+  return await queryPersons({personId})
 }
 
 module.exports.deletePerson = async function (personId) {
@@ -121,7 +119,7 @@ module.exports.deletePerson = async function (personId) {
 }
 
 module.exports.putPersonVillages = async function (personId, villageIds) {
-  return await dbUtils.retryOnDeadlock2({
+  await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       await connection.query('DELETE FROM person_village WHERE person_id = ?', [personId])
 
@@ -129,10 +127,8 @@ module.exports.putPersonVillages = async function (personId, villageIds) {
         const villageValues = villageIds.map(vid => [personId, vid])
         await connection.query('INSERT INTO person_village (person_id, village_id) VALUES ?', [villageValues])
       }
-
-      await connection.query('COMMIT')
-      return await queryPersons({personId})
     },
     statusObj: undefined
   })
+  return await queryPersons({personId})
 }
