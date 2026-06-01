@@ -27,7 +27,7 @@ module.exports.setConfigurationItem = async function setConfigurationItem (req, 
 
 module.exports.getAppData = async function getAppData (req, res, next) {
   try {
-    if (!config.experimental.appData) throw new SmError.NotFoundError('endpoint disabled, to enable set STIGMAN_EXPERIMENTAL_APPDATA=true')
+    if (!config.experimental.appData) throw new SmError.NotFoundError('endpoint disabled, to enable set VG_EXPERIMENTAL_APPDATA=true')
     if (!req.query.elevate) throw new SmError.PrivilegeError()
     const format = req.query.format || 'gzip'
     res.attachment(`appdata-v${config.lastMigration}_${escape.filenameComponentFromDate()}.jsonl${format==='gzip'?'.gz':''}`)
@@ -60,7 +60,7 @@ module.exports.replaceAppData = async function replaceAppData (req, res, next) {
   }
   
   try {
-    if (!config.experimental.appData) throw new SmError.NotFoundError('endpoint disabled, to enable set STIGMAN_EXPERIMENTAL_APPDATA=true')
+    if (!config.experimental.appData) throw new SmError.NotFoundError('endpoint disabled, to enable set VG_EXPERIMENTAL_APPDATA=true')
     if (!req.query.elevate) throw new SmError.PrivilegeError()
     let chunks = []
     for await (const chunk of req) {

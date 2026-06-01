@@ -90,7 +90,7 @@ function configureExpress(app) {
 
 function configureOpenApi(app) {
  
-  const apiSpecPath = path.join(__dirname, '../specification/stig-manager.yaml')
+  const apiSpecPath = path.join(__dirname, '../specification/village-green.yaml')
   app.use( "/api", openApiMiddleware ({
       apiSpec: apiSpecPath,
       validateRequests: {

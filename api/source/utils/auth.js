@@ -219,7 +219,7 @@ const setupJwks = async function (jwksUri, caCerts) {
     if (!cacheResult) throw new Error('refresh jwks cache failed')
     const kids = jwksCache.getKids()
     if (!config.oauth.allowInsecureTokens && containsInsecureKids(kids)) {
-        throw new Error('insecure_kid - JWKS contains insecure key IDs and STIGMAN_DEV_ALLOW_INSECURE_TOKENS is false')
+        throw new Error('insecure_kid - JWKS contains insecure key IDs and VG_DEV_ALLOW_INSECURE_TOKENS is false')
     }
 
     logger.writeDebug('auth', 'discovery', { jwksUri, kids: jwksCache.getKidTypes() })

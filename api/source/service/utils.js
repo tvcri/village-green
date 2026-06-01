@@ -129,7 +129,7 @@ async function setupSchema() {
       await setupInitialSchema()
     }
     const migrated = await doMigrations()
-    config.lastMigration = parseInt(migrated[migrated.length -1].file.substring(0,4))
+    config.lastMigration = migrated.length ? parseInt(migrated[migrated.length -1].file.substring(0,4)) : 0
   }
   catch (error) {
     logger.writeError('mysql', 'initalization', { message: error.message })

@@ -57,7 +57,7 @@ exports.queryJobs = async function ({ projections = [], filters = {} } = {}) {
     information_schema.events e
   where
     e.event_schema = database() 
-    AND e.event_name LIKE CONCAT("job-", job.jobId, "-stigman")
+    AND e.event_name LIKE CONCAT("job-", job.jobId, "-vg")
     LIMIT 1
   ) as event`)
 
@@ -138,7 +138,7 @@ async function dropEventByJob(jobId) {
 }
 
 function getEventNameByJob(jobId) {
-  return `job-${jobId}-stigman`
+  return `job-${jobId}-vg`
 }
 
 exports.createJob = async ({ jobData, userId, svcStatus } = {}) => {

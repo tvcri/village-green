@@ -78,7 +78,7 @@ class SigningKeyNotFoundError extends SmError {
 
 class InsecureTokenError extends SmError {
   constructor(detail) {
-    super('Insecure token presented and STIGMAN_DEV_ALLOW_INSECURE_TOKENS is false.')
+    super('Insecure token presented and VG_DEV_ALLOW_INSECURE_TOKENS is false.')
     this.status = 401
     this.detail = detail
   }

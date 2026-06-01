@@ -474,7 +474,7 @@ exports.replaceAppData = async function (buffer, contentType, progressCb = () =>
 
 exports.getAppInfo = async function(options = {}) {
   const { includeRowCounts } = options
-  const schema = 'stig-manager-appinfo-v1.1'
+  const schema = 'village-green-appinfo-v1.1'
   const sqlAnalyze = `ANALYZE TABLE collection, asset, review, review_history, user`
   const sqlInfoSchema = `
   SELECT
@@ -849,10 +849,10 @@ exports.getAppInfo = async function(options = {}) {
     }
   }
 
-  // remove strings from user privileges array that are not meaningful to stigman
-  const stigmanPrivs = ['admin', 'create_collection']
+  // remove strings from user privileges array that are not meaningful to vg
+  const vgPrivs = ['admin', 'create_collection']
   for (const user of userInfo ) {
-    user.privileges = user.privileges.filter(v => stigmanPrivs.includes(v))
+    user.privileges = user.privileges.filter(v => vgPrivs.includes(v))
   }
 
   //count privilege assignments and break out by lastAccess time periods
@@ -984,7 +984,7 @@ exports.getAppInfo = async function(options = {}) {
     const environment = {}
     for (const [key, value] of Object.entries(environmentVariables)) {
       if (/^(NODE|STIGMAN)_/.test(key)) {
-        environment[key] = key === 'STIGMAN_DB_PASSWORD' ? '***' : value
+        environment[key] = key === 'VG_DB_PASSWORD' ? '***' : value
       }
     }
     const {platform, arch, nodejsVersion, cpus, osMachine, osName, osRelease} = header

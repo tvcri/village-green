@@ -34,7 +34,7 @@ function serveApiDocs(app) {
 
 function getOAS(){
     // Read and modify OpenAPI specification
-    const apiSpecPath = path.join(__dirname, '../specification/stig-manager.yaml') 
+    const apiSpecPath = path.join(__dirname, '../specification/village-green.yaml') 
     let spec = fs.readFileSync(apiSpecPath, 'utf8')
     let oasDoc = jsyaml.load(spec)
     // Replace with config values

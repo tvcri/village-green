@@ -194,7 +194,7 @@ function serializeEnvironment () {
   let env = {}
   for (const [key, value] of Object.entries(process.env)) {
     if (/^(NODE|STIGMAN)_/.test(key)) {
-      env[key] = key === 'STIGMAN_DB_PASSWORD' ? '*' : value
+      env[key] = key === 'VG_DB_PASSWORD' ? '*' : value
     }
   }
   return env
