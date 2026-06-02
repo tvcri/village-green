@@ -1402,6 +1402,8 @@ paths:
       tags:
       - Village
       operationId: getVillages
+      parameters:
+      - $ref: '#/components/parameters/VillageProjectionQuery'
       responses:
         '200':
           description: Village list
@@ -1455,6 +1457,7 @@ paths:
       operationId: getVillage
       parameters:
       - $ref: '#/components/parameters/VillageIdPath'
+      - $ref: '#/components/parameters/VillageProjectionQuery'
       responses:
         '200':
           description: Village details
@@ -2316,6 +2319,10 @@ components:
           $ref: '#/components/schemas/VillageId'
         name:
           $ref: '#/components/schemas/VillageName'
+        roleCounts:
+          $ref: '#/components/schemas/RoleCounts'
+        capabilityCounts:
+          $ref: '#/components/schemas/CapabilityCounts'
       required:
       - villageId
       - name
@@ -2334,6 +2341,44 @@ components:
       properties:
         name:
           $ref: '#/components/schemas/VillageName'
+    RoleCounts:
+      additionalProperties: false
+      type: object
+      properties:
+        members:
+          type: integer
+          minimum: 0
+        volunteers:
+          type: integer
+          minimum: 0
+        both:
+          type: integer
+          minimum: 0
+      required:
+      - members
+      - volunteers
+      - both
+    CapabilityCounts:
+      additionalProperties: false
+      type: object
+      properties:
+        errands:
+          type: integer
+          minimum: 0
+        rides:
+          type: integer
+          minimum: 0
+        homeHelp:
+          type: integer
+          minimum: 0
+        techSupport:
+          type: integer
+          minimum: 0
+      required:
+      - errands
+      - rides
+      - homeHelp
+      - techSupport
     Grantee:
       oneOf:
       - $ref: '#/components/schemas/UserBasic'
@@ -2984,6 +3029,21 @@ components:
           - statistics
           - userGroups
           - webPreferences
+    VillageProjectionQuery:
+      name: projections
+      in: query
+      description: Additional properties to include in the response.
+      style: form
+      explode: true
+      schema:
+        type: array
+        uniqueItems: true
+        minItems: 1
+        items:
+          type: string
+          enum:
+          - roleCounts
+          - capabilityCounts
     PersonIdPath:
       name: personId
       in: path
