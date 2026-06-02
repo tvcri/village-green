@@ -16,7 +16,8 @@ INSERT IGNORE INTO capability (name) VALUES
 
 CREATE TABLE IF NOT EXISTS person (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  full_name VARCHAR(200) NOT NULL UNIQUE,
+  village_id INT NOT NULL,
+  full_name VARCHAR(200) NOT NULL,
   last_name VARCHAR(100),
   first_name VARCHAR(100),
   nickname VARCHAR(100),
@@ -28,15 +29,8 @@ CREATE TABLE IF NOT EXISTS person (
   phone VARCHAR(50),
   cell VARCHAR(50),
   birth_date DATE,
-  join_date DATE
-);
-
-CREATE TABLE IF NOT EXISTS person_village (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  person_id INT NOT NULL,
-  village_id INT NOT NULL,
-  UNIQUE(person_id, village_id),
-  FOREIGN KEY (person_id) REFERENCES person(id),
+  join_date DATE,
+  UNIQUE(village_id, full_name),
   FOREIGN KEY (village_id) REFERENCES village(id)
 );
 
@@ -89,4 +83,19 @@ CREATE TABLE IF NOT EXISTS service_request (
   FOREIGN KEY (village_id) REFERENCES village(id),
   FOREIGN KEY (member_person_id) REFERENCES person(id),
   FOREIGN KEY (volunteer_person_id) REFERENCES person(id)
+);
+
+CREATE TABLE IF NOT EXISTS user_data (
+  `userId` int NOT NULL AUTO_INCREMENT,
+  `username` varchar(255) NOT NULL,
+  `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `lastAccess` int DEFAULT NULL,
+  `lastClaims` json DEFAULT (_utf8mb4'{}'),
+  `status` enum('available','unavailable') NOT NULL DEFAULT 'available',
+  `statusDate` datetime NOT NULL DEFAULT (`created`),
+  `statusUser` int DEFAULT NULL,
+  `webPreferences` json NOT NULL DEFAULT (_utf8mb4'{"darkMode": true, "lastWhatsNew": "2000-01-01"}'),
+  PRIMARY KEY (`userId`),
+  UNIQUE KEY `INDEX_username` (`username`),
+  KEY `INDEX_status` (`status`)
 );
