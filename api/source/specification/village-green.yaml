@@ -1607,6 +1607,32 @@ paths:
       security:
       - oauth:
         - vg:village:read
+  /villages/{villageId}/persons:
+    get:
+      summary: List persons in a village
+      tags:
+      - Village
+      operationId: getVillagePersons
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      responses:
+        '200':
+          description: Person list for village
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Person'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
 components:
   schemas:
     ApiClassification:
