@@ -21,9 +21,9 @@ async function queryPersons (inPredicates = {}) {
     "DATE_FORMAT(p.join_date, '%Y-%m-%d') AS joinDate",
     `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
     `CASE
-      WHEN m.id IS NOT NULL AND v.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
+      WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
-      WHEN v.id IS NOT NULL THEN JSON_ARRAY('volunteer')
+      WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
     END AS roles`
   ]
@@ -31,7 +31,7 @@ async function queryPersons (inPredicates = {}) {
     'person p',
     'JOIN village v ON v.id = p.village_id',
     'LEFT JOIN member m ON m.person_id = p.id',
-    'LEFT JOIN volunteer v2 ON v2.person_id = p.id'
+    'LEFT JOIN volunteer vol ON vol.person_id = p.id'
   ])
   const orderBy = ['p.full_name']
   const predicates = { statements: [], binds: [] }
