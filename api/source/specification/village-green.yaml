@@ -2456,6 +2456,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VillageId'
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - member
+            - volunteer
     PersonPost:
       additionalProperties: false
       type: object
@@ -2505,6 +2512,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VillageId'
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - member
+            - volunteer
     PersonPatch:
       additionalProperties: false
       type: object
@@ -2561,6 +2575,13 @@ components:
           type: string
           format: date
           nullable: true
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - member
+            - volunteer
     Member:
       additionalProperties: false
       type: object
