@@ -41,6 +41,11 @@ async function queryPersons (inPredicates = {}) {
     predicates.binds.push(inPredicates.personId)
   }
 
+  if (inPredicates?.villageId) {
+    predicates.statements.push('p.village_id = ?')
+    predicates.binds.push(inPredicates.villageId)
+  }
+
   const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
   let [rows] = await dbUtils.pool.query(sql)
   return rows
@@ -53,6 +58,10 @@ module.exports.getPersons = async function () {
 module.exports.getPerson = async function (personId) {
   const rows = await queryPersons({personId})
   return rows[0] ?? null
+}
+
+module.exports.getPersonsByVillage = async function (villageId) {
+  return await queryPersons({villageId})
 }
 
 module.exports.createPerson = async function (body) {
