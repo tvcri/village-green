@@ -21,11 +21,19 @@ async function queryPersons (inPredicates = {}) {
     "DATE_FORMAT(p.join_date, '%Y-%m-%d') AS joinDate",
     `CAST(
       CONCAT('[', GROUP_CONCAT(DISTINCT CAST(pv.village_id AS CHAR) ORDER BY pv.village_id), ']')
-      AS JSON) AS villageIds`
+      AS JSON) AS villageIds`,
+    `CASE
+      WHEN m.id IS NOT NULL AND v.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
+      WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
+      WHEN v.id IS NOT NULL THEN JSON_ARRAY('volunteer')
+      ELSE JSON_ARRAY()
+    END AS roles`
   ]
   const joins = new Set([
     'person p',
-    'LEFT JOIN person_village pv ON pv.person_id = p.id'
+    'LEFT JOIN person_village pv ON pv.person_id = p.id',
+    'LEFT JOIN member m ON m.person_id = p.id',
+    'LEFT JOIN volunteer v ON v.person_id = p.id'
   ])
   const groupBy = ['p.id']
   const orderBy = ['p.full_name']
