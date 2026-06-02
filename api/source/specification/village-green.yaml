@@ -1428,6 +1428,185 @@ paths:
       security:
       - oauth:
         - vg:service-request
+  /villages:
+    get:
+      summary: List villages
+      tags:
+      - Village
+      operationId: getVillages
+      responses:
+        '200':
+          description: Village list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Village'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
+    post:
+      summary: Create village
+      tags:
+      - Village
+      operationId: createVillage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VillagePost'
+      responses:
+        '201':
+          description: Village created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Village'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village
+  /villages/{villageId}:
+    get:
+      summary: Get village by ID
+      tags:
+      - Village
+      operationId: getVillage
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      responses:
+        '200':
+          description: Village details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Village'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
+    patch:
+      summary: Update village by ID
+      tags:
+      - Village
+      operationId: patchVillage
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VillagePatch'
+      responses:
+        '200':
+          description: Village updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Village'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village
+    delete:
+      summary: Delete village by ID
+      tags:
+      - Village
+      operationId: deleteVillage
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      responses:
+        '200':
+          description: Village deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Village'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village
+  /villages/{villageId}/members:
+    get:
+      summary: List members in a village
+      tags:
+      - Village
+      operationId: getVillageMembers
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      responses:
+        '200':
+          description: Member list for village
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
+  /villages/{villageId}/volunteers:
+    get:
+      summary: List volunteers in a village
+      tags:
+      - Village
+      operationId: getVillageVolunteers
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      responses:
+        '200':
+          description: Volunteer list for village
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Volunteer'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
 components:
   schemas:
     ApiClassification:
@@ -2128,6 +2307,32 @@ components:
       $ref: '#/components/schemas/StringIntId'
     VillageName:
       $ref: '#/components/schemas/String45'
+    Village:
+      additionalProperties: false
+      type: object
+      properties:
+        villageId:
+          $ref: '#/components/schemas/VillageId'
+        name:
+          $ref: '#/components/schemas/VillageName'
+      required:
+      - villageId
+      - name
+    VillagePost:
+      additionalProperties: false
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/VillageName'
+      required:
+      - name
+    VillagePatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          $ref: '#/components/schemas/VillageName'
     Grantee:
       oneOf:
       - $ref: '#/components/schemas/UserBasic'
@@ -2796,6 +3001,12 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/ServiceRequestId'
+    VillageIdPath:
+      name: villageId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/VillageId'
   responses:
     Forbidden:
       description: The requesting User does not have access rights to the content
