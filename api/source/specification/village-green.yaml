@@ -2329,6 +2329,13 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Grantee'
+    PersonRoles:
+      type: array
+      items:
+        type: string
+        enum:
+        - member
+        - volunteer
     VillageId:
       $ref: '#/components/schemas/StringIntId'
     VillageName:
@@ -2457,12 +2464,7 @@ components:
           items:
             $ref: '#/components/schemas/VillageId'
         roles:
-          type: array
-          items:
-            type: string
-            enum:
-            - member
-            - volunteer
+          $ref: '#/components/schemas/PersonRoles'
     PersonPost:
       additionalProperties: false
       type: object
@@ -2513,12 +2515,7 @@ components:
           items:
             $ref: '#/components/schemas/VillageId'
         roles:
-          type: array
-          items:
-            type: string
-            enum:
-            - member
-            - volunteer
+          $ref: '#/components/schemas/PersonRoles'
     PersonPatch:
       additionalProperties: false
       type: object
@@ -2576,12 +2573,7 @@ components:
           format: date
           nullable: true
         roles:
-          type: array
-          items:
-            type: string
-            enum:
-            - member
-            - volunteer
+          $ref: '#/components/schemas/PersonRoles'
     Member:
       additionalProperties: false
       type: object
