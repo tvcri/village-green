@@ -82,21 +82,3 @@ module.exports.deletePerson = async function deletePerson (req, res, next) {
     next(err)
   }
 }
-
-module.exports.putPersonVillages = async function putPersonVillages (req, res, next) {
-  try {
-    const personId = req.params.personId
-    const villageIds = req.body
-
-    const existing = await PersonService.getPerson(personId)
-    if (!existing) {
-      throw new SmError.NotFoundError()
-    }
-
-    const response = await PersonService.putPersonVillages(personId, villageIds)
-    res.json(response[0])
-  }
-  catch (err) {
-    next(err)
-  }
-}

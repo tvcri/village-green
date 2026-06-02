@@ -19,9 +19,7 @@ async function queryPersons (inPredicates = {}) {
     'p.cell',
     "DATE_FORMAT(p.birth_date, '%Y-%m-%d') AS birthDate",
     "DATE_FORMAT(p.join_date, '%Y-%m-%d') AS joinDate",
-    `CAST(
-      CONCAT('[', GROUP_CONCAT(DISTINCT CAST(pv.village_id AS CHAR) ORDER BY pv.village_id), ']')
-      AS JSON) AS villageIds`,
+    `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
     `CASE
       WHEN m.id IS NOT NULL AND v.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
@@ -31,11 +29,10 @@ async function queryPersons (inPredicates = {}) {
   ]
   const joins = new Set([
     'person p',
-    'LEFT JOIN person_village pv ON pv.person_id = p.id',
+    'JOIN village v ON v.id = p.village_id',
     'LEFT JOIN member m ON m.person_id = p.id',
-    'LEFT JOIN volunteer v ON v.person_id = p.id'
+    'LEFT JOIN volunteer v2 ON v2.person_id = p.id'
   ])
-  const groupBy = ['p.id']
   const orderBy = ['p.full_name']
   const predicates = { statements: [], binds: [] }
 
@@ -44,9 +41,8 @@ async function queryPersons (inPredicates = {}) {
     predicates.binds.push(inPredicates.personId)
   }
 
-  const sql = dbUtils.makeQueryString({columns, joins, predicates, groupBy, orderBy, format: true})
+  const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
   let [rows] = await dbUtils.pool.query(sql)
-  rows = rows.map(r => ({...r, villageIds: r.villageIds ?? []}))
   return rows
 }
 
@@ -62,7 +58,7 @@ module.exports.getPerson = async function (personId) {
 module.exports.createPerson = async function (body) {
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const { villageIds, ...personFields } = body
+      const { villageId, ...personFields } = body
       const mappedFields = {}
       if (personFields.fullName !== undefined) mappedFields.full_name = personFields.fullName
       if (personFields.lastName !== undefined) mappedFields.last_name = personFields.lastName
@@ -77,14 +73,10 @@ module.exports.createPerson = async function (body) {
       if (personFields.cell !== undefined) mappedFields.cell = personFields.cell
       if (personFields.birthDate !== undefined) mappedFields.birth_date = personFields.birthDate
       if (personFields.joinDate !== undefined) mappedFields.join_date = personFields.joinDate
+      if (villageId !== undefined) mappedFields.village_id = villageId
 
       const [personInsertResult] = await connection.query('INSERT INTO person SET ?', mappedFields)
       const insertId = personInsertResult.insertId
-
-      if (villageIds?.length) {
-        const villageValues = villageIds.map(vid => [insertId, vid])
-        await connection.query('INSERT INTO person_village (person_id, village_id) VALUES ?', [villageValues])
-      }
 
       return insertId
     },
@@ -96,7 +88,7 @@ module.exports.createPerson = async function (body) {
 module.exports.patchPerson = async function (personId, body) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const { villageIds, ...personFields } = body
+      const { villageId, ...personFields } = body
 
       const mappedFields = {}
       if (personFields.fullName !== undefined) mappedFields.full_name = personFields.fullName
@@ -112,6 +104,7 @@ module.exports.patchPerson = async function (personId, body) {
       if (personFields.cell !== undefined) mappedFields.cell = personFields.cell
       if (personFields.birthDate !== undefined) mappedFields.birth_date = personFields.birthDate
       if (personFields.joinDate !== undefined) mappedFields.join_date = personFields.joinDate
+      if (villageId !== undefined) mappedFields.village_id = villageId
 
       if (Object.keys(mappedFields).length > 0) {
         await connection.query('UPDATE person SET ? WHERE id = ?', [mappedFields, personId])
@@ -124,19 +117,4 @@ module.exports.patchPerson = async function (personId, body) {
 
 module.exports.deletePerson = async function (personId) {
   await dbUtils.pool.query('DELETE FROM person WHERE id = ?', [personId])
-}
-
-module.exports.putPersonVillages = async function (personId, villageIds) {
-  await dbUtils.retryOnDeadlock2({
-    transactionFn: async (connection) => {
-      await connection.query('DELETE FROM person_village WHERE person_id = ?', [personId])
-
-      if (villageIds?.length) {
-        const villageValues = villageIds.map(vid => [personId, vid])
-        await connection.query('INSERT INTO person_village (person_id, village_id) VALUES ?', [villageValues])
-      }
-    },
-    statusObj: undefined
-  })
-  return await queryPersons({personId})
 }

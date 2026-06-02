@@ -983,38 +983,6 @@ paths:
       security:
       - oauth:
         - vg:person
-  /persons/{personId}/villages:
-    put:
-      summary: Set villages for person
-      tags:
-      - Person
-      operationId: putPersonVillages
-      parameters:
-      - $ref: '#/components/parameters/PersonIdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/VillageId'
-      responses:
-        '200':
-          description: Villages updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Person'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:person
   /members:
     get:
       summary: List members
@@ -2459,10 +2427,8 @@ components:
           type: string
           format: date
           nullable: true
-        villageIds:
-          type: array
-          items:
-            $ref: '#/components/schemas/VillageId'
+        village:
+          $ref: '#/components/schemas/Village'
         roles:
           $ref: '#/components/schemas/PersonRoles'
     PersonPost:
@@ -2470,6 +2436,7 @@ components:
       type: object
       required:
       - fullName
+      - villageId
       properties:
         fullName:
           type: string
@@ -2510,10 +2477,8 @@ components:
         joinDate:
           type: string
           format: date
-        villageIds:
-          type: array
-          items:
-            $ref: '#/components/schemas/VillageId'
+        villageId:
+          $ref: '#/components/schemas/VillageId'
         roles:
           $ref: '#/components/schemas/PersonRoles'
     PersonPatch:
@@ -2571,6 +2536,9 @@ components:
         joinDate:
           type: string
           format: date
+          nullable: true
+        villageId:
+          $ref: '#/components/schemas/VillageId'
           nullable: true
         roles:
           $ref: '#/components/schemas/PersonRoles'
