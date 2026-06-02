@@ -140,7 +140,7 @@ const setupUser = async function (req, res, next) {
 
             // Get privileges and check elevate param  
             userObject.privileges = {
-                create_collection: getClaimByPath(tokenPayload).includes('create_collection'),
+                create_village: getClaimByPath(tokenPayload).includes('create_village'),
                 admin: getClaimByPath(tokenPayload).includes('admin')
             }
 

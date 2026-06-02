@@ -1403,6 +1403,7 @@ paths:
       - Village
       operationId: getVillages
       parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       - $ref: '#/components/parameters/VillageProjectionQuery'
       responses:
         '200':
@@ -1664,6 +1665,8 @@ components:
       additionalProperties: false
       type: object
       properties:
+        villageId:
+          $ref: '#/components/schemas/VillageId'
         roleId:
           $ref: '#/components/schemas/RoleId'
       required:
@@ -1674,6 +1677,13 @@ components:
       properties:
         roleId:
           $ref: '#/components/schemas/RoleId'
+        village:
+          type: object
+          properties:
+            villageId:
+              $ref: '#/components/schemas/VillageId'
+            name:
+              $ref: '#/components/schemas/VillageName'
         grantees:
           $ref: '#/components/schemas/Grantees'
     CommitBranch:
@@ -2137,7 +2147,7 @@ components:
       properties:
         admin:
           type: boolean
-        create_collection:
+        create_village:
           type: boolean
     UserProjected:
       additionalProperties: false
@@ -2941,7 +2951,7 @@ components:
         type: string
         enum:
         - admin
-        - create_collection
+        - create_village
     RunSequenceQuery:
       name: after-seq
       in: query
@@ -2969,7 +2979,7 @@ components:
           type: string
           enum:
           - users
-          - collections
+          - villages
           - villageGrants
           - attributions
     UserIdPath:
@@ -3030,7 +3040,7 @@ components:
           - userGroups
           - webPreferences
     VillageProjectionQuery:
-      name: projections
+      name: projection
       in: query
       description: Additional properties to include in the response.
       style: form
@@ -3042,6 +3052,9 @@ components:
         items:
           type: string
           enum:
+          - statistics
+          - owners
+          - grants
           - roleCounts
           - capabilityCounts
     PersonIdPath:

@@ -22,7 +22,7 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
       ud.lastClaims, ?
     )), ud.username) as displayName`,
     `json_object(
-      'create_collection', 'create_collection' member of(JSON_VALUE(ud.lastClaims, ? default '[]' on empty)),
+      'create_village', 'create_village' member of(JSON_VALUE(ud.lastClaims, ? default '[]' on empty)),
       'admin', 'admin' member of(JSON_VALUE(ud.lastClaims, ? default '[]' on empty))
     ) as 'privileges'`,
     'ud.status',
@@ -37,22 +37,22 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
   const orderBy = ['ud.username']
 
   // PROJECTIONS
-  if (inProjection?.includes('collectionGrants')) {
+  if (inProjection?.includes('villageGrants')) {
     needsCollectionGrantees = true
     joins.add('left join cteGrantees cgs on ud.userId = cgs.userId')
-    joins.add('left join enabled_collection c on cgs.collectionId = c.collectionId')
-    columns.push(`case when count(cgs.collectionId) > 0
+    joins.add('left join village v on cgs.villageId = v.id')
+    columns.push(`case when count(cgs.villageId) > 0
     then 
       ${dbUtils.jsonArrayAggDistinct(`json_object(
-        'collection', json_object(
-          'collectionId', CAST(cgs.collectionId as char),
-          'name', c.name
+        'village', json_object(
+          'villageId', CAST(cgs.villageId as char),
+          'name', v.name
         ),
         'roleId', cgs.roleId,
         'grantees', cgs.grantees
       )`)}
     else json_array() 
-    end as collectionGrants`)
+    end as villageGrants`)
   }
 
   if (inProjection?.includes('statistics')) {
@@ -144,7 +144,7 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
     // REPLACE/UPDATE: userId is not null
 
     // Extract or initialize non-scalar properties to separate variables
-    let { collectionGrants, userGroups, ...userFields } = body
+    let { villageGrants, userGroups, ...userFields } = body
 
     connection = await dbUtils.pool.getConnection()
     connection.config.namedPlaceholders = true
@@ -186,28 +186,28 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
       }
   
       // Process grants if present
-      if (collectionGrants) {
+      if (villageGrants) {
         if ( writeAction !== dbUtils.WRITE_ACTION.CREATE ) {
-          // DELETE from collection_grant
+          // DELETE from village_grant
           const binds = [userId]
-          let sqlDeleteCollGrant = 'DELETE FROM collection_grant where userId = ?'
-          if (collectionGrants.length > 0) {
-            const collectionIds = collectionGrants.map(grant => grant.collectionId)
-            sqlDeleteCollGrant += ' and collectionId NOT IN (?)'
-            binds.push(collectionIds)
+          let sqlDeleteCollGrant = 'DELETE FROM village_grant where userId = ?'
+          if (villageGrants.length > 0) {
+            const villageIds = villageGrants.map(grant => grant.villageId)
+            sqlDeleteCollGrant += ' and villageId NOT IN (?)'
+            binds.push(villageIds)
           }
           await connection.query(sqlDeleteCollGrant, binds)
         }
-        if (collectionGrants.length > 0) {
+        if (villageGrants.length > 0) {
           let sqlInsertCollGrant = `
             INSERT INTO 
-              collection_grant (userId, collectionId, roleId)
+              village_grant (userId, villageId, roleId)
             VALUES
               ? as new
             ON DUPLICATE KEY UPDATE
               roleId = new.roleId`      
-          binds = collectionGrants.map( grant => [userId, grant.collectionId, grant.roleId])
-          // INSERT into collection_grant
+          binds = villageGrants.map( grant => [userId, grant.villageId, grant.roleId])
+          // INSERT into village_grant
           await connection.query(sqlInsertCollGrant, [binds] )
         }
       }
@@ -332,7 +332,7 @@ exports.replaceUser = async function( userId, body, projection, elevate, userObj
 }
 
 exports.updateUser = async function( userId, body, projection, elevate, userObject, svcStatus = {} ) {
-  if (body.status === 'unavailable' && (body.collectionGrants?.length || body.userGroups?.length)) {
+  if (body.status === 'unavailable' && (body.villageGrants?.length || body.userGroups?.length)) {
     throw new SmError.UserInconsistentError()
   } 
   let row = await _this.addOrUpdateUser(dbUtils.WRITE_ACTION.UPDATE, userId, body, projection, elevate, userObject, svcStatus)
@@ -350,7 +350,7 @@ exports.setUserData = async function (userObject, fields) {
   }
 }
 
-exports.addOrUpdateUserGroup = async function ({userGroupId, userGroupFields, userIds, collectionGrants, createdUserId, modifiedUserId, svcStatus = {}}) {
+exports.addOrUpdateUserGroup = async function ({userGroupId, userGroupFields, userIds, villageGrants, createdUserId, modifiedUserId, svcStatus = {}}) {
   // CREATE: userGroupId is falsey
   // REPLACE/UPDATE: userGroupId is not falsey
   const isUpdate = !!userGroupId
@@ -380,28 +380,28 @@ exports.addOrUpdateUserGroup = async function ({userGroupId, userGroupFields, us
       }
     }
     // Process grants if present
-    if (collectionGrants) {
+    if (villageGrants) {
       if (isUpdate) {
-        // DELETE from collection_grant
+        // DELETE from village_grant
         const binds = [userGroupId]
-        let sqlDeleteCollGrant = 'DELETE FROM collection_grant where userGroupId = ?'
-        if (collectionGrants.length > 0) {
-          const collectionIds = collectionGrants.map(grant => grant.collectionId)
-          sqlDeleteCollGrant += ' and collectionId NOT IN (?)'
-          binds.push(collectionIds)
+        let sqlDeleteCollGrant = 'DELETE FROM village_grant where userGroupId = ?'
+        if (villageGrants.length > 0) {
+          const villageIds = villageGrants.map(grant => grant.villageId)
+          sqlDeleteCollGrant += ' and villageId NOT IN (?)'
+          binds.push(villageIds)
         }
         await connection.query(sqlDeleteCollGrant, binds)
       }
-      if (collectionGrants.length > 0) {
+      if (villageGrants.length > 0) {
         let sqlInsertCollGrant = `
           INSERT INTO 
-            collection_grant (userGroupId, collectionId, roleId)
+            village_grant (userGroupId, villageId, roleId)
           VALUES
             ? as new
           ON DUPLICATE KEY UPDATE
             roleId = new.roleId`      
-        const binds = collectionGrants.map( grant => [userGroupId, grant.collectionId, grant.roleId])
-        // INSERT into collection_grant
+        const binds = villageGrants.map( grant => [userGroupId, grant.villageId, grant.roleId])
+        // INSERT into village_grant
         await connection.query(sqlInsertCollGrant, [binds] )
       }
     }
@@ -468,20 +468,20 @@ exports.queryUserGroups = async function ({projections = [], filters = {}, eleva
     ), ']') as json)
     END as users`)
   }
-  if (projections.includes('collections') || projections.includes('collectionGrants')) {
-    joins.add('left join collection_grant cgg using (userGroupId)')
-    joins.add('left join enabled_collection on cgg.collectionId = enabled_collection.collectionId')
+  if (projections.includes('villages') || projections.includes('villageGrants')) {
+    joins.add('left join village_grant cgg using (userGroupId)')
+    joins.add('left join village on cgg.villageId = village.id')
     groupBy.add('ug.userGroupId')
-    columns.push(`CASE WHEN count(cgg.collectionId)=0 
+    columns.push(`CASE WHEN count(cgg.villageId)=0 
     THEN json_array()
     ELSE cast(concat('[', group_concat(distinct json_object(
       'roleId', cgg.roleId,
-      'collection', json_object(
-        'collectionId', cast(cgg.collectionId as char),
-        'name', enabled_collection.name
+      'village', json_object(
+        'villageId', cast(cgg.villageId as char),
+        'name', village.name
       ))
     ), ']') as json)
-    END as collectionGrants`)
+    END as villageGrants`)
   }
   const sql = dbUtils.makeQueryString({columns, joins, predicates, groupBy, orderBy, format: true})
   const [rows] = await dbUtils.pool.query(sql)
@@ -501,7 +501,52 @@ exports.getUserObject = async function (username) {
     username,
     lastAccess,
     lastClaims,
-    status
+    status,
+    (select
+      coalesce(json_objectagg(
+        dt2.villageId, json_object(
+          'villageId', dt2.villageId,
+          'name', dt2.name,
+          'roleId', dt2.roleId, 
+          'grantIds', dt2.grantIds)), json_object())
+      from   
+      (select 
+        cg.villageId,
+        v.name,
+        cg.roleId,
+        json_array(cg.grantId) as grantIds
+      from
+        village_grant cg
+        inner join village v on (cg.villageId = v.id)
+        left join user_data ud2 on cg.userId = ud2.userId
+      where
+        ud2.userId = ud.userId
+      union 
+      select
+        villageId,
+        name,
+        roleId,
+        grantIds
+      from
+        (select
+          ROW_NUMBER() OVER(PARTITION BY ugu.userId, cg.villageId ORDER BY cg.roleId desc) as rn,
+          cg.villageId,
+          v.name, 
+          cg.roleId,
+          json_arrayagg(cg.grantId) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantIds
+        from 
+          village_grant cg
+          inner join village v on (cg.villageId = v.id)
+          left join user_group_user_map ugu on cg.userGroupId = ugu.userGroupId
+          left join user_group ug on ugu.userGroupId = ug.userGroupId
+          left join user_data ud3 on ugu.userId = ud3.userId
+          left join village_grant cgDirect on (cg.villageId = cgDirect.villageId and ugu.userId = cgDirect.userId)
+        where
+        cg.userGroupId is not null
+        and cgDirect.userId is null
+        and ud3.userId = ud.userId) dt
+    where
+      dt.rn = 1) dt2) as grants     
   from
     user_data ud
   where

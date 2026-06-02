@@ -755,18 +755,18 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
   return `cast(concat('[', group_concat(${distinct ? 'distinct ' : ''}${value} ${orderBy ? `order by ${orderBy}` : ''}), ']') as json)`
 }
 
-module.exports.sqlGrantees = function ({collectionId, collectionIds, userId, username, nameMatch, includeColumnCollectionId = true, returnCte = false}) {
+module.exports.sqlGrantees = function ({villageId, villageIds, userId, username, nameMatch, includeColumnVillageId = true, returnCte = false}) {
   const predicates = {
     statements: [],
     binds: []
   }
-  if (collectionId) {
-    predicates.statements.push('cg.collectionId = ?')
-    predicates.binds.push(collectionId)
+  if (villageId) {
+    predicates.statements.push('cg.villageId = ?')
+    predicates.binds.push(villageId)
   }
-  if (collectionIds) {
-    predicates.statements.push('cg.collectionId IN (?)')
-    predicates.binds.push(collectionIds)
+  if (villageIds) {
+    predicates.statements.push('cg.villageId IN (?)')
+    predicates.binds.push([villageIds])
   }
   if (userId) {
     predicates.statements.push('ud.userId = ?')
@@ -794,14 +794,14 @@ module.exports.sqlGrantees = function ({collectionId, collectionIds, userId, use
 
   // final query will be a UNION of sqlDirectGrants and sqlGroupGrants
   const sqlDirectGrants = `select 
-  ${includeColumnCollectionId ? 'cg.collectionId,' : ''}
+  ${includeColumnVillageId ? 'cg.villageId,' : ''}
   cast(cg.userId as char) as userId,
   cg.roleId,
   json_array(json_object('userId', cast(ud.userId as char),'username', ud.username)) as grantees,
   json_array(cg.grantId) as grantIds
 from
-  collection_grant cg
-  inner join enabled_collection c on (cg.collectionId = c.collectionId)
+  village_grant cg
+  inner join village v on (cg.villageId = v.id)
   left join user_data ud on cg.userId = ud.userId
 where
     cg.userId is not null
@@ -809,26 +809,26 @@ where
   const sqlFormattedDirectGrants = mysql.format(sqlDirectGrants, predicates.binds)
 
   const sqlGroupGrants = `select
-  ${includeColumnCollectionId ? 'collectionId,' : ''}
+  ${includeColumnVillageId ? 'villageId,' : ''}
   userId,
   roleId,
   grantees,
   grantIds
 from
   (select
-    ROW_NUMBER() OVER(PARTITION BY ugu.userId, cg.collectionId ORDER BY cg.roleId desc) as rn,
-    ${includeColumnCollectionId ? 'cg.collectionId,' : ''} 
+    ROW_NUMBER() OVER(PARTITION BY ugu.userId, cg.villageId ORDER BY cg.roleId desc) as rn,
+    ${includeColumnVillageId ? 'cg.villageId,' : ''} 
     cast(ugu.userId as char) as userId, 
     cg.roleId,
-    json_arrayagg(json_object('userGroupId', cast(cg.userGroupId as char),'name', ug.name)) OVER (PARTITION BY ugu.userId, cg.collectionId, cg.roleId) as grantees,
-    json_arrayagg(cg.grantId) OVER (PARTITION BY ugu.userId, cg.collectionId, cg.roleId) as grantIds
+    json_arrayagg(json_object('userGroupId', cast(cg.userGroupId as char),'name', ug.name)) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantees,
+    json_arrayagg(cg.grantId) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantIds
 from 
-    collection_grant cg
-    inner join enabled_collection c on cg.collectionId = c.collectionId
+    village_grant cg
+    inner join village v on cg.villageId = v.id
     left join user_group_user_map ugu on cg.userGroupId = ugu.userGroupId
     left join user_group ug on ugu.userGroupId = ug.userGroupId
     left join user_data ud on ugu.userId = ud.userId
-    left join collection_grant cgDirect on (cg.collectionId = cgDirect.collectionId and ugu.userId = cgDirect.userId)
+    left join village_grant cgDirect on (cg.villageId = cgDirect.villageId and ugu.userId = cgDirect.userId)
   where
     cg.userGroupId is not null
     and cgDirect.userId is null

@@ -5,7 +5,14 @@ const SmError = require('../utils/error')
 
 module.exports.getVillages = async function getVillages (req, res, next) {
   try {
-    const response = await VillageService.getVillages()
+    const projections = req.query.projection
+    const elevate = req.query.elevate
+    const response = await VillageService.queryVillages({
+      projections,
+      elevate,
+      grants: req.userObject.grants,
+      userId: req.userObject.userId
+    })
     res.json(response)
   }
   catch (err) {
@@ -37,11 +44,17 @@ module.exports.createVillage = async function createVillage (req, res, next) {
 module.exports.getVillage = async function getVillage (req, res, next) {
   try {
     const villageId = req.params.villageId
-    const response = await VillageService.getVillage(villageId)
-    if (!response) {
+    const projections = req.query.projection
+    const response = await VillageService.queryVillages({
+      filter: {villageId},
+      projections,
+      grants: req.userObject.grants,
+      userId: req.userObject.userId
+    })
+    if (!response[0]) {
       throw new SmError.NotFoundError()
     }
-    res.json(response)
+    res.json(response[0])
   }
   catch (err) {
     next(err)
@@ -87,8 +100,12 @@ module.exports.getVillageMembers = async function getVillageMembers (req, res, n
   try {
     const villageId = req.params.villageId
 
-    const existing = await VillageService.getVillage(villageId)
-    if (!existing) {
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      grants: req.userObject.grants,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
       throw new SmError.NotFoundError()
     }
 
@@ -104,8 +121,12 @@ module.exports.getVillageVolunteers = async function getVillageVolunteers (req, 
   try {
     const villageId = req.params.villageId
 
-    const existing = await VillageService.getVillage(villageId)
-    if (!existing) {
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      grants: req.userObject.grants,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
       throw new SmError.NotFoundError()
     }
 
@@ -121,8 +142,12 @@ module.exports.getVillagePersons = async function getVillagePersons (req, res, n
   try {
     const villageId = req.params.villageId
 
-    const existing = await VillageService.getVillage(villageId)
-    if (!existing) {
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      grants: req.userObject.grants,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
       throw new SmError.NotFoundError()
     }
 

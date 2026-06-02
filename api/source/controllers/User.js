@@ -2,17 +2,18 @@
 
 const config = require('../utils/config')
 const UserService = require(`../service/UserService`)
+const VillageService = require(`../service/VillageService`)
 const SmError = require('../utils/error')
 const dbUtils = require('../service/utils')
 
-async function validateCollectionGrants(collectionGrants, {elevate}) {
-  if (collectionGrants?.length) {
-    // Verify each grant for a valid collectionId
-    let requestedIds = collectionGrants.map( g => g.collectionId )
-    let availableCollections = await CollectionService.queryCollections({elevate})
-    let availableIds = availableCollections.map( c => c.collectionId)
+async function validateVillageGrants(villageGrants, {elevate}) {
+  if (villageGrants?.length) {
+    // Verify each grant for a valid villageId
+    let requestedIds = villageGrants.map( g => g.villageId )
+    let availableVillages = await VillageService.queryVillages({elevate})
+    let availableIds = availableVillages.map( c => c.villageId)
     if (! requestedIds.every( id => availableIds.includes(id) ) ) {
-      throw new SmError.UnprocessableError('One or more collectionIds are invalid.')
+      throw new SmError.UnprocessableError('One or more villageIds are invalid.')
     }
   }
 }
@@ -54,7 +55,7 @@ module.exports.deleteUser = async function deleteUser (req, res, next) {
       let userData = await UserService.getUserByUserId(userId, [], elevate, req.userObject)
       if (userData?.lastAccess) {
         // User has accessed the system, so we need to reject the request
-        throw new SmError.UnprocessableError('User has accessed the system. Use PATCH to remove collection grants or configure Authentication provider to reject user entirely.')
+        throw new SmError.UnprocessableError('User has accessed the system. Use PATCH to remove village grants or configure Authentication provider to reject user entirely.')
       }
       let response = await UserService.deleteUser(userId, projection, elevate, req.userObject)
       res.json(response)
@@ -89,7 +90,7 @@ module.exports.exportUserGroups = async function exportUserGroups (projections, 
 
 module.exports.getUser = async function getUser (req, res, next) {
   try {
-    const projection = ['statistics']
+    const projection = ['villageGrants', 'statistics']
     if (req.query.projection) {
       projection.push(req.query.projection)
     }
@@ -158,7 +159,7 @@ module.exports.replaceUser = async function replaceUser (req, res, next) {
 
     const intendedStatus = body.status || userData.status
     if (intendedStatus === 'unavailable') {
-      if (body.collectionGrants?.length || body.userGroups?.length) {
+      if (body.villageGrants?.length || body.userGroups?.length) {
         throw new SmError.UserInconsistentError()
       }
     }
@@ -167,8 +168,8 @@ module.exports.replaceUser = async function replaceUser (req, res, next) {
       body.statusDate = new Date()
     } 
 
-    if (body.collectionGrants?.length) {
-      await validateCollectionGrants(body.collectionGrants, {elevate})
+    if (body.villageGrants?.length) {
+      await validateVillageGrants(body.villageGrants, {elevate})
     }
 
     let response = await UserService.replaceUser(userId, body, projection, elevate, req.userObject, res.svcStatus)
@@ -195,10 +196,10 @@ module.exports.updateUser = async function updateUser (req, res, next) {
     // Determine intended status: body.status or current status
     const intendedStatus = body.status || userData.status
     if (intendedStatus === 'unavailable') {
-      if (body.collectionGrants?.length || body.userGroups?.length) {
+      if (body.villageGrants?.length || body.userGroups?.length) {
         throw new SmError.UserInconsistentError()
       }
-      body.collectionGrants = []
+      body.villageGrants = []
       body.userGroups = []
     }
     if (body.status) {
@@ -206,8 +207,8 @@ module.exports.updateUser = async function updateUser (req, res, next) {
       body.statusDate = new Date()
     } 
 
-    if (body.collectionGrants?.length) {
-      await validateCollectionGrants(body.collectionGrants, {elevate})
+    if (body.villageGrants?.length) {
+      await validateVillageGrants(body.villageGrants, {elevate})
     }
 
     let response = await UserService.replaceUser(userId, body, projection, elevate, req.userObject, res.svcStatus)
@@ -233,20 +234,20 @@ module.exports.setUserData = async function setUserData (username, fields) {
 module.exports.createUserGroup = async (req, res, next) => {
   try {
     if (!req.query.elevate) throw new SmError.PrivilegeError()
-    const {userIds, collectionGrants, ...userGroupFields} = req.body
+    const {userIds, villageGrants, ...userGroupFields} = req.body
     const invalidUserIds = await dbUtils.selectInvalidUserIds(userIds)
     if (invalidUserIds.length) {
       throw new SmError.UserInconsistentError()
     }
 
-    await validateCollectionGrants(collectionGrants, {elevate: req.query.elevate})
+    await validateVillageGrants(villageGrants, {elevate: req.query.elevate})
 
     let userGroupId
     try{
       userGroupId = await UserService.addOrUpdateUserGroup({
         userGroupFields,
         userIds,
-        collectionGrants,
+        villageGrants,
         createdUserId: req.userObject.userId,
         modifiedUserId: req.userObject.userId
       })
@@ -267,8 +268,8 @@ module.exports.createUserGroup = async (req, res, next) => {
 
 module.exports.getUserGroups = async (req, res, next) => {
   try {
-    if (req.query.projection?.includes('collections') && !req.query.elevate) {
-      throw new SmError.PrivilegeError('collections projection requires elevation')
+    if (req.query.projection?.includes('villages') && !req.query.elevate) {
+      throw new SmError.PrivilegeError('villages projection requires elevation')
     }
     const response = await UserService.queryUserGroups({
       projections: req.query.projection
@@ -282,8 +283,8 @@ module.exports.getUserGroups = async (req, res, next) => {
 
 module.exports.getUserGroup = async (req, res, next) => {
   try {
-    if (req.query.projection?.includes('collections') && !req.query.elevate) {
-      throw new SmError.PrivilegeError('collections projection requires elevation')
+    if (req.query.projection?.includes('villages') && !req.query.elevate) {
+      throw new SmError.PrivilegeError('villages projection requires elevation')
     }
     const response = await UserService.queryUserGroups({
       projections: req.query.projection,
@@ -300,13 +301,13 @@ module.exports.getUserGroup = async (req, res, next) => {
 async function putOrPatchUserGroup (req, res, next) {
   try {
     if (!req.query.elevate) throw new SmError.PrivilegeError()
-    const {userIds, collectionGrants, ...userGroupFields} = req.body
+    const {userIds, villageGrants, ...userGroupFields} = req.body
     const invalidUserIds = await dbUtils.selectInvalidUserIds(userIds)
     if (invalidUserIds.length) {
       throw new SmError.UserInconsistentError()
     }
 
-    await validateCollectionGrants(collectionGrants, {elevate: req.query.elevate})
+    await validateVillageGrants(villageGrants, {elevate: req.query.elevate})
 
     const userGroup = await UserService.queryUserGroups({
       projections: [],
@@ -317,7 +318,7 @@ async function putOrPatchUserGroup (req, res, next) {
       userGroupId: req.params.userGroupId,
       userGroupFields,
       userIds,
-      collectionGrants,
+      villageGrants,
       modifiedUserId: req.userObject.userId
     })
     const response = await UserService.queryUserGroups({
