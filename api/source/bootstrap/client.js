@@ -22,7 +22,7 @@ function serveClient(app) {
 
 function getClientEnv(){
     const envJS = 
-    `const STIGMAN = {
+    `const VG = {
         Env: {
             version: "${config.version}",
             consoleMode: "${config.client.consoleMode}",
@@ -65,7 +65,7 @@ function getClientEnv(){
 
 function serveClientEnv(app){
     const envJS = getClientEnv()
-    app.get('/js/Env.js', function (req, res) {
+    app.get('/Env.js', function (req, res) {
         req.component = 'static'
         writer.writeWithContentType(res, { payload: envJS, contentType: "application/javascript" })
     })

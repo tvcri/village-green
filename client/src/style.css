@@ -1,0 +1,382 @@
+:root {
+  font-family: 'Open Sans';
+  font-size: 11px;
+  color-scheme: dark !important;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #000000;
+
+  --role-restricted: #64748bcb;
+  --role-full: #e2ca43d5;
+  --role-manage: #4b7bc9da;
+  --role-owner: #087c21da;
+  
+  /* Classification Marking Colors */
+  --color-marking-unclassified: #007a33;
+  --color-marking-cui: #502b85;
+  --color-marking-confidential: #0033a0;
+  --color-marking-fouo: #502b85;
+  --color-marking-secret: #c8102e;
+  --color-marking-topsecret: #ff671f;
+  --color-marking-sci: #f7ea48;
+  
+  /* Brand Colors */
+  --color-primary: #6366f1; /* Indigo-500 */
+  --color-primary-hover: #4f46e5; /* Indigo-600 */
+  --color-primary-highlight: #60a5fa; /* Blue-400 */
+  --color-primary-highlight-light: #93c5fd;
+  --color-action-blue: #3b82f6; /* Blue-500 */
+  --color-action-blue-dark: #2563eb; /* Blue-700 */
+  --color-action-red: #ef4444;
+  --color-action-green: #4ade80;
+  --color-success: #22c55e; /* Green-500 */
+  --color-warning-yellow: #eab308; /* Yellow-500 */
+  --color-shield-green: #44ab5e; /* Green-500 */
+  --color-shield-green-dark: #4f7769; /* Green-700 */
+  --color-oss-blue: #273f6f; /* Green-700 */
+  
+  /* HOVER */
+  --color-button-hover-bg: rgba(255, 255, 255, 0.1);
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-hover-strong: #3f3f46;
+  --color-bg-hover-light: #76767c;
+
+  /* Metrics Status Chart Colors */
+  --metrics-status-chart-assessed: hsl(204, 91%, 29%);
+  --metrics-status-chart-submitted: hsl(41, 66%, 46%);
+  --metrics-status-chart-accepted: hsl(146, 93%, 27%);
+  --metrics-status-chart-unassessed: hsl(0 0% 18% / 1);
+  --metrics-status-chart-unsaved: hsl(0deg 0% 18%);
+  --metrics-status-chart-rejected: hsl(5, 89%, 32%);
+  
+  /* CAT Rating Colors */
+  --color-cat1: #c68c8c;
+  --color-cat2: #d4b056;
+  --color-cat3: #a3acd6;
+  
+  /* Collection Stats Colors */
+  --color-inventory: #c4a484;
+  --color-review-age: #d4d4d8;
+
+  /* Breadcrumb sizing */
+
+  /* Text Colors */
+  --color-text-primary: rgba(255, 255, 255, 0.87);
+  --color-text-dim: #a1a1aa; 
+  --color-text-bright: rgba(255, 255, 255, 0.95);
+  --color-text-dark: #18181b;
+
+  /* Surface Colors */
+  --color-background-darkest: #000000;
+  --color-background-dark: #18181b; 
+  --color-background-light: #27272a;  
+  --color-background-subtle: rgba(255, 255, 255, 0.05);
+
+  /* Border Colors */
+  --color-border-default: #3f3f46;
+  --color-border-light: #2a2a2d;
+  --color-border-hover: #52525b;
+
+  /* Error Colors */
+  --color-text-error: #f16969;
+
+  /* Status Indicator Colors (success/warning/error) — banners, badges, etc. */
+  --color-status-success-bg: color-mix(in srgb, #166534 18%, var(--color-background-dark));
+  --color-status-success-border: #4ade80;
+  --color-status-success-text: #86efac;
+  --color-status-warning-bg: color-mix(in srgb, #92400e 18%, var(--color-background-dark));
+  --color-status-warning-border: #fbbf24;
+  --color-status-warning-text: #fcd34d;
+  --color-status-error-bg: color-mix(in srgb, #7f1d1d 18%, var(--color-background-dark));
+  --color-status-error-border: #f87171;
+  --color-status-error-text: #fca5a5;
+
+  /* Result Status Colors */
+  --result-pass: hsl(120 84% 42% / 1);
+  --result-fail: hsl(19 100% 40% / 1);
+  --result-na: #767676;
+  --result-nr: #c0bab2;
+
+  /* Access Mode Badge Colors */
+  --color-access-rw-bg: hsl(120deg 40% 25%);
+  --color-access-rw-text: hsl(120deg 60% 75%);
+  --color-access-r-bg: hsl(0deg 40% 25%);
+  --color-access-r-text: hsl(0deg 60% 75%);
+
+  /* Engine/Override Attribution Badge Colors */
+  --color-engine-text: hsl(210, 80%, 80%);
+  --color-engine-bg: hsl(210, 50%, 25%);
+  --color-engine-border: hsl(210, 40%, 35%);
+  --color-override-text: hsl(30, 90%, 75%);
+  --color-override-bg: hsl(30, 50%, 22%);
+  --color-override-border: hsl(30, 40%, 35%);
+
+  /* Rule-diff changed-property chips (one muted hue per property kind) */
+  --color-chip-ruleid-bg: rgba(168, 85, 247, 0.16);
+  --color-chip-ruleid-border: rgba(168, 85, 247, 0.4);
+  --color-chip-ruleid-text: hsl(270, 75%, 85%);
+  --color-chip-check-bg: rgba(239, 68, 68, 0.14);
+  --color-chip-check-border: rgba(239, 68, 68, 0.4);
+  --color-chip-check-text: hsl(5, 80%, 80%);
+  --color-chip-fix-bg: rgba(59, 130, 246, 0.18);
+  --color-chip-fix-border: rgba(59, 130, 246, 0.45);
+  --color-chip-fix-text: hsl(215, 80%, 82%);
+  --color-chip-vulndiscussion-bg: rgba(249, 115, 22, 0.16);
+  --color-chip-vulndiscussion-border: rgba(249, 115, 22, 0.5);
+  --color-chip-vulndiscussion-text: hsl(25, 85%, 78%);
+  --color-chip-severity-bg: rgba(234, 179, 8, 0.18);
+  --color-chip-severity-border: rgba(234, 179, 8, 0.5);
+  --color-chip-severity-text: hsl(41, 80%, 80%);
+  --color-chip-default-bg: var(--color-background-darkest);
+  --color-chip-default-border: var(--color-border-default);
+  --color-chip-default-text: var(--color-text-primary);
+
+  /* Inline rule-ID character-level diff highlight (red for old, green for new) */
+  --color-diff-inline-del-bg: rgba(239, 68, 68, 0.3);
+  --color-diff-inline-del-text: hsl(5, 80%, 85%);
+  --color-diff-inline-add-bg: rgba(34, 197, 94, 0.3);
+  --color-diff-inline-add-text: hsl(146, 80%, 85%);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* CORA Risk Gradients */
+.sm-cora-risk-very-high {
+  background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+}
+.sm-cora-risk-high {
+  background: linear-gradient(135deg, #c2410c 0%, #7c2d12 100%); 
+}
+.sm-cora-risk-moderate {
+  background: linear-gradient(135deg, #ca8a04 0%, #713f12 100%);
+}
+.sm-cora-risk-low {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
+}
+.sm-cora-risk-very-low {
+  background: linear-gradient(135deg, #15803d 0%, #14532d 100%); 
+}
+
+
+
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Open Sans';
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+#app {
+  height: 100vh;
+  overflow: hidden;
+}
+
+
+/* Global form field focus color (light blue) */
+.p-inputtext:focus,
+.p-inputtextarea:focus,
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="number"]:focus,
+input[type="password"]:focus,
+textarea:focus {
+  outline: none !important;
+  border-color: var(--color-primary-highlight-light) !important;
+}
+.p-inputtext:enabled:focus{
+  outline: none !important;
+  border-color: var(--color-primary-highlight-light) !important;
+}
+
+/* Collection tab panel styles (shared across Assets, STIGs, Labels tabs) */
+.collection-tab-panel {
+  height: calc(100% - 1rem);
+  padding: 0.5rem;
+  overflow: hidden;
+}
+
+.collection-tab-panel .panel-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--color-background-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+}
+
+.collection-tab-panel .panel-header {
+  padding: 0.5rem 1rem;
+  background-color: var(--color-background-light);
+  border-bottom: 1px solid var(--color-border-default);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 30px;
+}
+
+.collection-tab-panel .panel-header h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.collection-tab-panel .grid-container {
+  flex: 1;
+  overflow: hidden;
+  background-color: var(--color-background-dark);
+  position: relative;
+}
+
+.collection-tab-panel .badge {
+  font-size: 0.75rem;
+  background-color: var(--color-background-dark);
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  color: var(--color-text-dim);
+  font-family: monospace;
+}
+
+.collection-tab-panel .empty-state,
+.collection-tab-panel .loading-state,
+.collection-tab-panel .error-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--color-text-dim);
+  font-style: italic;
+  width: 100%;
+}
+
+.collection-tab-panel .error-state {
+  color: var(--color-text-error);
+}
+
+/* Thin scrollbar utility */
+.sm-scrollbar-thin {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-default) rgba(255,255,255,0.04);
+}
+
+.sm-scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sm-scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.04);
+}
+
+.sm-scrollbar-thin::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.sm-scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-default);
+  border-radius: 999px;
+  border: none;
+  min-height: 28px;
+}
+
+.sm-scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-border-hover);
+}
+
+.p-datatable-mask {
+  background: var(--color-background-subtle) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.p-datatable-tbody > tr:hover > .agg-grid-empty-cell {
+  background: var(--color-background-dark) !important;
+}
+
+
+/* PrimeVue Splitter global hover style */
+.p-splitter .p-splitter-gutter {
+  transition: background-color 0.2s ease !important;
+  border-radius: 4px !important;
+}
+.p-splitter .p-splitter-gutter:hover {
+  background-color: var(--color-bg-hover-light) !important;
+}
+
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 300;
+  src: url('../fonts/open-sans-v15-latin-300.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: italic;
+  font-weight: 300;
+  src: url('../fonts/open-sans-v15-latin-300italic.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/open-sans-v15-latin-regular.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: italic;
+  font-weight: 400;
+  src: url('../fonts/open-sans-v15-latin-italic.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 600;
+  src: url('../fonts/open-sans-v15-latin-600.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: italic;
+  font-weight: 600;
+  src: url('../fonts/open-sans-v15-latin-600italic.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: url('../fonts/open-sans-v15-latin-700.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: italic;
+  font-weight: 700;
+  src: url('../fonts/open-sans-v15-latin-700italic.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 800;
+  src: url('../fonts/open-sans-v15-latin-800.woff2') format('woff2')
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: italic;
+  font-weight: 800;
+  src: url('../fonts/open-sans-v15-latin-800italic.woff2') format('woff2')
+}

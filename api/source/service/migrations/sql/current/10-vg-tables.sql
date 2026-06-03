@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS capability (
 
 INSERT IGNORE INTO capability (name) VALUES
   ('Errands'),
+  ('Friends'),
   ('Home Help'),
   ('Tech Support'),
   ('Rides');
