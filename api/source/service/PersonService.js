@@ -17,8 +17,11 @@ async function queryPersons (inPredicates = {}) {
     'p.email',
     'p.phone',
     'p.cell',
+    'p.emergency_contact_name AS emergencyContactName',
+    'p.emergency_contact_relationship AS emergencyContactRelationship',
+    'p.emergency_contact_phone AS emergencyContactPhone',
+    'p.emergency_contact_email AS emergencyContactEmail',
     "DATE_FORMAT(p.birth_date, '%Y-%m-%d') AS birthDate",
-    "DATE_FORMAT(p.join_date, '%Y-%m-%d') AS joinDate",
     `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
     `CASE
       WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')

@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS person (
   phone VARCHAR(50),
   cell VARCHAR(50),
   birth_date DATE,
-  join_date DATE,
+  emergency_contact_name VARCHAR(200),
+  emergency_contact_relationship VARCHAR(100),
+  emergency_contact_phone VARCHAR(50),
+  emergency_contact_email VARCHAR(200),
   UNIQUE(village_id, full_name),
   FOREIGN KEY (village_id) REFERENCES village(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -40,17 +43,13 @@ CREATE TABLE IF NOT EXISTS member (
   member_number VARCHAR(50),
   member_level VARCHAR(100),
   service_notes TEXT,
-  emergency_contact_name VARCHAR(200),
-  emergency_contact_relationship VARCHAR(100),
-  emergency_contact_phone VARCHAR(50),
-  emergency_contact_email VARCHAR(200),
+  join_date DATE,
   FOREIGN KEY (person_id) REFERENCES person(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS volunteer (
   id INT AUTO_INCREMENT PRIMARY KEY,
   person_id INT NOT NULL UNIQUE,
-  emergency_phone VARCHAR(50),
   FOREIGN KEY (person_id) REFERENCES person(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

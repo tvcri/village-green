@@ -114,6 +114,23 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
       ) as "grants"`)
     }
 
+    if (projections.includes('personCounts')) {
+      columns.push(`(SELECT 
+        JSON_OBJECT(
+        'both', SUM(CASE WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN 1 ELSE 0 END),
+        'volunteer', SUM(CASE WHEN m.id IS NULL AND vol.id IS NOT NULL THEN 1 ELSE 0 END),
+        'member', SUM(CASE WHEN m.id IS NOT NULL AND vol.id IS NULL THEN 1 ELSE 0 END)
+      )
+      FROM
+        person p
+        LEFT JOIN member m ON p.id = m.person_id
+        LEFT JOIN volunteer vol ON p.id = vol.person_id
+      WHERE
+        p.village_id = v.id
+      GROUP BY
+        p.village_id) as personCounts`)
+    }
+
 
     if (!elevate) {
       predicates.statements.push('v.id IN (?)')
@@ -181,13 +198,10 @@ module.exports.getVillageMembers = async function (villageId) {
     'p.full_name AS fullName',
     'CAST(m.id AS CHAR) AS memberId',
     'CAST(m.person_id AS CHAR) AS personId',
+    'p.full_name AS fullName',
     'm.member_number AS memberNumber',
     'm.member_level AS memberLevel',
     'm.service_notes AS serviceNotes',
-    'm.emergency_contact_name AS emergencyContactName',
-    'm.emergency_contact_relationship AS emergencyContactRelationship',
-    'm.emergency_contact_phone AS emergencyContactPhone',
-    'm.emergency_contact_email AS emergencyContactEmail'
   ]
   const joins = new Set([
     'member m',
@@ -205,7 +219,6 @@ module.exports.getVillageVolunteers = async function (villageId) {
     'p.full_name AS fullName',
     'CAST(vol.id AS CHAR) AS volunteerId',
     'CAST(vol.person_id AS CHAR) AS personId',
-    'vol.emergency_phone AS emergencyPhone',
   `  COALESCE(CAST(
       CONCAT('[', GROUP_CONCAT(CONCAT('"',c.name,'"') ORDER BY c.name), ']')
       AS JSON), JSON_ARRAY()) AS capabilities`
@@ -226,4 +239,58 @@ module.exports.getVillageVolunteers = async function (villageId) {
 
 module.exports.getVillagePersons = async function (villageId) {
   return await PersonService.getPersonsByVillage(villageId)
+}
+
+module.exports.getVillageServiceRequests = async function (villageId, status) {
+  const columns = [
+    'CAST(sr.id AS CHAR) AS serviceRequestId',
+    'sr.request_number AS requestNumber',
+    'CAST(sr.village_id AS CHAR) AS villageId',
+    'CAST(sr.member_person_id AS CHAR) AS memberPersonId',
+    'CAST(m.id AS CHAR) AS memberId',
+    'mp.full_name AS memberFullName',
+    'CAST(sr.volunteer_person_id AS CHAR) AS volunteerPersonId',
+    'CAST(vol.id AS CHAR) AS volunteerId',
+    'vp.full_name AS volunteerFullName',
+    'sr.status AS status',
+    'sr.service_name AS serviceName',
+    'sr.transportation_type AS transportationType',
+    "DATE_FORMAT(sr.created_at, '%Y-%m-%dT%TZ') AS createdAt",
+    "DATE_FORMAT(sr.start_at, '%Y-%m-%dT%TZ') AS startAt",
+    "DATE_FORMAT(sr.finish_at, '%Y-%m-%dT%TZ') AS finishAt",
+    'sr.instructions AS instructions',
+    'sr.description AS description',
+    'sr.destination AS destination',
+    'sr.address AS address',
+    'sr.city AS city',
+    'sr.phone AS phone'
+  ]
+  const joins = new Set([
+    'service_request sr',
+    'LEFT JOIN member m ON sr.member_person_id = m.person_id',
+    'LEFT JOIN person mp ON sr.member_person_id = mp.id',
+    'LEFT JOIN volunteer vol ON sr.volunteer_person_id = vol.person_id',
+    'LEFT JOIN person vp ON sr.volunteer_person_id = vp.id'
+  ])
+  const predicates = { statements: ['sr.village_id = ?'], binds: [villageId] }
+  if (status && status.length > 0) {
+    const dbStatuses = []
+    for (const s of status) {
+      if (s === 'open') dbStatuses.push('Open')
+      else if (s === 'confirmed') dbStatuses.push('Confirmed')
+      else if (s === 'completed') dbStatuses.push('Completed')
+      else if (s === 'unmatched') dbStatuses.push('Unmatched')
+      else if (s === 'cancelled') {
+        dbStatuses.push('Member cancelled', 'Volunteer cancelled')
+      }
+    }
+    if (dbStatuses.length > 0) {
+      predicates.statements.push('sr.status IN ?')
+      predicates.binds.push([dbStatuses])
+    }
+  }
+  const orderBy = ['sr.finish_at DESC']
+  const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
+  let [rows] = await dbUtils.pool.query(sql)
+  return rows
 }

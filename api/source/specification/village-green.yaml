@@ -1605,6 +1605,33 @@ paths:
       security:
       - oauth:
         - vg:village:read
+  /villages/{villageId}/service-requests:
+    get:
+      summary: List service requests for a village
+      tags:
+      - Village
+      operationId: getVillageServiceRequests
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      - $ref: '#/components/parameters/ServiceRequestStatusQuery'
+      responses:
+        '200':
+          description: Service request list for village
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceRequest'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read 
 components:
   schemas:
     ApiClassification:
@@ -2478,9 +2505,21 @@ components:
           type: string
           format: date
           nullable: true
-        joinDate:
+        emergencyContactName:
           type: string
-          format: date
+          maxLength: 200
+          nullable: true
+        emergencyContactRelationship:
+          type: string
+          maxLength: 100
+          nullable: true
+        emergencyContactPhone:
+          type: string
+          maxLength: 50
+          nullable: true
+        emergencyContactEmail:
+          type: string
+          maxLength: 200
           nullable: true
         village:
           $ref: '#/components/schemas/Village'
@@ -2529,13 +2568,21 @@ components:
         birthDate:
           type: string
           format: date
-        joinDate:
+        emergencyContactName:
           type: string
-          format: date
+          maxLength: 200
+        emergencyContactRelationship:
+          type: string
+          maxLength: 100
+        emergencyContactPhone:
+          type: string
+          maxLength: 50
+        emergencyContactEmail:
+          type: string
+          maxLength: 200
         villageId:
           $ref: '#/components/schemas/VillageId'
-        roles:
-          $ref: '#/components/schemas/PersonRoles'
+          nullable: false
     PersonPatch:
       additionalProperties: false
       type: object
@@ -2588,37 +2635,6 @@ components:
           type: string
           format: date
           nullable: true
-        joinDate:
-          type: string
-          format: date
-          nullable: true
-        villageId:
-          $ref: '#/components/schemas/VillageId'
-          nullable: true
-        roles:
-          $ref: '#/components/schemas/PersonRoles'
-    Member:
-      additionalProperties: false
-      type: object
-      required:
-      - memberId
-      - personId
-      properties:
-        memberId:
-          $ref: '#/components/schemas/MemberId'
-        personId:
-          $ref: '#/components/schemas/PersonId'
-        memberNumber:
-          type: string
-          maxLength: 50
-          nullable: true
-        memberLevel:
-          type: string
-          maxLength: 100
-          nullable: true
-        serviceNotes:
-          type: string
-          nullable: true
         emergencyContactName:
           type: string
           maxLength: 200
@@ -2635,6 +2651,34 @@ components:
           type: string
           maxLength: 200
           nullable: true
+    Member:
+      additionalProperties: false
+      type: object
+      required:
+      - memberId
+      - personId
+      properties:
+        memberId:
+          $ref: '#/components/schemas/MemberId'
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        fullName:
+          type: string
+          maxLength: 200
+        memberNumber:
+          type: string
+          maxLength: 50
+          nullable: true
+        memberLevel:
+          type: string
+          maxLength: 100
+          nullable: true
+        serviceNotes:
+          type: string
+          nullable: true
+        joinDate:
+          type: string
+          format: date
     MemberPost:
       additionalProperties: false
       type: object
@@ -2651,18 +2695,9 @@ components:
           maxLength: 100
         serviceNotes:
           type: string
-        emergencyContactName:
+        joinDate:
           type: string
-          maxLength: 200
-        emergencyContactRelationship:
-          type: string
-          maxLength: 100
-        emergencyContactPhone:
-          type: string
-          maxLength: 50
-        emergencyContactEmail:
-          type: string
-          maxLength: 200
+          format: date
     MemberPatch:
       additionalProperties: false
       type: object
@@ -2679,22 +2714,9 @@ components:
         serviceNotes:
           type: string
           nullable: true
-        emergencyContactName:
+        joinDate:
           type: string
-          maxLength: 200
-          nullable: true
-        emergencyContactRelationship:
-          type: string
-          maxLength: 100
-          nullable: true
-        emergencyContactPhone:
-          type: string
-          maxLength: 50
-          nullable: true
-        emergencyContactEmail:
-          type: string
-          maxLength: 200
-          nullable: true
+          format: date
     Volunteer:
       additionalProperties: false
       type: object
@@ -2706,10 +2728,9 @@ components:
           $ref: '#/components/schemas/VolunteerId'
         personId:
           $ref: '#/components/schemas/PersonId'
-        emergencyPhone:
+        fullName:
           type: string
-          maxLength: 50
-          nullable: true
+          maxLength: 200
         capabilityIds:
           type: array
           items:
@@ -2722,9 +2743,6 @@ components:
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
-        emergencyPhone:
-          type: string
-          maxLength: 50
         capabilityIds:
           type: array
           items:
@@ -2734,10 +2752,10 @@ components:
       type: object
       minProperties: 1
       properties:
-        emergencyPhone:
-          type: string
-          maxLength: 50
-          nullable: true
+        capabilityIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityId'
     ServiceRequest:
       additionalProperties: false
       type: object
@@ -2755,8 +2773,22 @@ components:
         memberPersonId:
           $ref: '#/components/schemas/PersonId'
           nullable: true
+        memberId:
+          $ref: '#/components/schemas/MemberId'
+          nullable: true
+        memberFullName:
+          type: string
+          maxLength: 200
+          nullable: true
         volunteerPersonId:
           $ref: '#/components/schemas/PersonId'
+          nullable: true
+        volunteerId:
+          $ref: '#/components/schemas/VolunteerId'
+          nullable: true
+        volunteerFullName:
+          type: string
+          maxLength: 200
           nullable: true
         status:
           type: string
@@ -2960,6 +2992,22 @@ components:
       schema:
         type: integer
         minimum: 0
+    ServiceRequestStatusQuery:
+      name: status
+      in: query
+      description: Filter service requests by status
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+          - open
+          - confirmed
+          - completed
+          - unmatched
+          - cancelled
     UserGroupIdPath:
       name: userGroupId
       in: path
@@ -3055,7 +3103,7 @@ components:
           - statistics
           - owners
           - grants
-          - roleCounts
+          - personCounts
           - capabilityCounts
     PersonIdPath:
       name: personId
