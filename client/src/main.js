@@ -11,10 +11,8 @@ import { useGlobalError } from './shared/composables/useGlobalError.js'
 import 'primeicons/primeicons.css'
 import './style.css'
 
-// this is a dark mode override — in the future we may want to make this dynamic based on user preference?
-// if (typeof document !== 'undefined') {
-//   document.documentElement.classList.add('app-dark')
-// }
+// Light theme is default. Dark mode can be enabled by adding 'app-dark' class to document root.
+// User preference stored in localStorage under 'vg-theme' key.
 
 try {
   const app = createApp(App)
@@ -34,8 +32,9 @@ try {
     theme: {
       preset: BluePreset,
       options: {
-      // Use the presence of .app-dark on <html> to enable dark mode
+        // Light theme is default. Dark mode enabled when .app-dark class is on <html>
         darkModeSelector: '.app-dark',
+        prefix: 'p',
       },
     },
     pt: MyPrimeVuePT,

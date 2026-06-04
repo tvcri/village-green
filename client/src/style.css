@@ -1,9 +1,9 @@
 :root {
   font-family: 'Open Sans';
   font-size: 11px;
-  color-scheme: dark !important;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #000000;
+  color-scheme: light;
+  color: rgba(0, 0, 0, 0.87);
+  background-color: #ffffff;
 
   --role-restricted: #64748bcb;
   --role-full: #e2ca43d5;
@@ -35,10 +35,10 @@
   --color-oss-blue: #273f6f; /* Green-700 */
   
   /* HOVER */
-  --color-button-hover-bg: rgba(255, 255, 255, 0.1);
-  --color-bg-hover: rgba(255, 255, 255, 0.05);
-  --color-bg-hover-strong: #3f3f46;
-  --color-bg-hover-light: #76767c;
+  --color-button-hover-bg: rgba(0, 0, 0, 0.05);
+  --color-bg-hover: rgba(0, 0, 0, 0.03);
+  --color-bg-hover-strong: #e4e4e7;
+  --color-bg-hover-light: #d4d4d8;
 
   /* Metrics Status Chart Colors */
   --metrics-status-chart-assessed: hsl(204, 91%, 29%);
@@ -60,21 +60,21 @@
   /* Breadcrumb sizing */
 
   /* Text Colors */
-  --color-text-primary: rgba(255, 255, 255, 0.87);
-  --color-text-dim: #a1a1aa; 
-  --color-text-bright: rgba(255, 255, 255, 0.95);
+  --color-text-primary: rgba(0, 0, 0, 0.87);
+  --color-text-dim: #71717a;
+  --color-text-bright: rgba(0, 0, 0, 0.95);
   --color-text-dark: #18181b;
 
   /* Surface Colors */
-  --color-background-darkest: #000000;
-  --color-background-dark: #18181b; 
-  --color-background-light: #27272a;  
-  --color-background-subtle: rgba(255, 255, 255, 0.05);
+  --color-background-darkest: #ffffff;
+  --color-background-dark: #f4f4f5;
+  --color-background-light: #fafafa;
+  --color-background-subtle: rgba(0, 0, 0, 0.05);
 
   /* Border Colors */
-  --color-border-default: #3f3f46;
-  --color-border-light: #2a2a2d;
-  --color-border-hover: #52525b;
+  --color-border-default: #e4e4e7;
+  --color-border-light: #f4f4f5;
+  --color-border-hover: #d4d4d8;
 
   /* Error Colors */
   --color-text-error: #f16969;
@@ -167,6 +167,8 @@ body {
   font-family: 'Open Sans';
   font-size: 1rem;
   font-weight: 400;
+  background-color: #ffffff;
+  color: rgba(0, 0, 0, 0.87);
 }
 
 #app {
@@ -379,4 +381,39 @@ textarea:focus {
   font-style: italic;
   font-weight: 800;
   src: url('../fonts/open-sans-v15-latin-800italic.woff2') format('woff2')
+}
+
+/* Dark theme */
+:root.app-dark {
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #18181b;
+
+  --color-text-primary: rgba(255, 255, 255, 0.87);
+  --color-text-dim: #a1a1aa;
+  --color-text-bright: rgba(255, 255, 255, 0.95);
+  --color-text-dark: #18181b;
+
+  --color-background-darkest: #000000;
+  --color-background-dark: #18181b;
+  --color-background-light: #27272a;
+  --color-background-subtle: rgba(255, 255, 255, 0.05);
+
+  --color-border-default: #3f3f46;
+  --color-border-light: #2a2a2d;
+  --color-border-hover: #52525b;
+
+  --color-button-hover-bg: rgba(255, 255, 255, 0.1);
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-hover-strong: #3f3f46;
+  --color-bg-hover-light: #76767c;
+
+  --color-status-success-bg: color-mix(in srgb, #166534 18%, var(--color-background-dark));
+  --color-status-warning-bg: color-mix(in srgb, #92400e 18%, var(--color-background-dark));
+  --color-status-error-bg: color-mix(in srgb, #7f1d1d 18%, var(--color-background-dark));
+}
+
+:root.app-dark body {
+  background-color: #18181b;
+  color: rgba(255, 255, 255, 0.87);
 }

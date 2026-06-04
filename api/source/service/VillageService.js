@@ -202,6 +202,7 @@ module.exports.getVillageMembers = async function (villageId) {
     'm.member_number AS memberNumber',
     'm.member_level AS memberLevel',
     'm.service_notes AS serviceNotes',
+    'm.join_date AS joinDate'
   ]
   const joins = new Set([
     'member m',
@@ -239,6 +240,11 @@ module.exports.getVillageVolunteers = async function (villageId) {
 
 module.exports.getVillagePersons = async function (villageId) {
   return await PersonService.getPersonsByVillage(villageId)
+}
+
+module.exports.getVillagePerson = async function (villageId, personId) {
+  const persons = await PersonService.getPersonsByVillage(villageId)
+  return persons.find(p => p.personId === personId) || null
 }
 
 module.exports.getVillageServiceRequests = async function (villageId, status) {

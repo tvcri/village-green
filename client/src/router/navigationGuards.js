@@ -3,9 +3,24 @@ import { useCurrentUser } from '../shared/composables/useCurrentUser.js'
 const { isAdmin, hasCollectionAccess, getCollectionRoleId } = useCurrentUser()
 
 export function navigationGuard(to) {
+  console.log('navigationGuard called for route:', to.name, 'params:', to.params, 'isAdmin.value:', isAdmin.value)
+
   // admin routes
   if (to.meta.requiresAdmin && !isAdmin.value) {
     return { name: 'home' }
+  }
+
+  // village-specific routes require a village grant
+  if (to.params.villageId) {
+    const villageId = String(to.params.villageId)
+    const villageGrants = VG.curUser?.villageGrants || []
+    console.log('navigationGuard village check:', { villageId, isAdmin: isAdmin.value, villageGrants, grantIds: villageGrants.map(g => String(g.village?.villageId)) })
+    const hasGrant = villageGrants.some(grant => String(grant.village?.villageId) === villageId)
+    console.log('hasGrant:', hasGrant)
+    if (!hasGrant) {
+      console.log('Redirecting to villages - no grant found')
+      return { name: 'villages' }
+    }
   }
 
   // collection-specific routes require a collection grant

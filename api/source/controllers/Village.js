@@ -159,6 +159,31 @@ module.exports.getVillagePersons = async function getVillagePersons (req, res, n
   }
 }
 
+module.exports.getVillagePerson = async function getVillagePerson (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+    const personId = req.params.personId
+
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      grants: req.userObject.grants,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await VillageService.getVillagePerson(villageId, personId)
+    if (!response) {
+      throw new SmError.NotFoundError()
+    }
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
 module.exports.getVillageServiceRequests = async function getVillageServiceRequests (req, res, next) {
   try {
     const villageId = req.params.villageId

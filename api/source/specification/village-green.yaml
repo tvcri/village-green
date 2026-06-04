@@ -1605,6 +1605,31 @@ paths:
       security:
       - oauth:
         - vg:village:read
+  /villages/{villageId}/persons/{personId}:
+    get:
+      summary: Get a person in a village
+      tags:
+      - Village
+      operationId: getVillagePerson
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      - $ref: '#/components/parameters/PersonIdPath'
+      responses:
+        '200':
+          description: Person details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Person'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
   /villages/{villageId}/service-requests:
     get:
       summary: List service requests for a village
