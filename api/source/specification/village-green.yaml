@@ -1686,7 +1686,7 @@ paths:
         - vg:village:write
       x-elevation-required: true
     post:
-      summary: Add a grant to a village
+      summary: Create one or more grants for a village
       tags:
       - Village
       operationId: createVillageGrant
@@ -1698,14 +1698,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VillageGrantWrite'
+              type: array
+              items:
+                $ref: '#/components/schemas/VillageGrantWrite'
       responses:
         '201':
-          description: Grant created
+          description: Grants created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VillageGrantRead'
+                type: array
+                items:
+                  $ref: '#/components/schemas/VillageGrantRead'
         '422':
           description: Request body is non-conformant
           content:

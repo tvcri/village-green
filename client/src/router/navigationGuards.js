@@ -7,11 +7,11 @@ export function navigationGuard(to) {
 
   // admin routes
   if (to.meta.requiresAdmin && !isAdmin.value) {
-    return { name: 'home' }
+    return { name: 'villages' }
   }
 
-  // village-specific routes require a village grant
-  if (to.params.villageId) {
+  // village-specific routes require a village grant (skip if in admin section)
+  if (to.params.villageId && !to.meta.requiresAdmin) {
     const villageId = String(to.params.villageId)
     const villageGrants = VG.curUser?.villageGrants || []
     console.log('navigationGuard village check:', { villageId, isAdmin: isAdmin.value, villageGrants, grantIds: villageGrants.map(g => String(g.village?.villageId)) })

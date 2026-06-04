@@ -2,6 +2,8 @@ import { apiCall } from './apiClient.js'
 
 export const getUser = () => apiCall('getUser')
 
+export const getUsers = () => apiCall('getUsers', { elevate: true })
+
 /**
  * Fetches the current user data from the API
  * @returns {Promise<object>} The user object with sorted collectionGrants

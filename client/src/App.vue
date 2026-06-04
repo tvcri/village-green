@@ -2,7 +2,7 @@
 import ReauthPrompt from './auth/ReauthPrompt.vue'
 import UserProfileMenu from './auth/UserProfileMenu.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
-import ElevateCheckbox from './components/ElevateCheckbox.vue'
+import AdminNav from './components/AdminNav.vue'
 import Breadcrumbs from './components/Breadcrumbs.vue'
 import { useOidcWorker } from './auth/useOidcWorker.js'
 import GlobalErrorModal from './components/global/GlobalErrorModal.vue'
@@ -25,7 +25,7 @@ const oidcWorker = useOidcWorker()
         <h1 class="app-title">Village Green</h1>
       </div>
       <div class="header-right">
-        <ElevateCheckbox />
+        <AdminNav />
         <ThemeToggle />
         <UserProfileMenu />
       </div>

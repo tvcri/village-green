@@ -355,22 +355,30 @@ module.exports.getVillageGrants = async function (villageId) {
 }
 
 module.exports.createVillageGrant = async function (villageId, body) {
-  const mappedFields = {
-    villageId,
-    roleId: body.roleId
-  }
+  const grantsArray = Array.isArray(body) ? body : [body]
 
-  if (body.userId !== undefined) {
-    mappedFields.userId = body.userId
-  } else if (body.userGroupId !== undefined) {
-    mappedFields.userGroupId = body.userGroupId
-  }
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      for (const grant of grantsArray) {
+        const mappedFields = {
+          villageId,
+          roleId: grant.roleId
+        }
 
-  const [result] = await dbUtils.pool.query('INSERT INTO village_grant SET ?', mappedFields)
-  const grantId = result.insertId
+        if (grant.userId !== undefined) {
+          mappedFields.userId = grant.userId
+        } else if (grant.userGroupId !== undefined) {
+          mappedFields.userGroupId = grant.userGroupId
+        }
+
+        await connection.query('INSERT INTO village_grant SET ?', mappedFields)
+      }
+    },
+    statusObj: undefined
+  })
 
   const grants = await module.exports.getVillageGrants(villageId)
-  return grants.find(g => g.grantId === String(grantId))
+  return grants
 }
 
 module.exports.replaceVillageGrants = async function (villageId, body) {

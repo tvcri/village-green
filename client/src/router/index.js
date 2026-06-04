@@ -43,6 +43,30 @@ const routes = [
     component: () => import('../features/ServiceRequestList/components/ServiceRequestDetail.vue'),
   },
   {
+    path: '/admin',
+    name: 'admin',
+    component: () => import('../features/Admin/components/AdminHub.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/villages',
+    name: 'admin-village-access',
+    component: () => import('../features/Admin/components/VillageAccessList.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/users',
+    name: 'admin-user-access',
+    component: () => import('../features/Admin/components/UserAccessList.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/villages/grants/:villageId',
+    name: 'admin-create-grant',
+    component: () => import('../features/Admin/components/CreateGrant.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: { template: '<div style="padding: 2rem;"><h1>Page not found</h1></div>' },

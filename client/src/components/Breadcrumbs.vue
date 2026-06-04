@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
+import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,10 +13,45 @@ const { state: villages } = useAsyncState(
   { immediate: true, onError: null }
 )
 
+const { state: adminVillages } = useAsyncState(
+  () => getAdminVillages(),
+  { immediate: true, onError: null }
+)
+
 const breadcrumbs = computed(() => {
   const crumbs = [
     { label: 'Villages', route: { name: 'villages' } }
   ]
+
+  // Handle admin routes first (to avoid adding village breadcrumb twice)
+  if (route.name && route.name.startsWith('admin')) {
+    crumbs[0] = { label: 'Admin', route: { name: 'admin' } }
+
+    switch (route.name) {
+      case 'admin-village-access':
+        crumbs.push({ label: 'Village Access' })
+        break
+      case 'admin-user-access':
+        crumbs.push({ label: 'User Access' })
+        break
+      case 'admin-create-grant': {
+        const villageId = route.params.villageId
+        const village = adminVillages.value?.find(v => v.villageId === villageId)
+        const villageName = village?.name || `Village ${villageId}`
+        crumbs.push({
+          label: 'Village Access',
+          route: { name: 'admin-village-access', query: { villageId } }
+        })
+        crumbs.push({
+          label: villageName,
+          route: { name: 'admin-village-access', query: { villageId } }
+        })
+        crumbs.push({ label: 'Create Grant' })
+        break
+      }
+    }
+    return crumbs
+  }
 
   const vId = route.params.villageId
 
