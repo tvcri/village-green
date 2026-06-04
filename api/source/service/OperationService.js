@@ -51,11 +51,6 @@ exports.getAppData = async function (res, format) {
   /** @type {string[]} tables to exclude from the appdata file */
   const excludedTables = [
     '_migrations', 
-    'status', 
-    'result',
-    'severity_cat_map', 
-    'cci', 
-    'cci_reference_map', 
     'config',
     'job',
     'job_run',
