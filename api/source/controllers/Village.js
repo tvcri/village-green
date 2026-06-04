@@ -204,3 +204,90 @@ module.exports.getVillageServiceRequests = async function getVillageServiceReque
     next(err)
   }
 }
+
+module.exports.getVillageGrants = async function getVillageGrants (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      elevate: true,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await VillageService.getVillageGrants(villageId)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.createVillageGrant = async function createVillageGrant (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+    const body = req.body
+
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      elevate: true,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await VillageService.createVillageGrant(villageId, body)
+    res.status(201).json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.replaceVillageGrants = async function replaceVillageGrants (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+    const body = req.body
+
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      elevate: true,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await VillageService.replaceVillageGrants(villageId, body)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.deleteVillageGrant = async function deleteVillageGrant (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+    const grantId = req.params.grantId
+
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      elevate: true,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await VillageService.deleteVillageGrant(villageId, grantId)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}

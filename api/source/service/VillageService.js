@@ -300,3 +300,170 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
   let [rows] = await dbUtils.pool.query(sql)
   return rows
 }
+
+module.exports.getVillageGrants = async function (villageId) {
+  const sql = `
+    SELECT
+      CAST(vg.grantId AS CHAR) AS grantId,
+      vg.roleId,
+      CAST(vg.userId AS CHAR) AS userId,
+      CAST(vg.userGroupId AS CHAR) AS userGroupId,
+      CASE
+        WHEN vg.userId IS NOT NULL THEN 'user'
+        WHEN vg.userGroupId IS NOT NULL THEN 'userGroup'
+      END AS grantType,
+      CAST(ud.userId AS CHAR) AS user_userId,
+      ud.username AS user_username,
+      COALESCE(
+        JSON_UNQUOTE(JSON_EXTRACT(ud.lastClaims, "$.${config.oauth.claims.name}")),
+        ud.username
+      ) AS user_displayName,
+      CAST(ug.userGroupId AS CHAR) AS userGroup_userGroupId,
+      ug.name AS userGroup_name,
+      ug.description AS userGroup_description
+    FROM village_grant vg
+    LEFT JOIN user_data ud ON vg.userId = ud.userId
+    LEFT JOIN user_group ug ON vg.userGroupId = ug.userGroupId
+    WHERE vg.villageId = ?
+    ORDER BY vg.grantId
+  `
+  const [rows] = await dbUtils.pool.query(sql, [villageId])
+
+  return rows.map(row => {
+    if (row.grantType === 'user') {
+      return {
+        grantId: row.grantId,
+        roleId: row.roleId,
+        user: {
+          userId: row.user_userId,
+          username: row.user_username,
+          displayName: row.user_displayName
+        }
+      }
+    } else {
+      return {
+        grantId: row.grantId,
+        roleId: row.roleId,
+        userGroup: {
+          userGroupId: row.userGroup_userGroupId,
+          name: row.userGroup_name,
+          description: row.userGroup_description
+        }
+      }
+    }
+  })
+}
+
+module.exports.createVillageGrant = async function (villageId, body) {
+  const mappedFields = {
+    villageId,
+    roleId: body.roleId
+  }
+
+  if (body.userId !== undefined) {
+    mappedFields.userId = body.userId
+  } else if (body.userGroupId !== undefined) {
+    mappedFields.userGroupId = body.userGroupId
+  }
+
+  const [result] = await dbUtils.pool.query('INSERT INTO village_grant SET ?', mappedFields)
+  const grantId = result.insertId
+
+  const grants = await module.exports.getVillageGrants(villageId)
+  return grants.find(g => g.grantId === String(grantId))
+}
+
+module.exports.replaceVillageGrants = async function (villageId, body) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      await connection.query('DELETE FROM village_grant WHERE villageId = ?', [villageId])
+
+      if (body && body.length > 0) {
+        for (const grant of body) {
+          const mappedFields = {
+            villageId,
+            roleId: grant.roleId
+          }
+
+          if (grant.userId !== undefined) {
+            mappedFields.userId = grant.userId
+          } else if (grant.userGroupId !== undefined) {
+            mappedFields.userGroupId = grant.userGroupId
+          }
+
+          await connection.query('INSERT INTO village_grant SET ?', mappedFields)
+        }
+      }
+    },
+    statusObj: undefined
+  })
+
+  return await module.exports.getVillageGrants(villageId)
+}
+
+module.exports.deleteVillageGrant = async function (villageId, grantId) {
+  const [existing] = await dbUtils.pool.query(
+    'SELECT * FROM village_grant WHERE grantId = ? AND villageId = ?',
+    [grantId, villageId]
+  )
+
+  if (!existing || existing.length === 0) {
+    const SmError = require('../utils/error')
+    throw new SmError.NotFoundError()
+  }
+
+  await dbUtils.pool.query('DELETE FROM village_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId])
+
+  const sql = `
+    SELECT
+      CAST(? AS CHAR) AS grantId,
+      ? AS roleId,
+      CASE
+        WHEN ? IS NOT NULL THEN 'user'
+        WHEN ? IS NOT NULL THEN 'userGroup'
+      END AS grantType,
+      CAST(ud.userId AS CHAR) AS user_userId,
+      ud.username AS user_username,
+      COALESCE(
+        JSON_UNQUOTE(JSON_EXTRACT(ud.lastClaims, "$.${config.oauth.claims.name}")),
+        ud.username
+      ) AS user_displayName,
+      CAST(ug.userGroupId AS CHAR) AS userGroup_userGroupId,
+      ug.name AS userGroup_name,
+      ug.description AS userGroup_description
+    FROM (SELECT 1) dummy
+    LEFT JOIN user_data ud ON ud.userId = ?
+    LEFT JOIN user_group ug ON ug.userGroupId = ?
+  `
+  const [rows] = await dbUtils.pool.query(sql, [
+    grantId,
+    existing[0].roleId,
+    existing[0].userId,
+    existing[0].userGroupId,
+    existing[0].userId,
+    existing[0].userGroupId
+  ])
+
+  const row = rows[0]
+  if (row.grantType === 'user') {
+    return {
+      grantId: row.grantId,
+      roleId: row.roleId,
+      user: {
+        userId: row.user_userId,
+        username: row.user_username,
+        displayName: row.user_displayName
+      }
+    }
+  } else {
+    return {
+      grantId: row.grantId,
+      roleId: row.roleId,
+      userGroup: {
+        userGroupId: row.userGroup_userGroupId,
+        name: row.userGroup_name,
+        description: row.userGroup_description
+      }
+    }
+  }
+}

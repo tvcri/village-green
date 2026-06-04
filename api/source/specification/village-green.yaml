@@ -1656,7 +1656,140 @@ paths:
                 $ref: '#/components/schemas/Error'
       security:
       - oauth:
-        - vg:village:read 
+        - vg:village:read
+  /villages/{villageId}/grants:
+    get:
+      summary: List all grants for a village
+      tags:
+      - Village
+      operationId: getVillageGrants
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      - $ref: '#/components/parameters/ElevateQuery'
+      responses:
+        '200':
+          description: Grant list for village
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VillageGrantRead'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:write
+      x-elevation-required: true
+    post:
+      summary: Add a grant to a village
+      tags:
+      - Village
+      operationId: createVillageGrant
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      - $ref: '#/components/parameters/ElevateQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VillageGrantWrite'
+      responses:
+        '201':
+          description: Grant created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VillageGrantRead'
+        '422':
+          description: Request body is non-conformant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:write
+      x-elevation-required: true
+    put:
+      summary: Replace all grants for a village
+      tags:
+      - Village
+      operationId: replaceVillageGrants
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      - $ref: '#/components/parameters/ElevateQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/VillageGrantWrite'
+      responses:
+        '200':
+          description: Grants replaced
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VillageGrantRead'
+        '422':
+          description: Request body is non-conformant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:write
+      x-elevation-required: true
+  /villages/{villageId}/grants/{grantId}:
+    delete:
+      summary: Delete a grant from a village
+      tags:
+      - Village
+      operationId: deleteVillageGrant
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      - $ref: '#/components/parameters/GrantIdPath'
+      - $ref: '#/components/parameters/ElevateQuery'
+      responses:
+        '200':
+          description: Grant deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VillageGrantRead'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:write
+      x-elevation-required: true
 components:
   schemas:
     ApiClassification:
@@ -1788,6 +1921,8 @@ components:
           type: string
         stack:
           type: string
+    GrantId:
+      $ref: '#/components/schemas/StringIntId'
     Grantee:
       oneOf:
       - $ref: '#/components/schemas/UserBasic'
@@ -2626,6 +2761,20 @@ components:
       - userId
       - username
       - displayName
+    UserGroup:
+      type: object
+      additionalProperties: false
+      required:
+        - userGroupId
+        - name
+        - description
+      properties:
+        userGroupId:
+          $ref: '#/components/schemas/UserGroupId'
+        name:
+          $ref: '#/components/schemas/String255'
+        description:
+          $ref: '#/components/schemas/String255Nullable'
     UserGroupBasic:
       type: object
       additionalProperties: false
@@ -2657,7 +2806,7 @@ components:
         villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/VillageGrant'
+            $ref: '#/components/schemas/UserVillageGrant'
           uniqueItems: true
     UserGroupPostOrPut:
       type: object
@@ -2677,7 +2826,7 @@ components:
         villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/VillageGrant'
+            $ref: '#/components/schemas/UserVillageGrant'
           uniqueItems: true
     UserGroupProjected:
       type: object
@@ -2722,7 +2871,7 @@ components:
         villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/VillageGrant'
+            $ref: '#/components/schemas/UserVillageGrant'
           uniqueItems: true
     UserPost:
       additionalProperties: false
@@ -2738,7 +2887,7 @@ components:
         villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/VillageGrant'
+            $ref: '#/components/schemas/UserVillageGrant'
           uniqueItems: true
       required:
       - username
@@ -2785,7 +2934,7 @@ components:
         villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/VillageGrantProjected'
+            $ref: '#/components/schemas/UserVillageGrantProjected'
       required:
       - userId
       - username
@@ -2808,7 +2957,7 @@ components:
         villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/VillageGrant'
+            $ref: '#/components/schemas/UserVillageGrant'
           uniqueItems: true
       required:
       - username
@@ -2833,6 +2982,31 @@ components:
       $ref: '#/components/schemas/StringDateTime'
     UserStatusUser:
       $ref: '#/components/schemas/StringIntIdNullable'
+    UserVillageGrant:
+      additionalProperties: false
+      type: object
+      properties:
+        villageId:
+          $ref: '#/components/schemas/VillageId'
+        roleId:
+          $ref: '#/components/schemas/RoleId'
+      required:
+      - roleId
+    UserVillageGrantProjected:
+      additionalProperties: false
+      type: object
+      properties:
+        roleId:
+          $ref: '#/components/schemas/RoleId'
+        village:
+          type: object
+          properties:
+            villageId:
+              $ref: '#/components/schemas/VillageId'
+            name:
+              $ref: '#/components/schemas/VillageName'
+        grantees:
+          $ref: '#/components/schemas/Grantees'
     Username:
       $ref: '#/components/schemas/String255'
     UsernameNullable:
@@ -2858,31 +3032,14 @@ components:
       required:
       - villageId
       - name
-    VillageGrant:
-      additionalProperties: false
-      type: object
-      properties:
-        villageId:
-          $ref: '#/components/schemas/VillageId'
-        roleId:
-          $ref: '#/components/schemas/RoleId'
-      required:
-      - roleId
-    VillageGrantProjected:
-      additionalProperties: false
-      type: object
-      properties:
-        roleId:
-          $ref: '#/components/schemas/RoleId'
-        village:
-          type: object
-          properties:
-            villageId:
-              $ref: '#/components/schemas/VillageId'
-            name:
-              $ref: '#/components/schemas/VillageName'
-        grantees:
-          $ref: '#/components/schemas/Grantees'
+    VillageGrantRead:
+      oneOf:
+        - $ref: '#/components/schemas/VillageUserGrantRead'     
+        - $ref: '#/components/schemas/VillageUserGroupGrantRead'
+    VillageGrantWrite:
+      oneOf:
+        - $ref: '#/components/schemas/VillageUserGrantWrite'     
+        - $ref: '#/components/schemas/VillageUserGroupGrantWrite'
     VillageId:
       $ref: '#/components/schemas/StringIntId'
     VillageName:
@@ -2902,6 +3059,53 @@ components:
           $ref: '#/components/schemas/VillageName'
       required:
       - name
+    VillageUserGrantRead:
+      additionalProperties: false
+      type: object
+      properties:
+        grantId:
+          $ref: '#/components/schemas/GrantId'
+        roleId:
+          $ref: '#/components/schemas/RoleId'
+        user:
+          $ref: '#/components/schemas/UserBasicWithDisplayName'
+      required:
+        - user
+        - roleId
+    VillageUserGrantWrite:
+      type: object
+      required:
+        - userId
+        - roleId
+      properties:
+        userId:
+          $ref: '#/components/schemas/UserId'
+        roleId:
+          $ref: '#/components/schemas/RoleId'
+    VillageUserGroupGrantRead:
+      type: object
+      required:
+        - userGroup          
+        - roleId
+      additionalProperties: false
+      properties:
+        grantId:
+          $ref: '#/components/schemas/GrantId'
+        userGroup:
+          $ref: '#/components/schemas/UserGroup'
+        roleId:
+          $ref: '#/components/schemas/RoleId'
+    VillageUserGroupGrantWrite:
+      type: object
+      required:
+        - userGroupId
+        - roleId
+      additionalProperties: false
+      properties:
+        userGroupId:
+          $ref: '#/components/schemas/UserGroupId'
+        roleId:
+          $ref: '#/components/schemas/RoleId'
     Volunteer:
       additionalProperties: false
       type: object
@@ -2980,6 +3184,13 @@ components:
       schema:
         type: boolean
         default: false
+    GrantIdPath:
+      name: grantId
+      in: path
+      description: A path parameter that identifies a Grant
+      required: true
+      schema:
+        $ref: '#/components/schemas/GrantId'
     JobIdPath:
       name: jobId
       in: path
