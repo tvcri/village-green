@@ -130,7 +130,22 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
       GROUP BY
         p.village_id) as personCounts`)
     }
-
+    if (projections.includes('capabilityCounts')) {
+      columns.push(`(SELECT 
+        JSON_OBJECT(
+        'errands', SUM(CASE WHEN c.name = 'Errands' THEN 1 ELSE 0 END),
+        'friends', SUM(CASE WHEN c.name = 'Friends' THEN 1 ELSE 0 END),
+        'homeHelp', SUM(CASE WHEN c.name = 'Home Help' THEN 1 ELSE 0 END),
+        'rides', SUM(CASE WHEN c.name = 'Rides' THEN 1 ELSE 0 END),
+        'techSupport', SUM(CASE WHEN c.name = 'Tech Support' THEN 1 ELSE 0 END)
+      )
+      FROM person p
+      JOIN volunteer vol ON p.id = vol.person_id
+      JOIN volunteer_capability vc ON vol.id = vc.volunteer_id
+      JOIN capability c ON vc.capability_id = c.id
+      WHERE p.village_id = v.id
+      GROUP BY p.village_id) as capabilityCounts`)
+    }
 
     if (!elevate) {
       predicates.statements.push('v.id IN (?)')
