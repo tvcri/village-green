@@ -1,23 +1,20 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import InputText from 'primevue/inputtext'
-import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 
 const router = useRouter()
 const route = useRoute()
 
 const villageId = computed(() => route.params.villageId)
-const memberSearchText = useDebouncedRef('', 300)
-const volunteerSearchText = useDebouncedRef('', 300)
+const selectedMember = ref('All members')
+const selectedVolunteer = ref('All volunteers')
 const selectedService = ref('All services')
 const selectedStatuses = ref([])
 const sortField = ref('requestNumber')
@@ -30,6 +27,18 @@ const { state: requests, isLoading, error, execute } = useAsyncState(
 
 const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled']
 
+const memberOptions = computed(() => {
+  if (!Array.isArray(requests.value)) return []
+  const members = new Set(requests.value.map(r => r.memberFullName).filter(Boolean))
+  return ['All members', ...Array.from(members).sort()]
+})
+
+const volunteerOptions = computed(() => {
+  if (!Array.isArray(requests.value)) return []
+  const volunteers = new Set(requests.value.map(r => r.volunteerFullName).filter(Boolean))
+  return ['All volunteers', ...Array.from(volunteers).sort()]
+})
+
 const serviceOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
   const services = new Set(requests.value.map(r => r.serviceName).filter(Boolean))
@@ -41,10 +50,16 @@ const filteredRequests = computed(() => {
 
   let result = requests.value.filter(r => {
     // Filter by member name
-    const memberMatch = (r.memberFullName || '').toLowerCase().includes(memberSearchText.value.toLowerCase())
+    let memberMatch = true
+    if (selectedMember.value && selectedMember.value !== 'All members') {
+      memberMatch = r.memberFullName === selectedMember.value
+    }
 
     // Filter by volunteer name
-    const volunteerMatch = (r.volunteerFullName || '').toLowerCase().includes(volunteerSearchText.value.toLowerCase())
+    let volunteerMatch = true
+    if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') {
+      volunteerMatch = r.volunteerFullName === selectedVolunteer.value
+    }
 
     // Filter by service
     let serviceMatch = true
@@ -133,40 +148,20 @@ const navigateToRequest = (serviceRequestId) => {
     <div class="filter-section">
       <div class="search-box">
         <label>Member:</label>
-        <div class="search-input-group">
-          <InputText
-            v-model="memberSearchText"
-            type="text"
-            placeholder="Search by name..."
-            spellcheck="false"
-          />
-          <Button
-            icon="pi pi-times"
-            variant="text"
-            size="small"
-            @click="memberSearchText = ''"
-            title="Clear search"
-          />
-        </div>
+        <Select
+          v-model="selectedMember"
+          :options="memberOptions"
+          placeholder="-- Select member --"
+        />
       </div>
 
       <div class="search-box">
         <label>Volunteer:</label>
-        <div class="search-input-group">
-          <InputText
-            v-model="volunteerSearchText"
-            type="text"
-            placeholder="Search by name..."
-            spellcheck="false"
-          />
-          <Button
-            icon="pi pi-times"
-            variant="text"
-            size="small"
-            @click="volunteerSearchText = ''"
-            title="Clear search"
-          />
-        </div>
+        <Select
+          v-model="selectedVolunteer"
+          :options="volunteerOptions"
+          placeholder="-- Select volunteer --"
+        />
       </div>
 
       <div class="search-box">
