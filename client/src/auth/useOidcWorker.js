@@ -9,7 +9,7 @@ export function setupOidcHandler() {
       const noTokenData = {
         type: 'noToken',
         isIdle: event.data.isIdle,
-        ...event.data.clientV2,
+        ...event.data,
       }
       noTokenMessage.value = noTokenData
     }
