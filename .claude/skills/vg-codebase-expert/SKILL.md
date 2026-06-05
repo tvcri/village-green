@@ -83,6 +83,10 @@ Then use these exploration tools:
 - `shared/composables/useAsyncState.js` — data pattern (gold standard)
 - `components/global/GlobalErrorModal.vue` — error display (required)
 
+### UI Framework
+- **PrimeVue is the standard UI library** — Use PrimeVue components (`Dropdown`, `DataTable`, `Button`, `AutoComplete`, `Checkbox`, `Breadcrumb`, `Tag`, etc.) instead of native HTML elements for consistency, theming, and accessibility
+- Custom CSS is acceptable only when PrimeVue doesn't provide the component needed
+
 ### What's Deletable
 - STIGMAN feature code (already deleted)
 - Old stores (deprecated)

@@ -1,6 +1,11 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import Dropdown from 'primevue/dropdown'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Button from 'primevue/button'
+import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRoleLabels } from '../../../shared/composables/useRoleLabels.js'
 import { getVillages, getVillageGrants, deleteVillageGrant } from '../api/villageGrantApi.js'
@@ -33,9 +38,8 @@ const selectedVillage = computed(() => {
   return villages.value?.find(v => v.villageId === selectedVillageId.value)
 })
 
-const handleVillageChange = (villageId) => {
-  selectedVillageId.value = villageId
-  if (villageId) {
+const handleVillageChange = () => {
+  if (selectedVillageId.value) {
     refetchGrants()
   }
 }
@@ -90,22 +94,16 @@ const displayGrants = computed(() => {
 
     <div class="village-selector">
       <label for="village-dropdown">Select Village:</label>
-      <select
+      <Dropdown
         id="village-dropdown"
-        :value="selectedVillageId"
-        @change="handleVillageChange($event.target.value)"
+        v-model="selectedVillageId"
+        :options="villages"
+        option-label="name"
+        option-value="villageId"
+        placeholder="-- Choose a village --"
         :disabled="villagesLoading"
-        class="dropdown"
-      >
-        <option value="">-- Choose a village --</option>
-        <option
-          v-for="village in villages"
-          :key="village.villageId"
-          :value="village.villageId"
-        >
-          {{ village.name }}
-        </option>
-      </select>
+        @change="handleVillageChange"
+      />
     </div>
 
     <div v-if="selectedVillageId && grantsLoading" class="loading-state">
@@ -115,45 +113,39 @@ const displayGrants = computed(() => {
     <div v-else-if="selectedVillageId" class="grants-section">
       <div class="grants-header">
         <h2>Grants for {{ selectedVillage?.name }}</h2>
-        <button class="btn-create" @click="handleCreateGrant">
-          + Create Grant
-        </button>
+        <Button
+          label="+ Create Grant"
+          @click="handleCreateGrant"
+        />
       </div>
 
       <div v-if="displayGrants.length === 0" class="empty-state">
         <p>No grants found for this village</p>
       </div>
 
-      <table v-else class="grants-table">
-        <thead>
-          <tr>
-            <th>Grantee</th>
-            <th>Type</th>
-            <th>Role</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="grant in displayGrants" :key="grant.grantId">
-            <td>{{ grant.granteeName }}</td>
-            <td>
-              <span class="badge" :data-type="grant.granteeType">
-                {{ grant.granteeType === 'user' ? 'User' : 'Group' }}
-              </span>
-            </td>
-            <td>{{ grant.roleLabel }}</td>
-            <td>
-              <button
-                class="btn-delete"
-                @click="handleDeleteGrant(grant.grantId)"
-                title="Delete grant"
-              >
-                Delete
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <DataTable :value="displayGrants" class="grants-table-responsive">
+        <Column field="granteeName" header="Grantee"></Column>
+        <Column field="granteeType" header="Type">
+          <template #body="slotProps">
+            <Tag
+              :value="slotProps.data.granteeType === 'user' ? 'User' : 'Group'"
+              :severity="slotProps.data.granteeType === 'user' ? 'info' : 'success'"
+            />
+          </template>
+        </Column>
+        <Column field="roleLabel" header="Role"></Column>
+        <Column header="Actions" :exportable="false">
+          <template #body="slotProps">
+            <Button
+              icon="pi pi-trash"
+              severity="danger"
+              size="small"
+              @click="handleDeleteGrant(slotProps.data.grantId)"
+              title="Delete grant"
+            />
+          </template>
+        </Column>
+      </DataTable>
     </div>
   </div>
 </template>
@@ -314,11 +306,59 @@ h1 {
   border-color: rgba(239, 68, 68, 0.5);
 }
 
-@media (max-width: 768px) {
-  .village-access-list {
+@media (max-width: 375px) {
+  :deep(.grants-table-responsive .p-datatable-thead) {
+    display: none;
+  }
+
+  :deep(.grants-table-responsive .p-datatable-tbody > tr) {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1rem;
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
     padding: 1rem;
   }
 
+  :deep(.grants-table-responsive .p-datatable-tbody > tr > td) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border: none;
+  }
+
+  :deep(.grants-table-responsive .p-datatable-tbody > tr > td:nth-child(1)::before) {
+    content: "Grantee";
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-right: 1rem;
+  }
+
+  :deep(.grants-table-responsive .p-datatable-tbody > tr > td:nth-child(2)::before) {
+    content: "Type";
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-right: 1rem;
+  }
+
+  :deep(.grants-table-responsive .p-datatable-tbody > tr > td:nth-child(3)::before) {
+    content: "Role";
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-right: 1rem;
+  }
+
+  :deep(.grants-table-responsive .p-datatable-tbody > tr > td:nth-child(4)::before) {
+    content: "Actions";
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-right: 1rem;
+  }
+}
+
+/* Stack when label + dropdown can't fit comfortably (~350px content) */
+@media (max-width: 350px) {
   .village-selector {
     flex-direction: column;
     align-items: flex-start;
@@ -326,6 +366,12 @@ h1 {
 
   .dropdown {
     min-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .village-access-list {
+    padding: 1rem;
   }
 
   .section-header {

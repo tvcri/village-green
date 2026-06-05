@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
+import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -15,6 +16,11 @@ const { state: villages } = useAsyncState(
 
 const { state: adminVillages } = useAsyncState(
   () => getAdminVillages(),
+  { immediate: true, onError: null }
+)
+
+const { state: adminUsers } = useAsyncState(
+  () => getAdminUsers(),
   { immediate: true, onError: null }
 )
 
@@ -45,6 +51,21 @@ const breadcrumbs = computed(() => {
         crumbs.push({
           label: villageName,
           route: { name: 'admin-village-access', query: { villageId } }
+        })
+        crumbs.push({ label: 'Create Grant' })
+        break
+      }
+      case 'admin-create-user-grant': {
+        const userId = route.params.userId
+        const user = adminUsers.value?.find(u => u.userId === userId)
+        const userName = user?.displayName || user?.username || `User ${userId}`
+        crumbs.push({
+          label: 'User Access',
+          route: { name: 'admin-user-access', query: { userId } }
+        })
+        crumbs.push({
+          label: userName,
+          route: { name: 'admin-user-access', query: { userId } }
         })
         crumbs.push({ label: 'Create Grant' })
         break

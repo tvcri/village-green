@@ -1794,6 +1794,102 @@ paths:
       - oauth:
         - vg:village:write
       x-elevation-required: true
+  /users/{userId}/grants:
+    get:
+      summary: List all grants for a user
+      tags:
+      - User
+      operationId: getUserGrants
+      parameters:
+      - $ref: '#/components/parameters/UserIdPath'
+      - $ref: '#/components/parameters/ElevateQuery'
+      responses:
+        '200':
+          description: Grant list for user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserVillageGrantRead'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:user:write
+      x-elevation-required: true
+    post:
+      summary: Create one or more grants for a user
+      tags:
+      - User
+      operationId: createUserGrant
+      parameters:
+      - $ref: '#/components/parameters/UserIdPath'
+      - $ref: '#/components/parameters/ElevateQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserVillageGrantWrite'
+      responses:
+        '201':
+          description: Grants created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserVillageGrantRead'
+        '422':
+          description: Request body is non-conformant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:user:write
+      x-elevation-required: true
+  /users/{userId}/grants/{grantId}:
+    delete:
+      summary: Delete a grant from a user
+      tags:
+      - User
+      operationId: deleteUserGrant
+      parameters:
+      - $ref: '#/components/parameters/UserIdPath'
+      - $ref: '#/components/parameters/GrantIdPath'
+      - $ref: '#/components/parameters/ElevateQuery'
+      responses:
+        '200':
+          description: Grant deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserVillageGrantRead'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:user:write
+      x-elevation-required: true
 components:
   schemas:
     ApiClassification:
@@ -2807,10 +2903,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserId'
-        villageGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserVillageGrant'
           uniqueItems: true
     UserGroupPostOrPut:
       type: object
@@ -2827,11 +2919,6 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/UserId'
-        villageGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserVillageGrant'
-          uniqueItems: true
     UserGroupProjected:
       type: object
       additionalProperties: false
@@ -2872,11 +2959,6 @@ components:
           $ref: '#/components/schemas/Username'
         status:
           $ref: '#/components/schemas/UserStatus'
-        villageGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserVillageGrant'
-          uniqueItems: true
     UserPost:
       additionalProperties: false
       type: object
@@ -2888,11 +2970,6 @@ components:
           uniqueItems: true
         username:
           $ref: '#/components/schemas/Username'
-        villageGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserVillageGrant'
-          uniqueItems: true
       required:
       - username
       - villageGrants
@@ -2938,7 +3015,7 @@ components:
         villageGrants:
           type: array
           items:
-            $ref: '#/components/schemas/UserVillageGrantProjected'
+            $ref: '#/components/schemas/UserVillageGrantRead'
       required:
       - userId
       - username
@@ -2958,11 +3035,6 @@ components:
           $ref: '#/components/schemas/Username'
         status:
           $ref: '#/components/schemas/UserStatus'
-        villageGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserVillageGrant'
-          uniqueItems: true
       required:
       - username
       - villageGrants
@@ -2986,7 +3058,7 @@ components:
       $ref: '#/components/schemas/StringDateTime'
     UserStatusUser:
       $ref: '#/components/schemas/StringIntIdNullable'
-    UserVillageGrant:
+    UserVillageGrantWrite:
       additionalProperties: false
       type: object
       properties:
@@ -2995,8 +3067,9 @@ components:
         roleId:
           $ref: '#/components/schemas/RoleId'
       required:
+      - villageId
       - roleId
-    UserVillageGrantProjected:
+    UserVillageGrantRead:
       additionalProperties: false
       type: object
       properties:

@@ -67,6 +67,12 @@ const routes = [
     meta: { requiresAdmin: true },
   },
   {
+    path: '/admin/users/grants/:userId',
+    name: 'admin-create-user-grant',
+    component: () => import('../features/Admin/components/CreateUserGrant.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: { template: '<div style="padding: 2rem;"><h1>Page not found</h1></div>' },

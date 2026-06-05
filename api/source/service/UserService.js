@@ -566,3 +566,94 @@ exports.patchUserWebPreferences = async function (userId, preferences) {
   await dbUtils.pool.query(sql, [JSON.stringify(preferences), userId])
   return preferences
 }
+
+exports.getUserGrants = async function (userId) {
+  const config = require('../utils/config')
+  const sql = `
+    SELECT
+      CAST(vg.grantId AS CHAR) AS grantId,
+      vg.roleId,
+      CAST(vg.villageId AS CHAR) AS villageId,
+      v.name AS village_name,
+      CAST(vg.userId AS CHAR) AS userId,
+      CAST(vg.userGroupId AS CHAR) AS userGroupId,
+      CASE
+        WHEN vg.userId IS NOT NULL THEN 'user'
+        WHEN vg.userGroupId IS NOT NULL THEN 'userGroup'
+      END AS granteeType,
+      CAST(ud.userId AS CHAR) AS grantee_userId,
+      ud.username AS grantee_username,
+      COALESCE(
+        JSON_UNQUOTE(JSON_EXTRACT(ud.lastClaims, "$.${config.oauth.claims.name}")),
+        ud.username
+      ) AS grantee_displayName,
+      CAST(ug.userGroupId AS CHAR) AS grantee_userGroupId,
+      ug.name AS grantee_name
+    FROM village_grant vg
+    JOIN village v ON vg.villageId = v.id
+    LEFT JOIN user_data ud ON vg.userId = ud.userId
+    LEFT JOIN user_group ug ON vg.userGroupId = ug.userGroupId
+    WHERE vg.userId = ? OR vg.userGroupId IN (SELECT userGroupId FROM user_group_user_map WHERE userId = ?)
+    ORDER BY vg.grantId
+  `
+  const [rows] = await dbUtils.pool.query(sql, [userId, userId])
+
+  return rows.map(row => {
+    const grantee = row.granteeType === 'user' ? {
+      userId: row.grantee_userId,
+      username: row.grantee_username,
+      displayName: row.grantee_displayName
+    } : {
+      userGroupId: row.grantee_userGroupId,
+      name: row.grantee_name
+    }
+
+    return {
+      grantId: row.grantId,
+      roleId: row.roleId,
+      village: {
+        villageId: row.villageId,
+        name: row.village_name
+      },
+      grantees: [grantee]
+    }
+  })
+}
+
+exports.createUserGrant = async function (userId, body) {
+  const grantsArray = Array.isArray(body) ? body : [body]
+
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      for (const grant of grantsArray) {
+        const mappedFields = {
+          userId,
+          villageId: grant.villageId,
+          roleId: grant.roleId
+        }
+
+        await connection.query('INSERT INTO village_grant SET ?', mappedFields)
+      }
+    },
+    statusObj: undefined
+  })
+
+  const grants = await exports.getUserGrants(userId)
+  return grants
+}
+
+exports.deleteUserGrant = async function (userId, grantId) {
+  const [existing] = await dbUtils.pool.query(
+    'SELECT * FROM village_grant WHERE grantId = ? AND userId = ?',
+    [grantId, userId]
+  )
+
+  if (!existing || existing.length === 0) {
+    throw new SmError.NotFoundError()
+  }
+
+  await dbUtils.pool.query('DELETE FROM village_grant WHERE grantId = ? AND userId = ?', [grantId, userId])
+
+  const grants = await exports.getUserGrants(userId)
+  return grants[0] || { grantId }
+}

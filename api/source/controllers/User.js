@@ -374,3 +374,73 @@ module.exports.patchUserWebPreferences = async (req, res, next) => {
   }
 }
 
+module.exports.getUserGrants = async function getUserGrants (req, res, next) {
+  try {
+    const userId = req.params.userId
+    const elevate = req.query.elevate
+
+    if (!elevate) {
+      throw new SmError.PrivilegeError()
+    }
+
+    const user = await UserService.getUserByUserId(userId)
+    if (!user) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await UserService.getUserGrants(userId)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.createUserGrant = async function createUserGrant (req, res, next) {
+  try {
+    const userId = req.params.userId
+    const body = req.body
+    const elevate = req.query.elevate
+
+    if (!elevate) {
+      throw new SmError.PrivilegeError()
+    }
+
+    const user = await UserService.getUserByUserId(userId)
+    if (!user) {
+      throw new SmError.NotFoundError()
+    }
+
+    await validateVillageGrants(body, {elevate})
+
+    const response = await UserService.createUserGrant(userId, body)
+    res.status(201).json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.deleteUserGrant = async function deleteUserGrant (req, res, next) {
+  try {
+    const userId = req.params.userId
+    const grantId = req.params.grantId
+    const elevate = req.query.elevate
+
+    if (!elevate) {
+      throw new SmError.PrivilegeError()
+    }
+
+    const user = await UserService.getUserByUserId(userId)
+    if (!user) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await UserService.deleteUserGrant(userId, grantId)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+

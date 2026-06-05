@@ -1,5 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router'
+import Button from 'primevue/button'
 
 const router = useRouter()
 
@@ -18,12 +19,8 @@ const navigateToUserAccess = () => {
     <p class="subtitle">Manage access and grants for the Village Green system</p>
 
     <div class="button-group">
-      <button class="nav-btn" @click="navigateToVillageAccess">
-        Village Access List
-      </button>
-      <button class="nav-btn" @click="navigateToUserAccess">
-        User Access List
-      </button>
+      <Button label="Village Access List" @click="navigateToVillageAccess" />
+      <Button label="User Access List" @click="navigateToUserAccess" />
     </div>
   </div>
 </template>
@@ -53,28 +50,8 @@ h1 {
   gap: 1rem;
 }
 
-.nav-btn {
-  padding: 1rem 1.5rem;
-  background-color: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  text-align: center;
-}
 
-.nav-btn:hover {
-  background-color: var(--color-primary-hover);
-}
-
-.nav-btn:active {
-  background-color: var(--color-primary-active);
-}
-
-@media (max-width: 300px) {
+@media (max-width: 400px) {
   .admin-hub {
     padding: 1rem;
   }
@@ -85,11 +62,6 @@ h1 {
 
   .button-group {
     grid-template-columns: 1fr;
-  }
-
-  .nav-btn {
-    padding: 0.75rem 1rem;
-    font-size: 0.9rem;
   }
 }
 </style>

@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import Dropdown from 'primevue/dropdown'
+import AutoComplete from 'primevue/autocomplete'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRoleLabels } from '../../../shared/composables/useRoleLabels.js'
 import { getVillageGrants, createVillageGrant } from '../api/villageGrantApi.js'
@@ -106,48 +108,36 @@ const isFormValid = computed(() => {
     <form @submit.prevent="handleSubmit" class="grant-form">
       <div class="form-group">
         <label for="role-select">Select Role:</label>
-        <select
+        <Dropdown
           id="role-select"
           v-model="selectedRoleId"
-          class="dropdown"
-          required
-        >
-          <option value="">-- Choose a role --</option>
-          <option
-            v-for="role in roles"
-            :key="role.id"
-            :value="role.id"
-          >
-            {{ role.label }}
-          </option>
-        </select>
+          :options="roles"
+          option-label="label"
+          option-value="id"
+          placeholder="-- Choose a role --"
+        />
       </div>
 
       <div class="form-group">
         <label for="user-search">Select Users:</label>
-        <div class="user-search-container">
-          <input
-            id="user-search"
-            v-model="userSearchQuery"
-            type="text"
-            placeholder="Search by name or username..."
-            class="search-input"
-          />
-          <div v-if="userSearchQuery" class="user-dropdown">
-            <div
-              v-for="user in filteredUsers"
-              :key="user.userId"
-              class="user-option"
-              @click="handleAddUser(user.userId)"
-            >
-              <div class="user-name">{{ user.displayName || user.username }}</div>
-              <div class="user-username">{{ user.username }}</div>
+        <AutoComplete
+          id="user-search"
+          v-model="userSearchQuery"
+          :suggestions="filteredUsers"
+          @complete="userSearchQuery = $event.query"
+          @item-select="handleAddUser($event.value.userId)"
+          option-label="displayName"
+          placeholder="Search by name or username..."
+          :field="{ label: 'displayName', value: 'userId' }"
+          :min-length="2"
+        >
+          <template #item="slotProps">
+            <div class="user-autocomplete-item">
+              <div class="user-name">{{ slotProps.option.displayName || slotProps.option.username }}</div>
+              <div class="user-username">{{ slotProps.option.username }}</div>
             </div>
-            <div v-if="filteredUsers.length === 0" class="user-option disabled">
-              No matching users found
-            </div>
-          </div>
-        </div>
+          </template>
+        </AutoComplete>
         <p v-if="selectedUsers.length === 0 && filteredUsers.length === 0 && !userSearchQuery" class="helper-text">
           All users already have grants for this village
         </p>
@@ -242,61 +232,8 @@ h1 {
   box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.1);
 }
 
-.user-search-container {
-  position: relative;
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  color: var(--color-text-primary);
-  font-size: 0.9rem;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--color-primary-highlight-light);
-  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.1);
-}
-
-.user-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin-top: 0.25rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  max-height: 250px;
-  overflow-y: auto;
-  z-index: 10;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.user-option {
-  padding: 0.75rem;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-  border-bottom: 1px solid var(--color-border-default);
-}
-
-.user-option:last-child {
-  border-bottom: none;
-}
-
-.user-option:not(.disabled):hover {
-  background-color: var(--color-background-dark);
-}
-
-.user-option.disabled {
-  cursor: not-allowed;
-  color: var(--color-text-dim);
-  text-align: center;
-  font-style: italic;
+.user-autocomplete-item {
+  padding: 0.5rem 0;
 }
 
 .user-name {
@@ -414,19 +351,21 @@ h1 {
   cursor: not-allowed;
 }
 
-@media (max-width: 768px) {
-  .create-grant {
-    padding: 1rem;
-  }
-
+@media (max-width: 600px) {
   .form-actions {
-    flex-direction: row;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .btn-submit,
   .btn-cancel {
-    width: auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .create-grant {
+    padding: 1rem;
   }
 
   .user-chips {
