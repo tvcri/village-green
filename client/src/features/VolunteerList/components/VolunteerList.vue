@@ -1,6 +1,11 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import InputText from 'primevue/inputtext'
+import Checkbox from 'primevue/checkbox'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
@@ -10,8 +15,10 @@ const route = useRoute()
 
 const villageId = computed(() => route.params.villageId)
 const searchText = useDebouncedRef('', 300)
+const selectedCapabilities = ref([])
 const sortField = ref('fullName')
 const sortDir = ref('asc')
+const capabilityOptions = ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support']
 
 const { state: volunteers, isLoading, error } = useAsyncState(
   () => getVillageVolunteers(villageId.value),
@@ -21,9 +28,20 @@ const { state: volunteers, isLoading, error } = useAsyncState(
 const filteredVolunteers = computed(() => {
   if (!Array.isArray(volunteers.value)) return []
 
-  let result = volunteers.value.filter(v =>
-    v.fullName?.toLowerCase().includes(searchText.value.toLowerCase())
-  )
+  let result = volunteers.value.filter(v => {
+    // Filter by name
+    const nameMatch = v.fullName?.toLowerCase().includes(searchText.value.toLowerCase())
+
+    // Filter by capabilities
+    let capabilityMatch = true
+    if (selectedCapabilities.value.length > 0) {
+      capabilityMatch = selectedCapabilities.value.some(cap =>
+        v.capabilities?.includes(cap)
+      )
+    }
+
+    return nameMatch && capabilityMatch
+  })
 
   result.sort((a, b) => {
     const aVal = a[sortField.value] ?? ''
@@ -46,10 +64,11 @@ const toggleSort = (field) => {
   }
 }
 
-const navigateToVolunteer = (personId, fullName) => {
+
+const navigateToVolunteer = (volunteer) => {
   router.push({
     name: 'volunteer-detail',
-    params: { villageId: villageId.value, personId, personName: fullName }
+    params: { villageId: villageId.value, personId: volunteer.personId, personName: volunteer.fullName }
   })
 }
 </script>
@@ -59,12 +78,28 @@ const navigateToVolunteer = (personId, fullName) => {
     <h1>Volunteers</h1>
 
     <div class="filter-section">
-      <input
-        v-model="searchText"
-        type="text"
-        placeholder="Search by name..."
-        class="search-input"
-      />
+      <div class="search-box">
+        <InputText
+          v-model="searchText"
+          type="text"
+          placeholder="Search by name..."
+        />
+      </div>
+
+      <div class="capability-filters">
+        <div
+          v-for="capability in capabilityOptions"
+          :key="capability"
+          class="capability-filter"
+        >
+          <Checkbox
+            v-model="selectedCapabilities"
+            :input-id="`capability-${capability}`"
+            :value="capability"
+          />
+          <label :for="`capability-${capability}`">{{ capability }}</label>
+        </div>
+      </div>
     </div>
 
     <div v-if="isLoading" class="loading-state">
@@ -80,43 +115,29 @@ const navigateToVolunteer = (personId, fullName) => {
     </div>
 
     <!-- Desktop Table -->
-    <table v-else class="volunteer-table desktop-only">
-      <thead>
-        <tr>
-          <th @click="toggleSort('fullName')" class="sortable">
-            Name
-            <span v-if="sortField === 'fullName'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
+    <DataTable
+      v-else
+      :value="filteredVolunteers"
+      class="volunteer-table-responsive desktop-only"
+      @row-click="(event) => navigateToVolunteer(event.data)"
+    >
+      <Column field="fullName" header="Name" sortable style="width: 50%"></Column>
+      <Column header="Capabilities" style="width: 50%">
+        <template #body="slotProps">
+          <div class="capabilities-list">
+            <Tag
+              v-for="cap in slotProps.data.capabilities"
+              :key="cap"
+              :value="cap"
+              class="capability-badge"
+            />
+            <span v-if="!slotProps.data.capabilities?.length" class="no-capabilities">
+              —
             </span>
-          </th>
-          <th>Capabilities</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="volunteer in filteredVolunteers"
-          :key="volunteer.volunteerId"
-          class="clickable"
-          @click="navigateToVolunteer(volunteer.personId, volunteer.fullName)"
-        >
-          <td>{{ volunteer.fullName }}</td>
-          <td>
-            <div class="capabilities-list">
-              <span
-                v-for="cap in volunteer.capabilities"
-                :key="cap"
-                class="capability-badge"
-              >
-                {{ cap }}
-              </span>
-              <span v-if="!volunteer.capabilities?.length" class="no-capabilities">
-                —
-              </span>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+          </div>
+        </template>
+      </Column>
+    </DataTable>
 
     <!-- Mobile Card List -->
     <div class="volunteer-cards mobile-only">
@@ -124,7 +145,7 @@ const navigateToVolunteer = (personId, fullName) => {
         v-for="volunteer in filteredVolunteers"
         :key="volunteer.volunteerId"
         class="volunteer-card"
-        @click="navigateToVolunteer(volunteer.personId, volunteer.fullName)"
+        @click="navigateToVolunteer(volunteer)"
       >
         <h3>{{ volunteer.fullName }}</h3>
         <div class="card-row">
@@ -157,17 +178,33 @@ h1 {
 
 .filter-section {
   margin-bottom: 1.5rem;
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
 }
 
-.search-input {
-  width: 100%;
-  max-width: 400px;
-  padding: 0.75rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  color: var(--color-text-primary);
+.search-box {
+  flex: 1;
+  min-width: 300px;
+}
+
+.capability-filters {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.capability-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.capability-filter label {
+  cursor: pointer;
   font-size: 0.9rem;
+  color: var(--color-text-primary);
 }
 
 .search-input:focus {
@@ -187,6 +224,10 @@ h1 {
 
 .error-state {
   color: var(--color-text-error);
+}
+
+.volunteer-table-responsive {
+  cursor: pointer;
 }
 
 /* Capabilities Badge */
@@ -306,7 +347,7 @@ h1 {
 
 /* Responsive */
 .desktop-only {
-  display: table;
+  width: 100%;
 }
 
 .mobile-only {

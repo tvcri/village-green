@@ -1,6 +1,13 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import InputText from 'primevue/inputtext'
+import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
+import Select from 'primevue/select'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
@@ -9,24 +16,58 @@ const router = useRouter()
 const route = useRoute()
 
 const villageId = computed(() => route.params.villageId)
-const searchText = useDebouncedRef('', 300)
+const memberSearchText = useDebouncedRef('', 300)
+const volunteerSearchText = useDebouncedRef('', 300)
+const selectedService = ref('All services')
 const selectedStatuses = ref([])
 const sortField = ref('requestNumber')
 const sortDir = ref('asc')
 
 const { state: requests, isLoading, error, execute } = useAsyncState(
-  () => getVillageServiceRequests(villageId.value, selectedStatuses.value),
+  () => getVillageServiceRequests(villageId.value),
   { immediate: true }
 )
 
 const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled']
 
+const serviceOptions = computed(() => {
+  if (!Array.isArray(requests.value)) return []
+  const services = new Set(requests.value.map(r => r.serviceName).filter(Boolean))
+  return ['All services', ...Array.from(services).sort()]
+})
+
 const filteredRequests = computed(() => {
   if (!Array.isArray(requests.value)) return []
 
-  let result = requests.value.filter(r =>
-    r.serviceName?.toLowerCase().includes(searchText.value.toLowerCase())
-  )
+  let result = requests.value.filter(r => {
+    // Filter by member name
+    const memberMatch = (r.memberFullName || '').toLowerCase().includes(memberSearchText.value.toLowerCase())
+
+    // Filter by volunteer name
+    const volunteerMatch = (r.volunteerFullName || '').toLowerCase().includes(volunteerSearchText.value.toLowerCase())
+
+    // Filter by service
+    let serviceMatch = true
+    if (selectedService.value && selectedService.value !== 'All services') {
+      serviceMatch = r.serviceName === selectedService.value
+    }
+
+    // Filter by status
+    let statusMatch = true
+    if (selectedStatuses.value.length > 0) {
+      const statusLower = r.status?.toLowerCase() || ''
+      statusMatch = selectedStatuses.value.some(selectedStatus => {
+        const selectedLower = selectedStatus.toLowerCase()
+        // For "cancelled", match any status containing "cancelled"
+        if (selectedLower === 'cancelled') {
+          return statusLower.includes('cancelled')
+        }
+        return statusLower === selectedLower
+      })
+    }
+
+    return memberMatch && volunteerMatch && serviceMatch && statusMatch
+  })
 
   result.sort((a, b) => {
     const aVal = a[sortField.value] ?? ''
@@ -56,7 +97,25 @@ const toggleStatus = (status) => {
   } else {
     selectedStatuses.value.push(status)
   }
-  execute()
+}
+
+const getStatusSeverity = (status) => {
+  const statusLower = status?.toLowerCase() || ''
+  if (statusLower.includes('cancelled')) {
+    return 'danger' // light red
+  }
+  switch (statusLower) {
+    case 'open':
+      return 'warn' // orange
+    case 'confirmed':
+      return 'info' // cyan
+    case 'completed':
+      return 'success' // green
+    case 'unmatched':
+      return 'secondary' // black/gray
+    default:
+      return 'info'
+  }
 }
 
 const navigateToRequest = (serviceRequestId) => {
@@ -73,27 +132,68 @@ const navigateToRequest = (serviceRequestId) => {
 
     <div class="filter-section">
       <div class="search-box">
-        <input
-          v-model="searchText"
-          type="text"
-          placeholder="Search by service name..."
-          class="search-input"
+        <label>Member:</label>
+        <div class="search-input-group">
+          <InputText
+            v-model="memberSearchText"
+            type="text"
+            placeholder="Search by name..."
+            spellcheck="false"
+          />
+          <Button
+            icon="pi pi-times"
+            variant="text"
+            size="small"
+            @click="memberSearchText = ''"
+            title="Clear search"
+          />
+        </div>
+      </div>
+
+      <div class="search-box">
+        <label>Volunteer:</label>
+        <div class="search-input-group">
+          <InputText
+            v-model="volunteerSearchText"
+            type="text"
+            placeholder="Search by name..."
+            spellcheck="false"
+          />
+          <Button
+            icon="pi pi-times"
+            variant="text"
+            size="small"
+            @click="volunteerSearchText = ''"
+            title="Clear search"
+          />
+        </div>
+      </div>
+
+      <div class="search-box">
+        <label>Service:</label>
+        <Select
+          v-model="selectedService"
+          :options="serviceOptions"
+          placeholder="-- Select service --"
+          @change="selectedService = selectedService"
         />
       </div>
 
-      <div class="status-filters">
-        <div
-          v-for="status in statusOptions"
-          :key="status"
-          class="status-filter"
-        >
-          <input
-            :id="`status-${status}`"
-            type="checkbox"
-            :checked="selectedStatuses.includes(status)"
-            @change="toggleStatus(status)"
-          />
-          <label :for="`status-${status}`">{{ status }}</label>
+      <div class="status-box">
+        <label>Status:</label>
+        <div class="status-filters">
+          <div
+            v-for="status in statusOptions"
+            :key="status"
+            class="status-filter"
+          >
+            <Checkbox
+              v-model="selectedStatuses"
+              :input-id="`status-${status}`"
+              :value="status"
+            />
+            <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
+          </div>
         </div>
       </div>
     </div>
@@ -111,59 +211,34 @@ const navigateToRequest = (serviceRequestId) => {
     </div>
 
     <!-- Desktop Table -->
-    <table v-else class="request-table desktop-only">
-      <thead>
-        <tr>
-          <th @click="toggleSort('requestNumber')" class="sortable">
-            #
-            <span v-if="sortField === 'requestNumber'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th @click="toggleSort('serviceName')" class="sortable">
-            Service
-            <span v-if="sortField === 'serviceName'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th @click="toggleSort('status')" class="sortable">
-            Status
-            <span v-if="sortField === 'status'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th>Member</th>
-          <th>Volunteer</th>
-          <th @click="toggleSort('startAt')" class="sortable">
-            Start
-            <span v-if="sortField === 'startAt'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th>City</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="request in filteredRequests"
-          :key="request.serviceRequestId"
-          class="clickable"
-          @click="navigateToRequest(request.serviceRequestId)"
-        >
-          <td>{{ request.requestNumber ?? '—' }}</td>
-          <td>{{ request.serviceName ?? '—' }}</td>
-          <td>
-            <span class="status-badge" :data-status="request.status">
-              {{ request.status ?? '—' }}
-            </span>
-          </td>
-          <td>{{ request.memberFullName ?? '—' }}</td>
-          <td>{{ request.volunteerFullName ?? '—' }}</td>
-          <td>{{ request.startAt ? formatDate(request.startAt) : '—' }}</td>
-          <td>{{ request.city ?? '—' }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-else class="table-container desktop-only">
+      <DataTable
+        :value="filteredRequests"
+        class="request-table-responsive"
+        scrollable
+        scrollHeight="flex"
+        @row-click="(event) => navigateToRequest(event.data.serviceRequestId)"
+      >
+      <Column field="requestNumber" header="#" sortable style="width: 10%"></Column>
+      <Column field="serviceName" header="Service" sortable style="width: 20%"></Column>
+      <Column field="status" header="Status" sortable style="width: 12%">
+        <template #body="slotProps">
+          <Tag
+            :value="slotProps.data.status"
+            :severity="getStatusSeverity(slotProps.data.status)"
+          />
+        </template>
+      </Column>
+      <Column field="memberFullName" header="Member" style="width: 15%"></Column>
+      <Column field="volunteerFullName" header="Volunteer" style="width: 15%"></Column>
+      <Column field="startAt" header="Start" sortable style="width: 15%">
+        <template #body="slotProps">
+          {{ slotProps.data.startAt ? formatDate(slotProps.data.startAt) : '—' }}
+        </template>
+      </Column>
+      <Column field="city" header="City" style="width: 13%"></Column>
+      </DataTable>
+    </div>
 
     <!-- Mobile Card List -->
     <div class="request-cards mobile-only">
@@ -215,6 +290,9 @@ function formatDate(dateStr) {
 <style scoped>
 .service-request-list {
   padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 h1 {
@@ -223,16 +301,53 @@ h1 {
 }
 
 .filter-section {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   margin-bottom: 1.5rem;
+  padding: 1rem 0;
+  background-color: var(--color-background-primary);
   display: flex;
   gap: 2rem;
   flex-wrap: wrap;
   align-items: flex-start;
+  border-bottom: 1px solid var(--color-border-default);
 }
 
 .search-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  width: 250px;
+}
+
+.search-box label {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+}
+
+.search-input-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.search-input-group :deep(.p-inputtext) {
   flex: 1;
-  min-width: 250px;
+}
+
+.status-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-box label {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
 }
 
 .search-input {
@@ -255,6 +370,7 @@ h1 {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  margin-top: 6px;
 }
 
 .status-filter {
@@ -262,6 +378,7 @@ h1 {
   align-items: center;
   gap: 0.5rem;
 }
+
 
 .status-filter input[type="checkbox"] {
   cursor: pointer;
@@ -284,6 +401,17 @@ h1 {
 
 .error-state {
   color: var(--color-text-error);
+}
+
+.request-table-responsive {
+  cursor: pointer;
+}
+
+.table-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .status-badge {
@@ -425,7 +553,7 @@ h1 {
 
 /* Responsive */
 .desktop-only {
-  display: table;
+  width: 100%;
 }
 
 .mobile-only {

@@ -1,6 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import InputText from 'primevue/inputtext'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageMembers } from '../api/memberApi.js'
@@ -46,10 +49,11 @@ const toggleSort = (field) => {
   }
 }
 
-const navigateToMember = (personId, fullName) => {
+const navigateToMember = (member) => {
   router.push({
     name: 'member-detail',
-    params: { villageId: villageId.value, personId, personName: fullName }
+    params: { villageId: villageId.value, personId: member.personId },
+    state: { member }
   })
 }
 </script>
@@ -59,11 +63,10 @@ const navigateToMember = (personId, fullName) => {
     <h1>Members</h1>
 
     <div class="filter-section">
-      <input
+      <InputText
         v-model="searchText"
         type="text"
         placeholder="Search by name..."
-        class="search-input"
       />
     </div>
 
@@ -80,49 +83,17 @@ const navigateToMember = (personId, fullName) => {
     </div>
 
     <!-- Desktop Table -->
-    <table v-else class="member-table desktop-only">
-      <thead>
-        <tr>
-          <th @click="toggleSort('fullName')" class="sortable">
-            Name
-            <span v-if="sortField === 'fullName'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th @click="toggleSort('memberNumber')" class="sortable">
-            Member #
-            <span v-if="sortField === 'memberNumber'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th @click="toggleSort('memberLevel')" class="sortable">
-            Level
-            <span v-if="sortField === 'memberLevel'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-          <th @click="toggleSort('joinDate')" class="sortable">
-            Join Date
-            <span v-if="sortField === 'joinDate'" class="sort-indicator">
-              {{ sortDir === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="member in filteredMembers"
-          :key="member.memberId"
-          class="clickable"
-          @click="navigateToMember(member.personId, member.fullName)"
-        >
-          <td>{{ member.fullName }}</td>
-          <td>{{ member.memberNumber ?? '—' }}</td>
-          <td>{{ member.memberLevel ?? '—' }}</td>
-          <td>{{ member.joinDate ?? '—' }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <DataTable
+      v-else
+      :value="filteredMembers"
+      class="member-table-responsive desktop-only"
+      @row-click="(event) => navigateToMember(event.data)"
+    >
+      <Column field="fullName" header="Name" sortable style="width: 25%"></Column>
+      <Column field="memberNumber" header="Member #" sortable style="width: 25%"></Column>
+      <Column field="memberLevel" header="Level" sortable style="width: 25%"></Column>
+      <Column field="joinDate" header="Join Date" sortable style="width: 25%"></Column>
+    </DataTable>
 
     <!-- Mobile Card List -->
     <div class="member-cards mobile-only">
@@ -130,7 +101,7 @@ const navigateToMember = (personId, fullName) => {
         v-for="member in filteredMembers"
         :key="member.memberId"
         class="member-card"
-        @click="navigateToMember(member.personId, member.fullName)"
+        @click="navigateToMember(member)"
       >
         <h3>{{ member.fullName }}</h3>
         <div class="card-row">
@@ -164,23 +135,6 @@ h1 {
   margin-bottom: 1.5rem;
 }
 
-.search-input {
-  width: 100%;
-  max-width: 400px;
-  padding: 0.75rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  color: var(--color-text-primary);
-  font-size: 0.9rem;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--color-primary-highlight-light);
-  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.1);
-}
-
 .loading-state,
 .error-state,
 .empty-state {
@@ -194,57 +148,8 @@ h1 {
   color: var(--color-text-error);
 }
 
-/* Desktop Table */
-.member-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.member-table thead {
-  background-color: var(--color-background-dark);
-}
-
-.member-table th {
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  border-bottom: 1px solid var(--color-border-default);
-}
-
-.member-table th.sortable {
+.member-table-responsive {
   cursor: pointer;
-  user-select: none;
-}
-
-.member-table th.sortable:hover {
-  background-color: var(--color-background-subtle);
-}
-
-.sort-indicator {
-  margin-left: 0.5rem;
-  font-size: 0.75rem;
-  opacity: 0.7;
-}
-
-.member-table td {
-  padding: 1rem;
-  border-bottom: 1px solid var(--color-border-default);
-  color: var(--color-text-primary);
-}
-
-.member-table tbody tr.clickable {
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.member-table tbody tr.clickable:hover {
-  background-color: var(--color-background-subtle);
 }
 
 /* Mobile Card List */
@@ -287,7 +192,7 @@ h1 {
 
 /* Responsive */
 .desktop-only {
-  display: table;
+  width: 100%;
 }
 
 .mobile-only {

@@ -1,4 +1,4 @@
 import { apiCall } from '../../../shared/api/apiClient.js'
 
-export const getVillageServiceRequests = (villageId, status) =>
-  apiCall('getVillageServiceRequests', { villageId, ...(status?.length && { status }) })
+export const getVillageServiceRequests = (villageId) =>
+  apiCall('getVillageServiceRequests', { villageId })

@@ -7,7 +7,10 @@ export default defineConfig(({ mode, command }) => {
   const envOrigin = env.VITE_ENV_ORIGIN
   return {
     base: command === 'build' ? './' : '/',
-    plugins: [vue(), VueDevtools()],
+    plugins: [
+      vue(), 
+      // VueDevtools()
+    ],
     server: {
       // Proxy requests for Env.js to the API server in development only
       proxy: {

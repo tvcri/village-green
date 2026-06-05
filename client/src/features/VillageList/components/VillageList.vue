@@ -1,6 +1,7 @@
 <script setup>
 import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import Card from 'primevue/card'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useElevate } from '../../../shared/composables/useElevate.js'
 import { getVillages } from '../api/villageApi.js'
@@ -42,14 +43,14 @@ const navigateToVillage = (villageId) => {
     </div>
 
     <div v-else class="village-grid">
-      <div
+      <Card
         v-for="village in villages"
         :key="village.villageId"
         class="village-card"
         @click="navigateToVillage(village.villageId)"
       >
-        <h2>{{ village.name }}</h2>
-        <div v-if="village.personCounts" class="card-stats">
+        <template #title>{{ village.name }}</template>
+        <template #content v-if="village.personCounts" class="card-stats">
           <div class="stat">
             <span class="label">Members:</span>
             <span class="value">{{ village.personCounts.member ?? 0 }}</span>
@@ -62,8 +63,8 @@ const navigateToVillage = (villageId) => {
             <span class="label">Both:</span>
             <span class="value">{{ village.personCounts.both ?? 0 }}</span>
           </div>
-        </div>
-      </div>
+        </template>
+      </Card>
     </div>
   </div>
 </template>
@@ -93,30 +94,20 @@ h1 {
 
 .village-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1.5rem;
   margin-top: 2rem;
 }
 
 .village-card {
-  padding: 1.5rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  border: 1px solid var(--color-border-default);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .village-card:hover {
-  background-color: var(--color-background-subtle);
-  border-color: var(--color-border-hover);
   transform: translateY(-2px);
-}
-
-.village-card h2 {
-  margin: 0 0 1rem 0;
-  font-size: 1.25rem;
-  color: var(--color-text-primary);
 }
 
 .card-stats {
@@ -147,12 +138,7 @@ h1 {
   }
 
   .village-grid {
-    grid-template-columns: 1fr;
     gap: 1rem;
-  }
-
-  .village-card {
-    padding: 1rem;
   }
 }
 </style>

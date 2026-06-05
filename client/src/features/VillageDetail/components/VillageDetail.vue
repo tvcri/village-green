@@ -1,6 +1,7 @@
 <script setup>
 import { computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import Button from 'primevue/button'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useElevate } from '../../../shared/composables/useElevate.js'
 import { getVillage } from '../api/villageApi.js'
@@ -34,15 +35,9 @@ const navigateTo = (section) => {
     <h1>{{ village?.name ?? 'Village' }}</h1>
 
     <div class="nav-section">
-      <button class="nav-btn" @click="navigateTo('members')">
-        Members
-      </button>
-      <button class="nav-btn" @click="navigateTo('volunteers')">
-        Volunteers
-      </button>
-      <button class="nav-btn" @click="navigateTo('service-requests')">
-        Service Requests
-      </button>
+      <Button label="Members" @click="navigateTo('members')" />
+      <Button label="Volunteers" @click="navigateTo('volunteers')" />
+      <Button label="Service Requests" @click="navigateTo('service-requests')" />
     </div>
   </div>
 </template>
@@ -63,22 +58,6 @@ h1 {
   flex-wrap: wrap;
 }
 
-.nav-btn {
-  padding: 0.75rem 1.5rem;
-  background-color: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
-}
-
-.nav-btn:hover {
-  background-color: var(--color-primary-hover);
-}
-
 @media (max-width: 768px) {
   .village-detail {
     padding: 1rem;
@@ -86,10 +65,6 @@ h1 {
 
   .nav-section {
     flex-direction: column;
-  }
-
-  .nav-btn {
-    width: 100%;
   }
 }
 </style>
