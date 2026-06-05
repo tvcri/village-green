@@ -72,6 +72,63 @@ const chartOptions = {
   }
 }
 
+const capabilityCountsChartData = computed(() => {
+  if (!village.value?.capabilityCounts) {
+    return null
+  }
+
+  const capabilityCounts = village.value.capabilityCounts
+  const sortedKeys = Object.keys(capabilityCounts).sort()
+  const labels = sortedKeys.map(key => camelCaseToTitleCase(key))
+  const data = sortedKeys.map(key => capabilityCounts[key])
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Volunteers',
+        backgroundColor: '#10B981',
+        borderColor: '#047857',
+        borderWidth: 1,
+        data
+      }
+    ]
+  }
+})
+
+const capabilityChartOptions = {
+  responsive: true,
+  maintainAspectRatio: true,
+  aspectRatio: 1.5,
+  plugins: {
+    legend: {
+      position: 'top'
+    },
+    tooltip: {
+      callbacks: {
+        label: (context) => {
+          return `${context.dataset.label}: ${context.parsed.y}`
+        }
+      }
+    }
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+      ticks: {
+        stepSize: 1
+      }
+    }
+  }
+}
+
+const camelCaseToTitleCase = (str) => {
+  return str
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (char) => char.toUpperCase())
+    .trim()
+}
+
 const navigateTo = (section) => {
   router.push({
     name: section,
@@ -90,8 +147,8 @@ const navigateTo = (section) => {
       <Button label="Service Requests" @click="navigateTo('service-requests')" />
     </div>
 
-    <div v-if="personCountsChartData" class="charts-section">
-      <div class="chart-container">
+    <div class="charts-section">
+      <div v-if="personCountsChartData" class="chart-container">
         <h2>Person Counts by Role</h2>
         <Chart
           type="pie"
@@ -110,6 +167,43 @@ const navigateTo = (section) => {
           <div class="summary-row">
             <span class="summary-label">Both Roles:</span>
             <span class="summary-value">{{ village.personCounts.both }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="capabilityCountsChartData" class="chart-container">
+        <h2>Volunteers by Capability</h2>
+        <Chart
+          type="bar"
+          :data="capabilityCountsChartData"
+          :options="capabilityChartOptions"
+        />
+        <div class="chart-summary">
+          <div class="summary-column">
+            <div class="summary-row">
+              <span class="summary-label">{{ camelCaseToTitleCase('errands') }}:</span>
+              <span class="summary-value">{{ village.capabilityCounts.errands }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">{{ camelCaseToTitleCase('friends') }}:</span>
+              <span class="summary-value">{{ village.capabilityCounts.friends }}</span>
+            </div>
+          </div>
+          <div class="summary-column">
+            <div class="summary-row">
+              <span class="summary-label">{{ camelCaseToTitleCase('homeHelp') }}:</span>
+              <span class="summary-value">{{ village.capabilityCounts.homeHelp }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">{{ camelCaseToTitleCase('rides') }}:</span>
+              <span class="summary-value">{{ village.capabilityCounts.rides }}</span>
+            </div>
+          </div>
+          <div class="summary-column">
+            <div class="summary-row">
+              <span class="summary-label">{{ camelCaseToTitleCase('techSupport') }}:</span>
+              <span class="summary-value">{{ village.capabilityCounts.techSupport }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -159,6 +253,12 @@ h2 {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--color-border-default);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.summary-column {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -166,8 +266,9 @@ h2 {
 
 .summary-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 1rem;
   font-size: 0.9rem;
 }
 
