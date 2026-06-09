@@ -219,13 +219,21 @@ const navigate = (crumb) => {
 }
 
 .breadcrumb-link--has-siblings {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.25rem;
 }
 
+.breadcrumb-link--has-siblings:hover {
+  background-color: color-mix(in srgb, var(--color-primary-highlight) 10%, transparent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+}
+
 .breadcrumb-chevron {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
+  opacity: 0.75;
 }
 
 .breadcrumb-current {
@@ -247,5 +255,16 @@ const navigate = (crumb) => {
     font-size: 0.85rem;
     gap: 0.3rem;
   }
+}
+</style>
+
+<style>
+.breadcrumb-sibling-active > .p-menuitem-content {
+  background-color: color-mix(in srgb, var(--color-primary-highlight) 12%, transparent) !important;
+  font-weight: 600;
+}
+
+.breadcrumb-sibling-active > .p-menuitem-content .p-menuitem-text {
+  color: var(--color-primary-highlight);
 }
 </style>
