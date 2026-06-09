@@ -94,12 +94,19 @@ const breadcrumbs = computed(() => {
   if (vId && villages.value) {
     const village = villages.value.find(v => v.villageId === vId)
     const villageName = village?.name || `Village ${vId}`
+
+    // Determine the current descendant route (if any)
+    let descendantRouteName = 'village-detail'
+    if (['members', 'member-detail', 'volunteers', 'volunteer-detail', 'service-requests', 'service-request-detail'].includes(route.name)) {
+      descendantRouteName = route.name
+    }
+
     crumbs.push({
       label: villageName,
       route: { name: 'village-detail', params: { villageId: vId } },
       siblings: villages.value.map(v => ({
         label: v.name,
-        route: { name: 'village-detail', params: { villageId: v.villageId } }
+        route: { name: descendantRouteName, params: { villageId: v.villageId, ...route.params } }
       }))
     })
   } else if (vId) {
