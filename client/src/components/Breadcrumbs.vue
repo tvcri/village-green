@@ -174,7 +174,14 @@ const navigate = (crumb) => {
         <template v-if="crumb.siblings">
           <Menu
             :ref="el => { if (el) menuRefs.set(index, el) }"
-            :model="crumb.siblings.filter(s => s.route.name !== route.name).map(s => ({
+            :model="crumb.siblings.filter(s => {
+              // For routes with same name but different params (e.g., villages), compare params
+              if (s.route.name === route.name) {
+                return JSON.stringify(s.route.params) !== JSON.stringify(route.params)
+              }
+              // For different route names (e.g., admin sections), exclude if route name matches
+              return s.route.name !== route.name
+            }).map(s => ({
               label: s.label,
               command: () => router.push(s.route)
             }))"
