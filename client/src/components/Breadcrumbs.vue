@@ -5,7 +5,7 @@ import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
-import { siblingGroups, siblingLabels } from '../shared/config/siblingGroups.js'
+import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
 import Menu from 'primevue/menu'
 
 const router = useRouter()
@@ -13,18 +13,20 @@ const route = useRoute()
 
 const menuRefs = new Map()
 
-function getSiblings(routeName, currentParams) {
-  // Find which group this route belongs to
-  const groupName = Object.entries(siblingGroups).find(
-    ([_, routes]) => routes.includes(routeName)
-  )?.[0]
+// Build reverse map at load time for O(1) lookups
+const routeToGroupMap = Object.fromEntries(
+  Object.entries(siblingGroups).flatMap(([groupName, routes]) =>
+    routes.map(r => [r.name, groupName])
+  )
+)
 
+function getSiblings(routeName, currentParams) {
+  const groupName = routeToGroupMap[routeName]
   if (!groupName) return null
 
-  // Map group routes to sibling objects
-  return siblingGroups[groupName].map(name => ({
-    label: siblingLabels[name],
-    route: { name, params: currentParams }
+  return siblingGroups[groupName].map(sibling => ({
+    label: sibling.label,
+    route: { name: sibling.name, params: currentParams }
   }))
 }
 
@@ -101,16 +103,12 @@ const breadcrumbs = computed(() => {
 
     // Determine the current descendant route (if any)
     // Detail routes map to their parent list routes
+    const listRouteNames = siblingGroups['village-sections'].map(r => r.name)
     let descendantRouteName = 'village-detail'
-    const detailToListMap = {
-      'member-detail': 'members',
-      'volunteer-detail': 'volunteers',
-      'service-request-detail': 'service-requests'
-    }
 
     if (detailToListMap[route.name]) {
       descendantRouteName = detailToListMap[route.name]
-    } else if (['members', 'volunteers', 'service-requests'].includes(route.name)) {
+    } else if (listRouteNames.includes(route.name)) {
       descendantRouteName = route.name
     }
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
@@ -11,6 +11,7 @@ import Fieldset from 'primevue/fieldset'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
+import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -45,10 +46,7 @@ const { state: village, execute: fetchVillage } = useAsyncState(
   { immediate: true }
 )
 
-watch(villageId, () => {
-  fetchRequests()
-  fetchVillage()
-})
+useRefetchOnChange(villageId, [fetchRequests, fetchVillage])
 
 const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled']
 

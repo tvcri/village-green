@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
@@ -10,6 +10,7 @@ import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
+import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { getVillageMembers } from '../api/memberApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -46,10 +47,7 @@ const { state: persons, execute: fetchPersons } = useAsyncState(
   { immediate: true }
 )
 
-watch(villageId, () => {
-  fetchMembers()
-  fetchPersons()
-})
+useRefetchOnChange(villageId, [fetchMembers, fetchPersons])
 
 const filteredMembers = computed(() => {
   if (!Array.isArray(members.value)) return []
