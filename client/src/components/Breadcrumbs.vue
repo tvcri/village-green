@@ -174,9 +174,8 @@ const navigate = (crumb) => {
         <template v-if="crumb.siblings">
           <Menu
             :ref="el => { if (el) menuRefs.set(index, el) }"
-            :model="crumb.siblings.map(s => ({
+            :model="crumb.siblings.filter(s => s.route.name !== route.name).map(s => ({
               label: s.label,
-              class: route.name === s.route.name ? 'breadcrumb-sibling-active' : '',
               command: () => router.push(s.route)
             }))"
             :popup="true"
