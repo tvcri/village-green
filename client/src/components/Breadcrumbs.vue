@@ -96,8 +96,17 @@ const breadcrumbs = computed(() => {
     const villageName = village?.name || `Village ${vId}`
 
     // Determine the current descendant route (if any)
+    // Detail routes map to their parent list routes
     let descendantRouteName = 'village-detail'
-    if (['members', 'member-detail', 'volunteers', 'volunteer-detail', 'service-requests', 'service-request-detail'].includes(route.name)) {
+    const detailToListMap = {
+      'member-detail': 'members',
+      'volunteer-detail': 'volunteers',
+      'service-request-detail': 'service-requests'
+    }
+
+    if (detailToListMap[route.name]) {
+      descendantRouteName = detailToListMap[route.name]
+    } else if (['members', 'volunteers', 'service-requests'].includes(route.name)) {
       descendantRouteName = route.name
     }
 
