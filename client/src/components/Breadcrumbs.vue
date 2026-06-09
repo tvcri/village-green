@@ -5,6 +5,7 @@ import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
+import { siblingGroups, siblingLabels } from '../shared/config/siblingGroups.js'
 import Menu from 'primevue/menu'
 
 const router = useRouter()
@@ -13,15 +14,18 @@ const route = useRoute()
 const menuRefs = new Map()
 
 function getSiblings(routeName, currentParams) {
-  const record = router.getRoutes().find(r => r.name === routeName)
-  if (!record?.meta?.siblingGroup) return null
-  const group = record.meta.siblingGroup
-  return router.getRoutes()
-    .filter(r => r.meta?.siblingGroup === group)
-    .map(r => ({
-      label: r.meta.siblingLabel,
-      route: { name: r.name, params: currentParams },
-    }))
+  // Find which group this route belongs to
+  const groupName = Object.entries(siblingGroups).find(
+    ([_, routes]) => routes.includes(routeName)
+  )?.[0]
+
+  if (!groupName) return null
+
+  // Map group routes to sibling objects
+  return siblingGroups[groupName].map(name => ({
+    label: siblingLabels[name],
+    route: { name, params: currentParams }
+  }))
 }
 
 const { state: villages } = useAsyncState(

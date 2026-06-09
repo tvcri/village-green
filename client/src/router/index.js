@@ -11,13 +11,11 @@ const routes = [
     path: '/villages/:villageId',
     name: 'village-detail',
     component: () => import('../features/VillageDetail/components/VillageDetail.vue'),
-    meta: { siblingGroup: 'village-list', siblingLabel: 'village-detail' },
   },
   {
     path: '/villages/:villageId/members',
     name: 'members',
     component: () => import('../features/MemberList/components/MemberList.vue'),
-    meta: { siblingGroup: 'village-sections', siblingLabel: 'Members' },
   },
   {
     path: '/villages/:villageId/members/:personId/:personName?',
@@ -28,7 +26,6 @@ const routes = [
     path: '/villages/:villageId/volunteers',
     name: 'volunteers',
     component: () => import('../features/VolunteerList/components/VolunteerList.vue'),
-    meta: { siblingGroup: 'village-sections', siblingLabel: 'Volunteers' },
   },
   {
     path: '/villages/:villageId/volunteers/:personId/:personName?',
@@ -39,7 +36,6 @@ const routes = [
     path: '/villages/:villageId/service-requests',
     name: 'service-requests',
     component: () => import('../features/ServiceRequestList/components/ServiceRequestList.vue'),
-    meta: { siblingGroup: 'village-sections', siblingLabel: 'Service Requests' },
   },
   {
     path: '/villages/:villageId/service-requests/:id',
@@ -56,13 +52,13 @@ const routes = [
     path: '/admin/villages',
     name: 'admin-village-access',
     component: () => import('../features/Admin/components/VillageAccessList.vue'),
-    meta: { requiresAdmin: true, siblingGroup: 'admin-sections', siblingLabel: 'Village Access' },
+    meta: { requiresAdmin: true },
   },
   {
     path: '/admin/users',
     name: 'admin-user-access',
     component: () => import('../features/Admin/components/UserAccessList.vue'),
-    meta: { requiresAdmin: true, siblingGroup: 'admin-sections', siblingLabel: 'User Access' },
+    meta: { requiresAdmin: true },
   },
   {
     path: '/admin/villages/grants/:villageId',
