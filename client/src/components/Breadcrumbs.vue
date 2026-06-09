@@ -110,13 +110,13 @@ const breadcrumbs = computed(() => {
       descendantRouteName = route.name
     }
 
-    const siblingsList = villages.value.map(v => {
+    const siblingsList = villages.value.length > 1 ? villages.value.map(v => {
       const siblingRoute = { name: descendantRouteName, params: { ...route.params, villageId: v.villageId } }
       return {
         label: v.name,
         route: siblingRoute
       }
-    })
+    }) : null
 
     crumbs.push({
       label: villageName,
