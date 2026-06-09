@@ -164,7 +164,7 @@ const navigate = (crumb) => {
           />
           <button
             class="breadcrumb-link breadcrumb-link--has-siblings"
-            @click="menuRefs.value[index]?.toggle($event)"
+            @click="menuRefs.value[index].toggle($event)"
           >
             {{ crumb.label }}
             <i class="pi pi-chevron-down breadcrumb-chevron" />
