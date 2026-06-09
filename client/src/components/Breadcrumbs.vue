@@ -1,13 +1,28 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
+import Menu from 'primevue/menu'
 
 const router = useRouter()
 const route = useRoute()
+
+const menuRefs = ref([])
+
+function getSiblings(routeName, currentParams) {
+  const record = router.getRoutes().find(r => r.name === routeName)
+  if (!record?.meta?.siblingGroup) return null
+  const group = record.meta.siblingGroup
+  return router.getRoutes()
+    .filter(r => r.meta?.siblingGroup === group)
+    .map(r => ({
+      label: r.meta.siblingLabel,
+      route: { name: r.name, params: currentParams },
+    }))
+}
 
 const { state: villages } = useAsyncState(
   () => getVillages(),
@@ -35,10 +50,10 @@ const breadcrumbs = computed(() => {
 
     switch (route.name) {
       case 'admin-village-access':
-        crumbs.push({ label: 'Village Access' })
+        crumbs.push({ label: 'Village Access', siblings: getSiblings('admin-village-access', {}) })
         break
       case 'admin-user-access':
-        crumbs.push({ label: 'User Access' })
+        crumbs.push({ label: 'User Access', siblings: getSiblings('admin-user-access', {}) })
         break
       case 'admin-create-grant': {
         const villageId = route.params.villageId
@@ -94,24 +109,24 @@ const breadcrumbs = computed(() => {
   const personName = route.params.personName
   switch (route.name) {
     case 'members':
-      crumbs.push({ label: 'Members' })
+      crumbs.push({ label: 'Members', siblings: getSiblings('members', { villageId: vId }) })
       break
     case 'member-detail':
-      crumbs.push({ label: 'Members', route: { name: 'members', params: { villageId: vId } } })
+      crumbs.push({ label: 'Members', route: { name: 'members', params: { villageId: vId } }, siblings: getSiblings('members', { villageId: vId }) })
       crumbs.push({ label: personName || 'Member' })
       break
     case 'volunteers':
-      crumbs.push({ label: 'Volunteers' })
+      crumbs.push({ label: 'Volunteers', siblings: getSiblings('volunteers', { villageId: vId }) })
       break
     case 'volunteer-detail':
-      crumbs.push({ label: 'Volunteers', route: { name: 'volunteers', params: { villageId: vId } } })
+      crumbs.push({ label: 'Volunteers', route: { name: 'volunteers', params: { villageId: vId } }, siblings: getSiblings('volunteers', { villageId: vId }) })
       crumbs.push({ label: personName || 'Volunteer' })
       break
     case 'service-requests':
-      crumbs.push({ label: 'Service Requests' })
+      crumbs.push({ label: 'Service Requests', siblings: getSiblings('service-requests', { villageId: vId }) })
       break
     case 'service-request-detail':
-      crumbs.push({ label: 'Service Requests', route: { name: 'service-requests', params: { villageId: vId } } })
+      crumbs.push({ label: 'Service Requests', route: { name: 'service-requests', params: { villageId: vId } }, siblings: getSiblings('service-requests', { villageId: vId }) })
       crumbs.push({ label: 'Request' })
       break
   }
