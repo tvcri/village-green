@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onBeforeUpdate } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
@@ -11,6 +11,8 @@ const router = useRouter()
 const route = useRoute()
 
 const menuRefs = ref([])
+
+onBeforeUpdate(() => { menuRefs.value = [] })
 
 function getSiblings(routeName, currentParams) {
   const record = router.getRoutes().find(r => r.name === routeName)
@@ -148,7 +150,7 @@ const navigate = (crumb) => {
         <!-- Crumb with sibling dropdown -->
         <template v-if="crumb.siblings">
           <Menu
-            :ref="el => { if (el) menuRefs[index] = el }"
+            :ref="el => { if (el) menuRefs.value[index] = el }"
             :model="crumb.siblings.map(s => ({
               label: s.label,
               class: route.name === s.route.name ? 'breadcrumb-sibling-active' : '',
@@ -158,7 +160,7 @@ const navigate = (crumb) => {
           />
           <button
             class="breadcrumb-link breadcrumb-link--has-siblings"
-            @click="menuRefs[index].toggle($event)"
+            @click="menuRefs.value[index].toggle($event)"
           >
             {{ crumb.label }}
             <i class="pi pi-chevron-down breadcrumb-chevron" />
