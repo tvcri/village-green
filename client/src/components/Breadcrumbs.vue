@@ -145,13 +145,36 @@ const navigate = (crumb) => {
   <nav class="breadcrumbs">
     <div class="breadcrumb-list">
       <template v-for="(crumb, index) in breadcrumbs" :key="index">
+        <!-- Crumb with sibling dropdown -->
+        <template v-if="crumb.siblings">
+          <Menu
+            :ref="el => { if (el) menuRefs[index] = el }"
+            :model="crumb.siblings.map(s => ({
+              label: s.label,
+              class: route.name === s.route.name ? 'breadcrumb-sibling-active' : '',
+              command: () => router.push(s.route)
+            }))"
+            :popup="true"
+          />
+          <button
+            class="breadcrumb-link breadcrumb-link--has-siblings"
+            @click="menuRefs[index].toggle($event)"
+          >
+            {{ crumb.label }}
+            <i class="pi pi-chevron-down breadcrumb-chevron" />
+          </button>
+        </template>
+
+        <!-- Crumb with route, no siblings -->
         <button
-          v-if="crumb.route"
+          v-else-if="crumb.route"
           class="breadcrumb-link"
           @click="navigate(crumb)"
         >
           {{ crumb.label }}
         </button>
+
+        <!-- Current crumb (no route, no siblings) -->
         <span v-else class="breadcrumb-current">
           {{ crumb.label }}
         </span>
@@ -193,6 +216,16 @@ const navigate = (crumb) => {
 .breadcrumb-link:hover {
   color: var(--color-primary-hover);
   text-decoration: underline;
+}
+
+.breadcrumb-link--has-siblings {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.breadcrumb-chevron {
+  font-size: 0.75rem;
 }
 
 .breadcrumb-current {
