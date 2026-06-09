@@ -10,7 +10,7 @@ import Menu from 'primevue/menu'
 const router = useRouter()
 const route = useRoute()
 
-const menuRefs = ref(new Map())
+const menuRefs = new Map()
 
 function getSiblings(routeName, currentParams) {
   const record = router.getRoutes().find(r => r.name === routeName)
@@ -152,7 +152,7 @@ const navigate = (crumb) => {
         <!-- Crumb with sibling dropdown -->
         <template v-if="crumb.siblings">
           <Menu
-            :ref="el => { if (el) menuRefs.value.set(index, el) }"
+            :ref="el => { if (el) menuRefs.set(index, el) }"
             :model="crumb.siblings.map(s => ({
               label: s.label,
               class: route.name === s.route.name ? 'breadcrumb-sibling-active' : '',
@@ -162,7 +162,7 @@ const navigate = (crumb) => {
           />
           <button
             class="breadcrumb-link breadcrumb-link--has-siblings"
-            @click="menuRefs.value.get(index)?.toggle($event)"
+            @click="menuRefs.get(index)?.toggle($event)"
           >
             {{ crumb.label }}
             <i class="pi pi-chevron-down breadcrumb-chevron" />
