@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
-import { getVillages } from '../features/VillageList/api/villageApi.js'
+import { getUserVillages } from '../features/VillageList/api/villageApi.js'
 import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import Menu from 'primevue/menu'
@@ -25,7 +25,7 @@ function getSiblings(routeName, currentParams) {
 }
 
 const { state: villages } = useAsyncState(
-  () => getVillages(),
+  () => getUserVillages(),
   { immediate: true, onError: null }
 )
 

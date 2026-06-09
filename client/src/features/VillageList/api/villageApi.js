@@ -9,6 +9,12 @@ export const getVillages = () => {
   })
 }
 
+export const getUserVillages = () => {
+  return apiCall('getVillages', {
+    projection: ['personCounts']
+  })
+}
+
 export const getVillageMembers = (villageId) => apiCall('getVillageMembers', { villageId })
 
 export const getVillageVolunteers = (villageId) => apiCall('getVillageVolunteers', { villageId })
