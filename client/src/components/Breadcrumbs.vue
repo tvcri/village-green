@@ -154,7 +154,7 @@ const navigate = (crumb) => {
         <!-- Crumb with sibling dropdown -->
         <template v-if="crumb.siblings">
           <Menu
-            :ref="el => { if (el) menuRefs.value[index] = el }"
+            :ref="el => { if (el && menuRefs.value) { while (menuRefs.value.length <= index) menuRefs.value.push(null); menuRefs.value[index] = el } }"
             :model="crumb.siblings.map(s => ({
               label: s.label,
               class: route.name === s.route.name ? 'breadcrumb-sibling-active' : '',
