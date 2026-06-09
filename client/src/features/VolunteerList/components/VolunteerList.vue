@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
@@ -33,15 +33,20 @@ const sortField = ref('fullName')
 const sortDir = ref('asc')
 const capabilityOptions = ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support']
 
-const { state: volunteers, isLoading, error } = useAsyncState(
+const { state: volunteers, isLoading, error, execute: fetchVolunteers } = useAsyncState(
   () => getVillageVolunteers(villageId.value),
   { immediate: true }
 )
 
-const { state: persons } = useAsyncState(
+const { state: persons, execute: fetchPersons } = useAsyncState(
   () => getVillagePersons(villageId.value),
   { immediate: true }
 )
+
+watch(villageId, () => {
+  fetchVolunteers()
+  fetchPersons()
+})
 
 const filteredVolunteers = computed(() => {
   if (!Array.isArray(volunteers.value)) return []
