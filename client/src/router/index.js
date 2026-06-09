@@ -11,6 +11,7 @@ const routes = [
     path: '/villages/:villageId',
     name: 'village-detail',
     component: () => import('../features/VillageDetail/components/VillageDetail.vue'),
+    meta: { siblingGroup: 'village-list', siblingLabel: 'village-detail' },
   },
   {
     path: '/villages/:villageId/members',

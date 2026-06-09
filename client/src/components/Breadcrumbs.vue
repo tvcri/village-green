@@ -98,7 +98,11 @@ const breadcrumbs = computed(() => {
     const villageName = village?.name || `Village ${vId}`
     crumbs.push({
       label: villageName,
-      route: { name: 'village-detail', params: { villageId: vId } }
+      route: { name: 'village-detail', params: { villageId: vId } },
+      siblings: villages.value.map(v => ({
+        label: v.name,
+        route: { name: 'village-detail', params: { villageId: v.villageId } }
+      }))
     })
   } else if (vId) {
     crumbs.push({
