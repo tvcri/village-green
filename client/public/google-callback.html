@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Authenticating with Google...</title>
+  <script type="text/javascript" src="./Env.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #f5f5f5;
+      margin: 0;
+    }
+    .message {
+      text-align: center;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="message">
+    <p>Completing authentication with Google...</p>
+  </div>
+
+  <script>
+    // Extract authorization code from URL
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    const error = params.get('error');
+
+    if (error) {
+      console.error('[google-callback] OAuth error:', error);
+      window.close();
+    } else if (code && state) {
+      (async () => {
+        try {
+          // First, exchange code for tokens via backend API
+          console.log('[google-callback] Exchanging code for tokens via API...');
+
+          // Get API base from VG.Env (set during app bootstrap)
+          const apiBase = VG?.Env?.apiBase || 'http://localhost:64001/api';
+          console.log('[google-callback] Using API base:', apiBase);
+
+          // Get code_verifier from sessionStorage if it exists (for PKCE)
+          const codeVerifier = sessionStorage.getItem('google_code_verifier');
+          const query = new URLSearchParams({ code });
+          if (codeVerifier) {
+            query.append('code_verifier', codeVerifier);
+          }
+
+          const tokenResponse = await fetch(`${apiBase}/oauth/token?${query}`, {
+            method: 'POST',
+          });
+
+          if (!tokenResponse.ok) {
+            const errorData = await tokenResponse.json().catch(() => ({}));
+            console.error('[google-callback] Token exchange failed:', errorData);
+            window.close();
+            return;
+          }
+
+          const tokens = await tokenResponse.json();
+          console.log('[google-callback] Tokens received, posting to SharedWorker');
+
+          // Connect to the SharedWorker and send tokens
+          const worker = new SharedWorker('/workers/google-worker.js', { name: 'vg-google-worker', type: 'module' });
+          const port = worker.port;
+          port.start();
+
+          // Send tokens to worker
+          const requestId = crypto.randomUUID();
+          port.postMessage({
+            requestId,
+            request: 'oauthCallback',
+            tokens,
+            state,
+          });
+
+          // Wait for the worker to confirm receipt
+          port.onmessage = (event) => {
+            // Handle auth-complete broadcast
+            if (event.data.requestId === 'auth-complete' && event.data.response?.authComplete) {
+              console.log('[google-callback] Auth complete, closing popup');
+              sessionStorage.removeItem('google_code_verifier');
+              window.close();
+            }
+            // Handle response to our specific request
+            else if (event.data.requestId === requestId) {
+              if (event.data.error) {
+                console.error('[google-callback] Worker error:', event.data.error);
+              } else {
+                console.log('[google-callback] Worker confirmed tokens stored');
+              }
+              sessionStorage.removeItem('google_code_verifier');
+              window.close();
+            }
+          };
+        } catch (err) {
+          console.error('[google-callback] Unexpected error:', err);
+          window.close();
+        }
+      })();
+    }
+  </script>
+</body>
+</html>

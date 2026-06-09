@@ -1,0 +1,24 @@
+.phone-numbers {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.phone-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  text-decoration: none;
+}
+
+.phone-item .phone-number {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text-primary) 30%, transparent);
+  text-decoration: none;
+}
+
+.phone-item:hover {
+  opacity: 0.7;
+}
