@@ -171,6 +171,7 @@ const navigate = (crumb) => {
   cursor: pointer;
   padding: 0;
   text-decoration: none;
+  font-weight: 600;
   transition: color 0.2s ease;
 }
 
@@ -181,7 +182,7 @@ const navigate = (crumb) => {
 
 .breadcrumb-current {
   color: var(--color-text-primary);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .breadcrumb-separator {
