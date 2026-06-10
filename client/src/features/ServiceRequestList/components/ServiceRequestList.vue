@@ -382,17 +382,16 @@ const clearFilters = () => {
     </div>
 
     <!-- Desktop Table -->
-    <div v-else class="table-container desktop-only">
-      <DataTable
-        :value="filteredRequests"
-        :sortField="sortField"
-        :sortOrder="sortDir === 'asc' ? 1 : -1"
-        class="request-table-responsive"
-        scrollable
-        scrollHeight="flex"
-        @row-click="(event) => navigateToRequest(event.data.serviceRequestId)"
-        @sort="onSort"
-      >
+    <DataTable
+      v-else
+      :value="filteredRequests"
+      :sortField="sortField"
+      :sortOrder="sortDir === 'asc' ? 1 : -1"
+      class="request-table-responsive desktop-only"
+      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: 0; z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
+      @row-click="(event) => navigateToRequest(event.data.serviceRequestId)"
+      @sort="onSort"
+    >
       <Column field="startAt" header="Date" sortable style="width: 12%">
         <template #body="slotProps">
           {{ slotProps.data.startAt ? formatDate(slotProps.data.startAt) : '—' }}
@@ -411,8 +410,7 @@ const clearFilters = () => {
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
       <Column field="city" header="City" sortable style="width: 13%"></Column>
       <Column field="requestNumber" header="#" sortable style="width: 10%"></Column>
-      </DataTable>
-    </div>
+    </DataTable>
 
     <!-- Mobile Card List -->
     <div class="request-cards mobile-only">
@@ -464,10 +462,6 @@ function formatDate(dateStr) {
 <style scoped>
 .service-request-list {
   padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
 }
 
 .header-row {
@@ -494,9 +488,6 @@ h1 {
 }
 
 .filter-section {
-  position: sticky;
-  top: 0;
-  z-index: 100;
   margin-bottom: 1.5rem;
   padding: 1rem 0;
   background-color: var(--color-background-primary);
@@ -727,13 +718,6 @@ h1 {
 
 .request-table-responsive {
   cursor: pointer;
-}
-
-.table-container {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
 }
 
 .status-badge {

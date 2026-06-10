@@ -242,6 +242,7 @@ async function handleCreateSheet() {
       v-else
       :value="filteredVolunteers"
       class="volunteer-table-responsive desktop-only"
+      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: 0; z-index: 1;' } }"
       @row-click="(event) => navigateToVolunteer(event.data)"
     >
       <Column field="fullName" header="Name" sortable style="width: 50%"></Column>

@@ -219,6 +219,7 @@ async function handleCreateSheet() {
       v-else
       :value="filteredMembers"
       class="member-table-responsive desktop-only"
+      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: 0; z-index: 1;' } }"
       @row-click="(event) => navigateToMember(event.data)"
     >
       <Column field="fullName" header="Name" sortable style="width: 25%"></Column>
