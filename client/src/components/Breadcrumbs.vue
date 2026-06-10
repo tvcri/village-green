@@ -190,11 +190,16 @@ const navigate = (crumb) => {
             :popup="true"
           />
           <button
-            class="breadcrumb-link breadcrumb-link--has-siblings"
-            @click="menuRefs.get(index)?.toggle($event)"
+            :class="index === breadcrumbs.length - 1 ? 'breadcrumb-current' : ['breadcrumb-link', 'breadcrumb-link-label']"
+            @click="navigate(crumb)"
           >
             {{ crumb.label }}
-            <i class="pi pi-chevron-down breadcrumb-chevron" />
+          </button>
+          <button
+            :class="['breadcrumb-link', index === breadcrumbs.length - 1 ? 'breadcrumb-current' : 'breadcrumb-link-dropdown']"
+            @click="menuRefs.get(index)?.toggle($event)"
+          >
+            <i class="pi pi-chevron-down" />
           </button>
         </template>
 
@@ -251,27 +256,29 @@ const navigate = (crumb) => {
   text-decoration: underline;
 }
 
-.breadcrumb-link--has-siblings {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
+.breadcrumb-link-label:hover {
+  color: var(--color-primary-hover);
 }
 
-.breadcrumb-link--has-siblings:hover {
-  background-color: color-mix(in srgb, var(--color-primary-highlight) 10%, transparent);
-  border-radius: 4px;
-  padding: 2px 6px;
-  margin: -2px -6px;
-}
-
-.breadcrumb-chevron {
+.breadcrumb-link-dropdown, .breadcrumb-current.breadcrumb-link {
   font-size: 0.65rem;
   opacity: 0.75;
+  padding: 0 2px;
+}
+
+.breadcrumb-link-dropdown:hover, .breadcrumb-current.breadcrumb-link:hover {
+  background-color: color-mix(in srgb, var(--color-primary-highlight) 20%, transparent);
+  border-radius: 4px;
+  opacity: 1;
 }
 
 .breadcrumb-current {
   color: var(--color-text-primary);
   font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: none;
 }
 
 .breadcrumb-separator {
@@ -288,16 +295,5 @@ const navigate = (crumb) => {
     font-size: 0.85rem;
     gap: 0.3rem;
   }
-}
-</style>
-
-<style>
-.breadcrumb-sibling-active > .p-menuitem-content {
-  background-color: color-mix(in srgb, var(--color-primary-highlight) 12%, transparent) !important;
-  font-weight: 600;
-}
-
-.breadcrumb-sibling-active > .p-menuitem-content .p-menuitem-text {
-  color: var(--color-primary-highlight);
 }
 </style>
