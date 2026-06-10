@@ -45,8 +45,8 @@ onMounted(async () => {
       </div>
     </header>
 
-    <div v-if="ceDumpTime" class="sync-status-bar">
-      Updated: {{ ceDumpTime }}
+    <div class="sync-status-bar">
+      <template v-if="ceDumpTime">Updated: {{ ceDumpTime }}</template>
     </div>
 
     <Breadcrumbs />
@@ -62,14 +62,14 @@ onMounted(async () => {
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
   margin: 0 auto;
   max-width: 1200px;
   width: 100%;
   border-left: 1px solid var(--color-border-light);
   border-right: 1px solid var(--color-border-light);
 }
+
 
 .app-header {
   display: flex;
@@ -120,7 +120,6 @@ onMounted(async () => {
 
 .app-main {
   flex: 1;
-  overflow: auto;
   background-color: var(--color-background-dark);
 }
 

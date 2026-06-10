@@ -5,6 +5,7 @@
   color: rgba(0, 0, 0, 0.87);
   background-color: #ffffff;
 
+  --breadcrumb-height: 35px;
   --role-restricted: #64748bcb;
   --role-full: #e2ca43d5;
   --role-manage: #4b7bc9da;
@@ -162,8 +163,6 @@
 
 body {
   margin: 0;
-  height: 100vh;
-  overflow: hidden;
   font-family: 'Open Sans';
   font-size: 1rem;
   font-weight: 400;
@@ -172,8 +171,7 @@ body {
 }
 
 #app {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
 }
 
 

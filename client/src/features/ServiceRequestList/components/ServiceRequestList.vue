@@ -388,7 +388,7 @@ const clearFilters = () => {
       :sortField="sortField"
       :sortOrder="sortDir === 'asc' ? 1 : -1"
       class="request-table-responsive desktop-only"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: 0; z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
+      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId)"
       @sort="onSort"
     >

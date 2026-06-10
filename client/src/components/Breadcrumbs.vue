@@ -227,6 +227,9 @@ const navigate = (crumb) => {
 
 <style scoped>
 .breadcrumbs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   padding: 1rem 2rem 0.5rem 2rem;
   background-color: var(--color-background-light);
   border-bottom: 1px solid var(--color-border-default);
