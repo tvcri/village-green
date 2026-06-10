@@ -238,6 +238,7 @@ const navigate = (crumb) => {
   gap: 0.5rem;
   flex-wrap: wrap;
   font-size: 0.9rem;
+  min-height: 1.2rem;
 }
 
 .breadcrumb-link {
@@ -261,7 +262,6 @@ const navigate = (crumb) => {
 }
 
 .breadcrumb-link-dropdown, .breadcrumb-current.breadcrumb-link {
-  font-size: 0.65rem;
   opacity: 0.75;
   padding: 0 2px;
 }
