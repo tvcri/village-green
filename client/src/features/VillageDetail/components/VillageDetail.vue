@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useElevate } from '../../../shared/composables/useElevate.js'
+import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { getVillage } from '../api/villageApi.js'
 
 const router = useRouter()
@@ -18,7 +19,8 @@ const { state: village, execute } = useAsyncState(
   { immediate: true }
 )
 
-// Refetch when elevate is toggled
+// Refetch when village changes or elevate is toggled
+useRefetchOnChange(villageId, execute)
 watch(elevateEnabled, () => {
   execute()
 })
