@@ -408,6 +408,9 @@ textarea:focus {
   --color-bg-hover-strong: #3f3f46;
   --color-bg-hover-light: #76767c;
 
+  --color-primary-hover: #818cf8; /* Indigo-400 */
+  --color-primary-highlight: #93c5fd; /* Blue-300 */
+
   --color-status-success-bg: color-mix(in srgb, #166534 18%, var(--color-background-dark));
   --color-status-warning-bg: color-mix(in srgb, #92400e 18%, var(--color-background-dark));
   --color-status-error-bg: color-mix(in srgb, #7f1d1d 18%, var(--color-background-dark));

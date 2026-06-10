@@ -11,6 +11,7 @@ import Fieldset from 'primevue/fieldset'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
+import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -35,15 +36,17 @@ const selectedStatuses = ref(['open', 'confirmed'])
 const sortField = ref('startAt')
 const sortDir = ref('asc')
 
-const { state: requests, isLoading, error, execute } = useAsyncState(
+const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
   () => getVillageServiceRequests(villageId.value),
   { immediate: true }
 )
 
-const { state: village } = useAsyncState(
+const { state: village, execute: fetchVillage } = useAsyncState(
   () => apiCall('getVillage', { villageId: villageId.value }),
   { immediate: true }
 )
+
+useRefetchOnChange(villageId, [fetchRequests, fetchVillage])
 
 const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled']
 

@@ -7,10 +7,10 @@ import { useElevate } from '../../../shared/composables/useElevate.js'
 import { getVillages } from '../api/villageApi.js'
 
 const router = useRouter()
-const { elevateEnabled } = useElevate()
+const { elevateEnabled, elevate } = useElevate()
 
 const { state: villages, isLoading, error, execute } = useAsyncState(
-  () => getVillages(),
+  () => getVillages(elevate.value),
   { immediate: true }
 )
 

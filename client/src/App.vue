@@ -92,9 +92,6 @@ onMounted(async () => {
 .app-logo {
   height: 50px;
   width: auto;
-  border: 3px solid var(--color-border-default);
-  border-radius: 8px;
-  padding: 3px;
   flex-shrink: 0;
 }
 

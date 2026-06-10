@@ -10,6 +10,7 @@ import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
+import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { getVillageMembers } from '../api/memberApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -36,15 +37,17 @@ const searchText = useDebouncedRef('', 300)
 const sortField = ref('fullName')
 const sortDir = ref('asc')
 
-const { state: members, isLoading, error } = useAsyncState(
+const { state: members, isLoading, error, execute: fetchMembers } = useAsyncState(
   () => getVillageMembers(villageId.value),
   { immediate: true }
 )
 
-const { state: persons } = useAsyncState(
+const { state: persons, execute: fetchPersons } = useAsyncState(
   () => getVillagePersons(villageId.value),
   { immediate: true }
 )
+
+useRefetchOnChange(villageId, [fetchMembers, fetchPersons])
 
 const filteredMembers = computed(() => {
   if (!Array.isArray(members.value)) return []

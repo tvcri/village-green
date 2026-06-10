@@ -1,10 +1,8 @@
 import { apiCall } from '../../../shared/api/apiClient.js'
-import { useElevate } from '../../../shared/composables/useElevate.js'
 
-export const getVillages = () => {
-  const { elevate } = useElevate()
+export const getVillages = (elevate) => {
   return apiCall('getVillages', {
-    ...(elevate.value && { elevate: elevate.value }),
+    ...(elevate && { elevate }),
     projection: ['personCounts']
   })
 }
