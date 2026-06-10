@@ -6,12 +6,12 @@ import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
-import SplitButton from 'primevue/splitbutton'
+import Menu from 'primevue/menu'
 
 const router = useRouter()
 const route = useRoute()
 
-const splitButtonRefs = new Map()
+const menuRefs = new Map()
 
 // Build reverse map at load time for O(1) lookups
 const routeToGroupMap = Object.fromEntries(
@@ -173,25 +173,30 @@ const navigate = (crumb) => {
     <div class="breadcrumb-list">
       <template v-for="(crumb, index) in breadcrumbs" :key="index">
         <!-- Crumb with sibling dropdown -->
-        <SplitButton
-          v-if="crumb.siblings"
-          :ref="el => { if (el) splitButtonRefs.set(index, el) }"
-          :label="crumb.label"
-          icon="pi pi-chevron-down"
-          :model="crumb.siblings.filter(s => {
-            // For routes with same name but different params (e.g., villages), compare params
-            if (s.route.name === route.name) {
-              return JSON.stringify(s.route.params) !== JSON.stringify(route.params)
-            }
-            // For different route names (e.g., admin sections), exclude if route name matches
-            return s.route.name !== route.name
-          }).map(s => ({
-            label: s.label,
-            command: () => router.push(s.route)
-          }))"
-          class="breadcrumb-splitbutton"
-          @click="navigate(crumb)"
-        />
+        <template v-if="crumb.siblings">
+          <Menu
+            :ref="el => { if (el) menuRefs.set(index, el) }"
+            :model="crumb.siblings.filter(s => {
+              // For routes with same name but different params (e.g., villages), compare params
+              if (s.route.name === route.name) {
+                return JSON.stringify(s.route.params) !== JSON.stringify(route.params)
+              }
+              // For different route names (e.g., admin sections), exclude if route name matches
+              return s.route.name !== route.name
+            }).map(s => ({
+              label: s.label,
+              command: () => router.push(s.route)
+            }))"
+            :popup="true"
+          />
+          <button
+            class="breadcrumb-link breadcrumb-link--has-siblings"
+            @click="menuRefs.get(index)?.toggle($event)"
+          >
+            {{ crumb.label }}
+            <i class="pi pi-chevron-down breadcrumb-chevron" />
+          </button>
+        </template>
 
         <!-- Crumb with route, no siblings -->
         <button
@@ -246,26 +251,22 @@ const navigate = (crumb) => {
   text-decoration: underline;
 }
 
-.breadcrumb-splitbutton :deep(.p-button) {
-  background: none;
-  border: none;
-  color: var(--color-primary-highlight);
-  padding: 0;
-  font-weight: 600;
+.breadcrumb-link--has-siblings {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
-.breadcrumb-splitbutton :deep(.p-button:hover) {
+.breadcrumb-link--has-siblings:hover {
   background-color: color-mix(in srgb, var(--color-primary-highlight) 10%, transparent);
   border-radius: 4px;
+  padding: 2px 6px;
+  margin: -2px -6px;
 }
 
-.breadcrumb-splitbutton :deep(.p-splitbutton-default-button) {
-  padding: 0 6px;
-}
-
-.breadcrumb-splitbutton :deep(.p-splitbutton-menubutton) {
-  padding: 0 4px;
-  border-left: 1px solid rgba(96, 165, 250, 0.2);
+.breadcrumb-chevron {
+  font-size: 0.65rem;
+  opacity: 0.75;
 }
 
 .breadcrumb-current {
@@ -291,12 +292,12 @@ const navigate = (crumb) => {
 </style>
 
 <style>
-.breadcrumb-splitbutton :deep(.p-menuitem.p-focus > .p-menuitem-content),
-.breadcrumb-splitbutton :deep(.p-menuitem:hover > .p-menuitem-content) {
-  background-color: color-mix(in srgb, var(--color-primary-highlight) 12%, transparent);
+.breadcrumb-sibling-active > .p-menuitem-content {
+  background-color: color-mix(in srgb, var(--color-primary-highlight) 12%, transparent) !important;
+  font-weight: 600;
 }
 
-.breadcrumb-splitbutton :deep(.p-menuitem > .p-menuitem-content .p-menuitem-text) {
-  color: inherit;
+.breadcrumb-sibling-active > .p-menuitem-content .p-menuitem-text {
+  color: var(--color-primary-highlight);
 }
 </style>
