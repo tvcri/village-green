@@ -247,7 +247,7 @@ const navigate = (crumb) => {
 .breadcrumb-link {
   background: none;
   border: none;
-  color: var(--color-primary-highlight);
+  color: var(--p-primary-400);
   cursor: pointer;
   padding: 0;
   text-decoration: none;
@@ -256,12 +256,12 @@ const navigate = (crumb) => {
 }
 
 .breadcrumb-link:hover {
-  color: var(--color-primary-hover);
+  color: var(--p-primary-600);
   text-decoration: underline;
 }
 
 .breadcrumb-link-label:hover {
-  color: var(--color-primary-hover);
+  color: var(--p-primary-600);
 }
 
 .breadcrumb-link-dropdown, .breadcrumb-current.breadcrumb-link {
@@ -270,7 +270,7 @@ const navigate = (crumb) => {
 }
 
 .breadcrumb-link-dropdown:hover, .breadcrumb-current.breadcrumb-link:hover {
-  background-color: color-mix(in srgb, var(--color-primary-highlight) 20%, transparent);
+  background-color: color-mix(in srgb, var(--p-primary-400) 20%, transparent);
   border-radius: 4px;
   opacity: 1;
 }

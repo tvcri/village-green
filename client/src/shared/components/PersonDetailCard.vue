@@ -241,7 +241,7 @@ const copyEmail = async (email) => {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--color-primary);
+  color: var(--p-primary-600);
   border-bottom: 2px solid var(--color-border-default);
   padding-bottom: 0.75rem;
 }
@@ -274,8 +274,8 @@ const copyEmail = async (email) => {
 
 .copy-button:hover {
   background-color: var(--color-background-light);
-  color: var(--color-primary);
-  border-color: var(--color-primary);
+  color: var(--p-primary-600);
+  border-color: var(--p-primary-600);
 }
 
 .copy-button.copied {

@@ -191,7 +191,7 @@ h1 {
 
 .dropdown:focus {
   outline: none;
-  border-color: var(--color-primary-highlight-light);
+  border-color: var(--p-primary-300);
   box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.1);
 }
 
@@ -264,7 +264,7 @@ h1 {
 }
 
 .btn-submit:hover:not(:disabled) {
-  background-color: var(--color-primary-hover);
+  background-color: var(--p-primary-600);
 }
 
 .btn-submit:disabled {

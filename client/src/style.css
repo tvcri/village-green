@@ -178,11 +178,11 @@ input[type="number"]:focus,
 input[type="password"]:focus,
 textarea:focus {
   outline: none !important;
-  border-color: var(--color-primary-highlight-light) !important;
+  border-color: var(--p-primary-300) !important;
 }
 .p-inputtext:enabled:focus{
   outline: none !important;
-  border-color: var(--color-primary-highlight-light) !important;
+  border-color: var(--p-primary-300) !important;
 }
 
 /* Collection tab panel styles (shared across Assets, STIGs, Labels tabs) */

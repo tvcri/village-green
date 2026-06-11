@@ -80,12 +80,12 @@ const navigateToVillage = (villageId) => {
           </div>
           <div v-if="village.srStatusCounts" class="sr-grid">
             <div class="sr-stat">
-              <Tag value="Open" :severity="getStatusSeverity('open')" class="sr-tag" />
-              <div class="sr-value">{{ village.srStatusCounts.open ?? 0 }}</div>
+              <div class="sr-label">Open</div>
+              <Tag :value="`${village.srStatusCounts.open ?? 0}`" :severity="getStatusSeverity('open')" class="sr-tag" />
             </div>
             <div class="sr-stat">
-              <Tag value="Confirmed" :severity="getStatusSeverity('confirmed')" class="sr-tag" />
-              <div class="sr-value">{{ village.srStatusCounts.confirmed ?? 0 }}</div>
+              <div class="sr-label">Confirmed</div>
+              <Tag :value="`${village.srStatusCounts.confirmed ?? 0}`" :severity="getStatusSeverity('confirmed')" class="sr-tag" />
             </div>
           </div>
         </template>
@@ -119,7 +119,7 @@ h1 {
 
 .village-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1.5rem;
   margin-top: 2rem;
 }
@@ -158,7 +158,7 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
 }
 
 .person-stat {
@@ -175,7 +175,7 @@ h1 {
 }
 
 .person-value {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--color-text-bright);
 }
@@ -184,6 +184,9 @@ h1 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.5rem;
+  max-width: 100px;
+  margin: 0 auto;
+  margin-bottom: 0.25rem;
 }
 
 .sr-stat {
@@ -193,15 +196,15 @@ h1 {
   gap: 0.25rem;
 }
 
-.sr-tag {
-  width: 100%;
+.sr-label {
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+  font-weight: 500;
 }
 
 :deep(.sr-tag.p-tag) {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
-  width: 60%;
-  text-align: center;
 }
 
 :deep(.village-card .p-card-body) {

@@ -675,7 +675,7 @@ h1 {
 
 .search-input:focus {
   outline: none;
-  border-color: var(--color-primary-highlight-light);
+  border-color: var(--p-primary-300);
   box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.1);
 }
 
