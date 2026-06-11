@@ -17,6 +17,8 @@ export const BluePreset = definePreset(Material, {
       950: '#172554',
     },
   },
+  components: {
+  }
 })
 
 export const MyPrimeVuePT = {

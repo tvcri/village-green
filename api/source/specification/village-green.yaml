@@ -2911,6 +2911,31 @@ components:
     StringUuid:
       pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
       type: string
+    ServiceRequestStatusCounts:
+      additionalProperties: false
+      type: object
+      properties:
+        open:
+          type: integer
+          minimum: 0
+        confirmed:
+          type: integer
+          minimum: 0
+        completed:
+          type: integer
+          minimum: 0
+        cancelled:
+          type: integer
+          minimum: 0
+        unmatched:
+          type: integer
+          minimum: 0
+      required:
+      - open
+      - confirmed
+      - completed
+      - cancelled
+      - unmatched
     UserBasic:
       additionalProperties: false
       type: object
@@ -3195,6 +3220,8 @@ components:
           $ref: '#/components/schemas/RoleCounts'
         capabilityCounts:
           $ref: '#/components/schemas/CapabilityCounts'
+        srStatusCounts:
+          $ref: '#/components/schemas/ServiceRequestStatusCounts'
       required:
       - villageId
       - name
@@ -3531,6 +3558,7 @@ components:
           - grants
           - personCounts
           - capabilityCounts
+          - srStatusCounts
     VolunteerIdPath:
       name: volunteerId
       in: path

@@ -2,7 +2,7 @@ import { apiCall } from '../../../shared/api/apiClient.js'
 import { getVillages as getVillagesBase } from '../../VillageList/api/villageApi.js'
 
 export const getVillages = () => {
-  return getVillagesBase(true)
+  return getVillagesBase(true, [])
 }
 
 export const getVillageGrants = (villageId) => {

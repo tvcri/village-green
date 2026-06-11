@@ -182,7 +182,7 @@ const copyEmail = async (email) => {
 .detail-card {
   max-width: 800px;
   border: 1px solid var(--color-border-default);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--box-shadow-card);
 }
 
 :deep(.p-card-title) {

@@ -1,9 +1,9 @@
 import { apiCall } from '../../../shared/api/apiClient.js'
 
-export const getVillages = (elevate) => {
+export const getVillages = (elevate, projection = []) => {
   return apiCall('getVillages', {
     ...(elevate && { elevate }),
-    projection: ['personCounts']
+    ...(projection.length && { projection })
   })
 }
 

@@ -146,6 +146,21 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
       WHERE p.village_id = v.id
       GROUP BY p.village_id) as capabilityCounts`)
     }
+    if (projections.includes('srStatusCounts')) {
+      columns.push(`(SELECT
+        JSON_OBJECT(
+          'open',	SUM(CASE WHEN \`status\` = 'Open' THEN 1 ELSE 0 END),
+          'confirmed',	SUM(CASE WHEN \`status\` = 'Confirmed' THEN 1 ELSE 0 END),
+          'completed',	SUM(CASE WHEN \`status\` = 'Completed' THEN 1 ELSE 0 END),
+          'cancelled',	SUM(CASE WHEN \`status\` LIKE '% cancelled' THEN 1 ELSE 0 END),
+          'unmatched',	SUM(CASE WHEN \`status\` = 'Unmatched' THEN 1 ELSE 0 END)
+        ) as sr_counts
+      FROM
+        village v2
+        JOIN service_request sr  on v2.id = sr.village_id
+      WHERE
+        v2.id = v.id) as srStatusCounts`)
+    }
 
     if (!elevate) {
       predicates.statements.push('v.id IN (?)')

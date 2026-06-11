@@ -4,9 +4,11 @@ import { useRoute } from 'vue-router'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
+import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 
 const route = useRoute()
+const { getStatusSeverity } = useStatusSeverity()
 
 const villageId = computed(() => route.params.villageId)
 const serviceRequestId = computed(() => route.params.id)
@@ -43,24 +45,6 @@ function formatTimeRange(startStr, finishStr) {
   return `${start} - ${finish}`
 }
 
-function getStatusSeverity(status) {
-  const statusLower = status?.toLowerCase() || ''
-  if (statusLower.includes('cancelled')) {
-    return 'danger'
-  }
-  switch (statusLower) {
-    case 'open':
-      return 'warn'
-    case 'confirmed':
-      return 'info'
-    case 'completed':
-      return 'success'
-    case 'unmatched':
-      return 'secondary'
-    default:
-      return 'info'
-  }
-}
 </script>
 
 <template>
