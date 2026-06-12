@@ -186,10 +186,9 @@ const validateOauthSecurity = function (req, requiredScopes) {
 
 // express-openapi-validator security handler for webhook Bearer token
 const validateWebhookBearer = function (req) {
-    const config = require('./config')
     const token = getBearerToken(req)
 
-    if (!token || token !== config.webhook.key) {
+    if (!token || !config.webhook.key || token !== config.webhook.key) {
         throw new SmError.UnauthorizedError('Invalid webhook API key')
     }
 
