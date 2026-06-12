@@ -15,7 +15,9 @@ const version = computed(() => VG?.Env?.version || '')
 const ceDumpTime = computed(() => {
   const time = state.value?.ceDumpTime
   if (!time) return null
-  return new Date(time).toLocaleString()
+  const date = new Date(time)
+  if (isNaN(date.getTime())) return null
+  return date.toLocaleString()
 })
 </script>
 
