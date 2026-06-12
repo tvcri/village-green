@@ -4,6 +4,11 @@ const state = ref(null) // current state object from the worker
 const error = ref(null)
 
 export function setupStateHandler() {
+  // Seed from the initial state already fetched during worker initialization
+  if (VG.stateWorker?.state) {
+    state.value = VG.stateWorker.state
+  }
+
   VG.stateWorker.workerChannel.addEventListener('message', async (ev) => {
     const eventMessage = ev.data || {}
     // successful state updates should update state and clear any prior error
