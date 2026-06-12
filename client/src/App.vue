@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import Toast from 'primevue/toast'
 import ReauthPrompt from './auth/ReauthPrompt.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
@@ -7,19 +7,15 @@ import HeaderMenu from './components/HeaderMenu.vue'
 import Breadcrumbs from './components/Breadcrumbs.vue'
 import { useOidcWorker } from './auth/useOidcWorker.js'
 import GlobalErrorModal from './components/global/GlobalErrorModal.vue'
-import { apiCall } from './shared/api/apiClient.js'
+import { useStateWorker } from './auth/useStateWorker.js'
 
 const oidcWorker = useOidcWorker()
-const ceDumpTime = ref(null)
+const { state } = useStateWorker()
 const version = computed(() => VG?.Env?.version || '')
-
-onMounted(async () => {
-  try {
-    const data = await apiCall('getCeDump')
-    ceDumpTime.value = new Date(data.ceDumpTime).toLocaleString()
-  } catch (err) {
-    console.error('Failed to fetch ceDumpTime:', err)
-  }
+const ceDumpTime = computed(() => {
+  const time = state.value?.ceDumpTime
+  if (!time) return null
+  return new Date(time).toLocaleString()
 })
 </script>
 
