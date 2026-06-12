@@ -110,7 +110,7 @@ const config = {
         }
     },
     webhook: {
-        key: process.env.VG_SYNC_WEBHOOK_KEY || ''
+        key: process.env.VG_SYNC_WEBHOOK_KEY
     },
     log: {
         level: parseInt(process.env.VG_LOG_LEVEL) || 3,
