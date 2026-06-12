@@ -184,6 +184,18 @@ const validateOauthSecurity = function (req, requiredScopes) {
     return true
 }
 
+// express-openapi-validator security handler for webhook Bearer token
+const validateWebhookBearer = function (req) {
+    const config = require('./config')
+    const token = getBearerToken(req)
+
+    if (!token || token !== config.webhook.key) {
+        throw new SmError.UnauthorizedError('Invalid webhook API key')
+    }
+
+    return true
+}
+
 // utility to extract bearer token from request
 const getBearerToken = req => {
     if (!req.headers.authorization) return
@@ -291,10 +303,11 @@ async function initializeAuth() {
 }
 
 module.exports = {
-    validateToken, 
-    setupUser, 
-    validateOauthSecurity, 
-    initializeAuth, 
+    validateToken,
+    setupUser,
+    validateOauthSecurity,
+    validateWebhookBearer,
+    initializeAuth,
     getClaimByPath,
     checkInsecureKid,
     decodeToken,
