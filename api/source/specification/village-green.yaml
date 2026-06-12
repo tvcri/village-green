@@ -491,6 +491,7 @@ paths:
   /op/ce-dump-updated:
     post:
       summary: Notify API of CE Dump sync completion
+      description: Updates the API with the CE Dump sync completion timestamp from an external sync service
       tags:
       - Operation
       operationId: ceDumpUpdated
@@ -502,11 +503,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ceDumpTime:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/CeDump'
         '401':
           description: Unauthorized - invalid webhook key
           content:
@@ -515,6 +512,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '500':
           description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: unexpected error
           content:
             application/json:
               schema:
