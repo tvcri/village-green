@@ -171,6 +171,7 @@ class State extends EventEmitter {
       since: this.#stateDate,
       dependencies: this.#dependencyStatus,
       endpoints: this.#endpoints,
+      ceDumpTime: this.#ceDumpTime,
     }
   }
 
