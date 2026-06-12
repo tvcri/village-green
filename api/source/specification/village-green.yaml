@@ -488,6 +488,37 @@ paths:
       security:
       - oauth:
         - vg:op:read
+  /op/ce-dump-updated:
+    post:
+      summary: Notify API of CE Dump sync completion
+      tags:
+      - Operation
+      operationId: ceDumpUpdated
+      security:
+      - webhookBearer: []
+      responses:
+        '200':
+          description: Sync update received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ceDumpTime:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized - invalid webhook key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /user:
     parameters:
     - $ref: '#/components/parameters/UserPreferenceQuery'
@@ -3576,3 +3607,7 @@ components:
     oauth:
       type: openIdConnect
       openIdConnectUrl: http://localhost:8080/realms/village-green/.well-known/openid-configuration
+    webhookBearer:
+      type: http
+      scheme: bearer
+      description: "Webhook API key for CE Dump sync updates"
