@@ -177,7 +177,7 @@ module.exports.ceDumpUpdated = async function ceDumpUpdated (req, res, next) {
   try {
     const ceDumpTime = await OperationService.getCeDump()
     state.ceDumpTime = ceDumpTime
-    state.emit('state-changed', state.currentState, undefined, state.dependencyStatus)
+    state.emit('state-changed', state.currentState, state.currentState, state.dependencyStatus)
     res.json({ ceDumpTime })
   }
   catch(err) {

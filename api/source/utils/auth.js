@@ -85,13 +85,16 @@ const validateToken = async function (req, res, next) {
     try {
         const tokenJWT = getBearerToken(req)
         if (tokenJWT) {
-            const tokenObj = decodeToken(tokenJWT)
-            checkInsecureKid(tokenObj)
-            const signingKey = await getSigningKey(tokenObj)
-            verifyToken(tokenJWT, signingKey)
-
-            req.access_token = tokenObj.payload
-            req.bearer = tokenJWT
+            const tokenObj = jwt.decode(tokenJWT, { complete: true })
+            if (tokenObj) {
+                // Only process valid JWTs; non-JWT bearer tokens (e.g. webhook keys)
+                // are left for the OAS security handler to validate
+                checkInsecureKid(tokenObj)
+                const signingKey = await getSigningKey(tokenObj)
+                verifyToken(tokenJWT, signingKey)
+                req.access_token = tokenObj.payload
+                req.bearer = tokenJWT
+            }
         }
         next()
     } catch (e) {

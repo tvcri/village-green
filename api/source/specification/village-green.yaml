@@ -2132,9 +2132,8 @@ components:
         ceDumpTime:
           type: string
           format: date-time
+          nullable: true
           description: Current time in ISO 8601 UTC format
-      required:
-      - ceDumpTime
     Error:
       type: object
       properties:
