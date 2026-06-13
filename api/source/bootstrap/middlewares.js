@@ -108,7 +108,8 @@ function configureOpenApi(app) {
       },
       validateSecurity: {
           handlers:{
-          oauth: auth.validateOauthSecurity 
+          oauth: auth.validateOauthSecurity,
+          webhookBearer: auth.validateWebhookBearer
           }
       },
       fileUploader: false

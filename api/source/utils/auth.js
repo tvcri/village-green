@@ -85,13 +85,16 @@ const validateToken = async function (req, res, next) {
     try {
         const tokenJWT = getBearerToken(req)
         if (tokenJWT) {
-            const tokenObj = decodeToken(tokenJWT)
-            checkInsecureKid(tokenObj)
-            const signingKey = await getSigningKey(tokenObj)
-            verifyToken(tokenJWT, signingKey)
-
-            req.access_token = tokenObj.payload
-            req.bearer = tokenJWT
+            const tokenObj = jwt.decode(tokenJWT, { complete: true })
+            if (tokenObj) {
+                // Only process valid JWTs; non-JWT bearer tokens (e.g. webhook keys)
+                // are left for the OAS security handler to validate
+                checkInsecureKid(tokenObj)
+                const signingKey = await getSigningKey(tokenObj)
+                verifyToken(tokenJWT, signingKey)
+                req.access_token = tokenObj.payload
+                req.bearer = tokenJWT
+            }
         }
         next()
     } catch (e) {
@@ -179,6 +182,17 @@ const validateOauthSecurity = function (req, requiredScopes) {
     )
     if (commonScopes.length == 0) {
         throw new SmError.OutOfScopeError()
+    }
+
+    return true
+}
+
+// express-openapi-validator security handler for webhook Bearer token
+const validateWebhookBearer = function (req) {
+    const token = getBearerToken(req)
+
+    if (!token || !config.webhook.key || token !== config.webhook.key) {
+        throw new SmError.UnauthorizedError('Invalid webhook API key')
     }
 
     return true
@@ -291,10 +305,11 @@ async function initializeAuth() {
 }
 
 module.exports = {
-    validateToken, 
-    setupUser, 
-    validateOauthSecurity, 
-    initializeAuth, 
+    validateToken,
+    setupUser,
+    validateOauthSecurity,
+    validateWebhookBearer,
+    initializeAuth,
     getClaimByPath,
     checkInsecureKid,
     decodeToken,

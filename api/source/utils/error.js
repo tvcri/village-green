@@ -148,6 +148,14 @@ class ModeLockedError extends SmError {
   }
 }
 
+class UnauthorizedError extends SmError {
+  constructor(detail) {
+    super('Unauthorized.')
+    this.status = 401
+    this.detail = detail
+  }
+}
+
 module.exports = {
   SmError,
   AuthorizeError,  
@@ -166,5 +174,6 @@ module.exports = {
   UserUnavailableError,
   UserInconsistentError,
   EndpointUnavailableError,
-  ModeLockedError
+  ModeLockedError,
+  UnauthorizedError
 }

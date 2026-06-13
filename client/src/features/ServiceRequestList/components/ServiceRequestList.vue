@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
@@ -12,6 +12,7 @@ import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
+import { useCeDumpRefresh } from '../../../shared/composables/useCeDumpRefresh.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -47,6 +48,10 @@ const { state: village, execute: fetchVillage } = useAsyncState(
 )
 
 useRefetchOnChange(villageId, [fetchRequests, fetchVillage])
+useCeDumpRefresh(() => fetchRequests())
+
+const hasLoadedOnce = ref(false)
+watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
 
 const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled']
 
@@ -369,11 +374,11 @@ const clearFilters = () => {
       </div>
     </div>
 
-    <div v-if="isLoading" class="loading-state">
+    <div v-if="isLoading && !hasLoadedOnce" class="loading-state">
       <p>Loading service requests...</p>
     </div>
 
-    <div v-else-if="error" class="error-state">
+    <div v-else-if="error && !hasLoadedOnce" class="error-state">
       <p>Unable to load service requests. Please try again.</p>
     </div>
 

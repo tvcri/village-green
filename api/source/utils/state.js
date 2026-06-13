@@ -38,20 +38,22 @@ class State extends EventEmitter {
   /** @type {Number} */
   #changeTimeoutId
 
+  /** @type {Date} */
+  #ceDumpTime
 
   /**
    * Creates an instance of State.
    * @param {Object} options - Options for initializing the state.
    * @param {StateString} [options.initialState='starting'] - The initial state of the API.
    */
-  constructor({ 
-    initialState = 'starting', 
-    endpoints = { 
-      ui: { 
-        current: '/', 
-        next: '' 
-      } 
-    } 
+  constructor({
+    initialState = 'starting',
+    endpoints = {
+      ui: {
+        current: '/',
+        next: ''
+      }
+    }
   } = {}) {
     super()
     this.#currentState = initialState
@@ -61,6 +63,7 @@ class State extends EventEmitter {
       oidc: false
     }
     this.#endpoints = endpoints
+    this.#ceDumpTime = null
   }
 
   /**
@@ -168,7 +171,25 @@ class State extends EventEmitter {
       since: this.#stateDate,
       dependencies: this.#dependencyStatus,
       endpoints: this.#endpoints,
+      ceDumpTime: this.#ceDumpTime,
     }
+  }
+
+  /**
+   * Sets the ceDumpTime.
+   * @param {Date} time - The new ceDumpTime.
+   */
+  set ceDumpTime(time) {
+    this.#ceDumpTime = time
+  }
+
+  /**
+   * Gets the ceDumpTime.
+   * @type {Date}
+   * @readonly
+   */
+  get ceDumpTime() {
+    return this.#ceDumpTime
   }
 }
 
