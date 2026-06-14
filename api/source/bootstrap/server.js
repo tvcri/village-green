@@ -83,6 +83,16 @@ async function applyConfigurationSettings() {
   if (config.settings.setClassification) {
     await OperationSvc.setConfigurationItem('classification', config.settings.setClassification)
   }
+
+  // Initialize ceDumpTime from database
+  try {
+    const ceDumpTime = await OperationSvc.getCeDump()
+    if (ceDumpTime) {
+      state.ceDumpTime = ceDumpTime
+    }
+  } catch (err) {
+    logger.writeWarn('server', 'ceDumpTime_init', { message: 'Failed to initialize ceDumpTime', error: serializeError(err) })
+  }
 }
 
 function logStartupDuration(startTime) {
