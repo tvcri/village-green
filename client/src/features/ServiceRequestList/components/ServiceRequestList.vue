@@ -1,13 +1,11 @@
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
-import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import Fieldset from 'primevue/fieldset'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -18,6 +16,14 @@ import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 
+defineOptions({ name: 'ServiceRequestList' })
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString()
+}
+
 const router = useRouter()
 const route = useRoute()
 
@@ -25,6 +31,24 @@ let toast = null
 
 onMounted(() => {
   toast = useToast()
+})
+
+const savedScrollY = ref(0)
+
+const removeAfterEach = router.afterEach((to, from) => {
+  if (from.name === 'service-requests') {
+    savedScrollY.value = window.scrollY
+  }
+  if (to.name === 'service-requests' && to.params.villageId === from.params.villageId) {
+    const target = savedScrollY.value
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: target, behavior: 'instant' })
+    })
+  }
+})
+
+onUnmounted(() => {
+  removeAfterEach()
 })
 
 const villageId = computed(() => route.params.villageId)
@@ -456,13 +480,6 @@ const clearFilters = () => {
   </div>
 </template>
 
-<script>
-function formatDate(dateStr) {
-  if (!dateStr) return '—'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString()
-}
-</script>
 
 <style scoped>
 .service-request-list {

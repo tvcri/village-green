@@ -90,6 +90,10 @@ else {
 const router = createRouter({
   history: historyBase ? createWebHistory(historyBase) : createWebHashHistory(),
   routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  },
 })
 
 router.beforeEach(navigationGuard)
