@@ -96,15 +96,6 @@ const volunteersForCsv = computed(() => {
   })
 })
 
-const toggleSort = (field) => {
-  if (sortField.value === field) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortField.value = field
-    sortDir.value = 'asc'
-  }
-}
-
 const clearSearch = () => searchText.immediate('')
 
 const navigateToVolunteer = (volunteer) => {

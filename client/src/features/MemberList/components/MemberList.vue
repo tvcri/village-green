@@ -87,15 +87,6 @@ const membersForCsv = computed(() => {
   })
 })
 
-const toggleSort = (field) => {
-  if (sortField.value === field) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortField.value = field
-    sortDir.value = 'asc'
-  }
-}
-
 const clearSearch = () => searchText.immediate('')
 
 const navigateToMember = (member) => {
@@ -314,7 +305,6 @@ h1 {
 .search-box {
   width: 250px;
 }
-
 
 .loading-state,
 .error-state,
