@@ -1,7 +1,10 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -16,6 +19,8 @@ import { getVillageMembers } from '../api/memberApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
+
+defineOptions({ name: 'MemberList' })
 
 const getMemberLevelSeverity = (level) => {
   if (level === 'Primary') return 'success'
@@ -39,17 +44,21 @@ const sortField = ref('fullName')
 const sortDir = ref('asc')
 
 const { state: members, isLoading, error, execute: fetchMembers } = useAsyncState(
-  () => getVillageMembers(villageId.value),
+  () => villageId.value ? getVillageMembers(villageId.value) : null,
   { immediate: true }
 )
 
 const { state: persons, execute: fetchPersons } = useAsyncState(
-  () => getVillagePersons(villageId.value),
+  () => villageId.value ? getVillagePersons(villageId.value) : null,
   { immediate: true }
 )
 
 useRefetchOnChange(villageId, [fetchMembers, fetchPersons])
+useScrollRestore('members', 'member-detail')
 useCeDumpRefresh(() => fetchMembers())
+watch(villageId, () => {
+  searchText.immediate('')
+})
 
 const filteredMembers = computed(() => {
   if (!Array.isArray(members.value)) return []
@@ -86,6 +95,8 @@ const toggleSort = (field) => {
     sortDir.value = 'asc'
   }
 }
+
+const clearSearch = () => searchText.immediate('')
 
 const navigateToMember = (member) => {
   router.push({
@@ -197,11 +208,17 @@ async function handleCreateSheet() {
     </div>
 
     <div class="filter-section">
-      <InputText
-        v-model="searchText"
-        type="text"
-        placeholder="Search by name..."
-      />
+      <div class="search-box">
+        <IconField style="width: 100%">
+          <InputText
+            v-model="searchText"
+            type="text"
+            placeholder="Search by name..."
+            style="width: 100%"
+          />
+          <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
+        </IconField>
+      </div>
     </div>
 
     <div v-if="isLoading" class="loading-state">
@@ -294,9 +311,10 @@ h1 {
   align-items: center;
 }
 
-.filter-section :deep(input) {
+.search-box {
   width: 250px;
 }
+
 
 .loading-state,
 .error-state,

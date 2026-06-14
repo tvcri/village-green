@@ -1,6 +1,7 @@
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
@@ -33,23 +34,7 @@ onMounted(() => {
   toast = useToast()
 })
 
-const savedScrollY = ref(0)
-
-const removeAfterEach = router.afterEach((to, from) => {
-  if (from.name === 'service-requests') {
-    savedScrollY.value = window.scrollY
-  }
-  if (to.name === 'service-requests' && to.params.villageId === from.params.villageId) {
-    const target = savedScrollY.value
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: target, behavior: 'instant' })
-    })
-  }
-})
-
-onUnmounted(() => {
-  removeAfterEach()
-})
+useScrollRestore('service-requests', 'service-request-detail')
 
 const villageId = computed(() => route.params.villageId)
 const isCreatingSheet = ref(false)
@@ -62,17 +47,23 @@ const sortField = ref('startAt')
 const sortDir = ref('asc')
 
 const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
-  () => getVillageServiceRequests(villageId.value),
+  () => villageId.value ? getVillageServiceRequests(villageId.value) : null,
   { immediate: true }
 )
 
 const { state: village, execute: fetchVillage } = useAsyncState(
-  () => apiCall('getVillage', { villageId: villageId.value }),
+  () => villageId.value ? apiCall('getVillage', { villageId: villageId.value }) : null,
   { immediate: true }
 )
 
 useRefetchOnChange(villageId, [fetchRequests, fetchVillage])
 useCeDumpRefresh(() => fetchRequests())
+watch(villageId, () => {
+  selectedMember.value = 'All members'
+  selectedVolunteer.value = 'All volunteers'
+  selectedService.value = 'All services'
+  selectedStatuses.value = ['open', 'confirmed']
+})
 
 const hasLoadedOnce = ref(false)
 watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })

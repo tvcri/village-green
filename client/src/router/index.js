@@ -87,11 +87,14 @@ else {
   historyBase = VG.Env.pathPrefix ? `${VG.Env.pathPrefix}client-v2/` : null
 }
 
+if (typeof window !== 'undefined') {
+  history.scrollRestoration = 'manual'
+}
+
 const router = createRouter({
   history: historyBase ? createWebHistory(historyBase) : createWebHashHistory(),
   routes,
-  scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) return savedPosition
+  scrollBehavior() {
     return { top: 0 }
   },
 })
