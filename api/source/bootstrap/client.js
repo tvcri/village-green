@@ -61,6 +61,7 @@ function getClientEnv(){
             google: {
                 clientId: "${config.google.clientId}",
                 redirectUri: "${config.google.redirectUri}",
+                googleMapsKey: "${config.google.mapsKey}",
             }
         }
     }`
