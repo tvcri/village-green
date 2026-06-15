@@ -1,13 +1,12 @@
 <script setup>
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
-import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import Fieldset from 'primevue/fieldset'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -18,6 +17,14 @@ import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 
+defineOptions({ name: 'ServiceRequestList' })
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString()
+}
+
 const router = useRouter()
 const route = useRoute()
 
@@ -26,6 +33,8 @@ let toast = null
 onMounted(() => {
   toast = useToast()
 })
+
+useScrollRestore('service-requests', 'service-request-detail')
 
 const villageId = computed(() => route.params.villageId)
 const isCreatingSheet = ref(false)
@@ -38,17 +47,23 @@ const sortField = ref('startAt')
 const sortDir = ref('asc')
 
 const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
-  () => getVillageServiceRequests(villageId.value),
+  () => villageId.value ? getVillageServiceRequests(villageId.value) : null,
   { immediate: true }
 )
 
 const { state: village, execute: fetchVillage } = useAsyncState(
-  () => apiCall('getVillage', { villageId: villageId.value }),
+  () => villageId.value ? apiCall('getVillage', { villageId: villageId.value }) : null,
   { immediate: true }
 )
 
 useRefetchOnChange(villageId, [fetchRequests, fetchVillage])
 useCeDumpRefresh(() => fetchRequests())
+watch(villageId, () => {
+  selectedMember.value = 'All members'
+  selectedVolunteer.value = 'All volunteers'
+  selectedService.value = 'All services'
+  selectedStatuses.value = ['open', 'confirmed']
+})
 
 const hasLoadedOnce = ref(false)
 watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
@@ -456,13 +471,6 @@ const clearFilters = () => {
   </div>
 </template>
 
-<script>
-function formatDate(dateStr) {
-  if (!dateStr) return '—'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString()
-}
-</script>
 
 <style scoped>
 .service-request-list {

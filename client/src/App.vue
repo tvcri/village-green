@@ -50,7 +50,11 @@ const ceDumpTime = computed(() => {
     <Breadcrumbs />
 
     <main class="app-main">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <keep-alive include="ServiceRequestList,MemberList,VolunteerList">
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
     </main>
   </div>
 </template>

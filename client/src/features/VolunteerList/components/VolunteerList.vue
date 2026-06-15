@@ -1,7 +1,10 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
@@ -17,6 +20,8 @@ import { getVillageVolunteers } from '../api/volunteerApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
+
+defineOptions({ name: 'VolunteerList' })
 
 const router = useRouter()
 const route = useRoute()
@@ -36,17 +41,22 @@ const sortDir = ref('asc')
 const capabilityOptions = ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support']
 
 const { state: volunteers, isLoading, error, execute: fetchVolunteers } = useAsyncState(
-  () => getVillageVolunteers(villageId.value),
+  () => villageId.value ? getVillageVolunteers(villageId.value) : null,
   { immediate: true }
 )
 
 const { state: persons, execute: fetchPersons } = useAsyncState(
-  () => getVillagePersons(villageId.value),
+  () => villageId.value ? getVillagePersons(villageId.value) : null,
   { immediate: true }
 )
 
 useRefetchOnChange(villageId, [fetchVolunteers, fetchPersons])
+useScrollRestore('volunteers', 'volunteer-detail')
 useCeDumpRefresh(() => fetchVolunteers())
+watch(villageId, () => {
+  searchText.immediate('')
+  selectedCapabilities.value = []
+})
 
 const filteredVolunteers = computed(() => {
   if (!Array.isArray(volunteers.value)) return []
@@ -86,14 +96,7 @@ const volunteersForCsv = computed(() => {
   })
 })
 
-const toggleSort = (field) => {
-  if (sortField.value === field) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortField.value = field
-    sortDir.value = 'asc'
-  }
-}
+const clearSearch = () => searchText.immediate('')
 
 const navigateToVolunteer = (volunteer) => {
   router.push({
@@ -203,11 +206,15 @@ async function handleCreateSheet() {
     <div class="filter-section">
       <div class="search-and-capabilities">
         <div class="search-box">
-          <InputText
-            v-model="searchText"
-            type="text"
-            placeholder="Search by name..."
-          />
+          <IconField style="width: 100%">
+            <InputText
+              v-model="searchText"
+              type="text"
+              placeholder="Search by name..."
+              style="width: 100%"
+            />
+            <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
+          </IconField>
         </div>
 
         <div class="capability-filters">
@@ -324,9 +331,8 @@ h1 {
   width: 100%;
 }
 
-.search-box :deep(input) {
+.search-box {
   width: 250px;
-  box-sizing: border-box;
 }
 
 .capability-filters {
@@ -520,7 +526,7 @@ h1 {
     max-width: 100%;
   }
 
-  .search-box :deep(input) {
+  .search-box {
     width: 100%;
   }
 
