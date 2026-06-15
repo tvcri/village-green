@@ -1,6 +1,7 @@
 'use strict';
 
 const SmError = require('../utils/error')
+const ServiceRequestService = require('../service/ServiceRequestService')
 
 module.exports.getServiceRequests = async function getServiceRequests (req, res, next) {
   try {
@@ -24,8 +25,13 @@ module.exports.createServiceRequest = async function createServiceRequest (req, 
 
 module.exports.getServiceRequest = async function getServiceRequest (req, res, next) {
   try {
-    // TODO: Implement getServiceRequest
-    res.json({})
+    const serviceRequestId = req.params.serviceRequestId
+    const projections = req.query.projection ?? []
+    const response = await ServiceRequestService.getServiceRequest(serviceRequestId, projections)
+    if (!response) {
+      throw new SmError.NotFoundError()
+    }
+    res.json(response)
   }
   catch (err) {
     next(err)

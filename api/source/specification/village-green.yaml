@@ -1441,6 +1441,7 @@ paths:
       operationId: getServiceRequest
       parameters:
       - $ref: '#/components/parameters/ServiceRequestIdPath'
+      - $ref: '#/components/parameters/ServiceRequestProjectionQuery'
       responses:
         '200':
           description: Service request details
@@ -3488,6 +3489,18 @@ components:
           - completed
           - unmatched
           - cancelled
+    ServiceRequestProjectionQuery:
+      name: projection
+      in: query
+      description: Additional properties to include in the response.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+          - memberAddress
     UserGroupIdPath:
       name: userGroupId
       in: path

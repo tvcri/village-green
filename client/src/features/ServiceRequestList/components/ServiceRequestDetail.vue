@@ -5,20 +5,17 @@ import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
-import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
+import { getServiceRequest } from '../api/serviceRequestApi.js'
 
 const route = useRoute()
 const { getStatusSeverity } = useStatusSeverity()
 
-const villageId = computed(() => route.params.villageId)
 const serviceRequestId = computed(() => route.params.id)
 
-const { state: requests } = useAsyncState(
-  () => getVillageServiceRequests(villageId.value),
+const { state: request } = useAsyncState(
+  () => getServiceRequest(serviceRequestId.value, ['memberAddress']),
   { immediate: true }
 )
-
-const request = computed(() => requests.value?.find(r => r.serviceRequestId === serviceRequestId.value))
 
 function formatDate(dateStr) {
   if (!dateStr) return null
@@ -73,6 +70,35 @@ function formatTimeRange(startStr, finishStr) {
             <span class="label">Volunteer:</span>
             <span class="value"><strong>{{ request.volunteerFullName }}</strong></span>
           </div>
+
+          <template v-if="request.memberAddress">
+            <div v-if="request.memberAddress.address" class="detail-field">
+              <span class="label">Member Address:</span>
+              <span class="value">{{ request.memberAddress.address }}</span>
+            </div>
+            <div v-if="request.memberAddress.city || request.memberAddress.state || request.memberAddress.zip" class="detail-field">
+              <span class="label">Member City/State/Zip:</span>
+              <span class="value">{{ [request.memberAddress.city, request.memberAddress.state, request.memberAddress.zip].filter(Boolean).join(', ') }}</span>
+            </div>
+            <div v-if="request.memberAddress.phone" class="detail-field">
+              <span class="label">Member Phone:</span>
+              <div class="phone-numbers">
+                <a :href="`tel:${request.memberAddress.phone}`" class="phone-item">
+                  <i class="pi pi-phone"></i>
+                  <span class="phone-number">{{ request.memberAddress.phone }}</span>
+                </a>
+              </div>
+            </div>
+            <div v-if="request.memberAddress.cell" class="detail-field">
+              <span class="label">Member Cell:</span>
+              <div class="phone-numbers">
+                <a :href="`tel:${request.memberAddress.cell}`" class="phone-item">
+                  <i class="pi pi-phone"></i>
+                  <span class="phone-number">{{ request.memberAddress.cell }}</span>
+                </a>
+              </div>
+            </div>
+          </template>
         </div>
 
         <!-- Description Section -->
