@@ -6,6 +6,7 @@ import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
+import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
 
 const route = useRoute()
 const { getStatusSeverity } = useStatusSeverity()
@@ -16,6 +17,18 @@ const { state: request } = useAsyncState(
   () => getServiceRequest(serviceRequestId.value, ['memberAddress']),
   { immediate: true }
 )
+
+const mapOrigin = computed(() => {
+  const a = request.value?.memberAddress
+  if (!a) return ''
+  return [a.address, a.city, a.state, a.zip].filter(Boolean).join(', ')
+})
+
+const mapDestination = computed(() => {
+  const r = request.value
+  if (!r) return ''
+  return [r.address, r.city, 'RI'].filter(Boolean).join(', ')
+})
 
 function formatDate(dateStr) {
   if (!dateStr) return null
@@ -160,6 +173,12 @@ function formatTimeRange(startStr, finishStr) {
             <span class="value">{{ request.requestNumber }}</span>
           </div>
         </div>
+        <ServiceRequestMap
+          v-if="mapOrigin && mapDestination"
+          :origin="mapOrigin"
+          :destination="mapDestination"
+          class="map-section"
+        />
       </template>
     </Card>
 
@@ -292,6 +311,10 @@ function formatTimeRange(startStr, finishStr) {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.map-section {
+  margin-top: 2rem;
 }
 
 .not-found {
