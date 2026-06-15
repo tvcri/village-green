@@ -22,6 +22,7 @@ function buildSrc(origin, destination) {
   <iframe
     v-if="origin && destination"
     :src="buildSrc(origin, destination)"
+    title="Driving directions map"
     class="service-request-map"
     allowfullscreen
     loading="lazy"
