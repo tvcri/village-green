@@ -42,9 +42,23 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
       'state', mp.state,
       'zip', LPAD(mp.zip, 5, '0'),
       'phone', mp.phone,
-      'cell', mp.cell
+      'cell', mp.cell,
+      'email', mp.email
     ) AS memberAddress`)
   }
+
+  if (projections.includes('volunteerAddress')) {
+    columns.push(`IF(sr.volunteer_person_id IS NOT NULL, JSON_OBJECT(
+      'address', vp.address,
+      'city', vp.city,
+      'state', vp.state,
+      'zip', LPAD(vp.zip, 5, '0'),
+      'phone', vp.phone,
+      'cell', vp.cell,
+      'email', vp.email
+    ), NULL) AS volunteerAddress`)
+  }
+
 
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
   const [rows] = await dbUtils.pool.query(sql)

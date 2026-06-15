@@ -13,7 +13,7 @@ async function queryPersons (inPredicates = {}) {
     'p.address',
     'p.city',
     'p.state',
-    'p.zip',
+    "LPAD(p.zip, 5, '0') AS zip",
     'p.email',
     'p.phone',
     'p.cell',

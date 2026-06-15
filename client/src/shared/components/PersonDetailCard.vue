@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import Card from 'primevue/card'
+import PersonMap from '../../components/PersonMap.vue'
 
 const props = defineProps({
   person: {
@@ -15,6 +16,20 @@ const props = defineProps({
 })
 
 const copiedEmail = ref(false)
+
+const SHOW_MAP_KEY = 'vg.showMap'
+const showMap = ref(localStorage.getItem(SHOW_MAP_KEY) !== 'false')
+
+function toggleMap() {
+  showMap.value = !showMap.value
+  localStorage.setItem(SHOW_MAP_KEY, showMap.value)
+}
+
+const mapAddress = computed(() => {
+  const p = props.person
+  if (!p?.address && !p?.city) return ''
+  return [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ')
+})
 
 const isMember = computed(() => props.personType === 'member')
 const isVolunteer = computed(() => props.personType === 'volunteer')
@@ -168,6 +183,12 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.emergencyContactEmail }}</span>
         </div>
       </div>
+      <div v-if="mapAddress" class="map-section">
+        <button class="map-toggle" @click="toggleMap">
+            {{ showMap ? 'Always Hide Maps' : 'Always Show Maps' }}
+        </button>
+        <PersonMap v-if="showMap" :address="mapAddress" />
+      </div>
     </template>
   </Card>
 
@@ -313,6 +334,25 @@ const copyEmail = async (email) => {
 
 .capabilities-field {
   grid-column: 1 / -1;
+}
+
+.map-section {
+  margin-top: 2rem;
+}
+
+.map-toggle {
+  margin-bottom: 0.75rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+.map-toggle:hover {
+  background: var(--color-border-default);
 }
 
 .not-found {
