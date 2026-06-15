@@ -125,6 +125,7 @@ const config = {
         clientId: process.env.VG_GOOGLE_CLIENT_ID ?? '',
         clientSecret: process.env.VG_GOOGLE_CLIENT_SECRET ?? '',
         redirectUri: process.env.VG_GOOGLE_REDIRECT_URI ?? '',
+        mapsKey: process.env.VG_GOOGLE_MAPS_KEY ?? '',
     }
 }
 
