@@ -166,6 +166,7 @@ const activeFilterCount = computed(() => {
   if (selectedMember.value && selectedMember.value !== 'All members') count++
   if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') count++
   if (selectedService.value && selectedService.value !== 'All services') count++
+  if (selectedVillage.value && selectedVillage.value !== 'All villages') count++
   return count
 })
 
@@ -339,7 +340,7 @@ const clearFilters = () => {
             <span class="toggle-icon">▼</span>
             <span class="filters-title">
               Filters
-              <span v-if="requests && requests.length && (filteredRequests.length < requests.length)" class="filter-count-tag">
+              <span v-if="requests && requests.length && (filteredRequests.length < requests.length || activeFilterCount > 0)" class="filter-count-tag">
                 {{ filteredRequests.length }} of {{ requests.length }} requests
                 <span
                   role="button"
