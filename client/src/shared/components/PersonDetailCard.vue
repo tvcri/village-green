@@ -201,7 +201,7 @@ const copyEmail = async (email) => {
 @import '../styles/phone-link.css';
 
 .detail-card {
-  max-width: 800px;
+  max-width: 1100px;
   border: 1px solid var(--color-border-default);
   box-shadow: var(--box-shadow-card);
 }
@@ -241,8 +241,8 @@ const copyEmail = async (email) => {
 
 .section {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;
 }
@@ -361,7 +361,13 @@ const copyEmail = async (email) => {
   color: var(--color-text-dim);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
+  .section {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
   .section {
     grid-template-columns: 1fr;
     gap: 1rem;
