@@ -135,6 +135,13 @@ const breadcrumbs = computed(() => {
   // Add page-specific breadcrumb
   const personName = route.params.personName
   switch (route.name) {
+    case 'meta':
+      crumbs.push({ label: 'Meta' })
+      break
+    case 'meta-service-requests':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' } })
+      crumbs.push({ label: 'Service Requests' })
+      break
     case 'members':
       crumbs.push({ label: 'Members', siblings: getSiblings('members', { villageId: vId }) })
       break
@@ -153,7 +160,12 @@ const breadcrumbs = computed(() => {
       crumbs.push({ label: 'Service Requests', siblings: getSiblings('service-requests', { villageId: vId }) })
       break
     case 'service-request-detail':
-      crumbs.push({ label: 'Service Requests', route: { name: 'service-requests', params: { villageId: vId } }, siblings: getSiblings('service-requests', { villageId: vId }) })
+      if (route.query.from === 'meta') {
+        crumbs.push({ label: 'Meta', route: { name: 'meta' } })
+        crumbs.push({ label: 'Service Requests', route: { name: 'meta-service-requests' } })
+      } else {
+        crumbs.push({ label: 'Service Requests', route: { name: 'service-requests', params: { villageId: vId } }, siblings: getSiblings('service-requests', { villageId: vId }) })
+      }
       crumbs.push({ label: 'Request' })
       break
   }
