@@ -97,7 +97,7 @@ const breadcrumbs = computed(() => {
 
   const vId = route.params.villageId
 
-  if (vId && villages.value) {
+  if (vId && villages.value && !(route.name === 'service-request-detail' && route.query.from === 'meta')) {
     const village = villages.value.find(v => v.villageId === vId)
     const villageName = village?.name || `Village ${vId}`
 
@@ -125,7 +125,7 @@ const breadcrumbs = computed(() => {
       route: { name: 'village-detail', params: { villageId: vId } },
       siblings: siblingsList
     })
-  } else if (vId) {
+  } else if (vId && !(route.name === 'service-request-detail' && route.query.from === 'meta')) {
     crumbs.push({
       label: `Village ${vId}`,
       route: { name: 'village-detail', params: { villageId: vId } }
