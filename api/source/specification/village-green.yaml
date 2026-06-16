@@ -1457,6 +1457,18 @@ paths:
       tags:
       - ServiceRequest
       operationId: getServiceRequests
+      parameters:
+        - $ref: '#/components/parameters/ElevateQuery'
+        - $ref: '#/components/parameters/ServiceRequestStatusQuery'
+        - name: villageId
+          in: query
+          description: Filter to specific villages (omit for all granted villages)
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/VillageId'
       responses:
         '200':
           description: List of service requests
