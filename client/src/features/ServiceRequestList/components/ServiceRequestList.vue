@@ -12,8 +12,9 @@ import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { useCeDumpRefresh } from '../../../shared/composables/useCeDumpRefresh.js'
-import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
+import { getVillageServiceRequests, getServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
+import { getVillages } from '../../VillageList/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
@@ -40,6 +41,8 @@ onMounted(() => {
 useScrollRestore('service-requests', 'service-request-detail')
 
 const villageId = computed(() => route.params.villageId)
+const isMetaMode = computed(() => !route.params.villageId)
+const selectedVillageIds = ref([])
 const isCreatingSheet = ref(false)
 const filtersCollapsed = ref(true)
 const selectedMember = ref('All members')
@@ -50,12 +53,25 @@ const sortField = ref('startAt')
 const sortDir = ref('asc')
 
 const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
-  () => villageId.value ? getVillageServiceRequests(villageId.value) : null,
+  () => {
+    if (isMetaMode.value) {
+      return getServiceRequests({
+        status: selectedStatuses.value,
+        villageId: selectedVillageIds.value
+      })
+    }
+    return villageId.value ? getVillageServiceRequests(villageId.value) : null
+  },
   { immediate: true }
 )
 
 const { state: village, execute: fetchVillage } = useAsyncState(
   () => villageId.value ? apiCall('getVillage', { villageId: villageId.value }) : null,
+  { immediate: true }
+)
+
+const { state: allVillages } = useAsyncState(
+  () => isMetaMode.value ? getVillages() : null,
   { immediate: true }
 )
 
@@ -66,6 +82,10 @@ watch(villageId, () => {
   selectedVolunteer.value = 'All volunteers'
   selectedService.value = 'All services'
   selectedStatuses.value = ['open', 'confirmed']
+})
+
+watch([selectedStatuses, selectedVillageIds], () => {
+  if (isMetaMode.value) fetchRequests()
 })
 
 const hasLoadedOnce = ref(false)
@@ -95,34 +115,28 @@ const filteredRequests = computed(() => {
   if (!Array.isArray(requests.value)) return []
 
   let result = requests.value.filter(r => {
-    // Filter by member name
     let memberMatch = true
     if (selectedMember.value && selectedMember.value !== 'All members') {
       memberMatch = r.memberFullName === selectedMember.value
     }
 
-    // Filter by volunteer name
     let volunteerMatch = true
     if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') {
       volunteerMatch = r.volunteerFullName === selectedVolunteer.value
     }
 
-    // Filter by service
     let serviceMatch = true
     if (selectedService.value && selectedService.value !== 'All services') {
       serviceMatch = r.serviceName === selectedService.value
     }
 
-    // Filter by status
+    // In village mode: client-side status filter. In meta mode: already server-filtered.
     let statusMatch = true
-    if (selectedStatuses.value.length > 0) {
+    if (!isMetaMode.value && selectedStatuses.value.length > 0) {
       const statusLower = r.status?.toLowerCase() || ''
       statusMatch = selectedStatuses.value.some(selectedStatus => {
         const selectedLower = selectedStatus.toLowerCase()
-        // For "cancelled", match any status containing "cancelled"
-        if (selectedLower === 'cancelled') {
-          return statusLower.includes('cancelled')
-        }
+        if (selectedLower === 'cancelled') return statusLower.includes('cancelled')
         return statusLower === selectedLower
       })
     }
@@ -278,11 +292,10 @@ async function handleCreateSheet() {
   }
 }
 
-const navigateToRequest = (serviceRequestId) => {
-  router.push({
-    name: 'service-request-detail',
-    params: { villageId: villageId.value, id: serviceRequestId }
-  })
+const navigateToRequest = (serviceRequestId, rowVillageId) => {
+  const params = { villageId: rowVillageId ?? villageId.value, id: serviceRequestId }
+  const query = isMetaMode.value ? { from: 'meta' } : {}
+  router.push({ name: 'service-request-detail', params, query })
 }
 
 const clearFilters = () => {
@@ -388,6 +401,19 @@ const clearFilters = () => {
               @change="selectedService = selectedService"
             />
           </div>
+
+          <!-- Village Filter (meta mode only) -->
+          <div v-if="isMetaMode" class="search-box">
+            <label>Village:</label>
+            <Select
+              v-model="selectedVillageIds"
+              :options="allVillages ?? []"
+              option-label="name"
+              option-value="villageId"
+              placeholder="-- All villages --"
+              multiple
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -412,7 +438,7 @@ const clearFilters = () => {
       :sortOrder="sortDir === 'asc' ? 1 : -1"
       class="request-table-responsive desktop-only"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
-      @row-click="(event) => navigateToRequest(event.data.serviceRequestId)"
+      @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
       @sort="onSort"
       @filter="trackEvent('filter_applied')"
     >
@@ -421,6 +447,7 @@ const clearFilters = () => {
           {{ slotProps.data.startAt ? formatDate(slotProps.data.startAt) : '—' }}
         </template>
       </Column>
+      <Column v-if="isMetaMode" field="villageName" header="Village" sortable style="width: 15%"></Column>
       <Column field="serviceName" header="Service" sortable style="width: 20%"></Column>
       <Column field="status" header="Status" sortable style="width: 12%">
         <template #body="slotProps">
@@ -442,7 +469,7 @@ const clearFilters = () => {
         v-for="request in filteredRequests"
         :key="request.serviceRequestId"
         class="request-card"
-        @click="navigateToRequest(request.serviceRequestId)"
+        @click="navigateToRequest(request.serviceRequestId, request.villageId)"
       >
         <div class="card-header">
           <h3>{{ request.serviceName ?? 'Service Request' }}</h3>
