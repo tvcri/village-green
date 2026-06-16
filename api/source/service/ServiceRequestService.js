@@ -101,6 +101,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
   const predicates = { statements: [], binds: [] }
 
   if (!elevate) {
+    if (!villageIdsGranted.length) return []
     predicates.statements.push('sr.village_id IN (?)')
     predicates.binds.push([villageIdsGranted])
   }
