@@ -29,6 +29,21 @@ const getTotalPersonCount = (village) => {
   return (counts.member ?? 0) + (counts.volunteer ?? 0) + (counts.both ?? 0)
 }
 
+const metaVillageCounts = computed(() => {
+  if (!Array.isArray(villages.value) || villages.value.length <= 1) return null
+  return villages.value.reduce(
+    (acc, v) => {
+      acc.member += v.personCounts?.member ?? 0
+      acc.volunteer += v.personCounts?.volunteer ?? 0
+      acc.both += v.personCounts?.both ?? 0
+      acc.open += v.srStatusCounts?.open ?? 0
+      acc.confirmed += v.srStatusCounts?.confirmed ?? 0
+      return acc
+    },
+    { member: 0, volunteer: 0, both: 0, open: 0, confirmed: 0 }
+  )
+})
+
 const navigateToVillage = (villageId) => {
   router.push({ name: 'village-detail', params: { villageId } })
 }
@@ -90,6 +105,48 @@ const navigateToVillage = (villageId) => {
           </div>
         </template>
       </Card>
+      <Card
+        v-if="metaVillageCounts"
+        class="village-card meta-village-card"
+        @click="router.push({ name: 'meta' })"
+      >
+        <template #title>
+          <div class="title-header">
+            <span class="village-name">Meta Village</span>
+            <Tag
+              icon="pi pi-users"
+              :value="`${metaVillageCounts.member + metaVillageCounts.volunteer + metaVillageCounts.both}`"
+              severity="secondary"
+            />
+          </div>
+        </template>
+        <template #content>
+          <div class="people-grid">
+            <div class="person-stat">
+              <div class="person-label">Members</div>
+              <div class="person-value">{{ metaVillageCounts.member }}</div>
+            </div>
+            <div class="person-stat">
+              <div class="person-label">Volunteers</div>
+              <div class="person-value">{{ metaVillageCounts.volunteer }}</div>
+            </div>
+            <div class="person-stat">
+              <div class="person-label">Both</div>
+              <div class="person-value">{{ metaVillageCounts.both }}</div>
+            </div>
+          </div>
+          <div class="sr-grid">
+            <div class="sr-stat">
+              <div class="sr-label">Open</div>
+              <Tag :value="`${metaVillageCounts.open}`" :severity="getStatusSeverity('open')" class="sr-tag" />
+            </div>
+            <div class="sr-stat">
+              <div class="sr-label">Confirmed</div>
+              <Tag :value="`${metaVillageCounts.confirmed}`" :severity="getStatusSeverity('confirmed')" class="sr-tag" />
+            </div>
+          </div>
+        </template>
+      </Card>
     </div>
   </div>
 </template>
@@ -133,6 +190,15 @@ h1 {
 
 .village-card:hover {
   transform: translateY(-2px);
+}
+
+.meta-village-card {
+  border: 2px dashed var(--color-border-default);
+  opacity: 0.85;
+}
+
+.meta-village-card:hover {
+  opacity: 1;
 }
 
 .title-header {
