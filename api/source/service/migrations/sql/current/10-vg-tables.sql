@@ -1,92 +1,153 @@
-CREATE TABLE IF NOT EXISTS village (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(200) NOT NULL UNIQUE
+-- MySQL dump 10.13  Distrib 8.4.2, for Linux (x86_64)
+--
+-- Host: 127.0.0.1    Database: vg
+-- ------------------------------------------------------
+-- Server version	8.4.2
+
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `_migrations`
+--
+
+DROP TABLE IF EXISTS `_migrations`;
+CREATE TABLE `_migrations` (
+  `createdAt` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `name` varchar(128) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS capability (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE
+--
+-- Table structure for table `analytics_events`
+--
+
+DROP TABLE IF EXISTS `analytics_events`;
+CREATE TABLE `analytics_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int unsigned NOT NULL,
+  `event_type` varchar(32) NOT NULL,
+  `route_name` varchar(64) DEFAULT NULL,
+  `path` varchar(512) DEFAULT NULL,
+  `event_name` varchar(64) DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_analytics_user_time` (`user_id`,`created_at`),
+  KEY `idx_analytics_route_time` (`event_type`,`route_name`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-INSERT IGNORE INTO capability (name) VALUES
-  ('Errands'),
-  ('Friends'),
-  ('Home Help'),
-  ('Tech Support'),
-  ('Rides');
+--
+-- Table structure for table `capability`
+--
 
-CREATE TABLE IF NOT EXISTS person (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  village_id INT NOT NULL,
-  full_name VARCHAR(200) NOT NULL,
-  last_name VARCHAR(100),
-  first_name VARCHAR(100),
-  nickname VARCHAR(100),
-  address VARCHAR(300),
-  city VARCHAR(100),
-  state VARCHAR(50),
-  zip VARCHAR(20),
-  email VARCHAR(200),
-  phone VARCHAR(50),
-  cell VARCHAR(50),
-  birth_date DATE,
-  emergency_contact_name VARCHAR(200),
-  emergency_contact_relationship VARCHAR(100),
-  emergency_contact_phone VARCHAR(50),
-  emergency_contact_email VARCHAR(200),
-  UNIQUE(village_id, full_name),
-  FOREIGN KEY (village_id) REFERENCES village(id)
+DROP TABLE IF EXISTS `capability`;
+CREATE TABLE `capability` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS member (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  person_id INT NOT NULL UNIQUE,
-  member_number VARCHAR(50),
-  member_level VARCHAR(100),
-  service_notes TEXT,
-  join_date DATE,
-  FOREIGN KEY (person_id) REFERENCES person(id)
+--
+-- Table structure for table `ce_dump`
+--
+
+DROP TABLE IF EXISTS `ce_dump`;
+CREATE TABLE `ce_dump` (
+  `ceDumpTime` datetime NOT NULL,
+  PRIMARY KEY (`ceDumpTime`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS volunteer (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  person_id INT NOT NULL UNIQUE,
-  FOREIGN KEY (person_id) REFERENCES person(id)
+--
+-- Table structure for table `member`
+--
+
+DROP TABLE IF EXISTS `member`;
+CREATE TABLE `member` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `person_id` int NOT NULL,
+  `member_number` varchar(50) DEFAULT NULL,
+  `member_level` varchar(100) DEFAULT NULL,
+  `service_notes` text,
+  `join_date` date DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `person_id` (`person_id`),
+  CONSTRAINT `member_ibfk_1` FOREIGN KEY (`person_id`) REFERENCES `person` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS volunteer_capability (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  volunteer_id INT NOT NULL,
-  capability_id INT NOT NULL,
-  FOREIGN KEY (volunteer_id) REFERENCES volunteer(id),
-  FOREIGN KEY (capability_id) REFERENCES capability(id)
+--
+-- Table structure for table `person`
+--
+
+DROP TABLE IF EXISTS `person`;
+CREATE TABLE `person` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `village_id` int NOT NULL,
+  `full_name` varchar(200) NOT NULL,
+  `last_name` varchar(100) DEFAULT NULL,
+  `first_name` varchar(100) DEFAULT NULL,
+  `nickname` varchar(100) DEFAULT NULL,
+  `address` varchar(300) DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `state` varchar(50) DEFAULT NULL,
+  `zip` varchar(20) DEFAULT NULL,
+  `email` varchar(200) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `cell` varchar(50) DEFAULT NULL,
+  `birth_date` date DEFAULT NULL,
+  `emergency_contact_name` varchar(200) DEFAULT NULL,
+  `emergency_contact_relationship` varchar(100) DEFAULT NULL,
+  `emergency_contact_phone` varchar(50) DEFAULT NULL,
+  `emergency_contact_email` varchar(200) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `village_id` (`village_id`,`full_name`),
+  CONSTRAINT `person_ibfk_1` FOREIGN KEY (`village_id`) REFERENCES `village` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS service_request (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  request_number INT,
-  village_id INT NOT NULL,
-  member_person_id INT,
-  volunteer_person_id INT,
-  status VARCHAR(50),
-  service_name VARCHAR(200),
-  transportation_type VARCHAR(100),
-  created_at DATETIME,
-  start_at DATETIME,
-  finish_at DATETIME,
-  instructions TEXT,
-  description TEXT,
-  destination TEXT,
-  address TEXT,
-  city VARCHAR(100),
-  phone VARCHAR(50),
-  FOREIGN KEY (village_id) REFERENCES village(id),
-  FOREIGN KEY (member_person_id) REFERENCES person(id),
-  FOREIGN KEY (volunteer_person_id) REFERENCES person(id)
+--
+-- Table structure for table `service_request`
+--
+
+DROP TABLE IF EXISTS `service_request`;
+CREATE TABLE `service_request` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `request_number` int DEFAULT NULL,
+  `village_id` int NOT NULL,
+  `member_person_id` int DEFAULT NULL,
+  `volunteer_person_id` int DEFAULT NULL,
+  `status` varchar(50) DEFAULT NULL,
+  `service_name` varchar(200) DEFAULT NULL,
+  `transportation_type` varchar(100) DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `start_at` datetime DEFAULT NULL,
+  `finish_at` datetime DEFAULT NULL,
+  `instructions` text,
+  `description` text,
+  `destination` text,
+  `address` text,
+  `city` varchar(100) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `village_id` (`village_id`),
+  KEY `member_person_id` (`member_person_id`),
+  KEY `volunteer_person_id` (`volunteer_person_id`),
+  CONSTRAINT `service_request_ibfk_1` FOREIGN KEY (`village_id`) REFERENCES `village` (`id`),
+  CONSTRAINT `service_request_ibfk_2` FOREIGN KEY (`member_person_id`) REFERENCES `person` (`id`),
+  CONSTRAINT `service_request_ibfk_3` FOREIGN KEY (`volunteer_person_id`) REFERENCES `person` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+--
+-- Table structure for table `user_data`
+--
 
-CREATE TABLE IF NOT EXISTS user_data (
+DROP TABLE IF EXISTS `user_data`;
+CREATE TABLE `user_data` (
   `userId` int NOT NULL AUTO_INCREMENT,
   `username` varchar(255) NOT NULL,
   `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -101,7 +162,12 @@ CREATE TABLE IF NOT EXISTS user_data (
   KEY `INDEX_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS `user_group` (
+--
+-- Table structure for table `user_group`
+--
+
+DROP TABLE IF EXISTS `user_group`;
+CREATE TABLE `user_group` (
   `userGroupId` int NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
   `description` varchar(255) DEFAULT NULL,
@@ -117,7 +183,12 @@ CREATE TABLE IF NOT EXISTS `user_group` (
   CONSTRAINT `fk_user_group_2` FOREIGN KEY (`modifiedUserId`) REFERENCES `user_data` (`userId`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS `user_group_user_map` (
+--
+-- Table structure for table `user_group_user_map`
+--
+
+DROP TABLE IF EXISTS `user_group_user_map`;
+CREATE TABLE `user_group_user_map` (
   `ugumId` int NOT NULL AUTO_INCREMENT,
   `userGroupId` int NOT NULL,
   `userId` int NOT NULL,
@@ -128,7 +199,24 @@ CREATE TABLE IF NOT EXISTS `user_group_user_map` (
   CONSTRAINT `fk_user_group_map_2` FOREIGN KEY (`userId`) REFERENCES `user_data` (`userId`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS `village_grant` (
+--
+-- Table structure for table `village`
+--
+
+DROP TABLE IF EXISTS `village`;
+CREATE TABLE `village` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(200) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `village_grant`
+--
+
+DROP TABLE IF EXISTS `village_grant`;
+CREATE TABLE `village_grant` (
   `grantId` int NOT NULL AUTO_INCREMENT,
   `villageId` int NOT NULL,
   `userId` int DEFAULT NULL,
@@ -143,7 +231,48 @@ CREATE TABLE IF NOT EXISTS `village_grant` (
   CONSTRAINT `fk_village_grant_3` FOREIGN KEY (`userGroupId`) REFERENCES `user_group` (`userGroupId`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `ce_dump` (
-  `ceDumpTime` DATETIME NOT NULL,
-  PRIMARY KEY (`ceDumpTime`)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+--
+-- Table structure for table `volunteer`
+--
+
+DROP TABLE IF EXISTS `volunteer`;
+CREATE TABLE `volunteer` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `person_id` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `person_id` (`person_id`),
+  CONSTRAINT `volunteer_ibfk_1` FOREIGN KEY (`person_id`) REFERENCES `person` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `volunteer_capability`
+--
+
+DROP TABLE IF EXISTS `volunteer_capability`;
+CREATE TABLE `volunteer_capability` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `volunteer_id` int NOT NULL,
+  `capability_id` int NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `volunteer_id` (`volunteer_id`),
+  KEY `capability_id` (`capability_id`),
+  CONSTRAINT `volunteer_capability_ibfk_1` FOREIGN KEY (`volunteer_id`) REFERENCES `volunteer` (`id`),
+  CONSTRAINT `volunteer_capability_ibfk_2` FOREIGN KEY (`capability_id`) REFERENCES `capability` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping events for database 'vg'
+--
+
+--
+-- Dumping routines for database 'vg'
+--
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2026-06-16 17:19:56

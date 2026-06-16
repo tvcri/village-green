@@ -16,8 +16,11 @@ import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
+import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
 defineOptions({ name: 'ServiceRequestList' })
+
+const { trackEvent } = useAnalytics()
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -411,6 +414,7 @@ const clearFilters = () => {
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId)"
       @sort="onSort"
+      @filter="trackEvent('filter_applied')"
     >
       <Column field="startAt" header="Date" sortable style="width: 12%">
         <template #body="slotProps">

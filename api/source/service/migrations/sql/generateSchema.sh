@@ -12,7 +12,7 @@
 
 
 #List of table names for static data.
-static_data_tables="capability _migrations task job job_task_map"
+static_data_tables="capability _migrations"
 
 # Export the schema of all tables in the 'vg' database into a SQL file,
 # removing any AUTO_INCREMENT attribute values to prevent conflicts with existing data when imported

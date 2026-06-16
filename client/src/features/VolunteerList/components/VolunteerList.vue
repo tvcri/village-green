@@ -20,8 +20,11 @@ import { getVillageVolunteers } from '../api/volunteerApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
+import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
 defineOptions({ name: 'VolunteerList' })
+
+const { trackEvent } = useAnalytics()
 
 const router = useRouter()
 const route = useRoute()
@@ -253,6 +256,7 @@ async function handleCreateSheet() {
       class="volunteer-table-responsive desktop-only"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
       @row-click="(event) => navigateToVolunteer(event.data)"
+      @filter="trackEvent('filter_applied')"
     >
       <Column field="fullName" header="Name" sortable style="width: 50%"></Column>
       <Column header="Capabilities" style="width: 50%">
