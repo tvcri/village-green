@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { navigationGuard } from './navigationGuards.js'
+import { useAnalytics } from '../shared/composables/useAnalytics.js'
 
 const routes = [
   {
@@ -73,6 +74,12 @@ const routes = [
     meta: { requiresAdmin: true },
   },
   {
+    path: '/admin/analytics',
+    name: 'admin-analytics',
+    component: () => import('../features/Admin/components/AnalyticsSummary.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: { template: '<div style="padding: 2rem;"><h1>Page not found</h1></div>' },
@@ -100,5 +107,10 @@ const router = createRouter({
 })
 
 router.beforeEach(navigationGuard)
+
+const { trackPageView } = useAnalytics()
+router.afterEach((to) => {
+  trackPageView(to)
+})
 
 export default router
