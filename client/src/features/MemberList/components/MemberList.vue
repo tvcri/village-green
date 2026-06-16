@@ -19,8 +19,11 @@ import { getVillageMembers } from '../api/memberApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
+import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
 defineOptions({ name: 'MemberList' })
+
+const { trackEvent } = useAnalytics()
 
 const getMemberLevelSeverity = (level) => {
   if (level === 'Primary') return 'success'
@@ -231,6 +234,7 @@ async function handleCreateSheet() {
       class="member-table-responsive desktop-only"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
       @row-click="(event) => navigateToMember(event.data)"
+      @filter="trackEvent('filter_applied')"
     >
       <Column field="fullName" header="Name" sortable style="width: 25%"></Column>
       <Column header="Level" sortable style="width: 25%">
