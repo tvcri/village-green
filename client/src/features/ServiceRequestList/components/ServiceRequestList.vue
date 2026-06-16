@@ -303,6 +303,7 @@ const clearFilters = () => {
   selectedVolunteer.value = 'All volunteers'
   selectedService.value = 'All services'
   selectedStatuses.value = []
+  selectedVillageIds.value = []
 }
 </script>
 
