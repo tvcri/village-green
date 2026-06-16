@@ -522,6 +522,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /op/analytics/events:
+    post:
+      tags:
+      - Analytics
+      summary: Record analytics events
+      operationId: postEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/AnalyticsEvent'
+              maxItems: 50
+      responses:
+        '204':
+          description: Events recorded
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:read
+  /op/analytics/summary:
+    get:
+      tags:
+      - Analytics
+      summary: Get analytics summary (admin only)
+      operationId: getSummary
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: userId
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Analytics summary rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalyticsSummaryRow'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:read
   /user:
     parameters:
     - $ref: '#/components/parameters/UserPreferenceQuery'
@@ -3434,6 +3503,41 @@ components:
           format: date
       additionalProperties: false
       minProperties: 1
+    AnalyticsEvent:
+      type: object
+      required:
+        - eventType
+      properties:
+        eventType:
+          type: string
+          enum: [page_view, interaction]
+        routeName:
+          type: string
+          nullable: true
+        path:
+          type: string
+          nullable: true
+        eventName:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+    AnalyticsSummaryRow:
+      type: object
+      properties:
+        routeName:
+          type: string
+          nullable: true
+        totalVisits:
+          type: integer
+        uniqueUsers:
+          type: integer
+        lastVisited:
+          type: string
+          format: date-time
+          nullable: true
   parameters:
     AppDataFormatQuery:
       name: format
