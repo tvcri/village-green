@@ -23,10 +23,17 @@ const navigate = () => {
     router.push({ name: 'admin' })
   }
 }
+
+const isOnAnalytics = computed(() => route.name === 'admin-analytics')
+
+const navigateToAnalytics = () => {
+  router.push({ name: 'admin-analytics' })
+}
 </script>
 
 <template>
   <Button v-if="isAdmin" :label="buttonLabel" @click="navigate" />
+  <Button v-if="isAdmin && isInAdmin && !isOnAnalytics" label="Analytics" @click="navigateToAnalytics" />
 </template>
 
 <style scoped>
