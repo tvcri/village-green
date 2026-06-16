@@ -80,6 +80,16 @@ const routes = [
     meta: { requiresAdmin: true },
   },
   {
+    path: '/meta',
+    name: 'meta',
+    component: () => import('../features/MetaVillage/components/MetaVillage.vue'),
+  },
+  {
+    path: '/meta/service-requests',
+    name: 'meta-service-requests',
+    component: () => import('../features/ServiceRequestList/components/ServiceRequestList.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: { template: '<div style="padding: 2rem;"><h1>Page not found</h1></div>' },
