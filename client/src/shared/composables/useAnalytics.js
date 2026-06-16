@@ -38,17 +38,7 @@ function enqueue(event) {
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-      if (queue.length && navigator.sendBeacon) {
-        const batch = queue.splice(0, queue.length)
-        const blob = new Blob([JSON.stringify(batch)], { type: 'application/json' })
-        const base = typeof VG !== 'undefined' && VG.Env?.pathPrefix
-          ? `${window.location.origin}${VG.Env.pathPrefix}api`
-          : `${window.location.origin}/api`
-        navigator.sendBeacon(`${base}/op/analytics/events`, blob)
-      }
-      else {
-        flush()
-      }
+      flush()
     }
   })
 }
