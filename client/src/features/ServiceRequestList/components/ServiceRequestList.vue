@@ -45,7 +45,7 @@ useScrollRestore(
 
 const villageId = computed(() => route.params.villageId)
 const isMetaMode = computed(() => !route.params.villageId)
-const selectedVillageIds = ref([])
+const selectedVillage = ref('All villages')
 const isCreatingSheet = ref(false)
 const filtersCollapsed = ref(true)
 const selectedMember = ref('All members')
@@ -60,7 +60,9 @@ const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncSt
     if (isMetaMode.value) {
       return getServiceRequests({
         status: selectedStatuses.value,
-        villageId: selectedVillageIds.value
+        villageId: selectedVillage.value !== 'All villages'
+          ? [(allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId].filter(Boolean)
+          : []
       })
     }
     return villageId.value ? getVillageServiceRequests(villageId.value) : null
@@ -87,7 +89,7 @@ watch(villageId, () => {
   selectedStatuses.value = ['open', 'confirmed']
 })
 
-watch([selectedStatuses, selectedVillageIds], () => {
+watch([selectedStatuses, selectedVillage], () => {
   if (isMetaMode.value) fetchRequests()
 })
 
@@ -306,7 +308,7 @@ const clearFilters = () => {
   selectedVolunteer.value = 'All volunteers'
   selectedService.value = 'All services'
   selectedStatuses.value = []
-  selectedVillageIds.value = []
+  selectedVillage.value = 'All villages'
 }
 </script>
 
@@ -410,12 +412,9 @@ const clearFilters = () => {
           <div v-if="isMetaMode" class="search-box">
             <label>Village:</label>
             <Select
-              v-model="selectedVillageIds"
-              :options="allVillages ?? []"
-              option-label="name"
-              option-value="villageId"
+              v-model="selectedVillage"
+              :options="['All villages', ...(allVillages ?? []).map(v => v.name)]"
               placeholder="-- All villages --"
-              multiple
             />
           </div>
         </div>
