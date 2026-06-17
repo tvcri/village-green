@@ -59,8 +59,12 @@ function getRoleSeverity(role) {
   return 'secondary'
 }
 
-function navigateToPerson(personId) {
-  router.push({ name: 'meta-person-detail', params: { personId }, query: { from: 'meta' } })
+function navigateToPerson(personId, fullName) {
+  router.push({
+    name: 'meta-person-detail',
+    params: { personId, personName: fullName },
+    query: { from: 'meta' }
+  })
 }
 
 function onSearch() {
@@ -114,7 +118,7 @@ function onSearch() {
       :loading="isLoading"
       striped-rows
       hover
-      @row-click="(event) => navigateToPerson(event.data.personId)"
+      @row-click="(event) => navigateToPerson(event.data.personId, event.data.fullName)"
     >
       <Column field="fullName" header="Name" sortable style="width: 20%" />
       <Column field="village.name" header="Village" sortable style="width: 15%" />

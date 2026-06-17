@@ -95,7 +95,7 @@ const routes = [
     component: () => import('../features/PersonList/components/PersonList.vue'),
   },
   {
-    path: '/meta/persons/:personId',
+    path: '/meta/persons/:personId/:personName?',
     name: 'meta-person-detail',
     component: () => import('../features/PersonList/components/PersonDetail.vue'),
   },
