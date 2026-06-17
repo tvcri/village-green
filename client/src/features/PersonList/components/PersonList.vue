@@ -118,6 +118,7 @@ function onSearch() {
       :loading="isLoading"
       striped-rows
       hover
+      class="person-table"
       @row-click="(event) => navigateToPerson(event.data.personId, event.data.fullName)"
     >
       <Column field="fullName" header="Name" sortable style="width: 20%" />
@@ -183,6 +184,10 @@ function onSearch() {
   display: flex;
   gap: 0.25rem;
   flex-wrap: wrap;
+}
+
+.person-table {
+  cursor: pointer;
 }
 
 .empty-state {
