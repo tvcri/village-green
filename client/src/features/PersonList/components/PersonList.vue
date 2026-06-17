@@ -76,6 +76,9 @@ function onSearch() {
   <div class="person-list">
     <div class="list-header">
       <h2>Persons</h2>
+      <span v-if="persons !== null && !isLoading" class="result-count">
+        {{ persons.length }} {{ persons.length === 1 ? 'person' : 'persons' }}
+      </span>
     </div>
 
     <div class="filters">
@@ -188,6 +191,11 @@ function onSearch() {
   display: flex;
   gap: 0.25rem;
   flex-wrap: wrap;
+}
+
+.result-count {
+  font-size: 0.9rem;
+  color: var(--color-text-dim);
 }
 
 .person-table {
