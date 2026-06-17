@@ -21,11 +21,17 @@ const personType = computed(() => {
   if (isVolunteer) return 'volunteer'
   return 'member'
 })
+
+const flatPerson = computed(() => {
+  if (!person.value) return null
+  const { memberInfo, volunteerInfo, ...rest } = person.value
+  return { ...rest, ...memberInfo, ...volunteerInfo }
+})
 </script>
 
 <template>
   <div class="person-detail">
-    <PersonDetailCard v-if="person" :person="person" :person-type="personType" />
+    <PersonDetailCard v-if="flatPerson" :person="flatPerson" :person-type="personType" />
   </div>
 </template>
 
