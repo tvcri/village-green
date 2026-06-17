@@ -10,7 +10,7 @@ const props = defineProps({
   },
   personType: {
     type: String,
-    enum: ['member', 'volunteer'],
+    enum: ['member', 'volunteer', 'member, volunteer'],
     required: true
   }
 })
@@ -31,8 +31,8 @@ const mapAddress = computed(() => {
   return [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ')
 })
 
-const isMember = computed(() => props.personType === 'member')
-const isVolunteer = computed(() => props.personType === 'volunteer')
+const isMember = computed(() => props.personType === 'member' || props.personType === 'member, volunteer')
+const isVolunteer = computed(() => props.personType === 'volunteer' || props.personType === 'member, volunteer')
 
 const copyEmail = async (email) => {
   try {

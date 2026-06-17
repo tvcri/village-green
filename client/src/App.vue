@@ -51,7 +51,7 @@ const ceDumpTime = computed(() => {
 
     <main class="app-main">
       <router-view v-slot="{ Component }">
-        <keep-alive include="ServiceRequestList,MemberList,VolunteerList">
+        <keep-alive include="ServiceRequestList,MemberList,VolunteerList,PersonList">
           <component :is="Component" />
         </keep-alive>
       </router-view>

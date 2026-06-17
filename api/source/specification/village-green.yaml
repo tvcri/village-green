@@ -1044,6 +1044,37 @@ paths:
       tags:
       - Person
       operationId: getPersons
+      parameters:
+        - $ref: '#/components/parameters/ElevateQuery'
+        - name: villageId
+          in: query
+          description: Filter to specific villages (omit for all granted villages)
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/VillageId'
+        - name: firstName
+          in: query
+          description: Filter by first name (contains, case-insensitive)
+          schema:
+            type: string
+        - name: lastName
+          in: query
+          description: Filter by last name (contains, case-insensitive)
+          schema:
+            type: string
+        - name: phone
+          in: query
+          description: Filter by phone or cell (contains, case-insensitive)
+          schema:
+            type: string
+        - name: email
+          in: query
+          description: Filter by email (contains, case-insensitive)
+          schema:
+            type: string
       responses:
         '200':
           description: List of persons
@@ -1052,7 +1083,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Person'
+                  $ref: '#/components/schemas/PersonSummary'
         default:
           description: error
           content:
@@ -1097,6 +1128,7 @@ paths:
       operationId: getPerson
       parameters:
       - $ref: '#/components/parameters/PersonIdPath'
+      - $ref: '#/components/parameters/PersonProjectionQuery'
       responses:
         '200':
           description: Person details
@@ -1457,6 +1489,18 @@ paths:
       tags:
       - ServiceRequest
       operationId: getServiceRequests
+      parameters:
+        - $ref: '#/components/parameters/ElevateQuery'
+        - $ref: '#/components/parameters/ServiceRequestStatusQuery'
+        - name: villageId
+          in: query
+          description: Filter to specific villages (omit for all granted villages)
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/VillageId'
       responses:
         '200':
           description: List of service requests
@@ -2158,6 +2202,8 @@ components:
       - techSupport
     CapabilityId:
       $ref: '#/components/schemas/StringIntId'
+    CapabilityName:
+      $ref: '#/components/schemas/String255'
     CommitBranch:
       type: string
     CommitDescribe:
@@ -2622,6 +2668,47 @@ components:
           $ref: '#/components/schemas/Village'
         roles:
           $ref: '#/components/schemas/PersonRoles'
+        memberInfo:
+          $ref: '#/components/schemas/Member'
+          nullable: true
+        volunteerInfo:
+          $ref: '#/components/schemas/Volunteer'
+          nullable: true
+    PersonSummary:
+      additionalProperties: false
+      type: object
+      required:
+        - personId
+        - fullName
+      properties:
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        fullName:
+          type: string
+          maxLength: 200
+        village:
+          type: object
+          nullable: true
+          properties:
+            villageId:
+              $ref: '#/components/schemas/VillageId'
+            name:
+              type: string
+        roles:
+          $ref: '#/components/schemas/PersonRoles'
+        phone:
+          type: object
+          nullable: true
+          properties:
+            phone:
+              type: string
+              nullable: true
+            cell:
+              type: string
+              nullable: true
+        email:
+          type: string
+          nullable: true
     PersonId:
       $ref: '#/components/schemas/StringIntId'
     PersonPatch:
@@ -3454,10 +3541,10 @@ components:
         fullName:
           type: string
           maxLength: 200
-        capabilityIds:
+        capabilities:
           type: array
           items:
-            $ref: '#/components/schemas/CapabilityId'
+            $ref: '#/components/schemas/CapabilityName'
     VolunteerId:
       $ref: '#/components/schemas/StringIntId'
     VolunteerPatch:
@@ -3592,6 +3679,19 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/PersonId'
+    PersonProjectionQuery:
+      name: projection
+      in: query
+      description: Additional properties to include in the response.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+          - memberInfo
+          - volunteerInfo
     PrivilegeQuery:
       name: privilege
       in: query

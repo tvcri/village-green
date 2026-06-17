@@ -97,7 +97,7 @@ const breadcrumbs = computed(() => {
 
   const vId = route.params.villageId
 
-  if (vId && villages.value) {
+  if (vId && villages.value && !(route.name === 'service-request-detail' && route.query.from === 'meta')) {
     const village = villages.value.find(v => v.villageId === vId)
     const villageName = village?.name || `Village ${vId}`
 
@@ -125,7 +125,7 @@ const breadcrumbs = computed(() => {
       route: { name: 'village-detail', params: { villageId: vId } },
       siblings: siblingsList
     })
-  } else if (vId) {
+  } else if (vId && !(route.name === 'service-request-detail' && route.query.from === 'meta')) {
     crumbs.push({
       label: `Village ${vId}`,
       route: { name: 'village-detail', params: { villageId: vId } }
@@ -134,7 +134,37 @@ const breadcrumbs = computed(() => {
 
   // Add page-specific breadcrumb
   const personName = route.params.personName
+  const metaSiblings = villages.value?.length
+    ? [
+        { label: 'Meta', route: { name: 'meta' } },
+        ...villages.value.map(v => ({
+          label: v.name,
+          route: { name: 'village-detail', params: { villageId: v.villageId } }
+        }))
+      ]
+    : null
+
   switch (route.name) {
+    case 'meta':
+      crumbs.push({ label: 'Meta', siblings: metaSiblings })
+      break
+    case 'meta-service-requests':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Service Requests', siblings: [
+        { label: 'Persons', route: { name: 'meta-persons' } }
+      ]})
+      break
+    case 'meta-persons':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', siblings: [
+        { label: 'Service Requests', route: { name: 'meta-service-requests' } }
+      ]})
+      break
+    case 'meta-person-detail':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: route.params.personName || 'Person' })
+      break
     case 'members':
       crumbs.push({ label: 'Members', siblings: getSiblings('members', { villageId: vId }) })
       break
@@ -153,7 +183,12 @@ const breadcrumbs = computed(() => {
       crumbs.push({ label: 'Service Requests', siblings: getSiblings('service-requests', { villageId: vId }) })
       break
     case 'service-request-detail':
-      crumbs.push({ label: 'Service Requests', route: { name: 'service-requests', params: { villageId: vId } }, siblings: getSiblings('service-requests', { villageId: vId }) })
+      if (route.query.from === 'meta') {
+        crumbs.push({ label: 'Meta', route: { name: 'meta' } })
+        crumbs.push({ label: 'Service Requests', route: { name: 'meta-service-requests' } })
+      } else {
+        crumbs.push({ label: 'Service Requests', route: { name: 'service-requests', params: { villageId: vId } }, siblings: getSiblings('service-requests', { villageId: vId }) })
+      }
       crumbs.push({ label: 'Request' })
       break
   }

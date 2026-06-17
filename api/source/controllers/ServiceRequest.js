@@ -5,8 +5,20 @@ const ServiceRequestService = require('../service/ServiceRequestService')
 
 module.exports.getServiceRequests = async function getServiceRequests (req, res, next) {
   try {
-    // TODO: Implement getServiceRequests
-    res.json({})
+    const elevate = req.query.elevate
+    if (elevate && !req.userObject.privileges?.admin) {
+      throw new SmError.PrivilegeError()
+    }
+    const status = req.query.status
+    const villageId = req.query.villageId
+    const villageIdsGranted = Object.keys(req.userObject.grants)
+    const response = await ServiceRequestService.getServiceRequests({
+      villageIdsGranted,
+      elevate,
+      status,
+      villageId
+    })
+    res.json(response)
   }
   catch (err) {
     next(err)
