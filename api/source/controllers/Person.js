@@ -5,7 +5,21 @@ const SmError = require('../utils/error')
 
 module.exports.getPersons = async function getPersons (req, res, next) {
   try {
-    const response = await PersonService.getPersons()
+    const elevate = req.query.elevate
+    if (elevate && !req.userObject.privileges?.admin) {
+      throw new SmError.PrivilegeError()
+    }
+    const { villageId, firstName, lastName, phone, email } = req.query
+    const villageIdsGranted = Object.keys(req.userObject.grants)
+    const response = await PersonService.getPersons({
+      villageIdsGranted,
+      elevate,
+      villageId,
+      firstName,
+      lastName,
+      phone,
+      email
+    })
     res.json(response)
   }
   catch (err) {
