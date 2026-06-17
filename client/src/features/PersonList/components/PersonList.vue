@@ -7,6 +7,7 @@ import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -23,6 +24,9 @@ const lastName = ref('')
 const phone = ref('')
 const email = ref('')
 
+const showMembers = ref(true)
+const showVolunteers = ref(true)
+
 const hasFilter = computed(() =>
   firstName.value.trim() || lastName.value.trim() || phone.value.trim() || email.value.trim()
 )
@@ -36,6 +40,16 @@ const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
   }),
   { immediate: false }
 )
+
+const filteredPersons = computed(() => {
+  if (!persons.value) return null
+  return persons.value.filter(p => {
+    const roles = parseJson(p.roles)
+    if (showMembers.value && roles.includes('member')) return true
+    if (showVolunteers.value && roles.includes('volunteer')) return true
+    return false
+  })
+})
 
 function parseJson(val) {
   if (Array.isArray(val)) return val
@@ -80,8 +94,8 @@ function onSearch() {
   <div class="person-list">
     <div class="list-header">
       <h2>Persons</h2>
-      <span v-if="persons !== null && !isLoading" class="result-count">
-        {{ persons.length }} {{ persons.length === 1 ? 'person' : 'persons' }}
+      <span v-if="filteredPersons !== null && !isLoading" class="result-count">
+        {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
       </span>
     </div>
 
@@ -89,23 +103,26 @@ function onSearch() {
       <IconField>
         <InputIcon class="pi pi-user" />
         <InputText v-model="firstName" placeholder="First name" @keyup.enter="onSearch" />
-        <InputIcon v-if="firstName" class="pi pi-times" style="cursor: pointer" @click.stop="firstName = ''" />
       </IconField>
       <IconField>
         <InputIcon class="pi pi-user" />
         <InputText v-model="lastName" placeholder="Last name" @keyup.enter="onSearch" />
-        <InputIcon v-if="lastName" class="pi pi-times" style="cursor: pointer" @click.stop="lastName = ''" />
       </IconField>
       <IconField>
         <InputIcon class="pi pi-phone" />
         <InputText v-model="phone" placeholder="Phone" @keyup.enter="onSearch" />
-        <InputIcon v-if="phone" class="pi pi-times" style="cursor: pointer" @click.stop="phone = ''" />
       </IconField>
       <IconField>
         <InputIcon class="pi pi-envelope" />
         <InputText v-model="email" placeholder="Email" @keyup.enter="onSearch" />
-        <InputIcon v-if="email" class="pi pi-times" style="cursor: pointer" @click.stop="email = ''" />
       </IconField>
+      <Button
+        icon="pi pi-times"
+        severity="secondary"
+        text
+        :disabled="!hasFilter"
+        @click="firstName = ''; lastName = ''; phone = ''; email = ''"
+      />
       <Button
         label="Search"
         icon="pi pi-search"
@@ -115,21 +132,33 @@ function onSearch() {
       />
     </div>
 
-    <div v-if="persons === null" class="empty-state">
+    <div v-if="persons !== null && !isLoading" class="role-filters">
+      <label class="role-filter-label">
+        <Checkbox v-model="showMembers" :binary="true" />
+        <span>Member</span>
+      </label>
+      <label class="role-filter-label">
+        <Checkbox v-model="showVolunteers" :binary="true" />
+        <span>Volunteer</span>
+      </label>
+    </div>
+
+    <div v-if="filteredPersons === null" class="empty-state">
       Enter at least one filter to search persons.
     </div>
 
-    <div v-else-if="!isLoading && persons.length === 0" class="empty-state">
+    <div v-else-if="!isLoading && filteredPersons.length === 0" class="empty-state">
       No persons found.
     </div>
 
     <DataTable
       v-else
-      :value="persons"
+      :value="filteredPersons"
       :loading="isLoading"
       striped-rows
       hover
       class="person-table"
+      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
       @row-click="(event) => navigateToPerson(event.data.personId, event.data.fullName)"
     >
       <Column field="fullName" header="Name" sortable style="width: 20%" />
@@ -189,6 +218,20 @@ function onSearch() {
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
+}
+
+.role-filters {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.role-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
 }
 
 .role-tags {

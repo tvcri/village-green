@@ -8,8 +8,10 @@ const router = useRouter()
 <template>
   <div class="meta-village">
     <h1>Meta Village</h1>
-    <Button label="Service Requests" @click="router.push({ name: 'meta-service-requests' })" />
-    <Button label="Persons" @click="router.push({ name: 'meta-persons' })" />
+    <div class="actions">
+      <Button label="Persons" @click="router.push({ name: 'meta-persons' })" />
+      <Button label="Service Requests" @click="router.push({ name: 'meta-service-requests' })" />
+    </div>
   </div>
 </template>
 
@@ -19,6 +21,12 @@ const router = useRouter()
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.actions {
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
 }
 
 h1 {

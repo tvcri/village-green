@@ -2202,6 +2202,8 @@ components:
       - techSupport
     CapabilityId:
       $ref: '#/components/schemas/StringIntId'
+    CapabilityName:
+      $ref: '#/components/schemas/String255'
     CommitBranch:
       type: string
     CommitDescribe:
@@ -3539,10 +3541,10 @@ components:
         fullName:
           type: string
           maxLength: 200
-        capabilityIds:
+        capabilities:
           type: array
           items:
-            $ref: '#/components/schemas/CapabilityId'
+            $ref: '#/components/schemas/CapabilityName'
     VolunteerId:
       $ref: '#/components/schemas/StringIntId'
     VolunteerPatch:
