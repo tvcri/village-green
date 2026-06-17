@@ -82,18 +82,22 @@ function onSearch() {
       <IconField>
         <InputIcon class="pi pi-user" />
         <InputText v-model="firstName" placeholder="First name" @keyup.enter="onSearch" />
+        <InputIcon v-if="firstName" class="pi pi-times" style="cursor: pointer" @click.stop="firstName = ''" />
       </IconField>
       <IconField>
         <InputIcon class="pi pi-user" />
         <InputText v-model="lastName" placeholder="Last name" @keyup.enter="onSearch" />
+        <InputIcon v-if="lastName" class="pi pi-times" style="cursor: pointer" @click.stop="lastName = ''" />
       </IconField>
       <IconField>
         <InputIcon class="pi pi-phone" />
         <InputText v-model="phone" placeholder="Phone" @keyup.enter="onSearch" />
+        <InputIcon v-if="phone" class="pi pi-times" style="cursor: pointer" @click.stop="phone = ''" />
       </IconField>
       <IconField>
         <InputIcon class="pi pi-envelope" />
         <InputText v-model="email" placeholder="Email" @keyup.enter="onSearch" />
+        <InputIcon v-if="email" class="pi pi-times" style="cursor: pointer" @click.stop="email = ''" />
       </IconField>
       <Button
         label="Search"
