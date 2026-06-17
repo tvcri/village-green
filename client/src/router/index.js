@@ -90,6 +90,16 @@ const routes = [
     component: () => import('../features/ServiceRequestList/components/ServiceRequestList.vue'),
   },
   {
+    path: '/meta/persons',
+    name: 'meta-persons',
+    component: () => import('../features/PersonList/components/PersonList.vue'),
+  },
+  {
+    path: '/meta/persons/:personId',
+    name: 'meta-person-detail',
+    component: () => import('../features/PersonList/components/PersonDetail.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: { template: '<div style="padding: 2rem;"><h1>Page not found</h1></div>' },

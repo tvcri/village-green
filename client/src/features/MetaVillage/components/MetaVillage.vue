@@ -9,6 +9,7 @@ const router = useRouter()
   <div class="meta-village">
     <h1>Meta Village</h1>
     <Button label="Service Requests" @click="router.push({ name: 'meta-service-requests' })" />
+    <Button label="Persons" @click="router.push({ name: 'meta-persons' })" />
   </div>
 </template>
 
