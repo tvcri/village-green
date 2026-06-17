@@ -67,45 +67,6 @@ const navigateToVillage = (villageId) => {
 
     <div v-else class="village-grid">
       <Card
-        v-for="village in villages"
-        :key="village.villageId"
-        class="village-card"
-        @click="navigateToVillage(village.villageId)"
-      >
-        <template #title>
-          <div class="title-header">
-            <span class="village-name">{{ village.name }}</span>
-            <Tag v-if="village.personCounts" icon="pi pi-users" :value="`${getTotalPersonCount(village)}`" severity="secondary" />
-          </div>
-        </template>
-        <template #content class="card-stats">
-          <div v-if="village.personCounts" class="people-grid">
-            <div class="person-stat">
-              <div class="person-label">Members</div>
-              <div class="person-value">{{ village.personCounts.member ?? 0 }}</div>
-            </div>
-            <div class="person-stat">
-              <div class="person-label">Volunteers</div>
-              <div class="person-value">{{ village.personCounts.volunteer ?? 0 }}</div>
-            </div>
-            <div class="person-stat">
-              <div class="person-label">Both</div>
-              <div class="person-value">{{ village.personCounts.both ?? 0 }}</div>
-            </div>
-          </div>
-          <div v-if="village.srStatusCounts" class="sr-grid">
-            <div class="sr-stat">
-              <div class="sr-label">Open</div>
-              <Tag :value="`${village.srStatusCounts.open ?? 0}`" :severity="getStatusSeverity('open')" class="sr-tag" />
-            </div>
-            <div class="sr-stat">
-              <div class="sr-label">Confirmed</div>
-              <Tag :value="`${village.srStatusCounts.confirmed ?? 0}`" :severity="getStatusSeverity('confirmed')" class="sr-tag" />
-            </div>
-          </div>
-        </template>
-      </Card>
-      <Card
         v-if="metaVillageCounts"
         class="village-card meta-village-card"
         @click="router.push({ name: 'meta' })"
@@ -143,6 +104,45 @@ const navigateToVillage = (villageId) => {
             <div class="sr-stat">
               <div class="sr-label">Confirmed</div>
               <Tag :value="`${metaVillageCounts.confirmed}`" :severity="getStatusSeverity('confirmed')" class="sr-tag" />
+            </div>
+          </div>
+        </template>
+      </Card>
+      <Card
+        v-for="village in villages"
+        :key="village.villageId"
+        class="village-card"
+        @click="navigateToVillage(village.villageId)"
+      >
+        <template #title>
+          <div class="title-header">
+            <span class="village-name">{{ village.name }}</span>
+            <Tag v-if="village.personCounts" icon="pi pi-users" :value="`${getTotalPersonCount(village)}`" severity="secondary" />
+          </div>
+        </template>
+        <template #content class="card-stats">
+          <div v-if="village.personCounts" class="people-grid">
+            <div class="person-stat">
+              <div class="person-label">Members</div>
+              <div class="person-value">{{ village.personCounts.member ?? 0 }}</div>
+            </div>
+            <div class="person-stat">
+              <div class="person-label">Volunteers</div>
+              <div class="person-value">{{ village.personCounts.volunteer ?? 0 }}</div>
+            </div>
+            <div class="person-stat">
+              <div class="person-label">Both</div>
+              <div class="person-value">{{ village.personCounts.both ?? 0 }}</div>
+            </div>
+          </div>
+          <div v-if="village.srStatusCounts" class="sr-grid">
+            <div class="sr-stat">
+              <div class="sr-label">Open</div>
+              <Tag :value="`${village.srStatusCounts.open ?? 0}`" :severity="getStatusSeverity('open')" class="sr-tag" />
+            </div>
+            <div class="sr-stat">
+              <div class="sr-label">Confirmed</div>
+              <Tag :value="`${village.srStatusCounts.confirmed ?? 0}`" :severity="getStatusSeverity('confirmed')" class="sr-tag" />
             </div>
           </div>
         </template>
