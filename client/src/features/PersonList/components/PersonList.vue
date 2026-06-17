@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -66,6 +66,10 @@ function navigateToPerson(personId, fullName) {
     query: { from: 'meta' }
   })
 }
+
+watch([firstName, lastName, phone, email], () => {
+  if (!hasFilter.value) persons.value = null
+})
 
 function onSearch() {
   if (hasFilter.value) fetchPersons()
