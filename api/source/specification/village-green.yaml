@@ -1128,6 +1128,7 @@ paths:
       operationId: getPerson
       parameters:
       - $ref: '#/components/parameters/PersonIdPath'
+      - $ref: '#/components/parameters/PersonProjectionQuery'
       responses:
         '200':
           description: Person details
@@ -2665,6 +2666,12 @@ components:
           $ref: '#/components/schemas/Village'
         roles:
           $ref: '#/components/schemas/PersonRoles'
+        memberInfo:
+          $ref: '#/components/schemas/Member'
+          nullable: true
+        volunteerInfo:
+          $ref: '#/components/schemas/Volunteer'
+          nullable: true
     PersonSummary:
       additionalProperties: false
       type: object
@@ -3670,6 +3677,19 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/PersonId'
+    PersonProjectionQuery:
+      name: projection
+      in: query
+      description: Additional properties to include in the response.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+          - memberInfo
+          - volunteerInfo
     PrivilegeQuery:
       name: privilege
       in: query

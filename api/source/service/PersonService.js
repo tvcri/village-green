@@ -54,12 +54,68 @@ async function queryPersons (inPredicates = {}) {
   return rows
 }
 
-module.exports.getPersons = async function () {
-  return await queryPersons({})
-}
+module.exports.getPerson = async function (personId, projections = []) {
+  const columns = [
+    'CAST(p.id AS CHAR) AS personId',
+    'p.full_name AS fullName',
+    'p.last_name AS lastName',
+    'p.first_name AS firstName',
+    'p.nickname',
+    'p.address',
+    'p.city',
+    'p.state',
+    "LPAD(p.zip, 5, '0') AS zip",
+    'p.email',
+    'p.phone',
+    'p.cell',
+    'p.emergency_contact_name AS emergencyContactName',
+    'p.emergency_contact_relationship AS emergencyContactRelationship',
+    'p.emergency_contact_phone AS emergencyContactPhone',
+    'p.emergency_contact_email AS emergencyContactEmail',
+    "DATE_FORMAT(p.birth_date, '%Y-%m-%d') AS birthDate",
+    `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
+    `CASE
+      WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
+      WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
+      WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
+      ELSE JSON_ARRAY()
+    END AS roles`
+  ]
+  const joins = new Set([
+    'person p',
+    'JOIN village v ON v.id = p.village_id',
+    'LEFT JOIN member m ON m.person_id = p.id',
+    'LEFT JOIN volunteer vol ON vol.person_id = p.id'
+  ])
+  const predicates = { statements: ['p.id = ?'], binds: [personId] }
 
-module.exports.getPerson = async function (personId) {
-  const rows = await queryPersons({personId})
+  if (projections.includes('memberInfo')) {
+    columns.push(`(SELECT JSON_OBJECT(
+      'memberId', CAST(id AS CHAR),
+      'memberNumber', member_number,
+      'memberLevel', member_level,
+      'serviceNotes', service_notes,
+      'joinDate', DATE_FORMAT(join_date, '%Y-%m-%d')
+    ) FROM member WHERE person_id = p.id) AS memberInfo`)
+  }
+
+  if (projections.includes('volunteerInfo')) {
+    columns.push(`(SELECT JSON_OBJECT(
+      'volunteerId', CAST(vol2.id AS CHAR),
+      'capabilities', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(CONCAT('"', c.name, '"') ORDER BY c.name), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_capability vc
+        JOIN capability c ON c.id = vc.capability_id
+        WHERE vc.volunteer_id = vol2.id
+      )
+    ) FROM volunteer vol2 WHERE vol2.person_id = p.id) AS volunteerInfo`)
+  }
+
+  const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
+  const [rows] = await dbUtils.pool.query(sql)
   return rows[0] ?? null
 }
 
