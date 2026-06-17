@@ -9,7 +9,7 @@ const route = useRoute()
 const personId = computed(() => route.params.personId)
 
 const { state: person } = useAsyncState(
-  () => apiCall('getPerson', { personId: personId.value }),
+  () => apiCall('getPerson', { personId: personId.value, projection: ['memberInfo', 'volunteerInfo'] }),
   { immediate: true }
 )
 
