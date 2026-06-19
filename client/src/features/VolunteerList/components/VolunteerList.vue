@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import InputText from 'primevue/inputtext'
@@ -14,7 +14,6 @@ import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
-import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { useCeDumpRefresh } from '../../../shared/composables/useCeDumpRefresh.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
@@ -50,15 +49,42 @@ const { state: volunteers, isLoading, error, execute: fetchVolunteers } = useAsy
 
 const { state: persons, execute: fetchPersons } = useAsyncState(
   () => villageId.value ? getVillagePersons(villageId.value) : null,
-  { immediate: true }
+  { immediate: false }
 )
 
-useRefetchOnChange(villageId, [fetchVolunteers, fetchPersons])
 useScrollRestore('volunteers', 'volunteer-detail')
 useCeDumpRefresh(() => fetchVolunteers())
-watch(villageId, () => {
+const navigatedToDetail = ref(false)
+const villageIdWhenNavigatedAway = ref(null)
+const hasActivatedOnce = ref(false)
+const fetchedByWatch = ref(false)
+const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
+  fetchedByWatch.value = true
   searchText.immediate('')
   selectedCapabilities.value = []
+  fetchVolunteers()
+  persons.value = null
+})
+onDeactivated(pauseVillageWatch)
+onActivated(() => {
+  resumeVillageWatch()
+  if (!hasActivatedOnce.value) {
+    hasActivatedOnce.value = true
+    return
+  }
+  if (fetchedByWatch.value) {
+    fetchedByWatch.value = false
+    return
+  }
+  if (navigatedToDetail.value && villageId.value === villageIdWhenNavigatedAway.value) {
+    navigatedToDetail.value = false
+    return
+  }
+  navigatedToDetail.value = false
+  searchText.immediate('')
+  selectedCapabilities.value = []
+  fetchVolunteers()
+  persons.value = null
 })
 
 const filteredVolunteers = computed(() => {
@@ -102,6 +128,8 @@ const volunteersForCsv = computed(() => {
 const clearSearch = () => searchText.immediate('')
 
 const navigateToVolunteer = (volunteer) => {
+  navigatedToDetail.value = true
+  villageIdWhenNavigatedAway.value = villageId.value
   router.push({
     name: 'volunteer-detail',
     params: { villageId: villageId.value, personId: volunteer.personId }
@@ -125,7 +153,8 @@ const columnsForCsv = [
   { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
 ]
 
-const handleDownloadCsv = () => {
+const handleDownloadCsv = async () => {
+  if (!persons.value) await fetchPersons()
   const csv = toCsv(volunteersForCsv.value, columnsForCsv)
   const villageName = persons.value?.[0]?.village?.name || 'village'
   const filename = `${villageName}-volunteers.csv`
@@ -136,6 +165,7 @@ async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
 
+    if (!persons.value) await fetchPersons()
     const villageName = persons.value?.[0]?.village?.name || 'Village Green'
     const sheetName = `${villageName} Volunteers`
 
