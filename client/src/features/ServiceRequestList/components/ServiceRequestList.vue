@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import Checkbox from 'primevue/checkbox'
@@ -10,7 +10,6 @@ import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { useCeDumpRefresh } from '../../../shared/composables/useCeDumpRefresh.js'
 import { getVillageServiceRequests, getServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
@@ -72,7 +71,7 @@ const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncSt
 
 const { state: village, execute: fetchVillage } = useAsyncState(
   () => villageId.value ? apiCall('getVillage', { villageId: villageId.value }) : null,
-  { immediate: true }
+  { immediate: false }
 )
 
 const { state: allVillages } = useAsyncState(
@@ -80,13 +79,45 @@ const { state: allVillages } = useAsyncState(
   { immediate: true }
 )
 
-useRefetchOnChange(villageId, [fetchRequests, fetchVillage])
 useCeDumpRefresh(() => fetchRequests())
-watch(villageId, () => {
+const navigatedToDetail = ref(false)
+const villageIdWhenNavigatedAway = ref(null)
+const hasActivatedOnce = ref(false)
+const villageIdAtDeactivation = ref(null)
+const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
   selectedMember.value = 'All members'
   selectedVolunteer.value = 'All volunteers'
   selectedService.value = 'All services'
   selectedStatuses.value = ['open', 'confirmed']
+  fetchRequests()
+  village.value = null
+})
+onDeactivated(() => {
+  pauseVillageWatch()
+  villageIdAtDeactivation.value = villageId.value
+})
+onActivated(() => {
+  resumeVillageWatch()
+  if (!hasActivatedOnce.value) {
+    hasActivatedOnce.value = true
+    return
+  }
+  const villageChanged = villageId.value !== villageIdAtDeactivation.value
+  if (villageChanged) {
+    // watch will fire and handle the fetch
+    return
+  }
+  if (navigatedToDetail.value) {
+    navigatedToDetail.value = false
+    return
+  }
+  navigatedToDetail.value = false
+  selectedMember.value = 'All members'
+  selectedVolunteer.value = 'All volunteers'
+  selectedService.value = 'All services'
+  selectedStatuses.value = ['open', 'confirmed']
+  fetchRequests()
+  village.value = null
 })
 
 watch([selectedStatuses, selectedVillage], () => {
@@ -229,7 +260,8 @@ const columnsForCsv = [
   { header: 'Created At', key: 'createdAt' }
 ]
 
-const handleDownloadCsv = () => {
+const handleDownloadCsv = async () => {
+  if (!village.value && villageId.value) await fetchVillage()
   const csv = toCsv(requests.value || [], columnsForCsv)
   const villageName = village.value?.name || 'village'
   const filename = `${villageName}-service-requests.csv`
@@ -240,6 +272,7 @@ async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
 
+    if (!village.value && villageId.value) await fetchVillage()
     const villageName = village.value?.name || 'Village Green'
     const sheetName = `${villageName} Service Requests`
 
@@ -299,6 +332,8 @@ async function handleCreateSheet() {
 }
 
 const navigateToRequest = (serviceRequestId, rowVillageId) => {
+  navigatedToDetail.value = true
+  villageIdWhenNavigatedAway.value = villageId.value
   const params = { villageId: rowVillageId ?? villageId.value, id: serviceRequestId }
   const query = isMetaMode.value ? { from: 'meta' } : {}
   router.push({ name: 'service-request-detail', params, query })
