@@ -2404,11 +2404,13 @@ components:
             name:
               type: string
         volunteer:
-          $ref: '#/components/schemas/FcvPerson'
           nullable: true
+          allOf:
+            - $ref: '#/components/schemas/FcvPerson'
         member:
-          $ref: '#/components/schemas/FcvPerson'
           nullable: true
+          allOf:
+            - $ref: '#/components/schemas/FcvPerson'
     GrantId:
       $ref: '#/components/schemas/StringIntId'
     Grantee:
