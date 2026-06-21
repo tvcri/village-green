@@ -151,14 +151,26 @@ const breadcrumbs = computed(() => {
     case 'meta-service-requests':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Service Requests', siblings: [
-        { label: 'Persons', route: { name: 'meta-persons' } }
+        { label: 'Persons', route: { name: 'meta-persons' } },
+        { label: 'Friends', route: { name: 'meta-friends' } }
       ]})
       break
     case 'meta-persons':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', siblings: [
+        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
+        { label: 'Friends', route: { name: 'meta-friends' } }
+      ]})
+      break
+    case 'meta-friends':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Friends', siblings: [
+        { label: 'Persons', route: { name: 'meta-persons' } },
         { label: 'Service Requests', route: { name: 'meta-service-requests' } }
       ]})
+      break
+    case 'friends':
+      crumbs.push({ label: 'Friends', siblings: getSiblings('friends', { villageId: vId }) })
       break
     case 'meta-person-detail':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })

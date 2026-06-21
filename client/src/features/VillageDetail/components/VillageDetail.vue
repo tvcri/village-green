@@ -147,6 +147,7 @@ const navigateTo = (section) => {
       <Button label="Members" @click="navigateTo('members')" />
       <Button label="Volunteers" @click="navigateTo('volunteers')" />
       <Button label="Service Requests" @click="navigateTo('service-requests')" />
+      <Button label="Friends" @click="navigateTo('friends')" />
     </div>
 
     <div class="charts-section">
