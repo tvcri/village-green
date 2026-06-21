@@ -1672,6 +1672,16 @@ paths:
           description: Filter by activity type (must be present in activityTypes array)
           schema:
             type: string
+        - name: volunteerName
+          in: query
+          description: Filter by volunteer name (partial match against resolved and raw name)
+          schema:
+            type: string
+        - name: memberName
+          in: query
+          description: Filter by member name (partial match against resolved and raw name)
+          schema:
+            type: string
       responses:
         '200':
           description: List of FCV submissions

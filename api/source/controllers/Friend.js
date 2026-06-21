@@ -9,7 +9,7 @@ module.exports.getFriends = async function getFriends (req, res, next) {
     if (elevate && !req.userObject.privileges?.admin) {
       throw new SmError.PrivilegeError()
     }
-    const { villageId, volunteerPersonId, memberPersonId, dateStart, dateEnd, contactType, activityType } = req.query
+    const { villageId, volunteerPersonId, memberPersonId, dateStart, dateEnd, contactType, activityType, volunteerName, memberName } = req.query
     const villageIdsGranted = Object.keys(req.userObject.grants)
     const response = await FriendService.getFriends({
       villageIdsGranted,
@@ -20,7 +20,9 @@ module.exports.getFriends = async function getFriends (req, res, next) {
       dateStart,
       dateEnd,
       contactType,
-      activityType
+      activityType,
+      volunteerName,
+      memberName
     })
     res.json(response)
   }

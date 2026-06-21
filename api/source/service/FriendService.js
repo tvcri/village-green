@@ -2,7 +2,7 @@
 
 const dbUtils = require('./utils')
 
-module.exports.getFriends = async function ({ villageIdsGranted, elevate, villageId, volunteerPersonId, memberPersonId, dateStart, dateEnd, contactType, activityType }) {
+module.exports.getFriends = async function ({ villageIdsGranted, elevate, villageId, volunteerPersonId, memberPersonId, dateStart, dateEnd, contactType, activityType, volunteerName, memberName }) {
   const columns = [
     'CAST(fcv.id AS CHAR) AS friendId',
     "DATE_FORMAT(fcv.visitDate, '%Y-%m-%d') AS visitDate",
@@ -18,11 +18,11 @@ module.exports.getFriends = async function ({ villageIdsGranted, elevate, villag
     ) AS village`,
     `IF(fcv.volunteerPersonId IS NOT NULL,
       JSON_OBJECT('personId', CAST(pv.id AS CHAR), 'fullName', pv.full_name),
-      JSON_OBJECT('rawName', fcv.rawVolunteerName, 'fuzzyName', fcv.fuzzyVolunteerName)
+      JSON_OBJECT('rawName', fcv.rawVolunteerName)
     ) AS volunteer`,
     `IF(fcv.memberPersonId IS NOT NULL,
       JSON_OBJECT('personId', CAST(pm.id AS CHAR), 'fullName', pm.full_name),
-      JSON_OBJECT('rawName', fcv.rawMemberName, 'fuzzyName', fcv.fuzzyMemberName)
+      JSON_OBJECT('rawName', fcv.rawMemberName)
     ) AS member`
   ]
   const joins = new Set([
@@ -65,6 +65,14 @@ module.exports.getFriends = async function ({ villageIdsGranted, elevate, villag
   if (activityType) {
     predicates.statements.push('JSON_CONTAINS(fcv.activityTypes, JSON_QUOTE(?))')
     predicates.binds.push(activityType)
+  }
+  if (volunteerName) {
+    predicates.statements.push('(pv.full_name LIKE ? OR fcv.rawVolunteerName LIKE ?)')
+    predicates.binds.push(`%${volunteerName}%`, `%${volunteerName}%`)
+  }
+  if (memberName) {
+    predicates.statements.push('(pm.full_name LIKE ? OR fcv.rawMemberName LIKE ?)')
+    predicates.binds.push(`%${memberName}%`, `%${memberName}%`)
   }
 
   const orderBy = ['fcv.visitDate DESC', 'fcv.id DESC']
