@@ -27,8 +27,8 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
 
 module.exports.createServiceRequest = async function createServiceRequest (req, res, next) {
   try {
-    // TODO: Implement createServiceRequest
-    res.json({})
+    const response = await ServiceRequestService.createServiceRequest(req.body)
+    res.status(201).json(response)
   }
   catch (err) {
     next(err)

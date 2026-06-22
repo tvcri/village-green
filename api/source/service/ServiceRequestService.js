@@ -19,6 +19,9 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     "DATE_FORMAT(sr.created_at, '%Y-%m-%dT%TZ') AS createdAt",
     "DATE_FORMAT(sr.start_at, '%Y-%m-%dT%TZ') AS startAt",
     "DATE_FORMAT(sr.finish_at, '%Y-%m-%dT%TZ') AS finishAt",
+    "DATE_FORMAT(sr.appt_time, '%Y-%m-%dT%TZ') AS apptTime",
+    "DATE_FORMAT(sr.return_time, '%Y-%m-%dT%TZ') AS returnTime",
+    'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.destination AS destination',
@@ -83,6 +86,9 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     "DATE_FORMAT(sr.created_at, '%Y-%m-%dT%TZ') AS createdAt",
     "DATE_FORMAT(sr.start_at, '%Y-%m-%dT%TZ') AS startAt",
     "DATE_FORMAT(sr.finish_at, '%Y-%m-%dT%TZ') AS finishAt",
+    "DATE_FORMAT(sr.appt_time, '%Y-%m-%dT%TZ') AS apptTime",
+    "DATE_FORMAT(sr.return_time, '%Y-%m-%dT%TZ') AS returnTime",
+    'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.destination AS destination',
@@ -130,4 +136,53 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows
+}
+
+module.exports.createServiceRequest = async function (payload) {
+  const sql = `
+    INSERT INTO service_request (
+      village_id,
+      member_person_id,
+      volunteer_person_id,
+      request_number,
+      status,
+      service_name,
+      transportation_type,
+      created_at,
+      start_at,
+      finish_at,
+      appt_time,
+      return_time,
+      state,
+      instructions,
+      description,
+      destination,
+      address,
+      city,
+      phone
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `
+  const values = [
+    payload.villageId,
+    payload.memberPersonId || null,
+    payload.volunteerPersonId || null,
+    payload.requestNumber || null,
+    payload.status || null,
+    payload.serviceName || null,
+    payload.transportationType || null,
+    payload.createdAt || null,
+    payload.startAt || null,
+    payload.finishAt || null,
+    payload.apptTime || null,
+    payload.returnTime || null,
+    payload.state || null,
+    payload.instructions || null,
+    payload.description || null,
+    payload.destination || null,
+    payload.address || null,
+    payload.city || null,
+    payload.phone || null
+  ]
+  const [result] = await dbUtils.pool.query(sql, values)
+  return module.exports.getServiceRequest(result.insertId)
 }

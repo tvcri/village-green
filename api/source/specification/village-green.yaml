@@ -3139,6 +3139,18 @@ components:
           type: string
           maxLength: 50
           nullable: true
+        apptTime:
+          type: string
+          format: date-time
+          nullable: true
+        returnTime:
+          type: string
+          format: date-time
+          nullable: true
+        state:
+          type: string
+          maxLength: 50
+          nullable: true
         memberAddress:
           $ref: '#/components/schemas/PersonAddress'
           nullable: true
@@ -3207,6 +3219,18 @@ components:
           type: string
           maxLength: 50
           nullable: true
+        apptTime:
+          type: string
+          format: date-time
+          nullable: true
+        returnTime:
+          type: string
+          format: date-time
+          nullable: true
+        state:
+          type: string
+          maxLength: 50
+          nullable: true
     ServiceRequestPost:
       additionalProperties: false
       type: object
@@ -3251,6 +3275,15 @@ components:
           type: string
           maxLength: 100
         phone:
+          type: string
+          maxLength: 50
+        apptTime:
+          type: string
+          format: date-time
+        returnTime:
+          type: string
+          format: date-time
+        state:
           type: string
           maxLength: 50
     State:
