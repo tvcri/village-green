@@ -52,8 +52,9 @@ module.exports.getServiceRequest = async function getServiceRequest (req, res, n
 
 module.exports.patchServiceRequest = async function patchServiceRequest (req, res, next) {
   try {
-    // TODO: Implement patchServiceRequest
-    res.json({})
+    const serviceRequestId = req.params.serviceRequestId
+    const response = await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
+    res.json(response)
   }
   catch (err) {
     next(err)

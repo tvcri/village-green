@@ -108,10 +108,7 @@ onActivated(() => {
     // watch will fire and handle the fetch
     return
   }
-  if (navigatedToDetail.value) {
-    navigatedToDetail.value = false
-    return
-  }
+  // Always refetch when activated (returning from detail/create/edit)
   navigatedToDetail.value = false
   selectedMember.value = 'All members'
   selectedVolunteer.value = 'All volunteers'
@@ -345,6 +342,11 @@ const navigateToCreateRequest = () => {
   router.push({ name: 'meta-service-request-create' })
 }
 
+const navigateToEditRequest = (serviceRequestId) => {
+  navigatedToDetail.value = true
+  router.push({ name: 'meta-service-request-edit', params: { id: serviceRequestId } })
+}
+
 const clearFilters = () => {
   selectedMember.value = 'All members'
   selectedVolunteer.value = 'All volunteers'
@@ -514,6 +516,16 @@ const clearFilters = () => {
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
       <Column field="city" header="City" sortable style="width: 13%"></Column>
       <Column field="requestNumber" header="#" sortable style="width: 10%"></Column>
+      <Column v-if="isMetaMode" header="Actions" style="width: 8%">
+        <template #body="slotProps">
+          <Button
+            v-if="!slotProps.data.requestNumber"
+            icon="pi pi-pencil"
+            class="p-button-rounded p-button-text p-button-sm"
+            @click="navigateToEditRequest(slotProps.data.serviceRequestId)"
+          />
+        </template>
+      </Column>
     </DataTable>
 
     <!-- Mobile Card List -->

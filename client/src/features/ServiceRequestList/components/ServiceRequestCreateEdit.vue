@@ -7,7 +7,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
-import Calendar from 'primevue/calendar'
+import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import AutoComplete from 'primevue/autocomplete'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -168,6 +168,32 @@ watch(() => form.value.villageId, (villageId) => {
   }
 })
 
+watch([allMemberOptions, () => form.value.memberPersonId], ([members, memberId]) => {
+  if (members.length > 0 && memberId) {
+    const matching = members.find(m => m.value === String(memberId))
+    if (matching) {
+      selectedMember.value = matching
+    }
+  }
+})
+
+watch([allVolunteerOptions, () => form.value.volunteerPersonId], ([volunteers, volunteerId]) => {
+  if (volunteers.length > 0 && volunteerId) {
+    const matching = volunteers.find(v => v.value === String(volunteerId))
+    if (matching) {
+      selectedVolunteer.value = matching
+    }
+  }
+})
+
+const computedStatus = computed(() => {
+  return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
+})
+
+watch(() => form.value.volunteerPersonId, () => {
+  form.value.status = computedStatus.value
+}, { immediate: true })
+
 const serviceNameOptions = [
   'Ride: Medical Appnt',
   'Ride: Shopping',
@@ -194,11 +220,62 @@ const stateOptions = [
   'MA'
 ]
 
+const isRideService = computed(() => form.value.serviceName?.startsWith('Ride:'))
+
+const availableTransportationTypes = computed(() => {
+  return isRideService.value ? ['Round Trip', 'One Way'] : ['None']
+})
+
+watch(isRideService, (newIsRide) => {
+  if (!newIsRide) {
+    form.value.transportationType = 'None'
+  }
+})
+
 const handleSubmit = async () => {
   try {
+    // Required fields
     if (!form.value.villageId) {
       toast.add({ severity: 'error', summary: 'Error', detail: 'Village is required', life: 3000 })
       return
+    }
+    if (!form.value.serviceName) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Service name is required', life: 3000 })
+      return
+    }
+    if (!form.value.memberPersonId) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Member is required', life: 3000 })
+      return
+    }
+    if (!form.value.serviceDate) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Service date is required', life: 3000 })
+      return
+    }
+
+    // Ride-specific validation
+    if (isRideService.value) {
+      if (!form.value.destination) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Destination is required for ride services', life: 3000 })
+        return
+      }
+      if (!form.value.transportationType || !['Round Trip', 'One Way'].includes(form.value.transportationType)) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
+        return
+      }
+
+      // Time validation based on transportation type
+      const isRoundTrip = form.value.transportationType === 'Round Trip'
+      if (isRoundTrip) {
+        if (!form.value.startTime || !form.value.finishTime || !form.value.apptTime || !form.value.returnTime) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'All four times (start, finish, appointment, return) are required for round trip', life: 3000 })
+          return
+        }
+      } else {
+        if (!form.value.startTime || !form.value.finishTime) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Start and finish times are required for one way', life: 3000 })
+          return
+        }
+      }
     }
 
     isSubmitting.value = true
@@ -295,7 +372,7 @@ const handleCancel = () => {
           <!-- Service Info -->
           <div class="form-row">
             <div class="form-group">
-              <label for="serviceName" class="form-label">Service Name</label>
+              <label for="serviceName" class="form-label required">Service Name</label>
               <Select
                 id="serviceName"
                 v-model="form.serviceName"
@@ -304,12 +381,13 @@ const handleCancel = () => {
               />
             </div>
             <div class="form-group">
-              <label for="transportationType" class="form-label">Transportation Type</label>
+              <label for="transportationType" class="form-label" :class="{ required: isRideService }">Transportation Type</label>
               <Select
                 id="transportationType"
                 v-model="form.transportationType"
-                :options="transportationTypeOptions"
-                placeholder="Select type"
+                :options="availableTransportationTypes"
+                :disabled="!isRideService"
+                :placeholder="isRideService ? 'Select type' : 'None'"
               />
             </div>
           </div>
@@ -317,7 +395,7 @@ const handleCancel = () => {
           <!-- People -->
           <div class="form-row">
             <div class="form-group">
-              <label for="memberPersonId" class="form-label">Member</label>
+              <label for="memberPersonId" class="form-label required">Member</label>
               <AutoComplete
                 id="memberPersonId"
                 v-model="selectedMember"
@@ -342,77 +420,76 @@ const handleCancel = () => {
 
           <!-- Service Date -->
           <div class="form-group">
-            <label for="serviceDate" class="form-label">Service Date</label>
-            <Calendar
+            <label for="serviceDate" class="form-label required">Service Date</label>
+            <DatePicker
               id="serviceDate"
               v-model="form.serviceDate"
-              date-format="mm/dd/yy"
+              dateFormat="mm/dd/yy"
             />
           </div>
 
-          <!-- Times -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="startTime" class="form-label">Start Time</label>
-              <Calendar
-                id="startTime"
-                v-model="form.startTime"
-                time-only
-                hour-format="12"
-                :step-minute="15"
-              />
+          <!-- Times (for Ride services) -->
+          <template v-if="isRideService">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="startTime" class="form-label required">Start Time</label>
+                <DatePicker
+                  id="startTime"
+                  v-model="form.startTime"
+                  timeOnly
+                  hourFormat="12"
+                  :stepMinute="15"
+                />
+              </div>
+              <div class="form-group">
+                <label for="finishTime" class="form-label required">Finish Time</label>
+                <DatePicker
+                  id="finishTime"
+                  v-model="form.finishTime"
+                  timeOnly
+                  hourFormat="12"
+                  :stepMinute="15"
+                />
+              </div>
             </div>
-            <div class="form-group">
-              <label for="finishTime" class="form-label">Finish Time</label>
-              <Calendar
-                id="finishTime"
-                v-model="form.finishTime"
-                time-only
-                hour-format="12"
-                :step-minute="15"
-              />
-            </div>
-          </div>
 
-          <!-- Appointment Times -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="apptTime" class="form-label">Appointment Time</label>
-              <Calendar
-                id="apptTime"
-                v-model="form.apptTime"
-                time-only
-                hour-format="12"
-                :step-minute="15"
-              />
+            <!-- Appointment & Return Times (for Round Trip only) -->
+            <div v-if="form.transportationType === 'Round Trip'" class="form-row">
+              <div class="form-group">
+                <label for="apptTime" class="form-label required">Appointment Time</label>
+                <DatePicker
+                  id="apptTime"
+                  v-model="form.apptTime"
+                  timeOnly
+                  hourFormat="12"
+                  :stepMinute="15"
+                />
+              </div>
+              <div class="form-group">
+                <label for="returnTime" class="form-label required">Return Time</label>
+                <DatePicker
+                  id="returnTime"
+                  v-model="form.returnTime"
+                  timeOnly
+                  hourFormat="12"
+                  :stepMinute="15"
+                />
+              </div>
             </div>
-            <div class="form-group">
-              <label for="returnTime" class="form-label">Return Time</label>
-              <Calendar
-                id="returnTime"
-                v-model="form.returnTime"
-                time-only
-                hour-format="12"
-                :step-minute="15"
-              />
-            </div>
-          </div>
+          </template>
 
-          <!-- Status -->
+          <!-- Status (Read-only) -->
           <div class="form-group">
             <label for="status" class="form-label">Status</label>
-            <Select
-              id="status"
-              v-model="form.status"
-              :options="['Open', 'Confirmed']"
-              placeholder="Select status"
-            />
+            <div id="status" class="status-display">
+              {{ computedStatus }}
+            </div>
           </div>
 
           <!-- Location Info -->
           <div class="form-row">
             <div class="form-group">
-              <label for="destination" class="form-label">Destination</label>
+              <label for="destination" class="form-label" :class="{ required: isRideService }">Destination</label>
               <InputText
                 id="destination"
                 v-model="form.destination"
@@ -471,11 +548,11 @@ const handleCancel = () => {
           <!-- Created At (Edit Mode Only) -->
           <div v-if="isEdit" class="form-group">
             <label for="createdAt" class="form-label">Created At</label>
-            <Calendar
+            <DatePicker
               id="createdAt"
               v-model="form.createdAt"
-              show-time
-              hour-format="24"
+              showTime
+              hourFormat="24"
               :disabled="true"
             />
           </div>
@@ -584,6 +661,15 @@ const handleCancel = () => {
   padding: 2rem;
   text-align: center;
   color: var(--color-text-dim);
+}
+
+.status-display {
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-background-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
 }
 
 @media (max-width: 768px) {

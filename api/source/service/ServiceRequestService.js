@@ -147,51 +147,165 @@ module.exports.createServiceRequest = async function (payload) {
     return date.toISOString().slice(0, 19).replace('T', ' ')
   }
 
-  const sql = `
-    INSERT INTO service_request (
-      village_id,
-      member_person_id,
-      volunteer_person_id,
-      request_number,
-      status,
-      service_name,
-      transportation_type,
-      created_at,
-      start_at,
-      finish_at,
-      appt_time,
-      return_time,
-      state,
-      instructions,
-      description,
-      destination,
-      address,
-      city,
-      zip,
-      phone
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `
-  const values = [
-    payload.villageId,
-    payload.memberPersonId || null,
-    payload.volunteerPersonId || null,
-    payload.requestNumber || null,
-    payload.status || null,
-    payload.serviceName || null,
-    payload.transportationType || null,
-    convertToMySQLDateTime(payload.startAt),
-    convertToMySQLDateTime(payload.finishAt),
-    convertToMySQLDateTime(payload.apptTime),
-    convertToMySQLDateTime(payload.returnTime),
-    payload.state || null,
-    payload.instructions || null,
-    payload.description || null,
-    payload.destination || null,
-    payload.address || null,
-    payload.city || null,
-    payload.zip || null,
-    payload.phone || null
-  ]
-  const [result] = await dbUtils.pool.query(sql, values)
-  return module.exports.getServiceRequest(result.insertId)
+  return dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const sql = `
+        INSERT INTO service_request (
+          village_id,
+          member_person_id,
+          volunteer_person_id,
+          request_number,
+          status,
+          service_name,
+          transportation_type,
+          created_at,
+          start_at,
+          finish_at,
+          appt_time,
+          return_time,
+          state,
+          instructions,
+          description,
+          destination,
+          address,
+          city,
+          zip,
+          phone
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      const values = [
+        payload.villageId,
+        payload.memberPersonId || null,
+        payload.volunteerPersonId || null,
+        payload.requestNumber || null,
+        payload.status || null,
+        payload.serviceName || null,
+        payload.transportationType || null,
+        convertToMySQLDateTime(payload.startAt),
+        convertToMySQLDateTime(payload.finishAt),
+        convertToMySQLDateTime(payload.apptTime),
+        convertToMySQLDateTime(payload.returnTime),
+        payload.state || null,
+        payload.instructions || null,
+        payload.description || null,
+        payload.destination || null,
+        payload.address || null,
+        payload.city || null,
+        payload.zip || null,
+        payload.phone || null
+      ]
+      const [result] = await connection.query(sql, values)
+      const serviceRequestId = result.insertId
+
+      // Create email event for new request
+      const emailEventSql = `
+        INSERT INTO email_event (event_type, service_request_id, volunteer_id)
+        VALUES ('new_request', ?, ?)
+      `
+      await connection.query(emailEventSql, [serviceRequestId, payload.volunteerPersonId || null])
+
+      return module.exports.getServiceRequest(serviceRequestId)
+    }
+  })
+}
+
+module.exports.patchServiceRequest = async function (serviceRequestId, payload) {
+  const convertToMySQLDateTime = (isoString) => {
+    if (!isoString) return null
+    const date = new Date(isoString)
+    return date.toISOString().slice(0, 19).replace('T', ' ')
+  }
+
+  return dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const updates = []
+      const values = []
+
+      if (payload.memberPersonId !== undefined) {
+        updates.push('member_person_id = ?')
+        values.push(payload.memberPersonId || null)
+      }
+      if (payload.volunteerPersonId !== undefined) {
+        updates.push('volunteer_person_id = ?')
+        values.push(payload.volunteerPersonId || null)
+      }
+      if (payload.status !== undefined) {
+        updates.push('status = ?')
+        values.push(payload.status || null)
+      }
+      if (payload.serviceName !== undefined) {
+        updates.push('service_name = ?')
+        values.push(payload.serviceName || null)
+      }
+      if (payload.transportationType !== undefined) {
+        updates.push('transportation_type = ?')
+        values.push(payload.transportationType || null)
+      }
+      if (payload.startAt !== undefined) {
+        updates.push('start_at = ?')
+        values.push(convertToMySQLDateTime(payload.startAt))
+      }
+      if (payload.finishAt !== undefined) {
+        updates.push('finish_at = ?')
+        values.push(convertToMySQLDateTime(payload.finishAt))
+      }
+      if (payload.apptTime !== undefined) {
+        updates.push('appt_time = ?')
+        values.push(convertToMySQLDateTime(payload.apptTime))
+      }
+      if (payload.returnTime !== undefined) {
+        updates.push('return_time = ?')
+        values.push(convertToMySQLDateTime(payload.returnTime))
+      }
+      if (payload.state !== undefined) {
+        updates.push('state = ?')
+        values.push(payload.state || null)
+      }
+      if (payload.city !== undefined) {
+        updates.push('city = ?')
+        values.push(payload.city || null)
+      }
+      if (payload.zip !== undefined) {
+        updates.push('zip = ?')
+        values.push(payload.zip || null)
+      }
+      if (payload.address !== undefined) {
+        updates.push('address = ?')
+        values.push(payload.address || null)
+      }
+      if (payload.phone !== undefined) {
+        updates.push('phone = ?')
+        values.push(payload.phone || null)
+      }
+      if (payload.instructions !== undefined) {
+        updates.push('instructions = ?')
+        values.push(payload.instructions || null)
+      }
+      if (payload.description !== undefined) {
+        updates.push('description = ?')
+        values.push(payload.description || null)
+      }
+      if (payload.destination !== undefined) {
+        updates.push('destination = ?')
+        values.push(payload.destination || null)
+      }
+
+      if (updates.length === 0) {
+        return module.exports.getServiceRequest(serviceRequestId)
+      }
+
+      values.push(serviceRequestId)
+      const sql = `UPDATE service_request SET ${updates.join(', ')} WHERE id = ?`
+      await connection.query(sql, values)
+
+      // Create email event for patched request
+      const emailEventSql = `
+        INSERT INTO email_event (event_type, service_request_id, volunteer_id)
+        VALUES ('patch_request', ?, ?)
+      `
+      await connection.query(emailEventSql, [serviceRequestId, payload.volunteerPersonId || null])
+
+      return module.exports.getServiceRequest(serviceRequestId)
+    }
+  })
 }
