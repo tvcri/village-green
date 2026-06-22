@@ -12,3 +12,9 @@ export const getServiceRequests = ({ status, villageId } = {}) => {
   if (villageId?.length) params.villageId = villageId
   return apiCall('getServiceRequests', params)
 }
+
+export const createServiceRequest = (payload) =>
+  apiCall('createServiceRequest', payload)
+
+export const updateServiceRequest = (serviceRequestId, payload) =>
+  apiCall('patchServiceRequest', { serviceRequestId, ...payload })

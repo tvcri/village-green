@@ -3135,6 +3135,10 @@ components:
           type: string
           maxLength: 100
           nullable: true
+        zip:
+          type: string
+          maxLength: 20
+          nullable: true
         phone:
           type: string
           maxLength: 50
@@ -3170,10 +3174,16 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageId'
         memberPersonId:
-          $ref: '#/components/schemas/PersonId'
+          type: string
+          maxLength: 10
+          minLength: 1
+          pattern: ^[0-9]{1,10}$
           nullable: true
         volunteerPersonId:
-          $ref: '#/components/schemas/PersonId'
+          type: string
+          maxLength: 10
+          minLength: 1
+          pattern: ^[0-9]{1,10}$
           nullable: true
         status:
           type: string
@@ -3214,6 +3224,10 @@ components:
         city:
           type: string
           maxLength: 100
+          nullable: true
+        zip:
+          type: string
+          maxLength: 20
           nullable: true
         phone:
           type: string
@@ -3242,50 +3256,77 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageId'
         memberPersonId:
-          $ref: '#/components/schemas/PersonId'
+          type: string
+          maxLength: 10
+          minLength: 1
+          pattern: ^[0-9]{1,10}$
+          nullable: true
         volunteerPersonId:
-          $ref: '#/components/schemas/PersonId'
+          type: string
+          maxLength: 10
+          minLength: 1
+          pattern: ^[0-9]{1,10}$
+          nullable: true
         status:
           type: string
           maxLength: 50
+          nullable: true
         serviceName:
           type: string
           maxLength: 200
+          nullable: true
         transportationType:
           type: string
           maxLength: 100
+          nullable: true
         createdAt:
           type: string
           format: date-time
+          nullable: true
         startAt:
           type: string
           format: date-time
+          nullable: true
         finishAt:
           type: string
           format: date-time
+          nullable: true
         instructions:
           type: string
+          nullable: true
         description:
           type: string
+          nullable: true
         destination:
           type: string
+          nullable: true
         address:
           type: string
+          nullable: true
         city:
           type: string
           maxLength: 100
+          nullable: true
+        zip:
+          type: string
+          maxLength: 20
+          nullable: true
         phone:
           type: string
           maxLength: 50
+          nullable: true
         apptTime:
           type: string
           format: date-time
+          nullable: true
         returnTime:
           type: string
           format: date-time
+          nullable: true
         state:
           type: string
           maxLength: 50
+          nullable: true
     State:
       type: string
       enum:

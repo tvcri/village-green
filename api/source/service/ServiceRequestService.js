@@ -27,6 +27,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
+    'sr.zip AS zip',
     'sr.phone AS phone'
   ]
   const joins = new Set([
@@ -94,6 +95,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
+    'sr.zip AS zip',
     'sr.phone AS phone'
   ]
   const joins = new Set([
@@ -139,6 +141,12 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
 }
 
 module.exports.createServiceRequest = async function (payload) {
+  const convertToMySQLDateTime = (isoString) => {
+    if (!isoString) return null
+    const date = new Date(isoString)
+    return date.toISOString().slice(0, 19).replace('T', ' ')
+  }
+
   const sql = `
     INSERT INTO service_request (
       village_id,
@@ -159,8 +167,9 @@ module.exports.createServiceRequest = async function (payload) {
       destination,
       address,
       city,
+      zip,
       phone
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
   const values = [
     payload.villageId,
@@ -170,17 +179,17 @@ module.exports.createServiceRequest = async function (payload) {
     payload.status || null,
     payload.serviceName || null,
     payload.transportationType || null,
-    payload.createdAt || null,
-    payload.startAt || null,
-    payload.finishAt || null,
-    payload.apptTime || null,
-    payload.returnTime || null,
+    convertToMySQLDateTime(payload.startAt),
+    convertToMySQLDateTime(payload.finishAt),
+    convertToMySQLDateTime(payload.apptTime),
+    convertToMySQLDateTime(payload.returnTime),
     payload.state || null,
     payload.instructions || null,
     payload.description || null,
     payload.destination || null,
     payload.address || null,
     payload.city || null,
+    payload.zip || null,
     payload.phone || null
   ]
   const [result] = await dbUtils.pool.query(sql, values)

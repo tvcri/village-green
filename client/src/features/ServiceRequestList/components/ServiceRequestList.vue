@@ -7,6 +7,7 @@ import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -339,6 +340,11 @@ const navigateToRequest = (serviceRequestId, rowVillageId) => {
   router.push({ name: 'service-request-detail', params, query })
 }
 
+const navigateToCreateRequest = () => {
+  navigatedToDetail.value = true
+  router.push({ name: 'meta-service-request-create' })
+}
+
 const clearFilters = () => {
   selectedMember.value = 'All members'
   selectedVolunteer.value = 'All volunteers'
@@ -355,11 +361,19 @@ const clearFilters = () => {
         <h1>Service Requests</h1>
         <span class="subtitle">Last 30 days</span>
       </div>
-      <ExportButton
-        :disabled="isLoading || isCreatingSheet"
-        @download="handleDownloadCsv"
-        @export="handleCreateSheet"
-      />
+      <div class="header-actions">
+        <Button
+          v-if="isMetaMode"
+          label="New Request"
+          icon="pi pi-plus"
+          @click="navigateToCreateRequest"
+        />
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
+      </div>
     </div>
 
     <div class="filter-section">
@@ -568,6 +582,12 @@ h1 {
 .subtitle {
   font-size: 0.85rem;
   color: var(--color-text-dim);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .filter-section {

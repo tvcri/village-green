@@ -95,6 +95,16 @@ const routes = [
     component: () => import('../features/ServiceRequestList/components/ServiceRequestList.vue'),
   },
   {
+    path: '/meta/service-requests/create',
+    name: 'meta-service-request-create',
+    component: () => import('../features/ServiceRequestList/components/ServiceRequestCreateEdit.vue'),
+  },
+  {
+    path: '/meta/service-requests/:id/edit',
+    name: 'meta-service-request-edit',
+    component: () => import('../features/ServiceRequestList/components/ServiceRequestCreateEdit.vue'),
+  },
+  {
     path: '/meta/persons',
     name: 'meta-persons',
     component: () => import('../features/PersonList/components/PersonList.vue'),
