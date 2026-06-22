@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -25,14 +25,20 @@ useScrollRestore(
   null
 )
 
+function thirtyDaysAgo() {
+  const d = new Date()
+  d.setDate(d.getDate() - 30)
+  return d
+}
+
 const selectedVillage = ref(null)
 const volunteerName = ref('')
 const memberName = ref('')
-const dateStart = ref(null)
+const dateStart = ref(isMetaMode.value ? null : thirtyDaysAgo())
 const dateEnd = ref(null)
 const selectedContactType = ref(null)
 const selectedActivityType = ref(null)
-const filtersCollapsed = ref(true)
+const filtersCollapsed = ref(false)
 
 const contactTypeOptions = ['In-Person', 'Phone', 'Virtual']
 const activityTypeOptions = [
@@ -52,7 +58,7 @@ const hasFilter = computed(() =>
 
 const { state: friends, isLoading, execute: fetchFriends } = useAsyncState(
   () => getFriends({
-    villageId: selectedVillage.value?.villageId ?? null,
+    villageId: isMetaMode.value ? (selectedVillage.value?.villageId ?? null) : route.params.villageId,
     volunteerName: volunteerName.value.trim() || undefined,
     memberName: memberName.value.trim() || undefined,
     dateStart: dateStart.value ? formatDateParam(dateStart.value) : undefined,
@@ -70,6 +76,39 @@ const { state: allVillages } = useAsyncState(
 
 watch(hasFilter, (val) => {
   if (!val) friends.value = null
+})
+
+const hasActivatedOnce = ref(false)
+const villageIdAtDeactivation = ref(null)
+
+const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(
+  () => route.params.villageId,
+  () => {
+    if (isMetaMode.value) return
+    dateStart.value = thirtyDaysAgo()
+    friends.value = null
+    fetchFriends()
+  }
+)
+
+onDeactivated(() => {
+  pauseVillageWatch()
+  villageIdAtDeactivation.value = route.params.villageId
+})
+
+onActivated(() => {
+  resumeVillageWatch()
+  if (!hasActivatedOnce.value) {
+    hasActivatedOnce.value = true
+    return
+  }
+  const villageChanged = route.params.villageId !== villageIdAtDeactivation.value
+  if (villageChanged) return // watch will fire and handle the fetch
+  if (!isMetaMode.value) fetchFriends()
+})
+
+onMounted(() => {
+  if (!isMetaMode.value && hasFilter.value) fetchFriends()
 })
 
 function formatDateParam(date) {
@@ -110,6 +149,33 @@ function isUnresolved(person) {
   return person && !person.personId
 }
 
+const sortField = ref('visitDate')
+const sortOrder = ref(-1)
+
+const sortedFriends = computed(() => {
+  if (!Array.isArray(friends.value)) return []
+  return [...friends.value].sort((a, b) => {
+    let aVal, bVal
+    if (sortField.value === 'memberName') {
+      aVal = personName(a.member)
+      bVal = personName(b.member)
+    } else if (sortField.value === 'volunteerName') {
+      aVal = personName(a.volunteer)
+      bVal = personName(b.volunteer)
+    } else {
+      aVal = a[sortField.value] ?? ''
+      bVal = b[sortField.value] ?? ''
+    }
+    const cmp = String(aVal).localeCompare(String(bVal))
+    return sortOrder.value === 1 ? cmp : -cmp
+  })
+})
+
+function onSort(event) {
+  sortField.value = event.sortField
+  sortOrder.value = event.sortOrder
+}
+
 const popoverRefs = ref({})
 function registerPopover(el, friendId) {
   if (el) popoverRefs.value[friendId] = el
@@ -136,55 +202,68 @@ function toggleNotes(event, friendId) {
 
     <div v-if="!filtersCollapsed" class="filter-panel">
       <div class="filter-row">
-        <Select
-          v-if="isMetaMode"
-          v-model="selectedVillage"
-          :options="allVillages ?? []"
-          optionLabel="name"
-          placeholder="All villages"
-          showClear
-          class="filter-control"
-        />
-        <InputText
-          v-model="volunteerName"
-          placeholder="Volunteer name"
-          class="filter-control"
-          @keyup.enter="onSearch"
-        />
-        <InputText
-          v-model="memberName"
-          placeholder="Member name"
-          class="filter-control"
-          @keyup.enter="onSearch"
-        />
-        <DatePicker
-          v-model="dateStart"
-          placeholder="Date from"
-          dateFormat="yy-mm-dd"
-          showButtonBar
-          class="filter-control"
-        />
-        <DatePicker
-          v-model="dateEnd"
-          placeholder="Date to"
-          dateFormat="yy-mm-dd"
-          showButtonBar
-          class="filter-control"
-        />
-        <Select
-          v-model="selectedContactType"
-          :options="contactTypeOptions"
-          placeholder="Contact type"
-          showClear
-          class="filter-control"
-        />
-        <Select
-          v-model="selectedActivityType"
-          :options="activityTypeOptions"
-          placeholder="Activity type"
-          showClear
-          class="filter-control"
-        />
+        <div v-if="isMetaMode" class="search-box">
+          <label>Village:</label>
+          <Select
+            v-model="selectedVillage"
+            :options="allVillages ?? []"
+            optionLabel="name"
+            placeholder="All villages"
+            showClear
+          />
+        </div>
+        <div class="search-box">
+          <label>Member:</label>
+          <InputText
+            v-model="memberName"
+            placeholder="Member name"
+            @keyup.enter="onSearch"
+          />
+        </div>
+        <div class="search-box">
+          <label>Volunteer:</label>
+          <InputText
+            v-model="volunteerName"
+            placeholder="Volunteer name"
+            @keyup.enter="onSearch"
+          />
+        </div>
+        <div class="search-box">
+          <label>Date from:</label>
+          <DatePicker
+            v-model="dateStart"
+            placeholder="Date from"
+            dateFormat="yy-mm-dd"
+            showButtonBar
+          />
+        </div>
+        <div class="search-box">
+          <label>Date to:</label>
+          <DatePicker
+            v-model="dateEnd"
+            placeholder="Date to"
+            dateFormat="yy-mm-dd"
+            showButtonBar
+          />
+        </div>
+        <div class="search-box">
+          <label>Contact type:</label>
+          <Select
+            v-model="selectedContactType"
+            :options="contactTypeOptions"
+            placeholder="All"
+            showClear
+          />
+        </div>
+        <div class="search-box">
+          <label>Activity type:</label>
+          <Select
+            v-model="selectedActivityType"
+            :options="activityTypeOptions"
+            placeholder="All"
+            showClear
+          />
+        </div>
       </div>
       <div class="filter-actions">
         <Button label="Search" icon="pi pi-search" :disabled="!hasFilter" @click="onSearch" />
@@ -200,11 +279,86 @@ function toggleNotes(event, friendId) {
       Loading…
     </div>
 
+    <!-- Mobile card view -->
+    <div v-if="friends !== null && !isLoading" class="friend-cards mobile-only">
+      <div v-for="f in sortedFriends" :key="f.friendId" class="friend-card">
+        <div class="card-row">
+          <span class="label">Date:</span>
+          <span>{{ f.visitDate }}</span>
+        </div>
+        <div v-if="isMetaMode" class="card-row">
+          <span class="label">Village:</span>
+          <span>{{ f.village?.name ?? '—' }}</span>
+        </div>
+        <div class="card-row">
+          <span class="label">Member:</span>
+          <span class="person-cell">
+            {{ personName(f.member) }}
+            <i
+              v-if="isUnresolved(f.member)"
+              class="pi pi-exclamation-triangle unresolved-icon"
+              v-tooltip="'Name not matched to a person record'"
+            />
+          </span>
+        </div>
+        <div class="card-row">
+          <span class="label">Volunteer:</span>
+          <span class="person-cell">
+            {{ personName(f.volunteer) }}
+            <i
+              v-if="isUnresolved(f.volunteer)"
+              class="pi pi-exclamation-triangle unresolved-icon"
+              v-tooltip="'Name not matched to a person record'"
+            />
+          </span>
+        </div>
+        <div class="card-row">
+          <span class="label">Contact:</span>
+          <Tag
+            v-if="f.contactType"
+            :value="f.contactType"
+            :severity="getContactTypeSeverity(f.contactType)"
+          />
+        </div>
+        <div class="card-row card-row--wrap">
+          <span class="label">Activities:</span>
+          <div class="activity-tags">
+            <Tag
+              v-for="activity in (f.activityTypes ?? [])"
+              :key="activity"
+              :value="activity"
+              severity="secondary"
+            />
+          </div>
+        </div>
+        <div class="card-row">
+          <span class="label">Time:</span>
+          <span>{{ f.timeSpentMinutes }} min</span>
+        </div>
+        <div v-if="f.notes" class="card-row">
+          <span class="label">Notes:</span>
+          <i
+            class="pi pi-file-edit notes-icon"
+            style="cursor: pointer"
+            @click="toggleNotes($event, f.friendId + '-card')"
+          />
+          <Popover :ref="el => registerPopover(el, f.friendId + '-card')">
+            <div class="notes-popover">{{ f.notes }}</div>
+          </Popover>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desktop table view -->
     <DataTable
       v-if="friends !== null && !isLoading"
-      :value="friends"
-      class="friend-table"
+      :value="sortedFriends"
+      class="friend-table desktop-only"
       stripedRows
+      :sortField="sortField"
+      :sortOrder="sortOrder"
+      @sort="onSort"
+      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
     >
       <Column field="visitDate" header="Visit Date" sortable style="width: 10%" />
 
@@ -214,20 +368,7 @@ function toggleNotes(event, friendId) {
         </template>
       </Column>
 
-      <Column header="Volunteer" style="width: 14%">
-        <template #body="{ data }">
-          <span class="person-cell">
-            {{ personName(data.volunteer) }}
-            <i
-              v-if="isUnresolved(data.volunteer)"
-              class="pi pi-exclamation-triangle unresolved-icon"
-              v-tooltip="'Name not matched to a person record'"
-            />
-          </span>
-        </template>
-      </Column>
-
-      <Column header="Member" style="width: 14%">
+      <Column header="Member" sortable sortField="memberName" style="width: 14%">
         <template #body="{ data }">
           <span class="person-cell">
             {{ personName(data.member) }}
@@ -240,7 +381,20 @@ function toggleNotes(event, friendId) {
         </template>
       </Column>
 
-      <Column header="Contact Type" style="width: 11%">
+      <Column header="Volunteer" sortable sortField="volunteerName" style="width: 14%">
+        <template #body="{ data }">
+          <span class="person-cell">
+            {{ personName(data.volunteer) }}
+            <i
+              v-if="isUnresolved(data.volunteer)"
+              class="pi pi-exclamation-triangle unresolved-icon"
+              v-tooltip="'Name not matched to a person record'"
+            />
+          </span>
+        </template>
+      </Column>
+
+      <Column header="Contact Type" sortable field="contactType" style="width: 11%">
         <template #body="{ data }">
           <Tag
             v-if="data.contactType"
@@ -317,7 +471,7 @@ function toggleNotes(event, friendId) {
 
 .filters-toggle {
   background: none;
-  border: 1px solid var(--p-surface-300, #ccc);
+  border: 1px solid var(--color-border-default);
   border-radius: 4px;
   padding: 0.35rem 0.75rem;
   cursor: pointer;
@@ -332,19 +486,29 @@ function toggleNotes(event, friendId) {
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  border: 1px solid var(--p-surface-200, #e5e5e5);
+  border: 1px solid var(--color-border-default);
   border-radius: 6px;
-  background: var(--p-surface-50, #fafafa);
+  background: var(--color-background-light);
 }
 
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
-.filter-control {
-  min-width: 160px;
+.search-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  width: 200px;
+}
+
+.search-box label {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
 }
 
 .filter-actions {
@@ -386,5 +550,64 @@ function toggleNotes(event, friendId) {
   white-space: pre-wrap;
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+/* Mobile card view */
+.friend-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.friend-card {
+  padding: 1rem;
+  background-color: var(--color-background-light);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  gap: 0.5rem;
+}
+
+.card-row--wrap {
+  align-items: flex-start;
+}
+
+.card-row .label {
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+/* Responsive */
+.desktop-only {
+  width: 100%;
+}
+
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .friend-list {
+    padding: 1rem;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+
+  .mobile-only {
+    display: flex;
+  }
+
+  .search-box {
+    width: 100%;
+  }
 }
 </style>
