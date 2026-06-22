@@ -1623,6 +1623,83 @@ paths:
       security:
       - oauth:
         - vg:service-request
+  /friends:
+    get:
+      summary: List Friendly Calls & Visits submissions
+      tags:
+      - Friend
+      operationId: getFriends
+      parameters:
+        - $ref: '#/components/parameters/ElevateQuery'
+        - name: villageId
+          in: query
+          description: Filter to specific villages (omit for all granted villages)
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/VillageId'
+        - name: volunteerPersonId
+          in: query
+          description: Filter by volunteer person ID
+          schema:
+            $ref: '#/components/schemas/PersonId'
+        - name: memberPersonId
+          in: query
+          description: Filter by member person ID
+          schema:
+            $ref: '#/components/schemas/PersonId'
+        - name: dateStart
+          in: query
+          description: Filter visits on or after this date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: dateEnd
+          in: query
+          description: Filter visits on or before this date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: contactType
+          in: query
+          description: Filter by contact type (exact match)
+          schema:
+            type: string
+        - name: activityType
+          in: query
+          description: Filter by activity type (must be present in activityTypes array)
+          schema:
+            type: string
+        - name: volunteerName
+          in: query
+          description: Filter by volunteer name (partial match against resolved and raw name)
+          schema:
+            type: string
+        - name: memberName
+          in: query
+          description: Filter by member name (partial match against resolved and raw name)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of FCV submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FriendSubmission'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:friends:read
   /villages:
     get:
       summary: List villages
@@ -2259,6 +2336,93 @@ components:
           type: string
         stack:
           type: string
+    FcvPerson:
+      oneOf:
+        - $ref: '#/components/schemas/FcvPersonResolved'
+        - $ref: '#/components/schemas/FcvPersonUnresolved'
+    FcvPersonResolved:
+      additionalProperties: false
+      type: object
+      required:
+        - personId
+        - fullName
+      properties:
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        fullName:
+          type: string
+          maxLength: 200
+    FcvPersonUnresolved:
+      additionalProperties: false
+      type: object
+      properties:
+        rawName:
+          type: string
+          maxLength: 200
+          nullable: true
+        fuzzyName:
+          type: string
+          maxLength: 200
+          nullable: true
+    FriendSubmission:
+      additionalProperties: false
+      type: object
+      required:
+        - friendId
+        - visitDate
+        - timeSpentMinutes
+        - contactType
+        - activityTypes
+        - activityOther
+        - notes
+        - submittedAt
+        - village
+        - volunteer
+        - member
+      properties:
+        friendId:
+          type: string
+        visitDate:
+          type: string
+          format: date
+        timeSpentMinutes:
+          type: integer
+        contactType:
+          type: string
+          maxLength: 50
+        activityTypes:
+          type: array
+          nullable: true
+          items:
+            type: string
+        activityOther:
+          type: string
+          maxLength: 500
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        submittedAt:
+          type: string
+          format: date-time
+        village:
+          type: object
+          nullable: true
+          properties:
+            villageId:
+              $ref: '#/components/schemas/VillageId'
+            name:
+              type: string
+        volunteer:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/FcvPerson'
+        member:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/FcvPerson'
     GrantId:
       $ref: '#/components/schemas/StringIntId'
     Grantee:

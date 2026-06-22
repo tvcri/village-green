@@ -44,6 +44,11 @@ const routes = [
     component: () => import('../features/ServiceRequestList/components/ServiceRequestDetail.vue'),
   },
   {
+    path: '/villages/:villageId/friends',
+    name: 'friends',
+    component: () => import('../features/FriendList/components/FriendList.vue'),
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('../features/Admin/components/AdminHub.vue'),
@@ -98,6 +103,11 @@ const routes = [
     path: '/meta/persons/:personId/:personName?',
     name: 'meta-person-detail',
     component: () => import('../features/PersonList/components/PersonDetail.vue'),
+  },
+  {
+    path: '/meta/friends',
+    name: 'meta-friends',
+    component: () => import('../features/FriendList/components/FriendList.vue'),
   },
   {
     path: '/:pathMatch(.*)*',
