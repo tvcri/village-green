@@ -155,6 +155,12 @@ const breadcrumbs = computed(() => {
         { label: 'Friends', route: { name: 'meta-friends' } }
       ]})
       break
+    case 'meta-service-request-create':
+    case 'meta-service-request-edit':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Service Requests', route: { name: 'meta-service-requests' } })
+      crumbs.push({ label: 'Request' })
+      break
     case 'meta-persons':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', siblings: [

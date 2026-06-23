@@ -10,6 +10,7 @@ import Textarea from 'primevue/textarea'
 import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import AutoComplete from 'primevue/autocomplete'
+import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
@@ -55,10 +56,10 @@ const form = ref({
   transportationType: '',
   createdAt: '',
   serviceDate: '',
-  startTime: '',
-  finishTime: '',
-  apptTime: '',
-  returnTime: '',
+  startTime: null,
+  finishTime: null,
+  apptTime: null,
+  returnTime: null,
   state: '',
   city: '',
   zip: '',
@@ -73,11 +74,12 @@ const isSubmitting = ref(false)
 
 watch(existingRequest, (val) => {
   if (val && isEdit.value) {
-    const extractTimeAsDate = (dateStr) => {
-      if (!dateStr) return ''
+    const extractTimeAsMinutes = (dateStr) => {
+      if (!dateStr) return null
       const date = new Date(dateStr)
-      const timeDate = new Date(0, 0, 0, date.getHours(), date.getMinutes())
-      return timeDate
+      const raw = date.getHours() * 60 + date.getMinutes()
+      // Snap to the nearest 15-minute slot so it matches a Select option.
+      return Math.round(raw / 15) * 15
     }
     const extractDate = (dateStr) => {
       if (!dateStr) return ''
@@ -92,10 +94,10 @@ watch(existingRequest, (val) => {
       transportationType: val.transportationType || '',
       createdAt: extractDate(val.createdAt),
       serviceDate: extractDate(val.startAt),
-      startTime: extractTimeAsDate(val.startAt),
-      finishTime: extractTimeAsDate(val.finishAt),
-      apptTime: extractTimeAsDate(val.apptTime),
-      returnTime: extractTimeAsDate(val.returnTime),
+      startTime: extractTimeAsMinutes(val.startAt),
+      finishTime: extractTimeAsMinutes(val.finishAt),
+      apptTime: extractTimeAsMinutes(val.apptTime),
+      returnTime: extractTimeAsMinutes(val.returnTime),
       state: val.state || '',
       city: val.city || '',
       zip: val.zip || '',
@@ -146,7 +148,8 @@ const filterVolunteers = (event) => {
 }
 
 watch(selectedMember, (val) => {
-  if (val) {
+  // Only update if it's a complete selected object with both label and value
+  if (val && typeof val === 'object' && val.label && val.value) {
     form.value.memberPersonId = String(val.value)
   } else {
     form.value.memberPersonId = null
@@ -154,14 +157,23 @@ watch(selectedMember, (val) => {
 })
 
 watch(selectedVolunteer, (val) => {
-  if (val) {
+  // Only update if it's a complete selected object with both label and value
+  if (val && typeof val === 'object' && val.label && val.value) {
     form.value.volunteerPersonId = String(val.value)
   } else {
     form.value.volunteerPersonId = null
   }
 })
 
-watch(() => form.value.villageId, (villageId) => {
+watch(() => form.value.villageId, (villageId, oldVillageId) => {
+  // Clear member/volunteer when switching from one village to another.
+  // Skip on initial population (oldVillageId is empty), so edit-loads keep their values.
+  if (oldVillageId && villageId !== oldVillageId) {
+    selectedMember.value = null
+    selectedVolunteer.value = null
+    form.value.memberPersonId = null
+    form.value.volunteerPersonId = null
+  }
   if (villageId) {
     fetchMembers()
     fetchVolunteers()
@@ -190,9 +202,53 @@ const computedStatus = computed(() => {
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
+const formattedCreatedAt = computed(() => {
+  if (!form.value.createdAt) return ''
+  const d = new Date(form.value.createdAt)
+  if (isNaN(d)) return ''
+  return d.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })
+})
+
 watch(() => form.value.volunteerPersonId, () => {
   form.value.status = computedStatus.value
 }, { immediate: true })
+
+// During creation, seeding a chosen time into the NEXT empty field should not
+// itself cascade onward. The `seeding` guard makes a programmatic seed-write
+// skip the downstream watcher, so a single user selection fills only one field.
+// Round Trip: Start -> Appointment -> Return -> Finish.
+// One Way:    Start -> Finish (Appointment/Return are hidden).
+let seeding = false
+const seedNext = (field, val) => {
+  if (form.value[field] == null) {
+    // Seed the next field 15 minutes later, capped at the last slot (23:45).
+    const next = Math.min(val + 15, 23 * 60 + 45)
+    seeding = true
+    form.value[field] = next
+    seeding = false
+  }
+}
+
+watch(() => form.value.startTime, (val) => {
+  if (isEdit.value || seeding || val == null) return
+  seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
+}, { flush: 'sync' })
+
+watch(() => form.value.apptTime, (val) => {
+  if (isEdit.value || seeding || val == null) return
+  seedNext('returnTime', val)
+}, { flush: 'sync' })
+
+watch(() => form.value.returnTime, (val) => {
+  if (isEdit.value || seeding || val == null) return
+  seedNext('finishTime', val)
+}, { flush: 'sync' })
 
 const serviceNameOptions = [
   'Ride: Medical Appnt',
@@ -220,14 +276,106 @@ const stateOptions = [
   'MA'
 ]
 
+// Times are stored as minutes-since-midnight (0..1425) so the Select value
+// always reflects the chosen slot and is trivial to seed/convert.
+const minutesToLabel = (mins) => {
+  const h24 = Math.floor(mins / 60)
+  const m = mins % 60
+  const period = h24 < 12 ? 'AM' : 'PM'
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`
+}
+
+const timeSlotOptions = []
+for (let mins = 0; mins < 24 * 60; mins += 15) {
+  timeSlotOptions.push({ label: minutesToLabel(mins), value: mins })
+}
+
+// Each later time field may only select a slot after the field before it.
+const slotsAfter = (mins) =>
+  mins == null ? timeSlotOptions : timeSlotOptions.filter(o => o.value > mins)
+
+const startOptions = computed(() => timeSlotOptions)
+const apptOptions = computed(() => slotsAfter(form.value.startTime))
+const returnOptions = computed(() => slotsAfter(form.value.apptTime))
+const finishOptions = computed(() =>
+  slotsAfter(
+    form.value.transportationType === 'Round Trip'
+      ? form.value.returnTime
+      : form.value.startTime
+  )
+)
+
 const isRideService = computed(() => form.value.serviceName?.startsWith('Ride:'))
+
+const noLocationServices = ['Tech Support', 'Household Chores/Handy Help']
+
+const showLocationFields = computed(() => {
+  if (!form.value.serviceName) return false
+  return !noLocationServices.includes(form.value.serviceName)
+})
 
 const availableTransportationTypes = computed(() => {
   return isRideService.value ? ['Round Trip', 'One Way'] : ['None']
 })
 
+const isFormValid = computed(() => {
+  const f = form.value
+
+  // Always required
+  if (!f.villageId || !f.serviceName || !f.memberPersonId || !f.serviceDate) {
+    return false
+  }
+
+  // Ride-specific requirements
+  if (isRideService.value) {
+    if (!f.destination) return false
+    if (!['Round Trip', 'One Way'].includes(f.transportationType)) return false
+
+    if (f.transportationType === 'Round Trip') {
+      if (f.startTime == null || f.apptTime == null || f.returnTime == null || f.finishTime == null) return false
+    } else {
+      if (f.startTime == null || f.finishTime == null) return false
+    }
+  }
+
+  return true
+})
+
+// After creating a request, clear the form for another entry but keep the
+// chosen village so consecutive requests for the same village are quick.
+const resetForNewRequest = () => {
+  const keepVillage = form.value.villageId
+  selectedMember.value = null
+  selectedVolunteer.value = null
+  form.value = {
+    villageId: keepVillage,
+    memberPersonId: '',
+    volunteerPersonId: '',
+    status: '',
+    serviceName: '',
+    transportationType: '',
+    createdAt: '',
+    serviceDate: '',
+    startTime: null,
+    finishTime: null,
+    apptTime: null,
+    returnTime: null,
+    state: '',
+    city: '',
+    zip: '',
+    address: '',
+    phone: '',
+    instructions: '',
+    description: '',
+    destination: ''
+  }
+}
+
 watch(isRideService, (newIsRide) => {
-  if (!newIsRide) {
+  if (newIsRide) {
+    form.value.transportationType = 'Round Trip'
+  } else {
     form.value.transportationType = 'None'
   }
 })
@@ -266,12 +414,12 @@ const handleSubmit = async () => {
       // Time validation based on transportation type
       const isRoundTrip = form.value.transportationType === 'Round Trip'
       if (isRoundTrip) {
-        if (!form.value.startTime || !form.value.finishTime || !form.value.apptTime || !form.value.returnTime) {
+        if (form.value.startTime == null || form.value.finishTime == null || form.value.apptTime == null || form.value.returnTime == null) {
           toast.add({ severity: 'error', summary: 'Error', detail: 'All four times (start, finish, appointment, return) are required for round trip', life: 3000 })
           return
         }
       } else {
-        if (!form.value.startTime || !form.value.finishTime) {
+        if (form.value.startTime == null || form.value.finishTime == null) {
           toast.add({ severity: 'error', summary: 'Error', detail: 'Start and finish times are required for one way', life: 3000 })
           return
         }
@@ -280,11 +428,24 @@ const handleSubmit = async () => {
 
     isSubmitting.value = true
 
-    const combineDateAndTime = (date, timeObj) => {
-      if (!date || !timeObj) return null
+    const combineDateAndTime = (date, minutes) => {
+      if (!date || minutes == null) return null
       const d = new Date(date)
-      const t = new Date(timeObj)
-      d.setHours(t.getHours(), t.getMinutes(), 0, 0)
+      d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
+      return d.toISOString()
+    }
+
+    const getStartOfDay = (date) => {
+      if (!date) return null
+      const d = new Date(date)
+      d.setHours(0, 0, 0, 0)
+      return d.toISOString()
+    }
+
+    const getEndOfDay = (date) => {
+      if (!date) return null
+      const d = new Date(date)
+      d.setHours(23, 59, 59, 999)
       return d.toISOString()
     }
 
@@ -295,10 +456,18 @@ const handleSubmit = async () => {
       status: form.value.status || null,
       serviceName: form.value.serviceName || null,
       transportationType: form.value.transportationType || null,
-      startAt: combineDateAndTime(form.value.serviceDate, form.value.startTime),
-      finishAt: combineDateAndTime(form.value.serviceDate, form.value.finishTime),
-      apptTime: combineDateAndTime(form.value.serviceDate, form.value.apptTime),
-      returnTime: combineDateAndTime(form.value.serviceDate, form.value.returnTime),
+      startAt: isRideService.value
+        ? combineDateAndTime(form.value.serviceDate, form.value.startTime)
+        : getStartOfDay(form.value.serviceDate),
+      finishAt: isRideService.value
+        ? combineDateAndTime(form.value.serviceDate, form.value.finishTime)
+        : getEndOfDay(form.value.serviceDate),
+      apptTime: isRideService.value && form.value.transportationType === 'Round Trip'
+        ? combineDateAndTime(form.value.serviceDate, form.value.apptTime)
+        : null,
+      returnTime: isRideService.value && form.value.transportationType === 'Round Trip'
+        ? combineDateAndTime(form.value.serviceDate, form.value.returnTime)
+        : null,
       state: form.value.state || null,
       city: form.value.city || null,
       zip: form.value.zip || null,
@@ -323,9 +492,14 @@ const handleSubmit = async () => {
       life: 3000
     })
 
-    setTimeout(() => {
-      router.push({ name: 'meta-service-requests' })
-    }, 500)
+    if (isEdit.value) {
+      setTimeout(() => {
+        router.push({ name: 'meta-service-requests' })
+      }, 500)
+    } else {
+      // Stay on the form, ready for another new request (keep the village).
+      resetForNewRequest()
+    }
   } catch (err) {
     console.error(err)
     toast.add({
@@ -340,7 +514,13 @@ const handleSubmit = async () => {
 }
 
 const handleCancel = () => {
-  router.back()
+  router.push({ name: 'meta-service-requests' })
+}
+
+const testValue = ref(null)
+const testItems = ref([])
+const testSearch = (event) => {
+  testItems.value = ['Option 1', 'Option 2', 'Option 3']
 }
 </script>
 
@@ -349,234 +529,261 @@ const handleCancel = () => {
     <Card class="form-card">
       <template #header>
         <div class="card-header-wrapper">
-          <h2 class="card-title">{{ isEdit ? 'Edit Service Request' : 'Create Service Request' }}</h2>
+          <div>
+            <h2 class="card-title">{{ isEdit ? 'Edit Service Request' : 'Create Service Request' }}</h2>
+            <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}</div>
+          </div>
+          <Tag
+            :value="computedStatus"
+            :severity="computedStatus === 'Confirmed' ? 'success' : 'info'"
+            class="status-tag"
+          />
         </div>
       </template>
 
       <template #content>
         <div v-if="isLoadingRequest && isEdit" class="loading">Loading...</div>
-        <form v-else class="form" @submit.prevent="handleSubmit">
-          <!-- Village Selection (Required) -->
-          <div class="form-group">
-            <label for="villageId" class="form-label required">Village</label>
-            <Select
-              id="villageId"
-              v-model="form.villageId"
-              :options="villageOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Select a village"
-            />
+
+        <form v-if="!isLoadingRequest || !isEdit" class="form" style="display: flex; flex-direction: column; gap: 1.5rem;" @submit.prevent="handleSubmit">
+          <!-- Persons Section -->
+          <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Persons</h3>
           </div>
 
-          <!-- Service Info -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="serviceName" class="form-label required">Service Name</label>
+          <!-- Persons Controls -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+            <div>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Village<span class="req">*</span></label>
               <Select
-                id="serviceName"
-                v-model="form.serviceName"
-                :options="serviceNameOptions"
-                placeholder="Select a service"
+                v-model="form.villageId"
+                :options="villageOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Select a village"
+                style="max-width: 16rem;"
               />
             </div>
-            <div class="form-group">
-              <label for="transportationType" class="form-label" :class="{ required: isRideService }">Transportation Type</label>
-              <Select
-                id="transportationType"
-                v-model="form.transportationType"
-                :options="availableTransportationTypes"
-                :disabled="!isRideService"
-                :placeholder="isRideService ? 'Select type' : 'None'"
-              />
-            </div>
-          </div>
 
-          <!-- People -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="memberPersonId" class="form-label required">Member</label>
+            <div v-if="form.villageId">
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Member<span class="req">*</span></label>
               <AutoComplete
-                id="memberPersonId"
                 v-model="selectedMember"
                 :suggestions="memberFilteredOptions"
                 option-label="label"
                 placeholder="Search member"
+                :force-selection="true"
+                showClear
                 @complete="filterMembers"
               />
             </div>
-            <div class="form-group">
-              <label for="volunteerPersonId" class="form-label">Volunteer</label>
+
+            <div v-if="form.villageId">
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Volunteer</label>
               <AutoComplete
-                id="volunteerPersonId"
                 v-model="selectedVolunteer"
                 :suggestions="volunteerFilteredOptions"
                 option-label="label"
                 placeholder="Search volunteer"
+                :force-selection="true"
+                showClear
                 @complete="filterVolunteers"
               />
             </div>
           </div>
 
-          <!-- Service Date -->
-          <div class="form-group">
-            <label for="serviceDate" class="form-label required">Service Date</label>
+          <!-- Hint shown until a village is selected -->
+          <div v-if="!form.villageId" class="village-hint">
+            Select a village to continue…
+          </div>
+
+          <!-- Remaining sections, revealed once a village is chosen -->
+          <template v-if="form.villageId">
+
+          <!-- Service Section -->
+          <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Service</h3>
+          </div>
+
+          <!-- Service Controls -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Service Name<span class="req">*</span></label>
+              <Select
+                v-model="form.serviceName"
+                :options="serviceNameOptions.map(s => ({ label: s, value: s }))"
+                option-label="label"
+                option-value="value"
+                placeholder="Select service"
+              />
+            </div>
+
+            <div>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Transportation Type<span v-if="isRideService" class="req">*</span></label>
+              <Select
+                v-model="form.transportationType"
+                :options="availableTransportationTypes.map(t => ({ label: t, value: t }))"
+                option-label="label"
+                option-value="value"
+                placeholder="Select type"
+              />
+            </div>
+
+            <div style="grid-column: 1 / -1;">
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Description</label>
+              <Textarea
+                v-model="form.description"
+                placeholder="Enter description"
+                rows="3"
+                style="width: 100%; resize: none;"
+              />
+            </div>
+          </div>
+
+          <!-- Date & Time Section -->
+          <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Date &amp; Time</h3>
+          </div>
+
+          <!-- Date Row -->
+          <div>
+            <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Date<span class="req">*</span></label>
             <DatePicker
-              id="serviceDate"
               v-model="form.serviceDate"
               dateFormat="mm/dd/yy"
+              placeholder="Select date"
+              style="max-width: 16rem;"
             />
           </div>
 
-          <!-- Times (for Ride services) -->
-          <template v-if="isRideService">
-            <div class="form-row">
-              <div class="form-group">
-                <label for="startTime" class="form-label required">Start Time</label>
-                <DatePicker
-                  id="startTime"
-                  v-model="form.startTime"
-                  timeOnly
-                  hourFormat="12"
-                  :stepMinute="15"
+          <!-- Time Row -->
+          <div
+            v-if="isRideService"
+            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;"
+          >
+            <div>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Start<span class="req">*</span></label>
+              <Select
+                v-model="form.startTime"
+                :options="startOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Start time"
+                filter
+                style="width: 100%;"
+              />
+            </div>
+
+            <div v-if="form.transportationType === 'Round Trip'">
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Appointment<span class="req">*</span></label>
+              <Select
+                v-model="form.apptTime"
+                :options="apptOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Appt time"
+                filter
+                style="width: 100%;"
+              />
+            </div>
+
+            <div v-if="form.transportationType === 'Round Trip'">
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Return<span class="req">*</span></label>
+              <Select
+                v-model="form.returnTime"
+                :options="returnOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Return time"
+                filter
+                style="width: 100%;"
+              />
+            </div>
+
+            <div>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Finish<span class="req">*</span></label>
+              <Select
+                v-model="form.finishTime"
+                :options="finishOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Finish time"
+                filter
+                style="width: 100%;"
+              />
+            </div>
+          </div>
+
+          <!-- Destination Section -->
+          <template v-if="showLocationFields">
+            <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
+            </div>
+
+            <!-- Destination / Address Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Destination<span v-if="isRideService" class="req">*</span></label>
+                <InputText
+                  v-model="form.destination"
+                  placeholder="Enter destination"
+                  style="width: 100%;"
                 />
               </div>
-              <div class="form-group">
-                <label for="finishTime" class="form-label required">Finish Time</label>
-                <DatePicker
-                  id="finishTime"
-                  v-model="form.finishTime"
-                  timeOnly
-                  hourFormat="12"
-                  :stepMinute="15"
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Address</label>
+                <InputText
+                  v-model="form.address"
+                  placeholder="Enter address"
+                  style="width: 100%;"
                 />
               </div>
             </div>
 
-            <!-- Appointment & Return Times (for Round Trip only) -->
-            <div v-if="form.transportationType === 'Round Trip'" class="form-row">
-              <div class="form-group">
-                <label for="apptTime" class="form-label required">Appointment Time</label>
-                <DatePicker
-                  id="apptTime"
-                  v-model="form.apptTime"
-                  timeOnly
-                  hourFormat="12"
-                  :stepMinute="15"
+            <!-- City / State / Zip / Phone Row -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr; gap: 1rem;">
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">City</label>
+                <InputText
+                  v-model="form.city"
+                  placeholder="City"
+                  style="width: 100%;"
                 />
               </div>
-              <div class="form-group">
-                <label for="returnTime" class="form-label required">Return Time</label>
-                <DatePicker
-                  id="returnTime"
-                  v-model="form.returnTime"
-                  timeOnly
-                  hourFormat="12"
-                  :stepMinute="15"
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">State</label>
+                <Select
+                  v-model="form.state"
+                  :options="stateOptions.map(s => ({ label: s, value: s }))"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="State"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Zip</label>
+                <InputText
+                  v-model="form.zip"
+                  placeholder="Zip"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Phone</label>
+                <InputText
+                  v-model="form.phone"
+                  placeholder="Phone"
+                  style="width: 100%;"
                 />
               </div>
             </div>
           </template>
 
-          <!-- Status (Read-only) -->
-          <div class="form-group">
-            <label for="status" class="form-label">Status</label>
-            <div id="status" class="status-display">
-              {{ computedStatus }}
-            </div>
-          </div>
-
-          <!-- Location Info -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="destination" class="form-label" :class="{ required: isRideService }">Destination</label>
-              <InputText
-                id="destination"
-                v-model="form.destination"
-                placeholder="Where are they going?"
-              />
-            </div>
-            <div class="form-group">
-              <label for="address" class="form-label">Address</label>
-              <InputText
-                id="address"
-                v-model="form.address"
-                placeholder="Street address"
-              />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="city" class="form-label">City</label>
-              <InputText
-                id="city"
-                v-model="form.city"
-                placeholder="City"
-              />
-            </div>
-            <div class="form-group">
-              <label for="state" class="form-label">State</label>
-              <Select
-                id="state"
-                v-model="form.state"
-                :options="stateOptions"
-                placeholder="Select state"
-              />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="zip" class="form-label">Zip</label>
-              <InputText
-                id="zip"
-                v-model="form.zip"
-                placeholder="Zip code"
-              />
-            </div>
-            <div class="form-group">
-              <label for="phone" class="form-label">Phone</label>
-              <InputText
-                id="phone"
-                v-model="form.phone"
-                placeholder="Phone number"
-              />
-            </div>
-          </div>
-
-          <!-- Created At (Edit Mode Only) -->
-          <div v-if="isEdit" class="form-group">
-            <label for="createdAt" class="form-label">Created At</label>
-            <DatePicker
-              id="createdAt"
-              v-model="form.createdAt"
-              showTime
-              hourFormat="24"
-              :disabled="true"
-            />
-          </div>
-
-          <!-- Notes -->
-          <div class="form-group">
-            <label for="instructions" class="form-label">Instructions</label>
-            <Textarea
-              id="instructions"
-              v-model="form.instructions"
-              placeholder="Special instructions"
-              rows="3"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="description" class="form-label">Description</label>
-            <Textarea
-              id="description"
-              v-model="form.description"
-              placeholder="Detailed description"
-              rows="3"
-            />
-          </div>
+          </template>
 
           <!-- Actions -->
           <div class="form-actions">
@@ -591,6 +798,7 @@ const handleCancel = () => {
               type="submit"
               :label="isEdit ? 'Update' : 'Create'"
               :loading="isSubmitting"
+              :disabled="!isFormValid || isSubmitting"
             />
           </div>
         </form>
@@ -610,14 +818,38 @@ const handleCancel = () => {
   width: 100%;
 }
 
+.village-hint {
+  color: var(--color-text-dim);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.req {
+  color: var(--color-error);
+  margin-left: 0.15rem;
+}
+
 .card-header-wrapper {
   padding: 1rem;
   border-bottom: 1px solid var(--color-border-default);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .card-title {
   margin: 0;
   color: var(--color-text-primary);
+}
+
+.card-subtitle {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+}
+
+.status-tag {
+  margin-left: auto;
 }
 
 .form {
@@ -641,6 +873,25 @@ const handleCancel = () => {
 .form-label.required::after {
   content: ' *';
   color: var(--color-error);
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 0 1rem 0;
+}
+
+.section-header {
+  grid-column: 1 / -1;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--p-primary-600);
+  border-bottom: 2px solid var(--color-border-default);
+  padding-bottom: 0.75rem;
 }
 
 .form-row {

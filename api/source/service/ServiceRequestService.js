@@ -199,7 +199,7 @@ module.exports.createServiceRequest = async function (payload) {
 
       // Create email event for new request
       const emailEventSql = `
-        INSERT INTO email_event (event_type, service_request_id, volunteer_id)
+        INSERT INTO email_event (event_type, service_request_id, volunteer_person_id)
         VALUES ('new_request', ?, ?)
       `
       await connection.query(emailEventSql, [serviceRequestId, payload.volunteerPersonId || null])
@@ -218,6 +218,13 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
 
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      // Capture the current volunteer so we only log an email_event when it changes.
+      const [currentRows] = await connection.query(
+        'SELECT volunteer_person_id FROM service_request WHERE id = ?',
+        [serviceRequestId]
+      )
+      const currentVolunteerPersonId = currentRows[0]?.volunteer_person_id ?? null
+
       const updates = []
       const values = []
 
@@ -298,12 +305,18 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       const sql = `UPDATE service_request SET ${updates.join(', ')} WHERE id = ?`
       await connection.query(sql, values)
 
-      // Create email event for patched request
-      const emailEventSql = `
-        INSERT INTO email_event (event_type, service_request_id, volunteer_id)
-        VALUES ('patch_request', ?, ?)
-      `
-      await connection.query(emailEventSql, [serviceRequestId, payload.volunteerPersonId || null])
+      // Only log an email_event when the volunteer assignment actually changes.
+      if (payload.volunteerPersonId !== undefined) {
+        const newVolunteerPersonId = payload.volunteerPersonId || null
+        const normalize = (v) => (v == null ? null : String(v))
+        if (normalize(newVolunteerPersonId) !== normalize(currentVolunteerPersonId)) {
+          const emailEventSql = `
+            INSERT INTO email_event (event_type, service_request_id, volunteer_person_id)
+            VALUES ('patch_request', ?, ?)
+          `
+          await connection.query(emailEventSql, [serviceRequestId, newVolunteerPersonId])
+        }
+      }
 
       return module.exports.getServiceRequest(serviceRequestId)
     }
