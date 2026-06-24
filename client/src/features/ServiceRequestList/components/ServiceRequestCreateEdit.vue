@@ -14,7 +14,7 @@ import Tag from 'primevue/tag'
 import Popover from 'primevue/popover'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
-import { getServiceRequest, updateServiceRequest } from '../api/serviceRequestApi.js'
+import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
@@ -537,7 +537,7 @@ const handleCancelRequest = async (reason) => {
   cancelPopover.value.hide()
   isCancelling.value = true
   try {
-    await updateServiceRequest(serviceRequestId.value, { status: reason })
+    await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request cancelled', life: 3000 })
     setTimeout(() => {
       router.push({ name: 'meta-service-requests' })

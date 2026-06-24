@@ -125,7 +125,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
       else if (s === 'completed') dbStatuses.push('Completed')
       else if (s === 'unmatched') dbStatuses.push('Unmatched')
       else if (s === 'cancelled') {
-        dbStatuses.push('Member cancelled', 'Volunteer cancelled')
+        dbStatuses.push('Member cancelled', 'Volunteer cancelled', 'Hub cancelled')
       }
     }
     if (dbStatuses.length > 0) {
