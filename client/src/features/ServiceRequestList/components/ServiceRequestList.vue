@@ -549,7 +549,7 @@ const clearFilters = () => {
       <Column v-if="isMetaMode" header="Actions" style="width: 8%">
         <template #body="slotProps">
           <Button
-            v-if="!slotProps.data.requestNumber"
+            v-if="['open', 'confirmed'].includes(slotProps.data.status?.toLowerCase())"
             icon="pi pi-pencil"
             class="p-button-rounded p-button-text p-button-sm"
             @click="navigateToEditRequest(slotProps.data.serviceRequestId)"
