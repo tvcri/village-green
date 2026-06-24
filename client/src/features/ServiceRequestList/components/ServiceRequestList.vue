@@ -4,9 +4,11 @@ import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
+import InputText from 'primevue/inputtext'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -50,6 +52,7 @@ const filtersCollapsed = ref(true)
 const selectedMember = ref('All members')
 const selectedVolunteer = ref('All volunteers')
 const selectedService = ref('All services')
+const idSearch = ref('')
 const selectedStatuses = ref(['open', 'confirmed'])
 const sortField = ref('startAt')
 const sortDir = ref('asc')
@@ -107,10 +110,7 @@ onActivated(() => {
     // watch will fire and handle the fetch
     return
   }
-  if (navigatedToDetail.value) {
-    navigatedToDetail.value = false
-    return
-  }
+  // Always refetch when activated (returning from detail/create/edit)
   navigatedToDetail.value = false
   selectedMember.value = 'All members'
   selectedVolunteer.value = 'All volunteers'
@@ -166,6 +166,16 @@ const filteredRequests = computed(() => {
       serviceMatch = r.serviceName === selectedService.value
     }
 
+    // Hybrid ID search: match the value shown in the "#" column — requestNumber
+    // if present (legacy), else serviceRequestId (VG-created). Matches what the
+    // user sees, so a legacy row isn't matched via its hidden id.
+    let idMatch = true
+    const idQuery = idSearch.value.trim().toLowerCase()
+    if (idQuery) {
+      const displayedId = String(r.requestNumber || r.serviceRequestId || '').toLowerCase()
+      idMatch = displayedId.includes(idQuery)
+    }
+
     // In village mode: client-side status filter. In meta mode: already server-filtered.
     let statusMatch = true
     if (!isMetaMode.value && selectedStatuses.value.length > 0) {
@@ -177,7 +187,7 @@ const filteredRequests = computed(() => {
       })
     }
 
-    return memberMatch && volunteerMatch && serviceMatch && statusMatch
+    return memberMatch && volunteerMatch && serviceMatch && statusMatch && idMatch
   })
 
   result.sort((a, b) => {
@@ -198,6 +208,7 @@ const activeFilterCount = computed(() => {
   if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') count++
   if (selectedService.value && selectedService.value !== 'All services') count++
   if (selectedVillage.value && selectedVillage.value !== 'All villages') count++
+  if (idSearch.value.trim()) count++
   return count
 })
 
@@ -339,12 +350,23 @@ const navigateToRequest = (serviceRequestId, rowVillageId) => {
   router.push({ name: 'service-request-detail', params, query })
 }
 
+const navigateToCreateRequest = () => {
+  navigatedToDetail.value = true
+  router.push({ name: 'meta-service-request-create' })
+}
+
+const navigateToEditRequest = (serviceRequestId) => {
+  navigatedToDetail.value = true
+  router.push({ name: 'meta-service-request-edit', params: { id: serviceRequestId } })
+}
+
 const clearFilters = () => {
   selectedMember.value = 'All members'
   selectedVolunteer.value = 'All volunteers'
   selectedService.value = 'All services'
   selectedStatuses.value = []
   selectedVillage.value = 'All villages'
+  idSearch.value = ''
 }
 </script>
 
@@ -355,11 +377,19 @@ const clearFilters = () => {
         <h1>Service Requests</h1>
         <span class="subtitle">Last 30 days</span>
       </div>
-      <ExportButton
-        :disabled="isLoading || isCreatingSheet"
-        @download="handleDownloadCsv"
-        @export="handleCreateSheet"
-      />
+      <div class="header-actions">
+        <Button
+          v-if="isMetaMode"
+          label="New Request"
+          icon="pi pi-plus"
+          @click="navigateToCreateRequest"
+        />
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
+      </div>
     </div>
 
     <div class="filter-section">
@@ -394,22 +424,34 @@ const clearFilters = () => {
         </div>
 
         <div v-if="!filtersCollapsed" class="filters-content">
-          <!-- Status Filter -->
-          <div class="status-filter-group">
-            <label class="filter-group-label">Status:</label>
-            <div class="status-filters">
-              <div
-                v-for="status in statusOptions"
-                :key="status"
-                class="status-filter"
-              >
-                <Checkbox
-                  v-model="selectedStatuses"
-                  :input-id="`status-${status}`"
-                  :value="status"
-                />
-                <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
+          <!-- Status + ID search row -->
+          <div class="status-id-row">
+            <!-- Status Filter -->
+            <div class="status-filter-group">
+              <label class="filter-group-label">Status:</label>
+              <div class="status-filters">
+                <div
+                  v-for="status in statusOptions"
+                  :key="status"
+                  class="status-filter"
+                >
+                  <Checkbox
+                    v-model="selectedStatuses"
+                    :input-id="`status-${status}`"
+                    :value="status"
+                  />
+                  <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
+                </div>
               </div>
+            </div>
+
+            <!-- Request ID / Number Search -->
+            <div class="search-box">
+              <label>Request ID / #:</label>
+              <InputText
+                v-model="idSearch"
+                placeholder="Search by ID or number"
+              />
             </div>
           </div>
 
@@ -499,7 +541,21 @@ const clearFilters = () => {
       <Column field="memberFullName" header="Member" sortable style="width: 15%"></Column>
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
       <Column field="city" header="City" sortable style="width: 13%"></Column>
-      <Column field="requestNumber" header="#" sortable style="width: 10%"></Column>
+      <Column field="requestNumber" header="#" sortable style="width: 10%">
+        <template #body="slotProps">
+          {{ slotProps.data.requestNumber || slotProps.data.serviceRequestId || '—' }}
+        </template>
+      </Column>
+      <Column v-if="isMetaMode" header="Actions" style="width: 8%">
+        <template #body="slotProps">
+          <Button
+            v-if="!slotProps.data.requestNumber"
+            icon="pi pi-pencil"
+            class="p-button-rounded p-button-text p-button-sm"
+            @click="navigateToEditRequest(slotProps.data.serviceRequestId)"
+          />
+        </template>
+      </Column>
     </DataTable>
 
     <!-- Mobile Card List -->
@@ -518,7 +574,7 @@ const clearFilters = () => {
         </div>
         <div class="card-row">
           <span class="label">#:</span>
-          <span>{{ request.requestNumber ?? '—' }}</span>
+          <span>{{ request.requestNumber || request.serviceRequestId || '—' }}</span>
         </div>
         <div class="card-row">
           <span class="label">Member:</span>
@@ -568,6 +624,12 @@ h1 {
 .subtitle {
   font-size: 0.85rem;
   color: var(--color-text-dim);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .filter-section {
@@ -681,6 +743,17 @@ h1 {
   background-color: var(--color-background-light);
   border: 1px solid var(--color-border-default);
   border-radius: 4px;
+}
+
+.status-id-row {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  flex: 1 1 100%;
+}
+
+.status-id-row .status-filter-group {
+  flex: 1 1 auto;
 }
 
 .status-filter-group {
@@ -961,6 +1034,11 @@ h1 {
 
   .status-filter-group {
     flex: 1 1 100%;
+  }
+
+  .status-id-row {
+    flex-direction: column;
+    gap: 1rem;
   }
 
   .status-filters {

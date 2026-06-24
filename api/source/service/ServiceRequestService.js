@@ -19,11 +19,15 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     "DATE_FORMAT(sr.created_at, '%Y-%m-%dT%TZ') AS createdAt",
     "DATE_FORMAT(sr.start_at, '%Y-%m-%dT%TZ') AS startAt",
     "DATE_FORMAT(sr.finish_at, '%Y-%m-%dT%TZ') AS finishAt",
+    "DATE_FORMAT(sr.appt_time, '%Y-%m-%dT%TZ') AS apptTime",
+    "DATE_FORMAT(sr.return_time, '%Y-%m-%dT%TZ') AS returnTime",
+    'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
+    'sr.zip AS zip',
     'sr.phone AS phone'
   ]
   const joins = new Set([
@@ -83,11 +87,15 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     "DATE_FORMAT(sr.created_at, '%Y-%m-%dT%TZ') AS createdAt",
     "DATE_FORMAT(sr.start_at, '%Y-%m-%dT%TZ') AS startAt",
     "DATE_FORMAT(sr.finish_at, '%Y-%m-%dT%TZ') AS finishAt",
+    "DATE_FORMAT(sr.appt_time, '%Y-%m-%dT%TZ') AS apptTime",
+    "DATE_FORMAT(sr.return_time, '%Y-%m-%dT%TZ') AS returnTime",
+    'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
+    'sr.zip AS zip',
     'sr.phone AS phone'
   ]
   const joins = new Set([
@@ -117,7 +125,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
       else if (s === 'completed') dbStatuses.push('Completed')
       else if (s === 'unmatched') dbStatuses.push('Unmatched')
       else if (s === 'cancelled') {
-        dbStatuses.push('Member cancelled', 'Volunteer cancelled')
+        dbStatuses.push('Member cancelled', 'Volunteer cancelled', 'Hub cancelled')
       }
     }
     if (dbStatuses.length > 0) {
@@ -130,4 +138,187 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows
+}
+
+module.exports.createServiceRequest = async function (payload) {
+  const convertToMySQLDateTime = (isoString) => {
+    if (!isoString) return null
+    const date = new Date(isoString)
+    return date.toISOString().slice(0, 19).replace('T', ' ')
+  }
+
+  return dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const sql = `
+        INSERT INTO service_request (
+          village_id,
+          member_person_id,
+          volunteer_person_id,
+          request_number,
+          status,
+          service_name,
+          transportation_type,
+          created_at,
+          start_at,
+          finish_at,
+          appt_time,
+          return_time,
+          state,
+          instructions,
+          description,
+          destination,
+          address,
+          city,
+          zip,
+          phone
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      const values = [
+        payload.villageId,
+        payload.memberPersonId || null,
+        payload.volunteerPersonId || null,
+        payload.requestNumber || null,
+        payload.status || null,
+        payload.serviceName || null,
+        payload.transportationType || null,
+        convertToMySQLDateTime(payload.startAt),
+        convertToMySQLDateTime(payload.finishAt),
+        convertToMySQLDateTime(payload.apptTime),
+        convertToMySQLDateTime(payload.returnTime),
+        payload.state || null,
+        payload.instructions || null,
+        payload.description || null,
+        payload.destination || null,
+        payload.address || null,
+        payload.city || null,
+        payload.zip || null,
+        payload.phone || null
+      ]
+      const [result] = await connection.query(sql, values)
+      const serviceRequestId = result.insertId
+
+      // Create email event for new request
+      const emailEventSql = `
+        INSERT INTO email_event (event_type, service_request_id, volunteer_person_id)
+        VALUES ('new_request', ?, ?)
+      `
+      await connection.query(emailEventSql, [serviceRequestId, payload.volunteerPersonId || null])
+
+      return module.exports.getServiceRequest(serviceRequestId)
+    }
+  })
+}
+
+module.exports.patchServiceRequest = async function (serviceRequestId, payload) {
+  const convertToMySQLDateTime = (isoString) => {
+    if (!isoString) return null
+    const date = new Date(isoString)
+    return date.toISOString().slice(0, 19).replace('T', ' ')
+  }
+
+  return dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      // Capture the current volunteer so we only log an email_event when it changes.
+      const [currentRows] = await connection.query(
+        'SELECT volunteer_person_id FROM service_request WHERE id = ?',
+        [serviceRequestId]
+      )
+      const currentVolunteerPersonId = currentRows[0]?.volunteer_person_id ?? null
+
+      const updates = []
+      const values = []
+
+      if (payload.memberPersonId !== undefined) {
+        updates.push('member_person_id = ?')
+        values.push(payload.memberPersonId || null)
+      }
+      if (payload.volunteerPersonId !== undefined) {
+        updates.push('volunteer_person_id = ?')
+        values.push(payload.volunteerPersonId || null)
+      }
+      if (payload.status !== undefined) {
+        updates.push('status = ?')
+        values.push(payload.status || null)
+      }
+      if (payload.serviceName !== undefined) {
+        updates.push('service_name = ?')
+        values.push(payload.serviceName || null)
+      }
+      if (payload.transportationType !== undefined) {
+        updates.push('transportation_type = ?')
+        values.push(payload.transportationType || null)
+      }
+      if (payload.startAt !== undefined) {
+        updates.push('start_at = ?')
+        values.push(convertToMySQLDateTime(payload.startAt))
+      }
+      if (payload.finishAt !== undefined) {
+        updates.push('finish_at = ?')
+        values.push(convertToMySQLDateTime(payload.finishAt))
+      }
+      if (payload.apptTime !== undefined) {
+        updates.push('appt_time = ?')
+        values.push(convertToMySQLDateTime(payload.apptTime))
+      }
+      if (payload.returnTime !== undefined) {
+        updates.push('return_time = ?')
+        values.push(convertToMySQLDateTime(payload.returnTime))
+      }
+      if (payload.state !== undefined) {
+        updates.push('state = ?')
+        values.push(payload.state || null)
+      }
+      if (payload.city !== undefined) {
+        updates.push('city = ?')
+        values.push(payload.city || null)
+      }
+      if (payload.zip !== undefined) {
+        updates.push('zip = ?')
+        values.push(payload.zip || null)
+      }
+      if (payload.address !== undefined) {
+        updates.push('address = ?')
+        values.push(payload.address || null)
+      }
+      if (payload.phone !== undefined) {
+        updates.push('phone = ?')
+        values.push(payload.phone || null)
+      }
+      if (payload.instructions !== undefined) {
+        updates.push('instructions = ?')
+        values.push(payload.instructions || null)
+      }
+      if (payload.description !== undefined) {
+        updates.push('description = ?')
+        values.push(payload.description || null)
+      }
+      if (payload.destination !== undefined) {
+        updates.push('destination = ?')
+        values.push(payload.destination || null)
+      }
+
+      if (updates.length === 0) {
+        return module.exports.getServiceRequest(serviceRequestId)
+      }
+
+      values.push(serviceRequestId)
+      const sql = `UPDATE service_request SET ${updates.join(', ')} WHERE id = ?`
+      await connection.query(sql, values)
+
+      // Only log an email_event when the volunteer assignment actually changes.
+      if (payload.volunteerPersonId !== undefined) {
+        const newVolunteerPersonId = payload.volunteerPersonId || null
+        const normalize = (v) => (v == null ? null : String(v))
+        if (normalize(newVolunteerPersonId) !== normalize(currentVolunteerPersonId)) {
+          const emailEventSql = `
+            INSERT INTO email_event (event_type, service_request_id, volunteer_person_id)
+            VALUES ('patch_request', ?, ?)
+          `
+          await connection.query(emailEventSql, [serviceRequestId, newVolunteerPersonId])
+        }
+      }
+
+      return module.exports.getServiceRequest(serviceRequestId)
+    }
+  })
 }
