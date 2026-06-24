@@ -41,7 +41,9 @@ onMounted(() => {
 
 useScrollRestore(
   route.name === 'meta-service-requests' ? 'meta-service-requests' : 'service-requests',
-  'service-request-detail'
+  route.name === 'meta-service-requests'
+    ? ['service-request-detail', 'meta-service-request-edit', 'meta-service-request-create']
+    : 'service-request-detail'
 )
 
 const villageId = computed(() => route.params.villageId)
