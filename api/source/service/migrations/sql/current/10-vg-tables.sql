@@ -152,7 +152,7 @@ CREATE TABLE `service_request` (
   `village_id` int NOT NULL,
   `member_person_id` int DEFAULT NULL,
   `volunteer_person_id` int DEFAULT NULL,
-  `status` varchar(50) DEFAULT NULL,
+  `status` varchar(50) NOT NULL,
   `service_name` varchar(200) DEFAULT NULL,
   `transportation_type` varchar(100) DEFAULT NULL,
   `created_at` datetime DEFAULT NULL,

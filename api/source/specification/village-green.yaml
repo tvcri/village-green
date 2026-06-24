@@ -3250,6 +3250,7 @@ components:
       type: object
       required:
       - villageId
+      - status
       properties:
         requestNumber:
           type: integer
@@ -3270,7 +3271,7 @@ components:
         status:
           type: string
           maxLength: 50
-          nullable: true
+          minLength: 1
         serviceName:
           type: string
           maxLength: 200

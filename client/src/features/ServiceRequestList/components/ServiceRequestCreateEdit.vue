@@ -291,18 +291,23 @@ for (let mins = 0; mins < 24 * 60; mins += 15) {
   timeSlotOptions.push({ label: minutesToLabel(mins), value: mins })
 }
 
-// Each later time field may only select a slot after the field before it.
-const slotsAfter = (mins) =>
-  mins == null ? timeSlotOptions : timeSlotOptions.filter(o => o.value > mins)
+// Each later time field may only select a slot after the field before it, but
+// the field's own current value is always included so an existing/loaded value
+// renders even if it would otherwise be filtered out (e.g. on edit).
+const slotsAfter = (after, current) => {
+  if (after == null) return timeSlotOptions
+  return timeSlotOptions.filter(o => o.value > after || o.value === current)
+}
 
 const startOptions = computed(() => timeSlotOptions)
-const apptOptions = computed(() => slotsAfter(form.value.startTime))
-const returnOptions = computed(() => slotsAfter(form.value.apptTime))
+const apptOptions = computed(() => slotsAfter(form.value.startTime, form.value.apptTime))
+const returnOptions = computed(() => slotsAfter(form.value.apptTime, form.value.returnTime))
 const finishOptions = computed(() =>
   slotsAfter(
     form.value.transportationType === 'Round Trip'
       ? form.value.returnTime
-      : form.value.startTime
+      : form.value.startTime,
+    form.value.finishTime
   )
 )
 
@@ -453,7 +458,9 @@ const handleSubmit = async () => {
       villageId: form.value.villageId,
       memberPersonId: form.value.memberPersonId?.trim() || null,
       volunteerPersonId: form.value.volunteerPersonId?.trim() || null,
-      status: form.value.status || null,
+      // Always derive status from the current volunteer assignment so it can
+      // never be null (the form watcher can miss reset/no-change cases).
+      status: computedStatus.value,
       serviceName: form.value.serviceName || null,
       transportationType: form.value.transportationType || null,
       startAt: isRideService.value
@@ -530,7 +537,7 @@ const testSearch = (event) => {
       <template #header>
         <div class="card-header-wrapper">
           <div>
-            <h2 class="card-title">{{ isEdit ? 'Edit Service Request' : 'Create Service Request' }}</h2>
+            <h2 class="card-title">{{ isEdit ? `Edit Service Request (#${serviceRequestId})` : 'Create Service Request' }}</h2>
             <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}</div>
           </div>
           <Tag
