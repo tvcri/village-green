@@ -11,9 +11,10 @@ import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import AutoComplete from 'primevue/autocomplete'
 import Tag from 'primevue/tag'
+import Popover from 'primevue/popover'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
-import { getServiceRequest } from '../api/serviceRequestApi.js'
+import { getServiceRequest, updateServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
@@ -71,6 +72,8 @@ const form = ref({
 })
 
 const isSubmitting = ref(false)
+const isCancelling = ref(false)
+const cancelPopover = ref(null)
 
 watch(existingRequest, (val) => {
   if (val && isEdit.value) {
@@ -524,6 +527,29 @@ const handleCancel = () => {
   router.push({ name: 'meta-service-requests' })
 }
 
+const CANCEL_REASONS = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
+
+const isCancelled = computed(() =>
+  existingRequest.value?.status?.toLowerCase().includes('cancelled') ?? false
+)
+
+const handleCancelRequest = async (reason) => {
+  cancelPopover.value.hide()
+  isCancelling.value = true
+  try {
+    await updateServiceRequest(serviceRequestId.value, { status: reason })
+    toast.add({ severity: 'success', summary: 'Success', detail: 'Service request cancelled', life: 3000 })
+    setTimeout(() => {
+      router.push({ name: 'meta-service-requests' })
+    }, 500)
+  } catch (err) {
+    console.error(err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to cancel service request', life: 5000 })
+  } finally {
+    isCancelling.value = false
+  }
+}
+
 const testValue = ref(null)
 const testItems = ref([])
 const testSearch = (event) => {
@@ -796,11 +822,33 @@ const testSearch = (event) => {
           <div class="form-actions">
             <Button
               type="button"
-              label="Cancel"
+              label="Close"
               severity="secondary"
               @click="handleCancel"
               :disabled="isSubmitting"
             />
+            <template v-if="isEdit">
+              <Button
+                type="button"
+                label="Cancel Request"
+                severity="danger"
+                :disabled="isSubmitting || isCancelling || isCancelled"
+                @click="(e) => cancelPopover.toggle(e)"
+              />
+              <Popover ref="cancelPopover">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
+                  <Button
+                    v-for="reason in CANCEL_REASONS"
+                    :key="reason"
+                    :label="reason"
+                    text
+                    severity="danger"
+                    style="justify-content: flex-start;"
+                    @click="handleCancelRequest(reason)"
+                  />
+                </div>
+              </Popover>
+            </template>
             <Button
               type="submit"
               :label="isEdit ? 'Update' : 'Create'"
