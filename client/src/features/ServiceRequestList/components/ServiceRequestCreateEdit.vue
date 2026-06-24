@@ -201,7 +201,10 @@ watch([allVolunteerOptions, () => form.value.volunteerPersonId], ([volunteers, v
   }
 })
 
+const statusOverride = ref(null)
+
 const computedStatus = computed(() => {
+  if (statusOverride.value) return statusOverride.value
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
@@ -533,6 +536,30 @@ const isCancelled = computed(() =>
   existingRequest.value?.status?.toLowerCase().includes('cancelled') ?? false
 )
 
+const isConfirmed = computed(() =>
+  existingRequest.value?.status?.toLowerCase() === 'confirmed'
+)
+
+const isCompleting = ref(false)
+
+const handleComplete = async () => {
+  isCompleting.value = true
+  statusOverride.value = 'Completed'
+  try {
+    await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: 'Completed' })
+    toast.add({ severity: 'success', summary: 'Success', detail: 'Service request marked as completed', life: 3000 })
+    setTimeout(() => {
+      router.push({ name: 'meta-service-requests' })
+    }, 500)
+  } catch (err) {
+    statusOverride.value = null
+    console.error(err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to complete service request', life: 5000 })
+  } finally {
+    isCompleting.value = false
+  }
+}
+
 const handleCancelRequest = async (reason) => {
   cancelPopover.value.hide()
   isCancelling.value = true
@@ -562,15 +589,27 @@ const testSearch = (event) => {
     <Card class="form-card">
       <template #header>
         <div class="card-header-wrapper">
-          <div>
-            <h2 class="card-title">{{ isEdit ? `Edit Service Request (#${serviceRequestId})` : 'Create Service Request' }}</h2>
+          <div class="header-left">
+            <div class="title-row">
+              <h2 class="card-title">{{ isEdit ? `Edit Service Request (#${existingRequest?.requestNumber ?? serviceRequestId})` : 'Create Service Request' }}</h2>
+            </div>
             <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}</div>
           </div>
-          <Tag
-            :value="computedStatus"
-            :severity="computedStatus === 'Confirmed' ? 'success' : 'info'"
-            class="status-tag"
-          />
+          <div class="header-right">
+            <Tag
+              v-if="!isEdit || !isLoadingRequest"
+              :value="computedStatus"
+              :severity="computedStatus === 'Confirmed' ? 'info' : computedStatus === 'Completed' ? 'success' : 'warn'"
+            />
+            <Button
+              v-if="isEdit && isConfirmed"
+              type="button"
+              label="Set Completed"
+              :loading="isCompleting"
+              :disabled="isCompleting"
+              @click="handleComplete"
+            />
+          </div>
         </div>
       </template>
 
@@ -820,13 +859,6 @@ const testSearch = (event) => {
 
           <!-- Actions -->
           <div class="form-actions">
-            <Button
-              type="button"
-              label="Close"
-              severity="secondary"
-              @click="handleCancel"
-              :disabled="isSubmitting"
-            />
             <template v-if="isEdit">
               <Button
                 type="button"
@@ -849,12 +881,21 @@ const testSearch = (event) => {
                 </div>
               </Popover>
             </template>
-            <Button
-              type="submit"
-              :label="isEdit ? 'Update' : 'Create'"
-              :loading="isSubmitting"
-              :disabled="!isFormValid || isSubmitting"
-            />
+            <div class="form-actions-right">
+              <Button
+                type="button"
+                label="Close"
+                severity="secondary"
+                @click="handleCancel"
+                :disabled="isSubmitting"
+              />
+              <Button
+                type="submit"
+                :label="isEdit ? 'Update' : 'Create'"
+                :loading="isSubmitting"
+                :disabled="!isFormValid || isSubmitting"
+              />
+            </div>
           </div>
         </form>
       </template>
@@ -903,8 +944,10 @@ const testSearch = (event) => {
   color: var(--color-text-dim);
 }
 
-.status-tag {
-  margin-left: auto;
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .form {
@@ -957,10 +1000,16 @@ const testSearch = (event) => {
 
 .form-actions {
   display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   padding-top: 1rem;
   border-top: 1px solid var(--color-border-default);
+}
+
+.form-actions-right {
+  display: flex;
+  gap: 1rem;
+  margin-left: auto;
 }
 
 .loading {
