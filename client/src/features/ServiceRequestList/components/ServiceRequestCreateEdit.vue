@@ -330,6 +330,14 @@ const availableTransportationTypes = computed(() => {
   return isRideService.value ? ['Round Trip', 'One Way'] : ['None']
 })
 
+// CE-dumped requests (request_number NOT NULL) lost their appointment and
+// return times during the migration off the retired CE system. That data is
+// unrecoverable, so for these legacy records we relax the appt/return
+// completeness requirement — users must still be able to apply status updates
+// without the UI permanently blocking the Update button. All other rules
+// (including start/finish times) remain enforced.
+const isLegacyRequest = computed(() => existingRequest.value?.requestNumber != null)
+
 const isFormValid = computed(() => {
   const f = form.value
 
@@ -344,7 +352,9 @@ const isFormValid = computed(() => {
     if (!['Round Trip', 'One Way'].includes(f.transportationType)) return false
 
     if (f.transportationType === 'Round Trip') {
-      if (f.startTime == null || f.apptTime == null || f.returnTime == null || f.finishTime == null) return false
+      if (f.startTime == null || f.finishTime == null) return false
+      // Legacy records lost appt/return times; don't require them.
+      if (!isLegacyRequest.value && (f.apptTime == null || f.returnTime == null)) return false
     } else {
       if (f.startTime == null || f.finishTime == null) return false
     }
@@ -425,8 +435,13 @@ const handleSubmit = async () => {
       // Time validation based on transportation type
       const isRoundTrip = form.value.transportationType === 'Round Trip'
       if (isRoundTrip) {
-        if (form.value.startTime == null || form.value.finishTime == null || form.value.apptTime == null || form.value.returnTime == null) {
-          toast.add({ severity: 'error', summary: 'Error', detail: 'All four times (start, finish, appointment, return) are required for round trip', life: 3000 })
+        if (form.value.startTime == null || form.value.finishTime == null) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Start and finish times are required for round trip', life: 3000 })
+          return
+        }
+        // Legacy CE-dumped records lost appt/return times; don't require them.
+        if (!isLegacyRequest.value && (form.value.apptTime == null || form.value.returnTime == null)) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Appointment and return times are required for round trip', life: 3000 })
           return
         }
       } else {
