@@ -114,7 +114,7 @@ module.exports.getPerson = async function (personId, projections = []) {
       'associateVillages', (
         SELECT COALESCE(
           CAST(CONCAT('[', GROUP_CONCAT(
-            JSON_OBJECT('villageId', CAST(vva.village_id AS CHAR), 'name', av.name)
+            JSON_OBJECT('villageId', CAST(vva.village_id AS CHAR), 'name', av.name) ORDER BY av.name
           ), ']') AS JSON),
           JSON_ARRAY()
         )
