@@ -29,3 +29,10 @@ module.exports.putCommunities = async function (personId, { communityIds = [] } 
   })
   return await module.exports.getCommunities(personId)
 }
+
+module.exports.getAllCommunities = async function () {
+  const [rows] = await dbUtils.pool.query(
+    'SELECT CAST(id AS CHAR) AS communityId, name FROM community ORDER BY name'
+  )
+  return rows
+}

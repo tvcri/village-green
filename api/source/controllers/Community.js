@@ -24,3 +24,11 @@ module.exports.putPersonCommunities = async function putPersonCommunities (req, 
   }
   catch (err) { next(err) }
 }
+
+module.exports.getCommunities = async function getCommunities (req, res, next) {
+  try {
+    const response = await CommunityService.getAllCommunities()
+    res.json(response)
+  }
+  catch (err) { next(err) }
+}
