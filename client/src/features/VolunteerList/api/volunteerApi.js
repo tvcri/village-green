@@ -1,3 +1,4 @@
-import { apiCall } from '../../../shared/api/apiClient.js'
+import { getPersons } from '../../PersonList/api/personApi.js'
 
-export const getVillageVolunteers = (villageId) => apiCall('getVillageVolunteers', { villageId })
+export const getVillageVolunteers = (villageId) =>
+  getPersons({ villageId: [villageId], role: 'volunteer' })

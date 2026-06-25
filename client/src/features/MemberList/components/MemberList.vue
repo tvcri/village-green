@@ -5,16 +5,13 @@ import { useScrollRestore } from '../../../shared/composables/useScrollRestore.j
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
-import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageMembers } from '../api/memberApi.js'
-import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
@@ -22,12 +19,6 @@ import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 defineOptions({ name: 'MemberList' })
 
 const { trackEvent } = useAnalytics()
-
-const getMemberLevelSeverity = (level) => {
-  if (level === 'Primary') return 'success'
-  if (level === 'Secondary') return 'info'
-  return 'secondary'
-}
 
 const router = useRouter()
 const route = useRoute()
@@ -49,11 +40,6 @@ const { state: members, isLoading, error, execute: fetchMembers } = useAsyncStat
   { immediate: true }
 )
 
-const { state: persons, execute: fetchPersons } = useAsyncState(
-  () => villageId.value ? getVillagePersons(villageId.value) : null,
-  { immediate: false }
-)
-
 useScrollRestore('members', 'member-detail')
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
@@ -63,7 +49,6 @@ const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => rou
   fetchedByWatch.value = true
   searchText.immediate('')
   fetchMembers()
-  persons.value = null
 })
 onDeactivated(pauseVillageWatch)
 onActivated(() => {
@@ -83,7 +68,6 @@ onActivated(() => {
   navigatedToDetail.value = false
   searchText.immediate('')
   fetchMembers()
-  persons.value = null
 })
 
 const filteredMembers = computed(() => {
@@ -106,11 +90,13 @@ const filteredMembers = computed(() => {
 const isEmpty = computed(() => !isLoading.value && filteredMembers.value.length === 0)
 
 const membersForCsv = computed(() => {
-  if (!Array.isArray(members.value) || !Array.isArray(persons.value)) return []
-  return members.value.map(m => {
-    const p = persons.value?.find(p => p.personId === m.personId) ?? {}
-    return { ...p, ...m }
-  })
+  if (!Array.isArray(members.value)) return []
+  return members.value.map(m => ({
+    ...m,
+    phone: m.phone?.phone ?? '',
+    cell: m.phone?.cell ?? '',
+    village: m.village?.name ?? ''
+  }))
 })
 
 const clearSearch = () => searchText.immediate('')
@@ -126,28 +112,15 @@ const navigateToMember = (member) => {
 
 const columnsForCsv = [
   { header: 'Full Name', key: 'fullName' },
-  { header: 'Member #', key: 'memberNumber' },
-  { header: 'Member Level', key: 'memberLevel' },
-  { header: 'Join Date', key: 'joinDate' },
-  { header: 'Service Notes', key: 'serviceNotes' },
+  { header: 'Village', key: 'village' },
   { header: 'Email', key: 'email' },
   { header: 'Phone', key: 'phone' },
-  { header: 'Cell', key: 'cell' },
-  { header: 'Address', key: 'address' },
-  { header: 'City', key: 'city' },
-  { header: 'State', key: 'state' },
-  { header: 'Zip', key: 'zip' },
-  { header: 'Birth Date', key: 'birthDate' },
-  { header: 'Emergency Contact Name', key: 'emergencyContactName' },
-  { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
-  { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
-  { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
+  { header: 'Cell', key: 'cell' }
 ]
 
 const handleDownloadCsv = async () => {
-  if (!persons.value) await fetchPersons()
   const csv = toCsv(membersForCsv.value, columnsForCsv)
-  const villageName = persons.value?.[0]?.village?.name || 'village'
+  const villageName = members.value?.[0]?.village?.name || 'village'
   const filename = `${villageName}-members.csv`
   downloadCsv(csv, filename)
 }
@@ -156,8 +129,7 @@ async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
 
-    if (!persons.value) await fetchPersons()
-    const villageName = persons.value?.[0]?.village?.name || 'Village Green'
+    const villageName = members.value?.[0]?.village?.name || 'Village Green'
     const sheetName = `${villageName} Members`
 
     const result = await createSheet(
@@ -263,46 +235,31 @@ async function handleCreateSheet() {
       @row-click="(event) => navigateToMember(event.data)"
       @filter="trackEvent('filter_applied')"
     >
-      <Column field="fullName" header="Name" sortable style="width: 25%"></Column>
-      <Column header="Level" sortable style="width: 25%">
+      <Column field="fullName" header="Name" sortable style="width: 50%"></Column>
+      <Column field="email" header="Email" sortable style="width: 30%"></Column>
+      <Column header="Phone" style="width: 20%">
         <template #body="slotProps">
-          <Tag
-            v-if="slotProps.data.memberLevel"
-            :value="slotProps.data.memberLevel"
-            :severity="getMemberLevelSeverity(slotProps.data.memberLevel)"
-          />
-          <span v-else class="text-dim">—</span>
+          {{ slotProps.data.phone?.phone || slotProps.data.phone?.cell || '—' }}
         </template>
       </Column>
-      <Column field="joinDate" header="Join Date" sortable style="width: 25%"></Column>
-      <Column field="memberNumber" header="Member #" sortable style="width: 25%"></Column>
     </DataTable>
 
     <!-- Mobile Card List -->
     <div class="member-cards mobile-only">
       <div
         v-for="member in filteredMembers"
-        :key="member.memberId"
+        :key="member.personId"
         class="member-card"
         @click="navigateToMember(member)"
       >
         <h3>{{ member.fullName }}</h3>
         <div class="card-row">
-          <span class="label">Member #:</span>
-          <span>{{ member.memberNumber ?? '—' }}</span>
+          <span class="label">Email:</span>
+          <span>{{ member.email ?? '—' }}</span>
         </div>
         <div class="card-row">
-          <span class="label">Level:</span>
-          <Tag
-            v-if="member.memberLevel"
-            :value="member.memberLevel"
-            :severity="getMemberLevelSeverity(member.memberLevel)"
-          />
-          <span v-else class="text-dim">—</span>
-        </div>
-        <div class="card-row">
-          <span class="label">Joined:</span>
-          <span>{{ member.joinDate ?? '—' }}</span>
+          <span class="label">Phone:</span>
+          <span>{{ member.phone?.phone || member.phone?.cell || '—' }}</span>
         </div>
       </div>
     </div>

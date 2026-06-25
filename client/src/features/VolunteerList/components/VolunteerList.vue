@@ -5,17 +5,13 @@ import { useScrollRestore } from '../../../shared/composables/useScrollRestore.j
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
-import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
-import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
@@ -36,19 +32,12 @@ onMounted(() => {
 const villageId = computed(() => route.params.villageId)
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
-const selectedCapabilities = ref([])
 const sortField = ref('fullName')
 const sortDir = ref('asc')
-const capabilityOptions = ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support']
 
 const { state: volunteers, isLoading, error, execute: fetchVolunteers } = useAsyncState(
   () => villageId.value ? getVillageVolunteers(villageId.value) : null,
   { immediate: true }
-)
-
-const { state: persons, execute: fetchPersons } = useAsyncState(
-  () => villageId.value ? getVillagePersons(villageId.value) : null,
-  { immediate: false }
 )
 
 useScrollRestore('volunteers', 'volunteer-detail')
@@ -59,9 +48,7 @@ const fetchedByWatch = ref(false)
 const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
   fetchedByWatch.value = true
   searchText.immediate('')
-  selectedCapabilities.value = []
   fetchVolunteers()
-  persons.value = null
 })
 onDeactivated(pauseVillageWatch)
 onActivated(() => {
@@ -80,28 +67,15 @@ onActivated(() => {
   }
   navigatedToDetail.value = false
   searchText.immediate('')
-  selectedCapabilities.value = []
   fetchVolunteers()
-  persons.value = null
 })
 
 const filteredVolunteers = computed(() => {
   if (!Array.isArray(volunteers.value)) return []
 
-  let result = volunteers.value.filter(v => {
-    // Filter by name
-    const nameMatch = v.fullName?.toLowerCase().includes(searchText.value.toLowerCase())
-
-    // Filter by capabilities
-    let capabilityMatch = true
-    if (selectedCapabilities.value.length > 0) {
-      capabilityMatch = selectedCapabilities.value.some(cap =>
-        v.capabilities?.includes(cap)
-      )
-    }
-
-    return nameMatch && capabilityMatch
-  })
+  let result = volunteers.value.filter(v =>
+    v.fullName?.toLowerCase().includes(searchText.value.toLowerCase())
+  )
 
   result.sort((a, b) => {
     const aVal = a[sortField.value] ?? ''
@@ -116,11 +90,13 @@ const filteredVolunteers = computed(() => {
 const isEmpty = computed(() => !isLoading.value && filteredVolunteers.value.length === 0)
 
 const volunteersForCsv = computed(() => {
-  if (!Array.isArray(volunteers.value) || !Array.isArray(persons.value)) return []
-  return volunteers.value.map(v => {
-    const p = persons.value?.find(p => p.personId === v.personId) ?? {}
-    return { ...p, ...v, capabilities: v.capabilities?.join('; ') ?? '' }
-  })
+  if (!Array.isArray(volunteers.value)) return []
+  return volunteers.value.map(v => ({
+    ...v,
+    phone: v.phone?.phone ?? '',
+    cell: v.phone?.cell ?? '',
+    village: v.village?.name ?? ''
+  }))
 })
 
 const clearSearch = () => searchText.immediate('')
@@ -136,25 +112,15 @@ const navigateToVolunteer = (volunteer) => {
 
 const columnsForCsv = [
   { header: 'Full Name', key: 'fullName' },
-  { header: 'Capabilities', key: 'capabilities' },
+  { header: 'Village', key: 'village' },
   { header: 'Email', key: 'email' },
   { header: 'Phone', key: 'phone' },
-  { header: 'Cell', key: 'cell' },
-  { header: 'Address', key: 'address' },
-  { header: 'City', key: 'city' },
-  { header: 'State', key: 'state' },
-  { header: 'Zip', key: 'zip' },
-  { header: 'Birth Date', key: 'birthDate' },
-  { header: 'Emergency Contact Name', key: 'emergencyContactName' },
-  { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
-  { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
-  { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
+  { header: 'Cell', key: 'cell' }
 ]
 
 const handleDownloadCsv = async () => {
-  if (!persons.value) await fetchPersons()
   const csv = toCsv(volunteersForCsv.value, columnsForCsv)
-  const villageName = persons.value?.[0]?.village?.name || 'village'
+  const villageName = volunteers.value?.[0]?.village?.name || 'village'
   const filename = `${villageName}-volunteers.csv`
   downloadCsv(csv, filename)
 }
@@ -163,8 +129,7 @@ async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
 
-    if (!persons.value) await fetchPersons()
-    const villageName = persons.value?.[0]?.village?.name || 'Village Green'
+    const villageName = volunteers.value?.[0]?.village?.name || 'Village Green'
     const sheetName = `${villageName} Volunteers`
 
     const result = await createSheet(
@@ -235,33 +200,16 @@ async function handleCreateSheet() {
     </div>
 
     <div class="filter-section">
-      <div class="search-and-capabilities">
-        <div class="search-box">
-          <IconField style="width: 100%">
-            <InputText
-              v-model="searchText"
-              type="text"
-              placeholder="Search by name..."
-              style="width: 100%"
-            />
-            <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
-          </IconField>
-        </div>
-
-        <div class="capability-filters">
-          <div
-            v-for="capability in capabilityOptions"
-            :key="capability"
-            class="capability-filter"
-          >
-            <Checkbox
-              v-model="selectedCapabilities"
-              :input-id="`capability-${capability}`"
-              :value="capability"
-            />
-            <label :for="`capability-${capability}`">{{ capability }}</label>
-          </div>
-        </div>
+      <div class="search-box">
+        <IconField style="width: 100%">
+          <InputText
+            v-model="searchText"
+            type="text"
+            placeholder="Search by name..."
+            style="width: 100%"
+          />
+          <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
+        </IconField>
       </div>
     </div>
 
@@ -287,19 +235,10 @@ async function handleCreateSheet() {
       @filter="trackEvent('filter_applied')"
     >
       <Column field="fullName" header="Name" sortable style="width: 50%"></Column>
-      <Column header="Capabilities" style="width: 50%">
+      <Column field="email" header="Email" sortable style="width: 30%"></Column>
+      <Column header="Phone" style="width: 20%">
         <template #body="slotProps">
-          <div class="capabilities-list">
-            <Tag
-              v-for="cap in slotProps.data.capabilities"
-              :key="cap"
-              :value="cap"
-              class="capability-badge"
-            />
-            <span v-if="!slotProps.data.capabilities?.length" class="no-capabilities">
-              —
-            </span>
-          </div>
+          {{ slotProps.data.phone?.phone || slotProps.data.phone?.cell || '—' }}
         </template>
       </Column>
     </DataTable>
@@ -308,23 +247,18 @@ async function handleCreateSheet() {
     <div class="volunteer-cards mobile-only">
       <div
         v-for="volunteer in filteredVolunteers"
-        :key="volunteer.volunteerId"
+        :key="volunteer.personId"
         class="volunteer-card"
         @click="navigateToVolunteer(volunteer)"
       >
         <h3>{{ volunteer.fullName }}</h3>
         <div class="card-row">
-          <span class="label">Capabilities:</span>
-          <div v-if="volunteer.capabilities?.length" class="capabilities-list">
-            <span
-              v-for="cap in volunteer.capabilities"
-              :key="cap"
-              class="capability-badge"
-            >
-              {{ cap }}
-            </span>
-          </div>
-          <span v-else class="no-capabilities">None listed</span>
+          <span class="label">Email:</span>
+          <span>{{ volunteer.email ?? '—' }}</span>
+        </div>
+        <div class="card-row">
+          <span class="label">Phone:</span>
+          <span>{{ volunteer.phone?.phone || volunteer.phone?.cell || '—' }}</span>
         </div>
       </div>
     </div>

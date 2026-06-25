@@ -1,4 +1,5 @@
 import { apiCall } from '../../../shared/api/apiClient.js'
+import { getPersons } from '../../PersonList/api/personApi.js'
 
 export const getVillages = (elevate, projection = []) => {
   return apiCall('getVillages', {
@@ -7,9 +8,11 @@ export const getVillages = (elevate, projection = []) => {
   })
 }
 
-export const getVillageMembers = (villageId) => apiCall('getVillageMembers', { villageId })
+export const getVillageMembers = (villageId) =>
+  getPersons({ villageId: [villageId], role: 'member' })
 
-export const getVillageVolunteers = (villageId) => apiCall('getVillageVolunteers', { villageId })
+export const getVillageVolunteers = (villageId) =>
+  getPersons({ villageId: [villageId], role: 'volunteer' })
 
 export const getVillageServiceRequests = (villageId, status) =>
   apiCall('getVillageServiceRequests', { villageId, ...(status?.length && { status }) })
