@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
@@ -112,44 +113,256 @@ function cancel () {
 </script>
 
 <template>
-  <div class="person-edit" style="padding:2rem;max-width:900px;">
-    <h2>{{ isEdit ? 'Edit Person' : 'Create Person' }}</h2>
-    <form class="form" style="display:flex;flex-direction:column;gap:1rem;" @submit.prevent="handleSubmit">
-      <label>Full Name <InputText v-model="form.fullName" /></label>
-      <label>First Name <InputText v-model="form.firstName" /></label>
-      <label>Last Name <InputText v-model="form.lastName" /></label>
-      <label>Nickname <InputText v-model="form.nickname" /></label>
-      <label>Home Village
-        <Select v-model="form.villageId" :options="villages" optionLabel="name" optionValue="villageId"
-                placeholder="(no home village)" showClear />
-      </label>
-      <label>Email <InputText v-model="form.email" /></label>
-      <label>Phone <InputText v-model="form.phone" /></label>
-      <label>Cell <InputText v-model="form.cell" /></label>
-      <label>Address <InputText v-model="form.address" /></label>
-      <label>City <InputText v-model="form.city" /></label>
-      <label>State <InputText v-model="form.state" /></label>
-      <label>Zip <InputText v-model="form.zip" /></label>
-      <label>Birth Date <InputText v-model="form.birthDate" placeholder="YYYY-MM-DD" /></label>
+  <Card class="detail-card">
+    <template #title>{{ isEdit ? 'Edit Person' : 'Create Person' }}</template>
+    <template #content>
+      <form @submit.prevent="handleSubmit">
 
-      <fieldset>
-        <legend>Communities</legend>
-        <label><Checkbox :modelValue="communityNames.has('Pride')" binary
-                @update:modelValue="v => toggleCommunity('Pride', v)" /> Pride</label>
-        <label><Checkbox :modelValue="communityNames.has('Veteran')" binary
-                @update:modelValue="v => toggleCommunity('Veteran', v)" /> Veteran</label>
-      </fieldset>
+        <!-- Personal Information Section -->
+        <div class="section">
+          <h3 class="section-header">Personal Information</h3>
 
-      <h3>Emergency Contact</h3>
-      <label>Name <InputText v-model="form.emergencyContactName" /></label>
-      <label>Relationship <InputText v-model="form.emergencyContactRelationship" /></label>
-      <label>Phone <InputText v-model="form.emergencyContactPhone" /></label>
-      <label>Email <InputText v-model="form.emergencyContactEmail" /></label>
+          <div class="form-field">
+            <label class="label" for="fullName">Full Name</label>
+            <InputText id="fullName" v-model="form.fullName" class="w-full" />
+          </div>
 
-      <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
-        <Button type="button" label="Cancel" severity="secondary" @click="cancel" />
-        <Button type="submit" label="Save" />
-      </div>
-    </form>
-  </div>
+          <div class="form-field">
+            <label class="label" for="firstName">First Name</label>
+            <InputText id="firstName" v-model="form.firstName" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="lastName">Last Name</label>
+            <InputText id="lastName" v-model="form.lastName" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="nickname">Nickname</label>
+            <InputText id="nickname" v-model="form.nickname" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="email">Email</label>
+            <InputText id="email" v-model="form.email" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="phone">Phone</label>
+            <InputText id="phone" v-model="form.phone" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="cell">Cell</label>
+            <InputText id="cell" v-model="form.cell" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="address">Address</label>
+            <InputText id="address" v-model="form.address" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="city">City</label>
+            <InputText id="city" v-model="form.city" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="state">State</label>
+            <InputText id="state" v-model="form.state" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="zip">Zip</label>
+            <InputText id="zip" v-model="form.zip" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="birthDate">Birth Date</label>
+            <InputText id="birthDate" v-model="form.birthDate" placeholder="YYYY-MM-DD" class="w-full" />
+          </div>
+        </div>
+
+        <!-- Home Village Section -->
+        <div class="section">
+          <h3 class="section-header">Home Village</h3>
+
+          <div class="form-field">
+            <label class="label" for="villageId">Village</label>
+            <Select
+              id="villageId"
+              v-model="form.villageId"
+              :options="villages"
+              optionLabel="name"
+              optionValue="villageId"
+              placeholder="(no home village)"
+              showClear
+              class="w-full"
+            />
+          </div>
+        </div>
+
+        <!-- Communities Section -->
+        <div class="section">
+          <h3 class="section-header">Communities</h3>
+
+          <div class="form-field communities-row">
+            <label class="checkbox-item">
+              <Checkbox
+                :modelValue="communityNames.has('Pride')"
+                binary
+                @update:modelValue="v => toggleCommunity('Pride', v)"
+              />
+              <span class="checkbox-label">Pride</span>
+            </label>
+            <label class="checkbox-item">
+              <Checkbox
+                :modelValue="communityNames.has('Veteran')"
+                binary
+                @update:modelValue="v => toggleCommunity('Veteran', v)"
+              />
+              <span class="checkbox-label">Veteran</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Emergency Contact Section -->
+        <div class="section">
+          <h3 class="section-header">Emergency Contact</h3>
+
+          <div class="form-field">
+            <label class="label" for="emergencyContactName">Name</label>
+            <InputText id="emergencyContactName" v-model="form.emergencyContactName" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="emergencyContactRelationship">Relationship</label>
+            <InputText id="emergencyContactRelationship" v-model="form.emergencyContactRelationship" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="emergencyContactPhone">Phone</label>
+            <InputText id="emergencyContactPhone" v-model="form.emergencyContactPhone" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="emergencyContactEmail">Email</label>
+            <InputText id="emergencyContactEmail" v-model="form.emergencyContactEmail" class="w-full" />
+          </div>
+        </div>
+
+        <!-- Footer: Save / Cancel buttons -->
+        <div class="form-footer">
+          <Button type="button" label="Cancel" severity="secondary" @click="cancel" />
+          <Button type="submit" label="Save" />
+        </div>
+
+      </form>
+    </template>
+  </Card>
 </template>
+
+<style scoped>
+.detail-card {
+  max-width: 1100px;
+  border: 1px solid var(--color-border-default);
+  box-shadow: var(--box-shadow-card);
+}
+
+:deep(.p-card-title) {
+  font-weight: 700;
+  font-size: 2rem;
+}
+
+:deep(.p-card-content) {
+  display: block;
+}
+
+.section {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+.section:first-of-type {
+  margin-top: 1rem;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.section-header {
+  grid-column: 1 / -1;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--p-primary-600);
+  border-bottom: 2px solid var(--color-border-default);
+  padding-bottom: 0.75rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--color-text-dim);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.communities-row {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  gap: 1.5rem;
+  align-items: center;
+  padding-top: 0.25rem;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-label {
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-default);
+}
+
+@media (max-width: 900px) {
+  .section {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .section {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+</style>
