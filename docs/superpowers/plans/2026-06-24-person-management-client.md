@@ -38,7 +38,7 @@
 - Create: `client/src/features/PersonList/api/roleApi.js`
 
 **Interfaces:**
-- Produces: `createPerson(body)`, `patchPerson(personId, body)`, `deletePerson(personId)`, `getPerson(personId, projection)`, `getPersonCommunities(personId)`, `putPersonCommunities(personId, communityIds)`; and in `roleApi.js`: `putMember`, `patchMember`, `deleteMember`, `putVolunteer`, `patchVolunteer`, `deleteVolunteer`.
+- Produces: `createPerson(body)`, `patchPerson(personId, body)`, `deletePerson(personId)`, `getPerson(personId, projection)`, `getPersonCommunities(personId)`, `putPersonCommunities(personId, communityIds)`, `getCommunities()`, `getCapabilities()`; and in `roleApi.js`: `putMember`, `patchMember`, `deleteMember`, `putVolunteer`, `patchVolunteer`, `deleteVolunteer`.
 
 - [ ] **Step 1: Extend `personApi.js`**
 
@@ -60,6 +60,10 @@ export const getPersonCommunities = (personId) =>
 
 export const putPersonCommunities = (personId, communityIds) =>
   apiCall('putPersonCommunities', { personId }, { communityIds })
+
+// Lookups (Plan A Task 8.5): full lists for id<->name resolution.
+export const getCommunities  = () => apiCall('getCommunities')
+export const getCapabilities = () => apiCall('getCapabilities')
 ```
 
 - [ ] **Step 2: Create `roleApi.js`**
@@ -154,7 +158,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Create: `client/src/features/PersonList/components/PersonEditForm.vue`
 
 **Interfaces:**
-- Consumes: `getPerson`, `createPerson`, `patchPerson`, `getPersonCommunities`, `putPersonCommunities` (personApi); a villages source for the home-village `Select` (see Step 2).
+- Consumes: `getPerson`, `createPerson`, `patchPerson`, `getPersonCommunities`, `putPersonCommunities`, `getCommunities` (personApi); a villages source for the home-village `Select` (see Step 1).
 - Produces: a route component for `meta-person-create` and `meta-person-edit`.
 
 - [ ] **Step 1: Identify the villages data source**
@@ -164,14 +168,9 @@ The home-village `Select` needs the list of villages the user can assign. `Servi
 Run: `grep -nE "village|getVillages|apiCall\('getVillages'|VillageList" client/src/features/ServiceRequestList/components/ServiceRequestCreateEdit.vue | head`
 Use the SAME operationId/source it uses (e.g. `apiCall('getVillages')` or an existing villageApi). Reuse, do not invent.
 
-- [ ] **Step 2: Determine community ids**
+- [ ] **Step 2: Community id resolution (via the getCommunities lookup)**
 
-Communities are Pride and Veteran. Their ids come from the backend. The form maps two checkboxes to community ids.
-
-Run: `curl -s "$API/persons/<anyPersonWithCommunities>/communities"` or query `SELECT id, name FROM community`.
-Because ids are environment-stable seed rows (Pride, Veteran), fetch them once on mount via a small lookup: load `getPersonCommunities` for the edited person to know which are checked, and resolve names→ids by matching against a fetched community list. If no "list all communities" endpoint exists yet, hardcode the mapping by **name** and resolve ids from the person's current memberships plus a known seed order — but PREFER: add a `GET /communities` lookup in Plan A if a clean id source is needed. For this stub, drive checkboxes by **name** and translate to ids using the seeded values surfaced by `getPersonCommunities`.
-
-> Decision for implementer: keep it simple — the two checkboxes are bound to a `Set` of community **names** (`'Pride'`, `'Veteran'`). On save, translate names→ids using a `communityNameToId` map built from a one-time `GET /communities`-style fetch. If Plan A did not add a communities list endpoint, add `GET /communities` (operationId `getCommunities`) as a tiny addition before implementing this step.
+Plan A Task 8.5 adds `GET /communities` → `[{ communityId, name }]`, exposed in the client as `getCommunities()`. On mount, fetch it once and build a `communityNameToId` Map. The two checkboxes are bound to a `Set` of community **names** (`'Pride'`, `'Veteran'`); on save, translate names→ids through that map. For the edited person, `getPersonCommunities(personId)` gives the currently-checked names. No hardcoding, no environment-id assumptions.
 
 - [ ] **Step 3: Create the component**
 
@@ -188,7 +187,7 @@ import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
 import {
   getPerson, createPerson, patchPerson,
-  getPersonCommunities, putPersonCommunities,
+  getPersonCommunities, putPersonCommunities, getCommunities,
 } from '../api/personApi.js'
 
 const router = useRouter()
@@ -208,6 +207,9 @@ const form = reactive({
 })
 
 const villages = ref([])          // [{ villageId, name }]
+const allCommunities = ref([])    // [{ communityId, name }] from getCommunities()
+const communityNameToId = computed(() =>
+  new Map(allCommunities.value.map(c => [c.name, c.communityId])))
 const communityNames = ref(new Set())   // Set<'Pride'|'Veteran'>
 let originalCommunityNames = new Set()
 
@@ -220,6 +222,7 @@ async function loadVillages () {
 
 onMounted(async () => {
   await loadVillages()
+  allCommunities.value = await getCommunities()   // [{ communityId, name }]
   if (isEdit.value) {
     const p = await getPerson(personId.value, [])
     Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
@@ -254,7 +257,7 @@ async function handleSubmit () {
       const created = await createPerson(buildPayload())
       id = created.personId
     }
-    // Community: only call if changed. Stub: see Step 2 for name→id translation.
+    // Community: only call if changed. Translate selected names → ids.
     if (communitiesChanged()) {
       await putPersonCommunities(id, communityNamesToIds(communityNames.value))
     }
@@ -272,10 +275,8 @@ function communitiesChanged () {
   return false
 }
 
-// Replace with the name→id map built from a communities fetch (Task 3 Step 2).
 function communityNamesToIds (names) {
-  // e.g. names.has('Pride') -> communityNameToId.get('Pride')
-  return []
+  return [...names].map(n => communityNameToId.value.get(n)).filter(Boolean)
 }
 
 function toggleCommunity (name, checked) {
@@ -335,9 +336,9 @@ function cancel () {
 </template>
 ```
 
-- [ ] **Step 4: Wire the villages source and community id map**
+- [ ] **Step 4: Wire the villages source**
 
-Replace the `loadVillages()` body and `communityNamesToIds()` per Steps 1–2 with the confirmed operationIds. The component must not ship with empty stubs.
+Replace the `loadVillages()` body with the project's confirmed villages operationId from Step 1 (e.g. `villages.value = await apiCall('getVillages')`). The component must not ship with an empty `loadVillages()`. The community id map is already wired via `getCommunities()` in `onMounted` + `communityNamesToIds` — no stub remains there.
 
 - [ ] **Step 5: Verify manually**
 
@@ -483,19 +484,15 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Create: `client/src/features/PersonList/components/VolunteerEdit.vue`
 
 **Interfaces:**
-- Consumes: `getPerson`, `putVolunteer`, `patchVolunteer`, `deleteVolunteer`; capability + village option sources.
+- Consumes: `getPerson`, `getCapabilities` (personApi), `putVolunteer`, `patchVolunteer`, `deleteVolunteer` (roleApi); a villages option source.
 - Produces: route component for `meta-person-volunteer`.
 
-- [ ] **Step 1: Identify capability and village option sources**
+- [ ] **Step 1: Identify the village option source**
 
-VolunteerEdit needs the full list of capabilities (for the capabilities `MultiSelect`) and villages (for associate villages `MultiSelect`).
+Capabilities come from `getCapabilities()` (Plan A Task 8.5 → `GET /capabilities` → `[{ capabilityId, name }]`), already added to `personApi.js` in Task 1. For associate villages, use the same villages source confirmed in Task 3 Step 1.
 
-Run:
-```
-grep -rnE "capabilit|getCapabilities|apiCall\('getCapab" client/src --include=*.js --include=*.vue | head
-grep -rnE "getVillages|villageApi" client/src --include=*.js --include=*.vue | head
-```
-Use the confirmed operationIds. If no capabilities list endpoint/source exists, surface this to the user before implementing (the spec assumes capabilities are a known set; a `GET /capabilities` lookup may be needed — coordinate as a small Plan A addition).
+Run: `grep -rnE "getVillages|villageApi" client/src --include=*.js --include=*.vue | head`
+Use the confirmed villages operationId. Do not invent a capabilities source — use `getCapabilities()`.
 
 - [ ] **Step 2: Create the component**
 
@@ -508,7 +505,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
-import { getPerson } from '../api/personApi.js'
+import { getPerson, getCapabilities } from '../api/personApi.js'
 import { putVolunteer, patchVolunteer, deleteVolunteer } from '../api/roleApi.js'
 
 const router = useRouter()
@@ -520,13 +517,19 @@ const person = ref(null)
 const hasVolunteer = ref(false)
 const hasHomeVillage = computed(() => !!person.value?.village?.villageId)
 
-const capabilityOptions = ref([])   // [{ capabilityId, name }] — from Step 1
-const villageOptions = ref([])      // [{ villageId, name }] — from Step 1
+const capabilityOptions = ref([])   // [{ capabilityId, name }] from getCapabilities()
+const villageOptions = ref([])      // [{ villageId, name }] from the villages source (Step 1)
 const selectedCapabilityIds = ref([])
 const selectedAssociateVillageIds = ref([])
 
+// Load the villages option source confirmed in Step 1 (e.g. apiCall('getVillages')).
+async function loadVillageOptions () {
+  // villageOptions.value = await apiCall('getVillages')
+}
+
 onMounted(async () => {
-  // load capabilityOptions and villageOptions per Step 1
+  capabilityOptions.value = await getCapabilities()
+  await loadVillageOptions()
   const p = await getPerson(personId.value, ['volunteerInfo'])
   person.value = p
   if (p.volunteerInfo) {
@@ -600,9 +603,9 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
 </style>
 ```
 
-- [ ] **Step 3: Wire option sources**
+- [ ] **Step 3: Wire the villages option source**
 
-Replace the `onMounted` option-loading comment with the confirmed capability/village fetches from Step 1. The component must not ship with empty option arrays.
+Capabilities already load via `getCapabilities()` in `onMounted`. Replace the `loadVillageOptions()` body with the confirmed villages operationId from Step 1 (e.g. `villageOptions.value = await apiCall('getVillages')`). The component must not ship with an empty `loadVillageOptions()`.
 
 - [ ] **Step 4: Verify manually**
 

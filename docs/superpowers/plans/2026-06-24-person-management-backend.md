@@ -200,20 +200,24 @@ Then, after the `email` predicate block and before `const orderBy`, add:
 ```
 (The `member`/`volunteer` LEFT JOINs already exist in `getPersons`. The `community` case uses an inner join so only persons with a community surface.)
 
-- [ ] **Step 3: Add the `communities` projection to `getPerson`**
+- [ ] **Step 3: Add the `communityInfo` projection to `getPerson`**
+
+The projection is named `communityInfo` for consistency with the sibling `memberInfo` / `volunteerInfo` projections. (The `/persons/{id}/communities` collection endpoint keeps its plural name — that is a separate REST sub-resource.) It returns an array of `{ communityId, name }` objects, matching the `Community` schema.
 
 In `module.exports.getPerson`, after the existing `volunteerInfo` projection block (ends with the `}` closing that `if`), add:
 ```javascript
-  if (projections.includes('communities')) {
+  if (projections.includes('communityInfo')) {
     columns.push(`(
       SELECT COALESCE(
-        CAST(CONCAT('[', GROUP_CONCAT(CONCAT('"', c.name, '"') ORDER BY c.name), ']') AS JSON),
+        CAST(CONCAT('[', GROUP_CONCAT(
+          JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name) ORDER BY c.name
+        ), ']') AS JSON),
         JSON_ARRAY()
       )
       FROM person_community pc
       JOIN community c ON c.id = pc.community_id
       WHERE pc.person_id = p.id
-    ) AS communities`)
+    ) AS communityInfo`)
   }
 ```
 Also change `getPerson`'s `JOIN village v` to `LEFT JOIN village v` (same NULL-home-village reason).
@@ -234,11 +238,11 @@ curl -sX POST "$API/persons" -H "Authorization: Bearer $TOKEN" \
 curl -s "$API/persons?role=member" -H "Authorization: Bearer $TOKEN" | jq 'length'
 curl -s "$API/persons?role=volunteer" -H "Authorization: Bearer $TOKEN" | jq 'length'
 
-# Get one with communities projection (empty array for a fresh person)
-curl -s "$API/persons/<id>?projection=memberInfo&projection=volunteerInfo&projection=communities" \
-  -H "Authorization: Bearer $TOKEN" | jq '.communities'
+# Get one with communityInfo projection (empty array for a fresh person)
+curl -s "$API/persons/<id>?projection=memberInfo&projection=volunteerInfo&projection=communityInfo" \
+  -H "Authorization: Bearer $TOKEN" | jq '.communityInfo'
 ```
-Expected: global person creates (201, `village` object of nulls), role filters return arrays, `communities` is `[]`.
+Expected: global person creates (201, `village` object of nulls), role filters return arrays, `communityInfo` is `[]`.
 
 - [ ] **Step 6: Commit**
 
@@ -846,14 +850,99 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
+## Task 8.5: Lookup endpoints — list all communities and capabilities
+
+The client needs id↔name sources for the community checkboxes and the capability MultiSelect. Add two small read-only lookups.
+
+**Files:**
+- Modify: `api/source/service/CommunityService.js` (add `getAllCommunities`)
+- Create: `api/source/service/CapabilityService.js`
+- Create: `api/source/controllers/Capability.js`
+- Modify: `api/source/controllers/Community.js` (add `getCommunities` list handler)
+
+**Interfaces:**
+- Produces: operationIds `getCommunities` (list all), `getCapabilities` (list all); each returns `[{ <id>, name }]`.
+
+- [ ] **Step 1: Add `getAllCommunities` to CommunityService**
+
+In `api/source/service/CommunityService.js`, append:
+```javascript
+module.exports.getAllCommunities = async function () {
+  const [rows] = await dbUtils.pool.query(
+    'SELECT CAST(id AS CHAR) AS communityId, name FROM community ORDER BY name'
+  )
+  return rows
+}
+```
+
+- [ ] **Step 2: Create CapabilityService**
+
+Create `api/source/service/CapabilityService.js`:
+```javascript
+'use strict';
+const dbUtils = require('./utils')
+
+module.exports.getAllCapabilities = async function () {
+  const [rows] = await dbUtils.pool.query(
+    'SELECT CAST(id AS CHAR) AS capabilityId, name FROM capability ORDER BY name'
+  )
+  return rows
+}
+```
+
+- [ ] **Step 3: Add a list handler to the Community controller**
+
+In `api/source/controllers/Community.js`, add:
+```javascript
+module.exports.getCommunities = async function getCommunities (req, res, next) {
+  try {
+    const response = await CommunityService.getAllCommunities()
+    res.json(response)
+  }
+  catch (err) { next(err) }
+}
+```
+
+- [ ] **Step 4: Create the Capability controller**
+
+Create `api/source/controllers/Capability.js`:
+```javascript
+'use strict';
+const CapabilityService = require('../service/CapabilityService')
+
+module.exports.getCapabilities = async function getCapabilities (req, res, next) {
+  try {
+    const response = await CapabilityService.getAllCapabilities()
+    res.json(response)
+  }
+  catch (err) { next(err) }
+}
+```
+
+- [ ] **Step 5: Verify (after OAS wiring in Task 9)**
+
+Defer runtime checks to Task 9 Step 7. For now restart the API; expect no module-load errors.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add api/source/service/CommunityService.js api/source/service/CapabilityService.js \
+        api/source/controllers/Community.js api/source/controllers/Capability.js
+git commit -m "feat(lookups): list-all communities and capabilities services/controllers
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+```
+
+---
+
 ## Task 9: OpenAPI spec — new paths, schemas, removals
 
 **Files:**
 - Modify: `api/source/specification/village-green.yaml`
 
 **Interfaces:**
-- Consumes: existing parameter components `PersonIdPath`, `CapabilityId`, `VillageId`; controller operationIds from Tasks 6–8.
-- Produces: operationIds `putPersonMember`, `patchPersonMember`, `deletePersonMember`, `putPersonVolunteer`, `patchPersonVolunteer`, `deletePersonVolunteer`, `getPersonCommunities`, `putPersonCommunities`; schemas `VolunteerPut`, `CommunityId`, `Community`; updated `Volunteer`, `PersonProjectionQuery`, `getPersons` `role` param.
+- Consumes: existing parameter components `PersonIdPath`, `CapabilityId`, `VillageId`; controller operationIds from Tasks 6–8.5.
+- Produces: operationIds `putPersonMember`, `patchPersonMember`, `deletePersonMember`, `putPersonVolunteer`, `patchPersonVolunteer`, `deletePersonVolunteer`, `getPersonCommunities`, `putPersonCommunities`, `getCommunities`, `getCapabilities`; schemas `VolunteerPut`, `CommunityId`, `Community`, `Capability`; updated `Volunteer`, `PersonProjectionQuery`, `getPersons` `role` param.
 
 > How operationId routes to a controller: this project's router maps `operationId` → `controllers/<Tag>.<operationId>`. Confirm by inspecting how `getPersons` is wired before adding paths:
 > Run: `grep -rn "operationId\|x-router-controller\|controllers/Person" api/source/*.js api/source/utils/*.js | head`
@@ -876,12 +965,12 @@ In the `/persons` `get` `parameters` list (after the `email` param, around line 
 
 - [ ] **Step 2: Extend `PersonProjectionQuery` enum**
 
-In `components/parameters/PersonProjectionQuery` (line ~3921), add `communities` to the enum:
+In `components/parameters/PersonProjectionQuery` (line ~3921), add `communityInfo` to the enum:
 ```yaml
           enum:
           - memberInfo
           - volunteerInfo
-          - communities
+          - communityInfo
 ```
 
 - [ ] **Step 3: Replace `/members` and `/volunteers` paths with person sub-resources**
@@ -1010,7 +1099,41 @@ Delete the entire `/members`, `/members/{memberId}`, `/volunteers`, `/volunteers
                 items: { $ref: '#/components/schemas/Community' }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:community ] } ]
+
+  /communities:
+    get:
+      summary: List all communities
+      tags: [Community]
+      operationId: getCommunities
+      responses:
+        '200':
+          description: List of communities
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Community' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /capabilities:
+    get:
+      summary: List all volunteer capabilities
+      tags: [Capability]
+      operationId: getCapabilities
+      responses:
+        '200':
+          description: List of capabilities
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Capability' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
 ```
+
+Note: `getCommunities` lives on the `Community` tag (→ `controllers/Community.js`, added in Task 8.5); `getCapabilities` on a new `Capability` tag (→ `controllers/Capability.js`).
 
 - [ ] **Step 4: Update schemas**
 
@@ -1066,7 +1189,7 @@ In `components/schemas`:
 ```
 (Add under the existing `capabilities` property.)
 
-4. **Add** community schemas:
+4. **Add** community and capability schemas (note: `CapabilityId` and `CapabilityName` already exist at lines ~2280-2282; only add `Capability` and the community schemas):
 ```yaml
     CommunityId:
       $ref: '#/components/schemas/StringIntId'
@@ -1077,15 +1200,22 @@ In `components/schemas`:
       properties:
         communityId: { $ref: '#/components/schemas/CommunityId' }
         name: { type: string, maxLength: 100 }
+    Capability:
+      additionalProperties: false
+      type: object
+      required: [ capabilityId, name ]
+      properties:
+        capabilityId: { $ref: '#/components/schemas/CapabilityId' }
+        name: { type: string, maxLength: 100 }
 ```
 
-5. **Extend** the `Person` schema to optionally carry `communities`:
+5. **Extend** the `Person` schema to optionally carry `communityInfo`:
 ```yaml
-        communities:
+        communityInfo:
           type: array
           items: { $ref: '#/components/schemas/Community' }
 ```
-(Add under the existing `volunteerInfo` property.)
+(Add under the existing `volunteerInfo` property. Named `communityInfo` to match the `memberInfo`/`volunteerInfo` projection siblings.)
 
 - [ ] **Step 5: Remove the village-scoped read endpoints**
 
@@ -1107,9 +1237,12 @@ curl -s "$API/persons/$PID/communities" -H "Authorization: Bearer $TOKEN" | jq  
 curl -sX PUT "$API/persons/$PID/communities" -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"communityIds":["1","2"]}' | jq '.[].name'
 # confirm projection on person
-curl -s "$API/persons/$PID?projection=communities" -H "Authorization: Bearer $TOKEN" | jq '.communities'
+curl -s "$API/persons/$PID?projection=communityInfo" -H "Authorization: Bearer $TOKEN" | jq '.communityInfo'
+# lookup endpoints
+curl -s "$API/communities"  -H "Authorization: Bearer $TOKEN" | jq    # [{communityId,name}...] Pride, Veteran
+curl -s "$API/capabilities" -H "Authorization: Bearer $TOKEN" | jq    # [{capabilityId,name}...]
 ```
-Expected: PUT returns `["Pride","Veteran"]` (sorted), projection reflects them.
+Expected: PUT returns `[{communityId,name:"Pride"},{...Veteran}]` (sorted by name), projection reflects them; lookups return the full seeded lists.
 
 - [ ] **Step 8: Commit**
 
