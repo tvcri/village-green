@@ -1,63 +1,39 @@
 'use strict';
-
+const VolunteerService = require('../service/VolunteerService')
+const MemberService = require('../service/MemberService')
+const PersonService = require('../service/PersonService')
 const SmError = require('../utils/error')
 
-module.exports.getVolunteers = async function getVolunteers (req, res, next) {
+module.exports.putPersonVolunteer = async function putPersonVolunteer (req, res, next) {
   try {
-    // TODO: Implement getVolunteers
-    res.json({})
+    const personId = req.params.personId
+    const person = await PersonService.getPerson(personId)
+    if (!person) throw new SmError.NotFoundError()
+    if (!(await MemberService.personHasHomeVillage(personId))) {
+      throw new SmError.UnprocessableError('Person must have a home village to hold a volunteer role.')
+    }
+    const response = await VolunteerService.putVolunteer(personId, req.body)
+    res.json(response)
   }
-  catch (err) {
-    next(err)
-  }
+  catch (err) { next(err) }
 }
 
-module.exports.createVolunteer = async function createVolunteer (req, res, next) {
+module.exports.patchPersonVolunteer = async function patchPersonVolunteer (req, res, next) {
   try {
-    // TODO: Implement createVolunteer
-    res.json({})
+    const personId = req.params.personId
+    if (!(await VolunteerService.volunteerExists(personId))) throw new SmError.NotFoundError()
+    const response = await VolunteerService.patchVolunteer(personId, req.body)
+    res.json(response)
   }
-  catch (err) {
-    next(err)
-  }
+  catch (err) { next(err) }
 }
 
-module.exports.getVolunteer = async function getVolunteer (req, res, next) {
+module.exports.deletePersonVolunteer = async function deletePersonVolunteer (req, res, next) {
   try {
-    // TODO: Implement getVolunteer
-    res.json({})
+    const personId = req.params.personId
+    if (!(await VolunteerService.volunteerExists(personId))) throw new SmError.NotFoundError()
+    await VolunteerService.deleteVolunteer(personId)
+    res.status(204).end()
   }
-  catch (err) {
-    next(err)
-  }
-}
-
-module.exports.patchVolunteer = async function patchVolunteer (req, res, next) {
-  try {
-    // TODO: Implement patchVolunteer
-    res.json({})
-  }
-  catch (err) {
-    next(err)
-  }
-}
-
-module.exports.deleteVolunteer = async function deleteVolunteer (req, res, next) {
-  try {
-    // TODO: Implement deleteVolunteer
-    res.json({})
-  }
-  catch (err) {
-    next(err)
-  }
-}
-
-module.exports.putVolunteerCapabilities = async function putVolunteerCapabilities (req, res, next) {
-  try {
-    // TODO: Implement putVolunteerCapabilities
-    res.json({})
-  }
-  catch (err) {
-    next(err)
-  }
+  catch (err) { next(err) }
 }
