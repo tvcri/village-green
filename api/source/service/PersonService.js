@@ -32,7 +32,7 @@ async function queryPersons (inPredicates = {}) {
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.village_id',
+    'LEFT JOIN village v ON v.id = p.village_id',
     'LEFT JOIN member m ON m.person_id = p.id',
     'LEFT JOIN volunteer vol ON vol.person_id = p.id'
   ])
@@ -83,7 +83,7 @@ module.exports.getPerson = async function (personId, projections = []) {
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.village_id',
+    'LEFT JOIN village v ON v.id = p.village_id',
     'LEFT JOIN member m ON m.person_id = p.id',
     'LEFT JOIN volunteer vol ON vol.person_id = p.id'
   ])
@@ -112,6 +112,20 @@ module.exports.getPerson = async function (personId, projections = []) {
         WHERE vc.volunteer_id = vol2.id
       )
     ) FROM volunteer vol2 WHERE vol2.person_id = p.id) AS volunteerInfo`)
+  }
+
+  if (projections.includes('communityInfo')) {
+    columns.push(`(
+      SELECT COALESCE(
+        CAST(CONCAT('[', GROUP_CONCAT(
+          JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name) ORDER BY c.name
+        ), ']') AS JSON),
+        JSON_ARRAY()
+      )
+      FROM person_community pc
+      JOIN community c ON c.id = pc.community_id
+      WHERE pc.person_id = p.id
+    ) AS communityInfo`)
   }
 
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
@@ -187,7 +201,7 @@ module.exports.deletePerson = async function (personId) {
   await dbUtils.pool.query('DELETE FROM person WHERE id = ?', [personId])
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, elevate, villageId, firstName, lastName, phone, email }) {
+module.exports.getPersons = async function ({ villageIdsGranted, elevate, villageId, firstName, lastName, phone, email, role }) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
     'p.full_name AS fullName',
@@ -203,7 +217,7 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.village_id',
+    'LEFT JOIN village v ON v.id = p.village_id',
     'LEFT JOIN member m ON m.person_id = p.id',
     'LEFT JOIN volunteer vol ON vol.person_id = p.id'
   ])
@@ -233,6 +247,16 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   if (email) {
     predicates.statements.push('p.email LIKE ?')
     predicates.binds.push(`%${email}%`)
+  }
+
+  if (role === 'member') {
+    predicates.statements.push('m.id IS NOT NULL')
+  }
+  else if (role === 'volunteer') {
+    predicates.statements.push('vol.id IS NOT NULL')
+  }
+  else if (role === 'community') {
+    joins.add('JOIN person_community pc ON pc.person_id = p.id')
   }
 
   const orderBy = ['p.full_name']
