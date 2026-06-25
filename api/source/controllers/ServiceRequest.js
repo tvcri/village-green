@@ -27,7 +27,10 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
 
 module.exports.createServiceRequest = async function createServiceRequest (req, res, next) {
   try {
-    const response = await ServiceRequestService.createServiceRequest(req.body)
+    // The service commits in a transaction and returns the new id; fetch the
+    // full record afterward so the read sees committed data.
+    const serviceRequestId = await ServiceRequestService.createServiceRequest(req.body)
+    const response = await ServiceRequestService.getServiceRequest(serviceRequestId)
     res.status(201).json(response)
   }
   catch (err) {
@@ -53,7 +56,10 @@ module.exports.getServiceRequest = async function getServiceRequest (req, res, n
 module.exports.patchServiceRequest = async function patchServiceRequest (req, res, next) {
   try {
     const serviceRequestId = req.params.serviceRequestId
-    const response = await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
+    // The service commits in a transaction and returns the id; fetch the full
+    // record afterward so the read sees committed data.
+    await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
+    const response = await ServiceRequestService.getServiceRequest(serviceRequestId)
     res.json(response)
   }
   catch (err) {

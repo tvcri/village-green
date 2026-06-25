@@ -330,14 +330,6 @@ const availableTransportationTypes = computed(() => {
   return isRideService.value ? ['Round Trip', 'One Way'] : ['None']
 })
 
-// CE-dumped requests (request_number NOT NULL) lost their appointment and
-// return times during the migration off the retired CE system. That data is
-// unrecoverable, so for these legacy records we relax the appt/return
-// completeness requirement — users must still be able to apply status updates
-// without the UI permanently blocking the Update button. All other rules
-// (including start/finish times) remain enforced.
-const isLegacyRequest = computed(() => existingRequest.value?.requestNumber != null)
-
 const isFormValid = computed(() => {
   const f = form.value
 
@@ -346,18 +338,11 @@ const isFormValid = computed(() => {
     return false
   }
 
-  // Ride-specific requirements
+  // Ride-specific requirements. Time fields are optional; only the
+  // destination and a valid transportation type are required.
   if (isRideService.value) {
     if (!f.destination) return false
     if (!['Round Trip', 'One Way'].includes(f.transportationType)) return false
-
-    if (f.transportationType === 'Round Trip') {
-      if (f.startTime == null || f.finishTime == null) return false
-      // Legacy records lost appt/return times; don't require them.
-      if (!isLegacyRequest.value && (f.apptTime == null || f.returnTime == null)) return false
-    } else {
-      if (f.startTime == null || f.finishTime == null) return false
-    }
   }
 
   return true
@@ -431,25 +416,7 @@ const handleSubmit = async () => {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
         return
       }
-
-      // Time validation based on transportation type
-      const isRoundTrip = form.value.transportationType === 'Round Trip'
-      if (isRoundTrip) {
-        if (form.value.startTime == null || form.value.finishTime == null) {
-          toast.add({ severity: 'error', summary: 'Error', detail: 'Start and finish times are required for round trip', life: 3000 })
-          return
-        }
-        // Legacy CE-dumped records lost appt/return times; don't require them.
-        if (!isLegacyRequest.value && (form.value.apptTime == null || form.value.returnTime == null)) {
-          toast.add({ severity: 'error', summary: 'Error', detail: 'Appointment and return times are required for round trip', life: 3000 })
-          return
-        }
-      } else {
-        if (form.value.startTime == null || form.value.finishTime == null) {
-          toast.add({ severity: 'error', summary: 'Error', detail: 'Start and finish times are required for one way', life: 3000 })
-          return
-        }
-      }
+      // Time fields are optional; no time validation is enforced.
     }
 
     isSubmitting.value = true
@@ -484,12 +451,23 @@ const handleSubmit = async () => {
       status: computedStatus.value,
       serviceName: form.value.serviceName || null,
       transportationType: form.value.transportationType || null,
-      startAt: isRideService.value
-        ? combineDateAndTime(form.value.serviceDate, form.value.startTime)
-        : getStartOfDay(form.value.serviceDate),
-      finishAt: isRideService.value
-        ? combineDateAndTime(form.value.serviceDate, form.value.finishTime)
-        : getEndOfDay(form.value.serviceDate),
+      // The date must always be preserved, since there is no standalone date
+      // column — start_at/finish_at carry it. When a specific time is given we
+      // use it; otherwise we anchor to start-of-day / end-of-day (local → UTC)
+      // so the chosen date is never lost. This holds for all service types:
+      // non-ride requests have no times and always anchor to the full day, and
+      // rides with optional/missing times fall back to the same anchors.
+      // TODO: post-CE, split the schema into a DATE column + nullable TIME
+      // columns so the date is no longer overloaded onto start_at/finish_at.
+      // That removes this anchoring, the local→UTC conversion, and the
+      // 12:00 AM / 11:45 PM anchor artifacts on re-edit. Touches: migration
+      // (backfill from start_at/finish_at; mind legacy CE rows), OAS schemas,
+      // ServiceRequestService SQL + finish_at DESC ordering, and the client
+      // (this builder, the edit read-back watcher, list "Date" column, detail).
+      startAt: combineDateAndTime(form.value.serviceDate, form.value.startTime)
+        ?? getStartOfDay(form.value.serviceDate),
+      finishAt: combineDateAndTime(form.value.serviceDate, form.value.finishTime)
+        ?? getEndOfDay(form.value.serviceDate),
       apptTime: isRideService.value && form.value.transportationType === 'Round Trip'
         ? combineDateAndTime(form.value.serviceDate, form.value.apptTime)
         : null,
@@ -748,7 +726,7 @@ const testSearch = (event) => {
             style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;"
           >
             <div>
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Start<span class="req">*</span></label>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Start</label>
               <Select
                 v-model="form.startTime"
                 :options="startOptions"
@@ -761,7 +739,7 @@ const testSearch = (event) => {
             </div>
 
             <div v-if="form.transportationType === 'Round Trip'">
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Appointment<span class="req">*</span></label>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Appointment</label>
               <Select
                 v-model="form.apptTime"
                 :options="apptOptions"
@@ -774,7 +752,7 @@ const testSearch = (event) => {
             </div>
 
             <div v-if="form.transportationType === 'Round Trip'">
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Return<span class="req">*</span></label>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Return</label>
               <Select
                 v-model="form.returnTime"
                 :options="returnOptions"
@@ -787,7 +765,7 @@ const testSearch = (event) => {
             </div>
 
             <div>
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Finish<span class="req">*</span></label>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Finish</label>
               <Select
                 v-model="form.finishTime"
                 :options="finishOptions"

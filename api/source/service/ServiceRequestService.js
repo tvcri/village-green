@@ -204,7 +204,10 @@ module.exports.createServiceRequest = async function (payload) {
       `
       await connection.query(emailEventSql, [serviceRequestId, payload.volunteerPersonId || null])
 
-      return module.exports.getServiceRequest(serviceRequestId)
+      // Return only the id. Reading the record back here would run on a
+      // separate pool connection while this transaction is still uncommitted,
+      // so it would return null. The caller fetches after commit.
+      return serviceRequestId
     }
   })
 }
@@ -298,7 +301,7 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       }
 
       if (updates.length === 0) {
-        return module.exports.getServiceRequest(serviceRequestId)
+        return serviceRequestId
       }
 
       values.push(serviceRequestId)
@@ -318,7 +321,8 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
         }
       }
 
-      return module.exports.getServiceRequest(serviceRequestId)
+      // Return only the id; the caller fetches the record after commit.
+      return serviceRequestId
     }
   })
 }

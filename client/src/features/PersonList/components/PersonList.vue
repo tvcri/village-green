@@ -8,10 +8,12 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
+import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { getPersons } from '../api/personApi.js'
+import { getVillages } from '../../VillageList/api/villageApi.js'
 
 defineOptions({ name: 'PersonList' })
 
@@ -23,16 +25,32 @@ const firstName = ref('')
 const lastName = ref('')
 const phone = ref('')
 const email = ref('')
+const selectedVillage = ref('All villages')
 
 const showMembers = ref(true)
 const showVolunteers = ref(true)
 
+// Village options for the filter; 'All villages' is the sentinel meaning no
+// village restriction (server returns persons across all granted villages).
+const { state: allVillages } = useAsyncState(() => getVillages(), { immediate: true })
+const villageOptions = computed(() => [
+  'All villages',
+  ...(allVillages.value ?? []).map(v => v.name)
+])
+
+const selectedVillageId = computed(() => {
+  if (selectedVillage.value === 'All villages') return undefined
+  return (allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId
+})
+
 const hasFilter = computed(() =>
-  firstName.value.trim() || lastName.value.trim() || phone.value.trim() || email.value.trim()
+  firstName.value.trim() || lastName.value.trim() || phone.value.trim() ||
+  email.value.trim() || !!selectedVillageId.value
 )
 
 const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
   () => getPersons({
+    villageId: selectedVillageId.value ? [selectedVillageId.value] : undefined,
     firstName: firstName.value.trim() || undefined,
     lastName: lastName.value.trim() || undefined,
     phone: phone.value.trim() || undefined,
@@ -81,7 +99,7 @@ function navigateToPerson(personId, fullName) {
   })
 }
 
-watch([firstName, lastName, phone, email], () => {
+watch([firstName, lastName, phone, email, selectedVillage], () => {
   if (!hasFilter.value) persons.value = null
 })
 
@@ -100,28 +118,36 @@ function onSearch() {
     </div>
 
     <div class="filters">
-      <IconField>
+      <Select
+        v-model="selectedVillage"
+        :options="villageOptions"
+        placeholder="Village"
+        class="filter-village"
+        :pt="{ root: { style: 'width: 12rem;' } }"
+      />
+      <IconField class="filter-input">
         <InputIcon class="pi pi-user" />
         <InputText v-model="firstName" placeholder="First name" @keyup.enter="onSearch" />
       </IconField>
-      <IconField>
+      <IconField class="filter-input">
         <InputIcon class="pi pi-user" />
         <InputText v-model="lastName" placeholder="Last name" @keyup.enter="onSearch" />
       </IconField>
-      <IconField>
+      <IconField class="filter-input">
         <InputIcon class="pi pi-phone" />
         <InputText v-model="phone" placeholder="Phone" @keyup.enter="onSearch" />
       </IconField>
-      <IconField>
+      <IconField class="filter-input">
         <InputIcon class="pi pi-envelope" />
         <InputText v-model="email" placeholder="Email" @keyup.enter="onSearch" />
       </IconField>
+      <div class="filter-actions">
       <Button
         icon="pi pi-times"
         severity="secondary"
         text
         :disabled="!hasFilter"
-        @click="firstName = ''; lastName = ''; phone = ''; email = ''"
+        @click="firstName = ''; lastName = ''; phone = ''; email = ''; selectedVillage = 'All villages'"
       />
       <Button
         label="Search"
@@ -130,6 +156,7 @@ function onSearch() {
         :disabled="!hasFilter"
         @click="onSearch"
       />
+      </div>
     </div>
 
     <div v-if="persons !== null && !isLoading" class="role-filters">
@@ -220,6 +247,26 @@ function onSearch() {
   align-items: center;
 }
 
+/* Inputs grow to share the leftover horizontal space (min-width keeps them
+   readable before wrapping); the action buttons stay their natural size and
+   push flush-right, dropping to a second line only when the row can't hold
+   everything. */
+.filter-input {
+  flex: 1 1 9rem;
+  min-width: 9rem;
+}
+
+.filter-input :deep(.p-inputtext) {
+  width: 100%;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-left: auto;
+}
+
 .role-filters {
   display: flex;
   gap: 1.5rem;
@@ -263,6 +310,15 @@ function onSearch() {
   .filters {
     flex-direction: column;
     align-items: stretch;
+  }
+  /* Let fields fill the column on narrow screens. */
+  .filter-village,
+  .filter-village :deep(.p-select),
+  .filter-input {
+    width: 100% !important;
+  }
+  .filter-actions {
+    margin-left: 0;
   }
 }
 </style>
