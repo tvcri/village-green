@@ -12,16 +12,22 @@ const upMigration = [
   `ALTER TABLE person ADD CONSTRAINT person_ibfk_1
      FOREIGN KEY (village_id) REFERENCES village (id)`,
 
-  // full_name is a read convenience derived from last/first — it is now a
-  // STORED generated column so it can never drift from the name parts and is
-  // not directly writable. NULLIF guards keep a blank part from producing a
-  // stray separator (e.g. ', Carl'). The app transitioned from read-only to
-  // owning person data, so this is the first writer of these columns.
+  // The app now OWNS person data (was read-only). A person requires both a
+  // last and first name, so enforce NOT NULL + non-empty at the schema level.
+  // (All existing rows already satisfy this.)
+  `ALTER TABLE person MODIFY COLUMN last_name  VARCHAR(100) NOT NULL`,
+  `ALTER TABLE person MODIFY COLUMN first_name VARCHAR(100) NOT NULL`,
+  `ALTER TABLE person
+     ADD CONSTRAINT person_names_non_empty
+     CHECK (last_name <> '' AND first_name <> '')`,
+
+  // full_name is a read convenience derived from last/first — a STORED
+  // generated column so it can never drift and is not directly writable.
+  // Because last/first are now NOT NULL and non-empty, no NULLIF guard is
+  // needed. The app transitioned from read-only to owning person data.
   `ALTER TABLE person
      MODIFY COLUMN full_name VARCHAR(200)
-     GENERATED ALWAYS AS (
-       CONCAT_WS(', ', NULLIF(last_name, ''), NULLIF(first_name, ''))
-     ) STORED`,
+     GENERATED ALWAYS AS (CONCAT_WS(', ', last_name, first_name)) STORED`,
 
   // A volunteer's zero-or-more associate villages beyond their home village.
   `CREATE TABLE volunteer_village_associate (
@@ -64,6 +70,10 @@ const downMigration = [
   // Revert full_name to a plain, writable column (preserving current values).
   `ALTER TABLE person
      MODIFY COLUMN full_name VARCHAR(200) NOT NULL`,
+  // Revert the name constraints back to the original nullable columns.
+  `ALTER TABLE person DROP CHECK person_names_non_empty`,
+  `ALTER TABLE person MODIFY COLUMN last_name  VARCHAR(100) DEFAULT NULL`,
+  `ALTER TABLE person MODIFY COLUMN first_name VARCHAR(100) DEFAULT NULL`,
   `DROP TABLE IF EXISTS person_community`,
   `DROP TABLE IF EXISTS community`,
   `DROP TABLE IF EXISTS volunteer_village_associate`,

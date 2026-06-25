@@ -120,9 +120,9 @@ DROP TABLE IF EXISTS `person`;
 CREATE TABLE `person` (
   `id` int NOT NULL AUTO_INCREMENT,
   `village_id` int DEFAULT NULL,
-  `last_name` varchar(100) DEFAULT NULL,
-  `first_name` varchar(100) DEFAULT NULL,
-  `full_name` varchar(200) GENERATED ALWAYS AS (concat_ws(', ',nullif(`last_name`,''),nullif(`first_name`,''))) STORED,
+  `last_name` varchar(100) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `full_name` varchar(200) GENERATED ALWAYS AS (concat_ws(', ',`last_name`,`first_name`)) STORED,
   `nickname` varchar(100) DEFAULT NULL,
   `address` varchar(300) DEFAULT NULL,
   `city` varchar(100) DEFAULT NULL,
@@ -137,6 +137,7 @@ CREATE TABLE `person` (
   `emergency_contact_phone` varchar(50) DEFAULT NULL,
   `emergency_contact_email` varchar(200) DEFAULT NULL,
   PRIMARY KEY (`id`),
+  CONSTRAINT `person_names_non_empty` CHECK ((`last_name` <> '' AND `first_name` <> '')),
   CONSTRAINT `person_ibfk_1` FOREIGN KEY (`village_id`) REFERENCES `village` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

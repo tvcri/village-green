@@ -2715,12 +2715,12 @@ components:
       properties:
         lastName:
           type: string
+          minLength: 1
           maxLength: 100
-          nullable: true
         firstName:
           type: string
+          minLength: 1
           maxLength: 100
-          nullable: true
         nickname:
           type: string
           maxLength: 100
@@ -2781,12 +2781,15 @@ components:
       type: object
       required:
       - lastName
+      - firstName
       properties:
         lastName:
           type: string
+          minLength: 1
           maxLength: 100
         firstName:
           type: string
+          minLength: 1
           maxLength: 100
         nickname:
           type: string
