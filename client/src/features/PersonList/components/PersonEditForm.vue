@@ -21,13 +21,52 @@ const isEdit = computed(() => !!route.params.personId)
 const personId = computed(() => route.params.personId)
 
 const form = reactive({
-  fullName: '', firstName: '', lastName: '', nickname: '',
+  firstName: '', lastName: '', nickname: '',
   address: '', city: '', state: '', zip: '',
   email: '', phone: '', cell: '', birthDate: '',
   emergencyContactName: '', emergencyContactRelationship: '',
   emergencyContactPhone: '', emergencyContactEmail: '',
   villageId: null,
 })
+
+const errors = reactive({})
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_RE = /^[\d\s\-()+]{7,}$/
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const ZIP_RE = /^\d{5}$/
+
+function validate () {
+  // Clear all current errors
+  Object.keys(errors).forEach(k => delete errors[k])
+
+  if (!form.firstName.trim()) errors.firstName = 'First name is required'
+  if (!form.lastName.trim())  errors.lastName  = 'Last name is required'
+
+  if (form.email && !EMAIL_RE.test(form.email))
+    errors.email = 'Enter a valid email address'
+  if (form.emergencyContactEmail && !EMAIL_RE.test(form.emergencyContactEmail))
+    errors.emergencyContactEmail = 'Enter a valid email address'
+
+  if (form.phone && !PHONE_RE.test(form.phone))
+    errors.phone = 'Enter a valid phone number'
+  if (form.cell && !PHONE_RE.test(form.cell))
+    errors.cell = 'Enter a valid phone number'
+  if (form.emergencyContactPhone && !PHONE_RE.test(form.emergencyContactPhone))
+    errors.emergencyContactPhone = 'Enter a valid phone number'
+
+  if (form.birthDate && (!DATE_RE.test(form.birthDate) || isNaN(Date.parse(form.birthDate))))
+    errors.birthDate = 'Enter a valid date (YYYY-MM-DD)'
+
+  if (form.zip && !ZIP_RE.test(form.zip))
+    errors.zip = 'Zip must be 5 digits'
+
+  return Object.keys(errors).length === 0
+}
+
+function clearError (field) {
+  delete errors[field]
+}
 
 const villages = ref([])          // [{ villageId, name }]
 const allCommunities = ref([])    // [{ communityId, name }] from getCommunities()
@@ -64,8 +103,8 @@ function buildPayload () {
 }
 
 async function handleSubmit () {
-  if (!form.fullName) {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Full name is required', life: 3000 })
+  if (!validate()) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
   try {
@@ -123,18 +162,27 @@ function cancel () {
           <h3 class="section-header">Personal Information</h3>
 
           <div class="form-field">
-            <label class="label" for="fullName">Full Name</label>
-            <InputText id="fullName" v-model="form.fullName" class="w-full" />
+            <label class="label" for="firstName">First Name <span class="required">*</span></label>
+            <InputText
+              id="firstName"
+              v-model="form.firstName"
+              class="w-full"
+              :class="{ 'p-invalid': errors.firstName }"
+              @input="clearError('firstName')"
+            />
+            <small class="field-error" v-if="errors.firstName">{{ errors.firstName }}</small>
           </div>
 
           <div class="form-field">
-            <label class="label" for="firstName">First Name</label>
-            <InputText id="firstName" v-model="form.firstName" class="w-full" />
-          </div>
-
-          <div class="form-field">
-            <label class="label" for="lastName">Last Name</label>
-            <InputText id="lastName" v-model="form.lastName" class="w-full" />
+            <label class="label" for="lastName">Last Name <span class="required">*</span></label>
+            <InputText
+              id="lastName"
+              v-model="form.lastName"
+              class="w-full"
+              :class="{ 'p-invalid': errors.lastName }"
+              @input="clearError('lastName')"
+            />
+            <small class="field-error" v-if="errors.lastName">{{ errors.lastName }}</small>
           </div>
 
           <div class="form-field">
@@ -144,17 +192,38 @@ function cancel () {
 
           <div class="form-field">
             <label class="label" for="email">Email</label>
-            <InputText id="email" v-model="form.email" class="w-full" />
+            <InputText
+              id="email"
+              v-model="form.email"
+              class="w-full"
+              :class="{ 'p-invalid': errors.email }"
+              @input="clearError('email')"
+            />
+            <small class="field-error" v-if="errors.email">{{ errors.email }}</small>
           </div>
 
           <div class="form-field">
             <label class="label" for="phone">Phone</label>
-            <InputText id="phone" v-model="form.phone" class="w-full" />
+            <InputText
+              id="phone"
+              v-model="form.phone"
+              class="w-full"
+              :class="{ 'p-invalid': errors.phone }"
+              @input="clearError('phone')"
+            />
+            <small class="field-error" v-if="errors.phone">{{ errors.phone }}</small>
           </div>
 
           <div class="form-field">
             <label class="label" for="cell">Cell</label>
-            <InputText id="cell" v-model="form.cell" class="w-full" />
+            <InputText
+              id="cell"
+              v-model="form.cell"
+              class="w-full"
+              :class="{ 'p-invalid': errors.cell }"
+              @input="clearError('cell')"
+            />
+            <small class="field-error" v-if="errors.cell">{{ errors.cell }}</small>
           </div>
 
           <div class="form-field">
@@ -174,12 +243,27 @@ function cancel () {
 
           <div class="form-field">
             <label class="label" for="zip">Zip</label>
-            <InputText id="zip" v-model="form.zip" class="w-full" />
+            <InputText
+              id="zip"
+              v-model="form.zip"
+              class="w-full"
+              :class="{ 'p-invalid': errors.zip }"
+              @input="clearError('zip')"
+            />
+            <small class="field-error" v-if="errors.zip">{{ errors.zip }}</small>
           </div>
 
           <div class="form-field">
             <label class="label" for="birthDate">Birth Date</label>
-            <InputText id="birthDate" v-model="form.birthDate" placeholder="YYYY-MM-DD" class="w-full" />
+            <InputText
+              id="birthDate"
+              v-model="form.birthDate"
+              placeholder="YYYY-MM-DD"
+              class="w-full"
+              :class="{ 'p-invalid': errors.birthDate }"
+              @input="clearError('birthDate')"
+            />
+            <small class="field-error" v-if="errors.birthDate">{{ errors.birthDate }}</small>
           </div>
         </div>
 
@@ -242,12 +326,26 @@ function cancel () {
 
           <div class="form-field">
             <label class="label" for="emergencyContactPhone">Phone</label>
-            <InputText id="emergencyContactPhone" v-model="form.emergencyContactPhone" class="w-full" />
+            <InputText
+              id="emergencyContactPhone"
+              v-model="form.emergencyContactPhone"
+              class="w-full"
+              :class="{ 'p-invalid': errors.emergencyContactPhone }"
+              @input="clearError('emergencyContactPhone')"
+            />
+            <small class="field-error" v-if="errors.emergencyContactPhone">{{ errors.emergencyContactPhone }}</small>
           </div>
 
           <div class="form-field">
             <label class="label" for="emergencyContactEmail">Email</label>
-            <InputText id="emergencyContactEmail" v-model="form.emergencyContactEmail" class="w-full" />
+            <InputText
+              id="emergencyContactEmail"
+              v-model="form.emergencyContactEmail"
+              class="w-full"
+              :class="{ 'p-invalid': errors.emergencyContactEmail }"
+              @input="clearError('emergencyContactEmail')"
+            />
+            <small class="field-error" v-if="errors.emergencyContactEmail">{{ errors.emergencyContactEmail }}</small>
           </div>
         </div>
 
@@ -318,6 +416,16 @@ function cancel () {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.required {
+  color: var(--color-text-error);
+}
+
+.field-error {
+  color: var(--color-text-error);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
 }
 
 .w-full {
