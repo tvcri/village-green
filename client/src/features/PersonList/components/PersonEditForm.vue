@@ -110,14 +110,6 @@ function cancel () {
     ? { name: 'meta-person-detail', params: { personId: personId.value } }
     : { name: 'meta-persons' })
 }
-
-function goMember () {
-  router.push({ name: 'meta-person-member', params: { personId: personId.value } })
-}
-
-function goVolunteer () {
-  router.push({ name: 'meta-person-volunteer', params: { personId: personId.value } })
-}
 </script>
 
 <template>
@@ -259,13 +251,8 @@ function goVolunteer () {
           </div>
         </div>
 
-        <!-- Footer: role management (edit only) on the left, Save / Cancel on the right -->
+        <!-- Footer: Save / Cancel buttons -->
         <div class="form-footer">
-          <div v-if="isEdit" class="role-actions">
-            <Button type="button" label="Member" icon="pi pi-id-card" severity="secondary" @click="goMember" />
-            <Button type="button" label="Volunteer" icon="pi pi-users" severity="secondary" @click="goVolunteer" />
-          </div>
-          <div class="footer-spacer"></div>
           <Button type="button" label="Cancel" severity="secondary" @click="cancel" />
           <Button type="submit" label="Save" />
         </div>
@@ -359,21 +346,11 @@ function goVolunteer () {
 
 .form-footer {
   display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid var(--color-border-default);
-}
-
-.role-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-/* Pushes Cancel/Save to the right, keeping role buttons on the left. */
-.footer-spacer {
-  flex: 1 1 auto;
 }
 
 @media (max-width: 900px) {
