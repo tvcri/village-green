@@ -94,9 +94,12 @@ function onSearch() {
   <div class="person-list">
     <div class="list-header">
       <h2>Persons</h2>
-      <span v-if="filteredPersons !== null && !isLoading" class="result-count">
-        {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
-      </span>
+      <div class="header-actions">
+        <span v-if="filteredPersons !== null && !isLoading" class="result-count">
+          {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
+        </span>
+        <Button label="New Person" icon="pi pi-plus" @click="$router.push({ name: 'meta-person-create' })" />
+      </div>
     </div>
 
     <div class="filters">
@@ -206,6 +209,12 @@ function onSearch() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .list-header h2 {
