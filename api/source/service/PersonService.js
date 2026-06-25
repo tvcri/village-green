@@ -165,7 +165,6 @@ module.exports.createPerson = async function (body) {
       if (personFields.phone !== undefined) mappedFields.phone = personFields.phone
       if (personFields.cell !== undefined) mappedFields.cell = personFields.cell
       if (personFields.birthDate !== undefined) mappedFields.birth_date = personFields.birthDate
-      if (personFields.joinDate !== undefined) mappedFields.join_date = personFields.joinDate
       if (villageId !== undefined) mappedFields.village_id = villageId
 
       const [personInsertResult] = await connection.query('INSERT INTO person SET ?', mappedFields)
@@ -196,7 +195,6 @@ module.exports.patchPerson = async function (personId, body) {
       if (personFields.phone !== undefined) mappedFields.phone = personFields.phone
       if (personFields.cell !== undefined) mappedFields.cell = personFields.cell
       if (personFields.birthDate !== undefined) mappedFields.birth_date = personFields.birthDate
-      if (personFields.joinDate !== undefined) mappedFields.join_date = personFields.joinDate
       if (villageId !== undefined) mappedFields.village_id = villageId
 
       if (Object.keys(mappedFields).length > 0) {
