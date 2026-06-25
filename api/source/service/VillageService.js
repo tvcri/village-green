@@ -223,51 +223,6 @@ module.exports.deleteVillage = async function (villageId) {
   await dbUtils.pool.query('DELETE FROM village WHERE id = ?', [villageId])
 }
 
-module.exports.getVillageMembers = async function (villageId) {
-  const columns = [
-    'p.full_name AS fullName',
-    'CAST(m.id AS CHAR) AS memberId',
-    'CAST(m.person_id AS CHAR) AS personId',
-    'p.full_name AS fullName',
-    'm.member_number AS memberNumber',
-    'm.member_level AS memberLevel',
-    'm.service_notes AS serviceNotes',
-    'DATE_FORMAT(m.join_date, "%Y-%m-%d") AS joinDate'
-  ]
-  const joins = new Set([
-    'member m',
-    'JOIN person p ON p.id = m.person_id'
-  ])
-  const predicates = { statements: ['p.village_id = ?'], binds: [villageId] }
-  const orderBy = ['p.full_name']
-  const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
-  const [rows] = await dbUtils.pool.query(sql)
-  return rows
-}
-
-module.exports.getVillageVolunteers = async function (villageId) {
-  const columns = [
-    'p.full_name AS fullName',
-    'CAST(vol.id AS CHAR) AS volunteerId',
-    'CAST(vol.person_id AS CHAR) AS personId',
-  `  COALESCE(CAST(
-      CONCAT('[', GROUP_CONCAT(CONCAT('"',c.name,'"') ORDER BY c.name), ']')
-      AS JSON), JSON_ARRAY()) AS capabilities`
-  ]
-  const joins = new Set([
-    'volunteer vol',
-    'JOIN person p ON p.id = vol.person_id',
-    'LEFT JOIN volunteer_capability vc ON vc.volunteer_id = vol.id',
-    'LEFT JOIN capability c ON c.id = vc.capability_id'
-  ])
-  const predicates = { statements: ['p.village_id = ?'], binds: [villageId] }
-  const groupBy = ['vol.id']
-  const orderBy = ['p.full_name']
-  const sql = dbUtils.makeQueryString({columns, joins, predicates, groupBy, orderBy, format: true})
-  let [rows] = await dbUtils.pool.query(sql)
-  return rows
-}
-
 module.exports.getVillagePersons = async function (villageId) {
   return await PersonService.getPersonsByVillage(villageId)
 }

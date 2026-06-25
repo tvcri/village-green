@@ -1075,6 +1075,15 @@ paths:
           description: Filter by email (contains, case-insensitive)
           schema:
             type: string
+        - name: role
+          in: query
+          description: Filter to persons holding a specific role
+          schema:
+            type: string
+            enum:
+            - member
+            - volunteer
+            - community
       responses:
         '200':
           description: List of persons
@@ -1197,292 +1206,160 @@ paths:
       security:
       - oauth:
         - vg:person
-  /members:
-    get:
-      summary: List members
-      tags:
-      - Member
-      operationId: getMembers
-      responses:
-        '200':
-          description: List of members
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Member'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:member:read
-    post:
-      summary: Create a new member
-      tags:
-      - Member
-      operationId: createMember
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MemberPost'
-      responses:
-        '201':
-          description: Member created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Member'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:member
-  /members/{memberId}:
-    get:
-      summary: Get member by ID
-      tags:
-      - Member
-      operationId: getMember
-      parameters:
-      - $ref: '#/components/parameters/MemberIdPath'
-      responses:
-        '200':
-          description: Member details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Member'
-        default:
-          description: Member not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:member:read
-    patch:
-      summary: Update member by ID
-      tags:
-      - Member
-      operationId: patchMember
-      parameters:
-      - $ref: '#/components/parameters/MemberIdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MemberPatch'
-      responses:
-        '200':
-          description: Member updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Member'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:member
-    delete:
-      summary: Delete member by ID
-      tags:
-      - Member
-      operationId: deleteMember
-      parameters:
-      - $ref: '#/components/parameters/MemberIdPath'
-      responses:
-        '200':
-          description: Member deleted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Member'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:member
-  /volunteers:
-    get:
-      summary: List volunteers
-      tags:
-      - Volunteer
-      operationId: getVolunteers
-      responses:
-        '200':
-          description: List of volunteers
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Volunteer'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:volunteer:read
-    post:
-      summary: Create a new volunteer
-      tags:
-      - Volunteer
-      operationId: createVolunteer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VolunteerPost'
-      responses:
-        '201':
-          description: Volunteer created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Volunteer'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:volunteer
-  /volunteers/{volunteerId}:
-    get:
-      summary: Get volunteer by ID
-      tags:
-      - Volunteer
-      operationId: getVolunteer
-      parameters:
-      - $ref: '#/components/parameters/VolunteerIdPath'
-      responses:
-        '200':
-          description: Volunteer details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Volunteer'
-        default:
-          description: Volunteer not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:volunteer:read
-    patch:
-      summary: Update volunteer by ID
-      tags:
-      - Volunteer
-      operationId: patchVolunteer
-      parameters:
-      - $ref: '#/components/parameters/VolunteerIdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VolunteerPatch'
-      responses:
-        '200':
-          description: Volunteer updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Volunteer'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:volunteer
-    delete:
-      summary: Delete volunteer by ID
-      tags:
-      - Volunteer
-      operationId: deleteVolunteer
-      parameters:
-      - $ref: '#/components/parameters/VolunteerIdPath'
-      responses:
-        '200':
-          description: Volunteer deleted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Volunteer'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:volunteer
-  /volunteers/{volunteerId}/capabilities:
+  /persons/{personId}/member:
     put:
-      summary: Set capabilities for volunteer
-      tags:
-      - Volunteer
-      operationId: putVolunteerCapabilities
-      parameters:
-      - $ref: '#/components/parameters/VolunteerIdPath'
+      summary: Grant or replace the member role
+      tags: [Member]
+      operationId: putPersonMember
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MemberPut' }
+      responses:
+        '200': { description: Person with member role, content: { application/json: { schema: { $ref: '#/components/schemas/Person' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+    patch:
+      summary: Update member attributes
+      tags: [Member]
+      operationId: patchPersonMember
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MemberPatch' }
+      responses:
+        '200': { description: Person with member role, content: { application/json: { schema: { $ref: '#/components/schemas/Person' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+    delete:
+      summary: Revoke the member role
+      tags: [Member]
+      operationId: deletePersonMember
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      responses:
+        '204': { description: Member role revoked }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+
+  /persons/{personId}/volunteer:
+    put:
+      summary: Grant or replace the volunteer role
+      tags: [Volunteer]
+      operationId: putPersonVolunteer
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VolunteerPut' }
+      responses:
+        '200': { description: Person with volunteer role, content: { application/json: { schema: { $ref: '#/components/schemas/Person' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    patch:
+      summary: Update volunteer capabilities and/or associate villages
+      tags: [Volunteer]
+      operationId: patchPersonVolunteer
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VolunteerPatch' }
+      responses:
+        '200': { description: Person with volunteer role, content: { application/json: { schema: { $ref: '#/components/schemas/Person' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Revoke the volunteer role
+      tags: [Volunteer]
+      operationId: deletePersonVolunteer
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      responses:
+        '204': { description: Volunteer role revoked }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /persons/{personId}/communities:
+    get:
+      summary: List a person's communities
+      tags: [Community]
+      operationId: getPersonCommunities
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      responses:
+        '200':
+          description: List of communities
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Community' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    put:
+      summary: Replace a person's community memberships
+      tags: [Community]
+      operationId: putPersonCommunities
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/CapabilityId'
+              type: object
+              additionalProperties: false
+              required: [ communityIds ]
+              properties:
+                communityIds:
+                  type: array
+                  items: { $ref: '#/components/schemas/CommunityId' }
       responses:
         '200':
-          description: Capabilities updated
+          description: Updated communities
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Volunteer'
-        default:
-          description: error
+                type: array
+                items: { $ref: '#/components/schemas/Community' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:community ] } ]
+
+  /communities:
+    get:
+      summary: List all communities
+      tags: [Community]
+      operationId: getCommunities
+      responses:
+        '200':
+          description: List of communities
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:volunteer
+                type: array
+                items: { $ref: '#/components/schemas/Community' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /capabilities:
+    get:
+      summary: List all volunteer capabilities
+      tags: [Capability]
+      operationId: getCapabilities
+      responses:
+        '200':
+          description: List of capabilities
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Capability' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
   /service-requests:
     get:
       summary: List service requests
@@ -1831,58 +1708,6 @@ paths:
       security:
       - oauth:
         - vg:village
-  /villages/{villageId}/members:
-    get:
-      summary: List members in a village
-      tags:
-      - Village
-      operationId: getVillageMembers
-      parameters:
-      - $ref: '#/components/parameters/VillageIdPath'
-      responses:
-        '200':
-          description: Member list for village
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Member'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:village:read
-  /villages/{villageId}/volunteers:
-    get:
-      summary: List volunteers in a village
-      tags:
-      - Village
-      operationId: getVillageVolunteers
-      parameters:
-      - $ref: '#/components/parameters/VillageIdPath'
-      responses:
-        '200':
-          description: Volunteer list for village
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Volunteer'
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:village:read
   /villages/{villageId}/persons:
     get:
       summary: List persons in a village
@@ -2281,6 +2106,22 @@ components:
       $ref: '#/components/schemas/StringIntId'
     CapabilityName:
       $ref: '#/components/schemas/String255'
+    Capability:
+      additionalProperties: false
+      type: object
+      required: [ capabilityId, name ]
+      properties:
+        capabilityId: { $ref: '#/components/schemas/CapabilityId' }
+        name: { type: string, maxLength: 100 }
+    CommunityId:
+      $ref: '#/components/schemas/StringIntId'
+    Community:
+      additionalProperties: false
+      type: object
+      required: [ communityId, name ]
+      properties:
+        communityId: { $ref: '#/components/schemas/CommunityId' }
+        name: { type: string, maxLength: 100 }
     CommitBranch:
       type: string
     CommitDescribe:
@@ -2737,25 +2578,14 @@ components:
         joinDate:
           type: string
           format: date
-    MemberPost:
+    MemberPut:
       additionalProperties: false
       type: object
-      required:
-      - personId
       properties:
-        personId:
-          $ref: '#/components/schemas/PersonId'
-        memberNumber:
-          type: string
-          maxLength: 50
-        memberLevel:
-          type: string
-          maxLength: 100
-        serviceNotes:
-          type: string
-        joinDate:
-          type: string
-          format: date
+        memberNumber: { type: string, maxLength: 50 }
+        memberLevel:  { type: string, maxLength: 100 }
+        serviceNotes: { type: string }
+        joinDate:     { type: string, format: date }
     Person:
       additionalProperties: false
       type: object
@@ -2838,6 +2668,9 @@ components:
         volunteerInfo:
           $ref: '#/components/schemas/Volunteer'
           nullable: true
+        communityInfo:
+          type: array
+          items: { $ref: '#/components/schemas/Community' }
     PersonSummary:
       additionalProperties: false
       type: object
@@ -3784,8 +3617,25 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CapabilityName'
+        associateVillages:
+          type: array
+          items:
+            type: object
+            properties:
+              villageId: { $ref: '#/components/schemas/VillageId' }
+              name: { type: string }
     VolunteerId:
       $ref: '#/components/schemas/StringIntId'
+    VolunteerPut:
+      additionalProperties: false
+      type: object
+      properties:
+        capabilityIds:
+          type: array
+          items: { $ref: '#/components/schemas/CapabilityId' }
+        associateVillageIds:
+          type: array
+          items: { $ref: '#/components/schemas/VillageId' }
     VolunteerPatch:
       additionalProperties: false
       type: object
@@ -3793,20 +3643,10 @@ components:
       properties:
         capabilityIds:
           type: array
-          items:
-            $ref: '#/components/schemas/CapabilityId'
-    VolunteerPost:
-      additionalProperties: false
-      type: object
-      required:
-      - personId
-      properties:
-        personId:
-          $ref: '#/components/schemas/PersonId'
-        capabilityIds:
+          items: { $ref: '#/components/schemas/CapabilityId' }
+        associateVillageIds:
           type: array
-          items:
-            $ref: '#/components/schemas/CapabilityId'
+          items: { $ref: '#/components/schemas/VillageId' }
     WebPreferences:
       type: object
       properties:
@@ -3931,6 +3771,7 @@ components:
           enum:
           - memberInfo
           - volunteerInfo
+          - communityInfo
     PrivilegeQuery:
       name: privilege
       in: query
