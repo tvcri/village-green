@@ -14,7 +14,6 @@ import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
-import { useCeDumpRefresh } from '../../../shared/composables/useCeDumpRefresh.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -53,7 +52,6 @@ const { state: persons, execute: fetchPersons } = useAsyncState(
 )
 
 useScrollRestore('volunteers', 'volunteer-detail')
-useCeDumpRefresh(() => fetchVolunteers())
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
 const hasActivatedOnce = ref(false)
