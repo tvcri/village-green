@@ -267,7 +267,10 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
     predicates.statements.push('vol.id IS NOT NULL')
   }
   else if (role === 'community') {
-    joins.add('JOIN person_community pc ON pc.person_id = p.id')
+    // EXISTS rather than a JOIN: a person with N community memberships would
+    // otherwise produce N duplicate rows (community is M:N, unlike the 1:1
+    // member/volunteer roles).
+    predicates.statements.push('EXISTS (SELECT 1 FROM person_community pc WHERE pc.person_id = p.id)')
   }
 
   const orderBy = ['p.full_name']
