@@ -119,7 +119,7 @@ CREATE TABLE `member` (
 DROP TABLE IF EXISTS `person`;
 CREATE TABLE `person` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `village_id` int NOT NULL,
+  `village_id` int DEFAULT NULL,
   `full_name` varchar(200) NOT NULL,
   `last_name` varchar(100) DEFAULT NULL,
   `first_name` varchar(100) DEFAULT NULL,
@@ -137,7 +137,6 @@ CREATE TABLE `person` (
   `emergency_contact_phone` varchar(50) DEFAULT NULL,
   `emergency_contact_email` varchar(200) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `village_id` (`village_id`,`full_name`),
   CONSTRAINT `person_ibfk_1` FOREIGN KEY (`village_id`) REFERENCES `village` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -289,6 +288,54 @@ CREATE TABLE `volunteer_capability` (
   KEY `capability_id` (`capability_id`),
   CONSTRAINT `volunteer_capability_ibfk_1` FOREIGN KEY (`volunteer_id`) REFERENCES `volunteer` (`id`),
   CONSTRAINT `volunteer_capability_ibfk_2` FOREIGN KEY (`capability_id`) REFERENCES `capability` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `volunteer_village_associate`
+--
+
+DROP TABLE IF EXISTS `volunteer_village_associate`;
+CREATE TABLE `volunteer_village_associate` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `volunteer_id` int NOT NULL,
+  `village_id` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `volunteer_village` (`volunteer_id`,`village_id`),
+  CONSTRAINT `vva_volunteer_fk` FOREIGN KEY (`volunteer_id`) REFERENCES `volunteer` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `vva_village_fk` FOREIGN KEY (`village_id`) REFERENCES `village` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `community`
+--
+
+DROP TABLE IF EXISTS `community`;
+CREATE TABLE `community` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `community`
+--
+
+INSERT INTO `community` (`name`) VALUES ('Pride'), ('Veteran');
+
+--
+-- Table structure for table `person_community`
+--
+
+DROP TABLE IF EXISTS `person_community`;
+CREATE TABLE `person_community` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `person_id` int NOT NULL,
+  `community_id` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `person_community` (`person_id`,`community_id`),
+  CONSTRAINT `pc_person_fk` FOREIGN KEY (`person_id`) REFERENCES `person` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pc_community_fk` FOREIGN KEY (`community_id`) REFERENCES `community` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
