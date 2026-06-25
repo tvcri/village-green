@@ -7,18 +7,9 @@ import HeaderMenu from './components/HeaderMenu.vue'
 import Breadcrumbs from './components/Breadcrumbs.vue'
 import { useOidcWorker } from './auth/useOidcWorker.js'
 import GlobalErrorModal from './components/global/GlobalErrorModal.vue'
-import { useStateWorker } from './auth/useStateWorker.js'
 
 const oidcWorker = useOidcWorker()
-const { state } = useStateWorker()
 const version = computed(() => VG?.Env?.version || '')
-const ceDumpTime = computed(() => {
-  const time = state.value?.ceDumpTime
-  if (!time) return null
-  const date = new Date(time)
-  if (isNaN(date.getTime())) return null
-  return date.toLocaleString()
-})
 </script>
 
 <template>
@@ -42,10 +33,6 @@ const ceDumpTime = computed(() => {
         <HeaderMenu :version="version" />
       </div>
     </header>
-
-    <div class="sync-status-bar">
-      <template v-if="ceDumpTime">Updated: {{ ceDumpTime }}</template>
-    </div>
 
     <Breadcrumbs />
 
@@ -111,15 +98,6 @@ const ceDumpTime = computed(() => {
   flex-shrink: 0;
 }
 
-.sync-status-bar {
-  padding: 0.5rem 2rem;
-  background-color: var(--color-background-light);
-  border-bottom: 1px solid var(--color-border-default);
-  font-size: 0.8rem;
-  color: var(--color-text-dim);
-  flex-shrink: 0;
-}
-
 .app-main {
   flex: 1;
   background-color: var(--color-background-dark);
@@ -145,10 +123,6 @@ const ceDumpTime = computed(() => {
 
   .header-controls {
     gap: 0.5rem;
-  }
-
-  .sync-status-bar {
-    padding: 0.5rem 1rem;
   }
 }
 </style>

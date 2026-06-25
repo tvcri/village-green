@@ -84,6 +84,13 @@ async function applyConfigurationSettings() {
     await OperationSvc.setConfigurationItem('classification', config.settings.setClassification)
   }
 
+  // TODO: Remove the CE-dump backend tail. CE is retired and the client no
+  // longer consumes ceDumpTime (header panel + useCeDumpRefresh removed).
+  // Dead plumbing to delete: this init block; state.js #ceDumpTime field +
+  // getter/setter; OperationService.getCeDump; Operation.js getCeDump/
+  // ceDumpUpdated controllers; the getCeDump/ceDumpUpdated operations + CeDump
+  // schema in specification/village-green.yaml; and the ce_dump table in
+  // migrations/sql/current/10-vg-tables.sql (requires a migration).
   // Initialize ceDumpTime from database
   try {
     const ceDumpTime = await OperationSvc.getCeDump()

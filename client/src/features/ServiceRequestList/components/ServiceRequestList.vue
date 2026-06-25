@@ -12,7 +12,6 @@ import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { useCeDumpRefresh } from '../../../shared/composables/useCeDumpRefresh.js'
 import { getVillageServiceRequests, getServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
@@ -84,7 +83,6 @@ const { state: allVillages } = useAsyncState(
   { immediate: true }
 )
 
-useCeDumpRefresh(() => fetchRequests())
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
 const hasActivatedOnce = ref(false)
