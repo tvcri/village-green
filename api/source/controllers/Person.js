@@ -9,7 +9,7 @@ module.exports.getPersons = async function getPersons (req, res, next) {
     if (elevate && !req.userObject.privileges?.admin) {
       throw new SmError.PrivilegeError()
     }
-    const { villageId, firstName, lastName, phone, email } = req.query
+    const { villageId, firstName, lastName, phone, email, role } = req.query
     const villageIdsGranted = Object.keys(req.userObject.grants)
     const response = await PersonService.getPersons({
       villageIdsGranted,
@@ -18,7 +18,8 @@ module.exports.getPersons = async function getPersons (req, res, next) {
       firstName,
       lastName,
       phone,
-      email
+      email,
+      role
     })
     res.json(response)
   }
@@ -30,18 +31,8 @@ module.exports.getPersons = async function getPersons (req, res, next) {
 module.exports.createPerson = async function createPerson (req, res, next) {
   try {
     const body = req.body
-    try {
-      const response = await PersonService.createPerson(body)
-      res.status(201).json(response[0])
-    }
-    catch (err) {
-      if (err.code === 'ER_DUP_ENTRY') {
-        throw new SmError.UnprocessableError('Duplicate name exists.')
-      }
-      else {
-        throw err
-      }
-    }
+    const response = await PersonService.createPerson(body)
+    res.status(201).json(response[0])
   }
   catch (err) {
     next(err)
