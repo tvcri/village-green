@@ -2776,12 +2776,14 @@ components:
           type: string
           maxLength: 200
           nullable: true
+        villageId:
+          $ref: '#/components/schemas/VillageId'
+          nullable: true
     PersonPost:
       additionalProperties: false
       type: object
       required:
       - fullName
-      - villageId
       properties:
         fullName:
           type: string
@@ -2833,7 +2835,7 @@ components:
           maxLength: 200
         villageId:
           $ref: '#/components/schemas/VillageId'
-          nullable: false
+          nullable: true
     PersonRoles:
       type: array
       items:
