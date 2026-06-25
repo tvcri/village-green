@@ -12,6 +12,17 @@ const upMigration = [
   `ALTER TABLE person ADD CONSTRAINT person_ibfk_1
      FOREIGN KEY (village_id) REFERENCES village (id)`,
 
+  // full_name is a read convenience derived from last/first — it is now a
+  // STORED generated column so it can never drift from the name parts and is
+  // not directly writable. NULLIF guards keep a blank part from producing a
+  // stray separator (e.g. ', Carl'). The app transitioned from read-only to
+  // owning person data, so this is the first writer of these columns.
+  `ALTER TABLE person
+     MODIFY COLUMN full_name VARCHAR(200)
+     GENERATED ALWAYS AS (
+       CONCAT_WS(', ', NULLIF(last_name, ''), NULLIF(first_name, ''))
+     ) STORED`,
+
   // A volunteer's zero-or-more associate villages beyond their home village.
   `CREATE TABLE volunteer_village_associate (
      id           int NOT NULL AUTO_INCREMENT,
@@ -50,6 +61,9 @@ const upMigration = [
 ]
 
 const downMigration = [
+  // Revert full_name to a plain, writable column (preserving current values).
+  `ALTER TABLE person
+     MODIFY COLUMN full_name VARCHAR(200) NOT NULL`,
   `DROP TABLE IF EXISTS person_community`,
   `DROP TABLE IF EXISTS community`,
   `DROP TABLE IF EXISTS volunteer_village_associate`,

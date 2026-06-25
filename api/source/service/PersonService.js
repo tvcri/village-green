@@ -153,7 +153,7 @@ module.exports.createPerson = async function (body) {
     transactionFn: async (connection) => {
       const { villageId, ...personFields } = body
       const mappedFields = {}
-      if (personFields.fullName !== undefined) mappedFields.full_name = personFields.fullName
+      // full_name is a STORED generated column (last/first) — never written here.
       if (personFields.lastName !== undefined) mappedFields.last_name = personFields.lastName
       if (personFields.firstName !== undefined) mappedFields.first_name = personFields.firstName
       if (personFields.nickname !== undefined) mappedFields.nickname = personFields.nickname
@@ -184,7 +184,7 @@ module.exports.patchPerson = async function (personId, body) {
       const { villageId, ...personFields } = body
 
       const mappedFields = {}
-      if (personFields.fullName !== undefined) mappedFields.full_name = personFields.fullName
+      // full_name is a STORED generated column (last/first) — never written here.
       if (personFields.lastName !== undefined) mappedFields.last_name = personFields.lastName
       if (personFields.firstName !== undefined) mappedFields.first_name = personFields.firstName
       if (personFields.nickname !== undefined) mappedFields.nickname = personFields.nickname
