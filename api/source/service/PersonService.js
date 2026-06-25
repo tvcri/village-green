@@ -110,6 +110,17 @@ module.exports.getPerson = async function (personId, projections = []) {
         FROM volunteer_capability vc
         JOIN capability c ON c.id = vc.capability_id
         WHERE vc.volunteer_id = vol2.id
+      ),
+      'associateVillages', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT('villageId', CAST(vva.village_id AS CHAR), 'name', av.name)
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_village_associate vva
+        JOIN village av ON av.id = vva.village_id
+        WHERE vva.volunteer_id = vol2.id
       )
     ) FROM volunteer vol2 WHERE vol2.person_id = p.id) AS volunteerInfo`)
   }

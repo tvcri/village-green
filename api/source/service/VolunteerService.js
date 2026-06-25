@@ -1,0 +1,96 @@
+'use strict';
+const dbUtils = require('./utils')
+const PersonService = require('./PersonService')
+
+// Ensure a volunteer row exists for the person; return its id.
+async function ensureVolunteer (connection, personId) {
+  const [existing] = await connection.query(
+    'SELECT id FROM volunteer WHERE person_id = ?', [personId]
+  )
+  if (existing.length) return existing[0].id
+  const [res] = await connection.query(
+    'INSERT INTO volunteer SET ?', { person_id: personId }
+  )
+  return res.insertId
+}
+
+// Full-array replace of capabilities for a volunteer.
+async function replaceCapabilities (connection, volunteerId, capabilityIds) {
+  await connection.query(
+    'DELETE FROM volunteer_capability WHERE volunteer_id = ?', [volunteerId]
+  )
+  if (capabilityIds?.length) {
+    const values = capabilityIds.map(id => [volunteerId, id])
+    await connection.query(
+      'INSERT INTO volunteer_capability (volunteer_id, capability_id) VALUES ?', [values]
+    )
+  }
+}
+
+// Full-array replace of associate villages for a volunteer.
+async function replaceAssociateVillages (connection, volunteerId, villageIds) {
+  await connection.query(
+    'DELETE FROM volunteer_village_associate WHERE volunteer_id = ?', [volunteerId]
+  )
+  if (villageIds?.length) {
+    const values = villageIds.map(id => [volunteerId, id])
+    await connection.query(
+      'INSERT INTO volunteer_village_associate (volunteer_id, village_id) VALUES ?', [values]
+    )
+  }
+}
+
+module.exports.volunteerExists = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    'SELECT id FROM volunteer WHERE person_id = ?', [personId]
+  )
+  return rows.length > 0
+}
+
+// Grant or fully replace the volunteer role (capabilities + associates wholesale).
+module.exports.putVolunteer = async function (personId, { capabilityIds = [], associateVillageIds = [] } = {}) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const volunteerId = await ensureVolunteer(connection, personId)
+      await replaceCapabilities(connection, volunteerId, capabilityIds)
+      await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
+    },
+    statusObj: undefined
+  })
+  return await PersonService.getPerson(personId, ['volunteerInfo'])
+}
+
+// Partial update: replace only the arrays that are present.
+module.exports.patchVolunteer = async function (personId, body = {}) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const volunteerId = await ensureVolunteer(connection, personId)
+      if (body.capabilityIds !== undefined) {
+        await replaceCapabilities(connection, volunteerId, body.capabilityIds)
+      }
+      if (body.associateVillageIds !== undefined) {
+        await replaceAssociateVillages(connection, volunteerId, body.associateVillageIds)
+      }
+    },
+    statusObj: undefined
+  })
+  return await PersonService.getPerson(personId, ['volunteerInfo'])
+}
+
+module.exports.deleteVolunteer = async function (personId) {
+  // volunteer_capability and volunteer_village_associate cascade on volunteer delete
+  // (associate has ON DELETE CASCADE; capability is cleared explicitly for safety).
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [rows] = await connection.query(
+        'SELECT id FROM volunteer WHERE person_id = ?', [personId]
+      )
+      if (!rows.length) return
+      const volunteerId = rows[0].id
+      await connection.query('DELETE FROM volunteer_capability WHERE volunteer_id = ?', [volunteerId])
+      await connection.query('DELETE FROM volunteer_village_associate WHERE volunteer_id = ?', [volunteerId])
+      await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
+    },
+    statusObj: undefined
+  })
+}
