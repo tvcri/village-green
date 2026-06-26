@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
@@ -75,8 +75,14 @@ const isSubmitting = ref(false)
 const isCancelling = ref(false)
 const cancelPopover = ref(null)
 
-watch(existingRequest, (val) => {
+// False while the existingRequest watcher is populating the form, so the
+// isRideService watcher does not overwrite the API's transportationType.
+// Starts true in create mode (no load needed); starts false in edit mode.
+const formLoaded = ref(!isEdit.value)
+
+watch(existingRequest, async (val) => {
   if (val && isEdit.value) {
+    formLoaded.value = false
     const extractTimeAsMinutes = (dateStr) => {
       if (!dateStr) return null
       const date = new Date(dateStr)
@@ -110,6 +116,8 @@ watch(existingRequest, (val) => {
       description: val.description || '',
       destination: val.destination || ''
     }
+    await nextTick()
+    formLoaded.value = true
   }
 })
 
@@ -379,6 +387,7 @@ const resetForNewRequest = () => {
 }
 
 watch(isRideService, (newIsRide) => {
+  if (!formLoaded.value) return
   if (newIsRide) {
     form.value.transportationType = 'Round Trip'
   } else {
