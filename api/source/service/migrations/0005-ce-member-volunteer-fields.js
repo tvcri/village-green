@@ -71,6 +71,25 @@ async function dropColumnIfExists (connection, table, column) {
   await run(connection, `ALTER TABLE ${table} DROP COLUMN ${column}`)
 }
 
+async function indexExists (connection, table, indexName) {
+  const [rows] = await connection.query(
+    `SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+    [table, indexName]
+  )
+  return rows[0].count > 0
+}
+
+async function addIndexIfMissing (connection, table, indexName, ddl) {
+  if (await indexExists(connection, table, indexName)) return
+  await run(connection, ddl)
+}
+
+async function dropIndexIfExists (connection, table, indexName) {
+  if (!(await indexExists(connection, table, indexName))) return
+  await run(connection, `ALTER TABLE ${table} DROP INDEX ${indexName}`)
+}
+
 const upFn = async (pool) => {
   const connection = await pool.getConnection()
   try {
@@ -205,6 +224,17 @@ const upFn = async (pool) => {
     await addColumnIfMissing(connection, 'volunteer', 'provider_type',
       `ALTER TABLE volunteer ADD COLUMN provider_type varchar(50) DEFAULT NULL`)
 
+    // volunteer_capability (base-schema bridge table) lacks a natural unique
+    // key, so the CE data load's INSERT ... ON DUPLICATE KEY UPDATE would
+    // insert duplicate (volunteer_id, capability_id) pairs on a re-run. Add the
+    // unique key here so the load is idempotent. The leading volunteer_id makes
+    // the separate KEY volunteer_id redundant; drop it to avoid a duplicate
+    // index (the capability_id FK still needs its own index, kept as-is).
+    await addIndexIfMissing(connection, 'volunteer_capability', 'volunteer_capability_natural',
+      `ALTER TABLE volunteer_capability
+         ADD UNIQUE KEY volunteer_capability_natural (volunteer_id, capability_id)`)
+    await dropIndexIfExists(connection, 'volunteer_capability', 'volunteer_id')
+
     // ---------------------------------------------------------------------
     // disability (member multi-valued trait)
     // ---------------------------------------------------------------------
@@ -282,6 +312,12 @@ const downFn = async (pool) => {
     await run(connection, `DROP TABLE IF EXISTS disability`)
 
     await dropColumnIfExists(connection, 'volunteer', 'provider_type')
+
+    // Reverse the volunteer_capability unique key: restore the plain
+    // volunteer_id index, then drop the natural unique key.
+    await addIndexIfMissing(connection, 'volunteer_capability', 'volunteer_id',
+      `ALTER TABLE volunteer_capability ADD KEY volunteer_id (volunteer_id)`)
+    await dropIndexIfExists(connection, 'volunteer_capability', 'volunteer_capability_natural')
 
     // Drop the household-link FK before its column.
     {
