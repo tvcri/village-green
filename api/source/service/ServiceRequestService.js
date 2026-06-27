@@ -1,6 +1,34 @@
 'use strict';
 
 const dbUtils = require('./utils')
+const SmError = require('../utils/error')
+
+const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
+
+function deriveStatus(clientStatus, volunteerPersonId) {
+  if (clientStatus === 'Draft' || clientStatus === 'Completed' || CANCELLED_STATUSES.includes(clientStatus)) {
+    return clientStatus
+  }
+  return volunteerPersonId ? 'Confirmed' : 'Open'
+}
+
+async function writeNotificationEvent(connection, serviceRequestId, resolvedStatus) {
+  if (resolvedStatus === 'Draft' || resolvedStatus === 'Completed') {
+    throw new SmError.UnprocessableError()
+  }
+  let eventType
+  if (CANCELLED_STATUSES.includes(resolvedStatus)) {
+    eventType = 'cancelled'
+  } else if (resolvedStatus === 'Confirmed') {
+    eventType = 'confirmed'
+  } else {
+    eventType = 'open'
+  }
+  await connection.query(
+    `INSERT INTO notification_event (event_type, service_request_id) VALUES (?, ?)`,
+    [eventType, serviceRequestId]
+  )
+}
 
 module.exports.getServiceRequest = async function (serviceRequestId, projections = []) {
   const columns = [
@@ -63,6 +91,22 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     ), NULL) AS volunteerAddress`)
   }
 
+  if (projections.includes('notificationHistory')) {
+    columns.push(`(
+      SELECT JSON_ARRAYAGG(
+        JSON_OBJECT(
+          'id', ne.id,
+          'eventType', ne.event_type,
+          'createdAt', DATE_FORMAT(ne.created_at, '%Y-%m-%dT%TZ'),
+          'sentAt', DATE_FORMAT(ne.sent_at, '%Y-%m-%dT%TZ'),
+          'failedAt', DATE_FORMAT(ne.failed_at, '%Y-%m-%dT%TZ'),
+          'recipients', ne.recipients
+        ) ORDER BY ne.created_at ASC
+      )
+      FROM notification_event ne
+      WHERE ne.service_request_id = sr.id
+    ) AS notificationHistory`)
+  }
 
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
   const [rows] = await dbUtils.pool.query(sql)
@@ -149,6 +193,8 @@ module.exports.createServiceRequest = async function (payload) {
 
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      const resolvedStatus = deriveStatus(payload.status, payload.volunteerPersonId)
+
       const sql = `
         INSERT INTO service_request (
           village_id,
@@ -178,7 +224,7 @@ module.exports.createServiceRequest = async function (payload) {
         payload.memberPersonId || null,
         payload.volunteerPersonId || null,
         payload.requestNumber || null,
-        payload.status || null,
+        resolvedStatus,
         payload.serviceName || null,
         payload.transportationType || null,
         convertToMySQLDateTime(payload.startAt),
@@ -197,12 +243,9 @@ module.exports.createServiceRequest = async function (payload) {
       const [result] = await connection.query(sql, values)
       const serviceRequestId = result.insertId
 
-      // Create email event for new request
-      const emailEventSql = `
-        INSERT INTO email_event (event_type, service_request_id, volunteer_person_id)
-        VALUES ('new_request', ?, ?)
-      `
-      await connection.query(emailEventSql, [serviceRequestId, payload.volunteerPersonId || null])
+      if (payload.notify) {
+        await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
+      }
 
       // Return only the id. Reading the record back here would run on a
       // separate pool connection while this transaction is still uncommitted,
@@ -221,12 +264,12 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
 
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      // Capture the current volunteer so we only log an email_event when it changes.
       const [currentRows] = await connection.query(
-        'SELECT volunteer_person_id FROM service_request WHERE id = ?',
+        'SELECT volunteer_person_id, status FROM service_request WHERE id = ?',
         [serviceRequestId]
       )
-      const currentVolunteerPersonId = currentRows[0]?.volunteer_person_id ?? null
+      const current = currentRows[0]
+      if (!current) return serviceRequestId
 
       const updates = []
       const values = []
@@ -238,10 +281,6 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       if (payload.volunteerPersonId !== undefined) {
         updates.push('volunteer_person_id = ?')
         values.push(payload.volunteerPersonId || null)
-      }
-      if (payload.status !== undefined) {
-        updates.push('status = ?')
-        values.push(payload.status || null)
       }
       if (payload.serviceName !== undefined) {
         updates.push('service_name = ?')
@@ -300,25 +339,20 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
         values.push(payload.destination || null)
       }
 
-      if (updates.length === 0) {
-        return serviceRequestId
-      }
+      const newVolunteerPersonId = payload.volunteerPersonId !== undefined
+        ? (payload.volunteerPersonId || null)
+        : current.volunteer_person_id
+      const resolvedStatus = deriveStatus(payload.status, newVolunteerPersonId)
+
+      updates.push('status = ?')
+      values.push(resolvedStatus)
 
       values.push(serviceRequestId)
       const sql = `UPDATE service_request SET ${updates.join(', ')} WHERE id = ?`
       await connection.query(sql, values)
 
-      // Only log an email_event when the volunteer assignment actually changes.
-      if (payload.volunteerPersonId !== undefined) {
-        const newVolunteerPersonId = payload.volunteerPersonId || null
-        const normalize = (v) => (v == null ? null : String(v))
-        if (normalize(newVolunteerPersonId) !== normalize(currentVolunteerPersonId)) {
-          const emailEventSql = `
-            INSERT INTO email_event (event_type, service_request_id, volunteer_person_id)
-            VALUES ('patch_request', ?, ?)
-          `
-          await connection.query(emailEventSql, [serviceRequestId, newVolunteerPersonId])
-        }
+      if (payload.notify) {
+        await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
       }
 
       // Return only the id; the caller fetches the record after commit.
