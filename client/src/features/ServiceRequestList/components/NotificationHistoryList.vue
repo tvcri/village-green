@@ -32,11 +32,12 @@ const sorted = computed(() => sortHistory(props.history))
     >
       <div class="history-row-top">
         <span class="event-type">{{ eventTypeLabel(entry.eventType) }}</span>
+        <span class="outcome-time">{{ outcomeLabel(entry) }}</span>
         <Tag
+          class="status-tag"
           :value="eventStatus(entry)"
           :severity="eventStatusSeverity(eventStatus(entry))"
         />
-        <span class="outcome-time">{{ outcomeLabel(entry) }}</span>
       </div>
       <div class="recipients">
         <template v-if="recipientList(entry).length">
@@ -93,6 +94,9 @@ const sorted = computed(() => sortHistory(props.history))
 .outcome-time {
   font-size: 0.85rem;
   color: var(--color-text-dim);
+}
+
+.status-tag {
   margin-left: auto;
 }
 
