@@ -7,6 +7,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
+import NotificationHistoryList from './NotificationHistoryList.vue'
 
 const route = useRoute()
 const { getStatusSeverity } = useStatusSeverity()
@@ -14,7 +15,7 @@ const { getStatusSeverity } = useStatusSeverity()
 const serviceRequestId = computed(() => route.params.id)
 
 const { state: request } = useAsyncState(
-  () => getServiceRequest(serviceRequestId.value, ['memberAddress', 'volunteerAddress']),
+  () => getServiceRequest(serviceRequestId.value, ['memberAddress', 'volunteerAddress', 'notificationHistory']),
   { immediate: true }
 )
 
@@ -246,6 +247,12 @@ function formatTimeRange(startStr, finishStr) {
               :waypoint="mapWaypoint"
             />
           </template>
+        </div>
+
+        <!-- Notifications Section -->
+        <div class="section">
+          <h3 class="section-header">Notifications</h3>
+          <NotificationHistoryList :history="request.notificationHistory ?? []" />
         </div>
       </template>
     </Card>
