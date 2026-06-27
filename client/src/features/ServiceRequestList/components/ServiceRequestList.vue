@@ -9,6 +9,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
+import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -54,6 +55,16 @@ const selectedMember = ref('All members')
 const selectedVolunteer = ref('All volunteers')
 const selectedService = ref('All services')
 const idSearch = ref('')
+const historyDialogVisible = ref(false)
+const historyRequestId = ref(null)
+const historyRequestLabel = ref(null)
+
+const openHistory = (row) => {
+  historyRequestId.value = row.serviceRequestId
+  historyRequestLabel.value = row.displayNumber
+  historyDialogVisible.value = true
+}
+
 const selectedStatuses = ref(['open', 'confirmed'])
 const sortField = ref('startAt')
 const sortDir = ref('asc')
@@ -542,13 +553,19 @@ const clearFilters = () => {
           {{ slotProps.data.displayNumber ?? '—' }}
         </template>
       </Column>
-      <Column v-if="isMetaMode" header="Actions" style="width: 8%">
+      <Column header="Actions" style="width: 10%">
         <template #body="slotProps">
           <Button
-            v-if="['open', 'confirmed', 'draft'].includes(slotProps.data.status?.toLowerCase())"
+            icon="pi pi-bell"
+            class="p-button-rounded p-button-text p-button-sm"
+            aria-label="Notification history"
+            @click.stop="openHistory(slotProps.data)"
+          />
+          <Button
+            v-if="isMetaMode && ['open', 'confirmed', 'draft'].includes(slotProps.data.status?.toLowerCase())"
             icon="pi pi-pencil"
             class="p-button-rounded p-button-text p-button-sm"
-            @click="navigateToEditRequest(slotProps.data.serviceRequestId)"
+            @click.stop="navigateToEditRequest(slotProps.data.serviceRequestId)"
           />
         </template>
       </Column>
@@ -590,6 +607,11 @@ const clearFilters = () => {
         </div>
       </div>
     </div>
+    <NotificationHistoryDialog
+      v-model:visible="historyDialogVisible"
+      :service-request-id="historyRequestId"
+      :display-label="historyRequestLabel"
+    />
   </div>
 </template>
 
