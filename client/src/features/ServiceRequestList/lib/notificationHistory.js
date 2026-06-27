@@ -39,9 +39,14 @@ export const eventTypeLabel = (eventType) => {
 
 // Recipient fullNames as an array (for rendering one chip per name). Names are
 // themselves "Last, First", so comma-joining reads ambiguously — the UI renders
-// these as individual chips instead. Empty array when there are no recipients.
+// these as individual chips instead. Sorted alphabetically because the API
+// returns recipients in non-deterministic personId order. Empty array when
+// there are no recipients.
 export const recipientList = (entry) =>
-  (entry?.recipients ?? []).map(r => r.fullName).filter(Boolean)
+  (entry?.recipients ?? [])
+    .map(r => r.fullName)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
 
 export const sortHistory = (history) =>
   (Array.isArray(history) ? [...history] : [])

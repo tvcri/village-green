@@ -71,6 +71,10 @@ describe('recipientList', () => {
     const entry = { recipients: [{ fullName: 'Doe, Jane' }, { fullName: 'Smith, John' }] }
     expect(recipientList(entry)).toEqual(['Doe, Jane', 'Smith, John'])
   })
+  it('sorts names alphabetically regardless of API order', () => {
+    const entry = { recipients: [{ fullName: 'Smith, John' }, { fullName: 'Adams, Amy' }, { fullName: 'Doe, Jane' }] }
+    expect(recipientList(entry)).toEqual(['Adams, Amy', 'Doe, Jane', 'Smith, John'])
+  })
   it('returns a single-element array for one recipient', () => {
     expect(recipientList({ recipients: [{ fullName: 'Doe, Jane' }] })).toEqual(['Doe, Jane'])
   })
