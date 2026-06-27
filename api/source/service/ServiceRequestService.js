@@ -107,7 +107,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
             FROM JSON_TABLE(ne.recipients, '$[*]' COLUMNS(personId INT PATH '$')) AS jt
             JOIN person p ON p.id = jt.personId
           ), JSON_ARRAY())
-        ) ORDER BY ne.created_at ASC
+        )
       )
       FROM notification_event ne
       WHERE ne.service_request_id = sr.id
