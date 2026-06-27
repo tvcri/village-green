@@ -243,8 +243,8 @@ const formattedCreatedAt = computed(() => {
 // When the user changes a time field, seed the NEXT field to val+15 minutes.
 // seedDepth tracks programmatic writes: a watcher only cascades when depth=0
 // (user-driven), so one user pick fills exactly one downstream field.
-// Round Trip: Start -> Appointment -> Return -> Finish.
-// One Way:    Start -> Finish (Appointment/Return are hidden).
+// Round Trip: Start -> Arrival -> Return -> Finish.
+// One Way:    Start -> Finish (Arrival/Return are hidden).
 let seedDepth = 0
 const seedNext = (field, val, delta = 15) => {
   seedDepth++
@@ -264,8 +264,8 @@ watch(() => form.value.apptTime, (val) => {
 
 watch(() => form.value.returnTime, (val) => {
   if (seedDepth > 0 || val == null) return
-  // Seed finish using the same duration as start→appt, so the ride home
-  // mirrors the outbound leg. Fall back to +15 if start/appt aren't set.
+  // Seed finish using the same duration as start→arrival, so the ride home
+  // mirrors the outbound leg. Fall back to +15 if start/arrival aren't set.
   const start = form.value.startTime
   const appt = form.value.apptTime
   const delta = (start != null && appt != null) ? (appt - start) : 15
