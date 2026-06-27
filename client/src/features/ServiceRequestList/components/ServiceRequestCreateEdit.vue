@@ -233,34 +233,32 @@ watch(() => form.value.volunteerPersonId, () => {
   form.value.status = computedStatus.value
 }, { immediate: true })
 
-// During creation, seeding a chosen time into the NEXT empty field should not
-// itself cascade onward. The `seeding` guard makes a programmatic seed-write
-// skip the downstream watcher, so a single user selection fills only one field.
+// When the user changes a time field, cascade forward to seed the next field
+// 15 minutes later. The `seeding` guard prevents a programmatic seed-write
+// from itself triggering further cascades — one user selection fills one field.
 // Round Trip: Start -> Appointment -> Return -> Finish.
 // One Way:    Start -> Finish (Appointment/Return are hidden).
 let seeding = false
 const seedNext = (field, val) => {
-  if (form.value[field] == null) {
-    // Seed the next field 15 minutes later, capped at the last slot (23:45).
-    const next = Math.min(val + 15, 23 * 60 + 45)
-    seeding = true
-    form.value[field] = next
-    seeding = false
-  }
+  // Always overwrite the next field on a user-driven change (not just when empty).
+  const next = Math.min(val + 15, 23 * 60 + 45)
+  seeding = true
+  form.value[field] = next
+  seeding = false
 }
 
 watch(() => form.value.startTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
+  if (seeding || val == null) return
   seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.apptTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
+  if (seeding || val == null) return
   seedNext('returnTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.returnTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
+  if (seeding || val == null) return
   seedNext('finishTime', val)
 }, { flush: 'sync' })
 
