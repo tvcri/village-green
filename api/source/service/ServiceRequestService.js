@@ -100,7 +100,11 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
           'createdAt', DATE_FORMAT(ne.created_at, '%Y-%m-%dT%TZ'),
           'sentAt', DATE_FORMAT(ne.sent_at, '%Y-%m-%dT%TZ'),
           'failedAt', DATE_FORMAT(ne.failed_at, '%Y-%m-%dT%TZ'),
-          'recipients', ne.recipients
+          'recipients', COALESCE((
+            SELECT JSON_ARRAYAGG(JSON_OBJECT('id', p.id, 'fullName', p.full_name))
+            FROM JSON_TABLE(ne.recipients, '$[*]' COLUMNS(personId INT PATH '$')) AS jt
+            JOIN person p ON p.id = jt.personId
+          ), JSON_ARRAY())
         ) ORDER BY ne.created_at ASC
       )
       FROM notification_event ne
