@@ -233,35 +233,36 @@ watch(() => form.value.volunteerPersonId, () => {
   form.value.status = computedStatus.value
 }, { immediate: true })
 
-// During creation, seeding a chosen time into the NEXT empty field should not
-// itself cascade onward. The `seeding` guard makes a programmatic seed-write
-// skip the downstream watcher, so a single user selection fills only one field.
+// When the user changes a time field, seed the NEXT field to val+15 minutes.
+// seedDepth tracks programmatic writes: a watcher only cascades when depth=0
+// (user-driven), so one user pick fills exactly one downstream field.
 // Round Trip: Start -> Appointment -> Return -> Finish.
 // One Way:    Start -> Finish (Appointment/Return are hidden).
-let seeding = false
-const seedNext = (field, val) => {
-  if (form.value[field] == null) {
-    // Seed the next field 15 minutes later, capped at the last slot (23:45).
-    const next = Math.min(val + 15, 23 * 60 + 45)
-    seeding = true
-    form.value[field] = next
-    seeding = false
-  }
+let seedDepth = 0
+const seedNext = (field, val, delta = 15) => {
+  seedDepth++
+  form.value[field] = Math.min(val + delta, 23 * 60 + 45)
+  seedDepth--
 }
 
 watch(() => form.value.startTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
+  if (seedDepth > 0 || val == null) return
   seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.apptTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
+  if (seedDepth > 0 || val == null) return
   seedNext('returnTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.returnTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
-  seedNext('finishTime', val)
+  if (seedDepth > 0 || val == null) return
+  // Seed finish using the same duration as start→appt, so the ride home
+  // mirrors the outbound leg. Fall back to +15 if start/appt aren't set.
+  const start = form.value.startTime
+  const appt = form.value.apptTime
+  const delta = (start != null && appt != null) ? (appt - start) : 15
+  seedNext('finishTime', val, delta)
 }, { flush: 'sync' })
 
 const serviceNameOptions = [
