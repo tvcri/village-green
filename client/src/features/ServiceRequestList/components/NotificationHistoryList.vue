@@ -6,7 +6,7 @@ import {
   eventStatusSeverity,
   outcomeLabel,
   eventTypeLabel,
-  recipientNames,
+  recipientList,
   sortHistory,
 } from '../lib/notificationHistory.js'
 
@@ -38,7 +38,16 @@ const sorted = computed(() => sortHistory(props.history))
         />
         <span class="outcome-time">{{ outcomeLabel(entry) }}</span>
       </div>
-      <div class="recipients">{{ recipientNames(entry) }}</div>
+      <div class="recipients">
+        <template v-if="recipientList(entry).length">
+          <span
+            v-for="(name, i) in recipientList(entry)"
+            :key="i"
+            class="recipient-chip"
+          >{{ name }}</span>
+        </template>
+        <span v-else class="recipients-empty">—</span>
+      </div>
     </div>
   </div>
 </template>
@@ -88,8 +97,29 @@ const sorted = computed(() => sortHistory(props.history))
 }
 
 .recipients {
-  font-size: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* Lightweight read-only chips. Names are "Last, First", so each goes in its own
+   chip to avoid the ambiguity of a comma-joined list. Uses --color-background-subtle
+   (a faint translucent tint defined for both light and dark in style.css) so the
+   chip reads as a quiet tag with contrast in either theme. */
+.recipient-chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
   color: var(--color-text-primary);
-  word-break: break-word;
+  background-color: var(--color-background-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.recipients-empty {
+  font-size: 0.9rem;
+  color: var(--color-text-dim);
 }
 </style>

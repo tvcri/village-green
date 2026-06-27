@@ -5,7 +5,7 @@ import {
   formatEventDate,
   outcomeLabel,
   eventTypeLabel,
-  recipientNames,
+  recipientList,
   sortHistory,
 } from './notificationHistory.js'
 
@@ -66,19 +66,23 @@ describe('eventTypeLabel', () => {
   })
 })
 
-describe('recipientNames', () => {
-  it('joins multiple fullNames with commas (broadcast case)', () => {
-    const entry = { recipients: [{ fullName: 'Jane Doe' }, { fullName: 'John Smith' }, { fullName: 'Maria Lopez' }] }
-    expect(recipientNames(entry)).toBe('Jane Doe, John Smith, Maria Lopez')
+describe('recipientList', () => {
+  it('returns an array of fullNames (broadcast case)', () => {
+    const entry = { recipients: [{ fullName: 'Doe, Jane' }, { fullName: 'Smith, John' }] }
+    expect(recipientList(entry)).toEqual(['Doe, Jane', 'Smith, John'])
   })
-  it('returns a single name unchanged', () => {
-    expect(recipientNames({ recipients: [{ fullName: 'Jane Doe' }] })).toBe('Jane Doe')
+  it('returns a single-element array for one recipient', () => {
+    expect(recipientList({ recipients: [{ fullName: 'Doe, Jane' }] })).toEqual(['Doe, Jane'])
   })
-  it('returns the dash placeholder for empty recipients', () => {
-    expect(recipientNames({ recipients: [] })).toBe('—')
+  it('filters out entries without a fullName', () => {
+    const entry = { recipients: [{ fullName: 'Doe, Jane' }, { fullName: null }, {}] }
+    expect(recipientList(entry)).toEqual(['Doe, Jane'])
   })
-  it('returns the dash placeholder when recipients is absent', () => {
-    expect(recipientNames({})).toBe('—')
+  it('returns an empty array when recipients is empty', () => {
+    expect(recipientList({ recipients: [] })).toEqual([])
+  })
+  it('returns an empty array when recipients is absent', () => {
+    expect(recipientList({})).toEqual([])
   })
 })
 

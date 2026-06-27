@@ -37,10 +37,11 @@ export const eventTypeLabel = (eventType) => {
   return eventType.charAt(0).toUpperCase() + eventType.slice(1)
 }
 
-export const recipientNames = (entry) => {
-  const names = (entry?.recipients ?? []).map(r => r.fullName).filter(Boolean)
-  return names.length ? names.join(', ') : '—'
-}
+// Recipient fullNames as an array (for rendering one chip per name). Names are
+// themselves "Last, First", so comma-joining reads ambiguously — the UI renders
+// these as individual chips instead. Empty array when there are no recipients.
+export const recipientList = (entry) =>
+  (entry?.recipients ?? []).map(r => r.fullName).filter(Boolean)
 
 export const sortHistory = (history) =>
   (Array.isArray(history) ? [...history] : [])
