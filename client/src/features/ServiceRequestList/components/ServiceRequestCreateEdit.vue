@@ -233,32 +233,26 @@ watch(() => form.value.volunteerPersonId, () => {
   form.value.status = computedStatus.value
 }, { immediate: true })
 
-// When the user changes a time field, cascade forward to seed the next field
-// 15 minutes later. The `seeding` guard prevents a programmatic seed-write
-// from itself triggering further cascades — one user selection fills one field.
+// When the user changes a time field, cascade forward to the next field,
+// setting it to val + 15 minutes. The full chain propagates:
 // Round Trip: Start -> Appointment -> Return -> Finish.
 // One Way:    Start -> Finish (Appointment/Return are hidden).
-let seeding = false
 const seedNext = (field, val) => {
-  // Always overwrite the next field on a user-driven change (not just when empty).
-  const next = Math.min(val + 15, 23 * 60 + 45)
-  seeding = true
-  form.value[field] = next
-  seeding = false
+  form.value[field] = Math.min(val + 15, 23 * 60 + 45)
 }
 
 watch(() => form.value.startTime, (val) => {
-  if (seeding || val == null) return
+  if (val == null) return
   seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.apptTime, (val) => {
-  if (seeding || val == null) return
+  if (val == null) return
   seedNext('returnTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.returnTime, (val) => {
-  if (seeding || val == null) return
+  if (val == null) return
   seedNext('finishTime', val)
 }, { flush: 'sync' })
 
