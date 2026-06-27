@@ -555,18 +555,20 @@ const clearFilters = () => {
       </Column>
       <Column header="Actions" style="width: 10%">
         <template #body="slotProps">
-          <Button
-            icon="pi pi-bell"
-            class="p-button-rounded p-button-text p-button-sm"
-            aria-label="Notification history"
-            @click.stop="openHistory(slotProps.data)"
-          />
-          <Button
-            v-if="isMetaMode && ['open', 'confirmed', 'draft'].includes(slotProps.data.status?.toLowerCase())"
-            icon="pi pi-pencil"
-            class="p-button-rounded p-button-text p-button-sm"
-            @click.stop="navigateToEditRequest(slotProps.data.serviceRequestId)"
-          />
+          <div class="row-actions">
+            <Button
+              icon="pi pi-bell"
+              class="p-button-rounded p-button-text p-button-sm"
+              aria-label="Notification history"
+              @click.stop="openHistory(slotProps.data)"
+            />
+            <Button
+              v-if="isMetaMode && ['open', 'confirmed', 'draft'].includes(slotProps.data.status?.toLowerCase())"
+              icon="pi pi-pencil"
+              class="p-button-rounded p-button-text p-button-sm"
+              @click.stop="navigateToEditRequest(slotProps.data.serviceRequestId)"
+            />
+          </div>
         </template>
       </Column>
     </DataTable>
@@ -892,6 +894,15 @@ h1 {
 
 .request-table-responsive {
   cursor: pointer;
+}
+
+/* Keep the row action icons (bell + edit) side by side; the narrow Actions
+   column would otherwise wrap them onto two rows. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
 }
 
 .status-badge {
