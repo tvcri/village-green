@@ -250,7 +250,7 @@ function formatTimeRange(startStr, finishStr) {
         </div>
 
         <!-- Notifications Section -->
-        <div class="section">
+        <div class="section notifications-section">
           <h3 class="section-header">Notifications</h3>
           <NotificationHistoryList :history="request.notificationHistory ?? []" />
         </div>
@@ -361,6 +361,12 @@ function formatTimeRange(startStr, finishStr) {
 
 .section:last-child {
   margin-bottom: 0;
+}
+
+/* The notification list is a single grid child; without this it would sit in
+   one of the section's 3 columns and wrap chips at ~1/3 width. Span all columns. */
+.notifications-section > :deep(.notification-history) {
+  grid-column: 1 / -1;
 }
 
 .section-header {
