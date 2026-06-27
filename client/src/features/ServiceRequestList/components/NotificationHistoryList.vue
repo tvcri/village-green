@@ -22,7 +22,7 @@ const sorted = computed(() => sortHistory(props.history))
 <template>
   <div class="notification-history">
     <p v-if="sorted.length === 0" class="empty-message">
-      No notifications sent yet.
+      No notifications recorded.
     </p>
     <div
       v-for="entry in sorted"

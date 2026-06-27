@@ -610,7 +610,7 @@ const handleCancelRequest = async (reason) => {
   cancelPopover.value.hide()
   isCancelling.value = true
   try {
-    await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason })
+    await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason, notify: true })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request cancelled', life: 3000 })
     setTimeout(() => {
       router.push({ name: 'meta-service-requests' })
