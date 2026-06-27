@@ -233,27 +233,36 @@ watch(() => form.value.volunteerPersonId, () => {
   form.value.status = computedStatus.value
 }, { immediate: true })
 
-// When the user changes a time field, cascade forward to the next field,
-// setting it to val + 15 minutes. The full chain propagates:
+// When the user changes a time field, seed the NEXT field to val+15 minutes.
+// seedDepth tracks programmatic writes: a watcher only cascades when depth=0
+// (user-driven), so one user pick fills exactly one downstream field.
 // Round Trip: Start -> Appointment -> Return -> Finish.
 // One Way:    Start -> Finish (Appointment/Return are hidden).
-const seedNext = (field, val) => {
-  form.value[field] = Math.min(val + 15, 23 * 60 + 45)
+let seedDepth = 0
+const seedNext = (field, val, delta = 15) => {
+  seedDepth++
+  form.value[field] = Math.min(val + delta, 23 * 60 + 45)
+  seedDepth--
 }
 
 watch(() => form.value.startTime, (val) => {
-  if (val == null) return
+  if (seedDepth > 0 || val == null) return
   seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.apptTime, (val) => {
-  if (val == null) return
+  if (seedDepth > 0 || val == null) return
   seedNext('returnTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.returnTime, (val) => {
-  if (val == null) return
-  seedNext('finishTime', val)
+  if (seedDepth > 0 || val == null) return
+  // Seed finish using the same duration as start→appt, so the ride home
+  // mirrors the outbound leg. Fall back to +15 if start/appt aren't set.
+  const start = form.value.startTime
+  const appt = form.value.apptTime
+  const delta = (start != null && appt != null) ? (appt - start) : 15
+  seedNext('finishTime', val, delta)
 }, { flush: 'sync' })
 
 const serviceNameOptions = [
