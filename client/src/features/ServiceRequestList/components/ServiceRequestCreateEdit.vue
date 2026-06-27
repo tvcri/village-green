@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import SplitButton from 'primevue/splitbutton'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
@@ -213,6 +214,7 @@ const statusOverride = ref(null)
 
 const computedStatus = computed(() => {
   if (statusOverride.value) return statusOverride.value
+  if (form.value.status === 'Draft') return 'Draft'
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
@@ -229,9 +231,6 @@ const formattedCreatedAt = computed(() => {
   })
 })
 
-watch(() => form.value.volunteerPersonId, () => {
-  form.value.status = computedStatus.value
-}, { immediate: true })
 
 // During creation, seeding a chosen time into the NEXT empty field should not
 // itself cascade onward. The `seeding` guard makes a programmatic seed-write
@@ -395,7 +394,7 @@ watch(isRideService, (newIsRide) => {
   }
 })
 
-const handleSubmit = async () => {
+const handleSubmit = async (notify = false, saveAsDraft = false) => {
   try {
     // Required fields
     if (!form.value.villageId) {
@@ -455,9 +454,7 @@ const handleSubmit = async () => {
       villageId: form.value.villageId,
       memberPersonId: form.value.memberPersonId?.trim() || null,
       volunteerPersonId: form.value.volunteerPersonId?.trim() || null,
-      // Always derive status from the current volunteer assignment so it can
-      // never be null (the form watcher can miss reset/no-change cases).
-      status: computedStatus.value,
+      notify,
       serviceName: form.value.serviceName || null,
       transportationType: form.value.transportationType || null,
       // The date must always be preserved, since there is no standalone date
@@ -491,6 +488,18 @@ const handleSubmit = async () => {
       instructions: form.value.instructions || null,
       description: form.value.description || null,
       destination: form.value.destination || null
+    }
+
+    // POST accepts an optional status (Draft only); PATCH accepts client-supplied statuses.
+    // For normal saves we let the API derive the status from the volunteer assignment.
+    if (!isEdit.value && saveAsDraft) {
+      payload.status = 'Draft'
+    } else if (isEdit.value) {
+      // Only send status on PATCH if it's a client-supplied value (non-derived).
+      const clientStatuses = ['Draft', 'Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
+      if (clientStatuses.includes(form.value.status)) {
+        payload.status = form.value.status
+      }
     }
 
     let result
@@ -527,6 +536,20 @@ const handleSubmit = async () => {
     isSubmitting.value = false
   }
 }
+
+const splitButtonModel = computed(() => {
+  const items = [
+    {
+      label: 'Save and Notify',
+      command: () => handleSubmit(true, false),
+      disabled: computedStatus.value === 'Draft' || computedStatus.value === 'Completed'
+    }
+  ]
+  if (!isEdit.value) {
+    items.push({ label: 'Save as Draft', command: () => handleSubmit(false, true) })
+  }
+  return items
+})
 
 const handleCancel = () => {
   router.push({ name: 'meta-service-requests' })
@@ -579,11 +602,6 @@ const handleCancelRequest = async (reason) => {
   }
 }
 
-const testValue = ref(null)
-const testItems = ref([])
-const testSearch = (event) => {
-  testItems.value = ['Option 1', 'Option 2', 'Option 3']
-}
 </script>
 
 <template>
@@ -601,7 +619,7 @@ const testSearch = (event) => {
             <Tag
               v-if="!isEdit || !isLoadingRequest"
               :value="computedStatus"
-              :severity="computedStatus === 'Confirmed' ? 'info' : computedStatus === 'Completed' ? 'success' : 'warn'"
+              :severity="computedStatus === 'Confirmed' ? 'info' : computedStatus === 'Completed' ? 'success' : computedStatus === 'Draft' ? 'secondary' : 'warn'"
             />
             <Button
               v-if="isEdit && isConfirmed"
@@ -891,11 +909,12 @@ const testSearch = (event) => {
                 @click="handleCancel"
                 :disabled="isSubmitting"
               />
-              <Button
-                type="submit"
+              <SplitButton
                 :label="isEdit ? 'Update' : 'Create'"
                 :loading="isSubmitting"
                 :disabled="!isFormValid || isSubmitting"
+                :model="splitButtonModel"
+                @click="handleSubmit(false, false)"
               />
             </div>
           </div>
