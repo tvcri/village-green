@@ -2,6 +2,12 @@ const MigrationHandler = require('./lib/MigrationHandler')
 
 const upMigration = [
   `RENAME TABLE email_event TO notification_event`,
+  // Backfill legacy event_type to the new vocabulary. Old values were
+  // new_request/patch_request; the new type derives solely from whether a
+  // volunteer was assigned: volunteer -> confirmed, otherwise -> open. This
+  // MUST run before volunteer_person_id is dropped below.
+  `UPDATE notification_event
+    SET event_type = IF(volunteer_person_id IS NOT NULL, 'confirmed', 'open')`,
   `ALTER TABLE notification_event
     DROP FOREIGN KEY fk_email_event_volunteer,
     DROP COLUMN volunteer_person_id,
