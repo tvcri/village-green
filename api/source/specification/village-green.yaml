@@ -3061,6 +3061,34 @@ components:
           type: string
           maxLength: 200
           nullable: true
+    ServiceRequestNotificationHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventType:
+          type: string
+          enum:
+          - open
+          - confirmed
+          - cancelled
+          - reminder
+        createdAt:
+          type: string
+          format: date-time
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+        failedAt:
+          type: string
+          format: date-time
+          nullable: true
+        recipients:
+          type: array
+          nullable: true
+          items:
+            type: integer
     ServiceRequest:
       additionalProperties: false
       type: object
@@ -3161,6 +3189,11 @@ components:
         volunteerAddress:
           $ref: '#/components/schemas/PersonAddress'
           nullable: true
+        notificationHistory:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/ServiceRequestNotificationHistory'
     ServiceRequestId:
       $ref: '#/components/schemas/StringIntId'
     ServiceRequestPatch:
@@ -3185,10 +3218,18 @@ components:
           minLength: 1
           pattern: ^[0-9]{1,10}$
           nullable: true
+        notify:
+          type: boolean
+          default: false
         status:
           type: string
-          maxLength: 50
           nullable: true
+          enum:
+          - Draft
+          - Completed
+          - Member cancelled
+          - Volunteer cancelled
+          - Hub cancelled
         serviceName:
           type: string
           maxLength: 200
@@ -3250,7 +3291,6 @@ components:
       type: object
       required:
       - villageId
-      - status
       properties:
         requestNumber:
           type: integer
@@ -3268,10 +3308,14 @@ components:
           minLength: 1
           pattern: ^[0-9]{1,10}$
           nullable: true
+        notify:
+          type: boolean
+          default: false
         status:
           type: string
-          maxLength: 50
-          minLength: 1
+          enum:
+          - Draft
+          nullable: true
         serviceName:
           type: string
           maxLength: 200
@@ -3983,6 +4027,7 @@ components:
           enum:
           - memberAddress
           - volunteerAddress
+          - notificationHistory
     UserGroupIdPath:
       name: userGroupId
       in: path
