@@ -3086,9 +3086,16 @@ components:
           nullable: true
         recipients:
           type: array
-          nullable: true
           items:
-            type: integer
+            type: object
+            required:
+              - id
+              - fullName
+            properties:
+              id:
+                type: integer
+              fullName:
+                type: string
     ServiceRequest:
       additionalProperties: false
       type: object
@@ -3103,6 +3110,10 @@ components:
           nullable: true
         villageId:
           $ref: '#/components/schemas/VillageId'
+        villageName:
+          type: string
+          maxLength: 100
+          nullable: true
         memberPersonId:
           $ref: '#/components/schemas/PersonId'
           nullable: true
@@ -4011,6 +4022,7 @@ components:
           enum:
           - open
           - confirmed
+          - draft
           - completed
           - unmatched
           - cancelled
