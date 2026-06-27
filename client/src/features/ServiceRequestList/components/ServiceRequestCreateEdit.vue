@@ -12,6 +12,7 @@ import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import AutoComplete from 'primevue/autocomplete'
 import Tag from 'primevue/tag'
+import Checkbox from 'primevue/checkbox'
 import Popover from 'primevue/popover'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
@@ -75,6 +76,8 @@ const form = ref({
 const isSubmitting = ref(false)
 const isCancelling = ref(false)
 const cancelPopover = ref(null)
+const isDraft = ref(false)
+const wasLoadedAsDraft = ref(false)
 
 // False while the existingRequest watcher is populating the form, so the
 // isRideService watcher does not overwrite the API's transportationType.
@@ -84,6 +87,8 @@ const formLoaded = ref(!isEdit.value)
 watch(existingRequest, async (val) => {
   if (val && isEdit.value) {
     formLoaded.value = false
+    isDraft.value = val.status === 'Draft'
+    wasLoadedAsDraft.value = val.status === 'Draft'
     const extractTimeAsMinutes = (dateStr) => {
       if (!dateStr) return null
       const date = new Date(dateStr)
@@ -212,9 +217,12 @@ watch([allVolunteerOptions, () => form.value.volunteerPersonId], ([volunteers, v
 
 const statusOverride = ref(null)
 
+const CLIENT_STATUSES = ['Draft', 'Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
+
 const computedStatus = computed(() => {
   if (statusOverride.value) return statusOverride.value
-  if (form.value.status === 'Draft') return 'Draft'
+  if (isDraft.value) return 'Draft'
+  if (CLIENT_STATUSES.includes(form.value.status) && form.value.status !== 'Draft') return form.value.status
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
@@ -232,35 +240,36 @@ const formattedCreatedAt = computed(() => {
 })
 
 
-// During creation, seeding a chosen time into the NEXT empty field should not
-// itself cascade onward. The `seeding` guard makes a programmatic seed-write
-// skip the downstream watcher, so a single user selection fills only one field.
-// Round Trip: Start -> Appointment -> Return -> Finish.
-// One Way:    Start -> Finish (Appointment/Return are hidden).
-let seeding = false
-const seedNext = (field, val) => {
-  if (form.value[field] == null) {
-    // Seed the next field 15 minutes later, capped at the last slot (23:45).
-    const next = Math.min(val + 15, 23 * 60 + 45)
-    seeding = true
-    form.value[field] = next
-    seeding = false
-  }
+// When the user changes a time field, seed the NEXT field to val+15 minutes.
+// seedDepth tracks programmatic writes: a watcher only cascades when depth=0
+// (user-driven), so one user pick fills exactly one downstream field.
+// Round Trip: Start -> Arrive -> Return -> Finish.
+// One Way:    Start -> Finish (Arrive/Return are hidden).
+let seedDepth = 0
+const seedNext = (field, val, delta = 15) => {
+  seedDepth++
+  form.value[field] = Math.min(val + delta, 23 * 60 + 45)
+  seedDepth--
 }
 
 watch(() => form.value.startTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
+  if (seedDepth > 0 || val == null) return
   seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.apptTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
+  if (seedDepth > 0 || val == null) return
   seedNext('returnTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.returnTime, (val) => {
-  if (isEdit.value || seeding || val == null) return
-  seedNext('finishTime', val)
+  if (seedDepth > 0 || val == null) return
+  // Seed finish using the same duration as start→arrive, so the ride home
+  // mirrors the outbound leg. Fall back to +15 if start/arrive aren't set.
+  const start = form.value.startTime
+  const appt = form.value.apptTime
+  const delta = (start != null && appt != null) ? (appt - start) : 15
+  seedNext('finishTime', val, delta)
 }, { flush: 'sync' })
 
 const serviceNameOptions = [
@@ -340,13 +349,14 @@ const availableTransportationTypes = computed(() => {
 const isFormValid = computed(() => {
   const f = form.value
 
-  // Always required
-  if (!f.villageId || !f.serviceName || !f.memberPersonId || !f.serviceDate) {
-    return false
-  }
+  if (!f.villageId) return false
 
-  // Ride-specific requirements. Time fields are optional; only the
-  // destination and a valid transportation type are required.
+  // Draft only requires a village
+  if (isDraft.value) return true
+
+  if (!f.serviceName || !f.memberPersonId || !f.serviceDate) return false
+
+  // Ride-specific requirements
   if (isRideService.value) {
     if (!f.destination) return false
     if (!['Round Trip', 'One Way'].includes(f.transportationType)) return false
@@ -359,6 +369,7 @@ const isFormValid = computed(() => {
 // chosen village so consecutive requests for the same village are quick.
 const resetForNewRequest = () => {
   const keepVillage = form.value.villageId
+  isDraft.value = false
   selectedMember.value = null
   selectedVolunteer.value = null
   form.value = {
@@ -394,37 +405,37 @@ watch(isRideService, (newIsRide) => {
   }
 })
 
-const handleSubmit = async (notify = false, saveAsDraft = false) => {
+const handleSubmit = async (notify = false) => {
   try {
-    // Required fields
     if (!form.value.villageId) {
       toast.add({ severity: 'error', summary: 'Error', detail: 'Village is required', life: 3000 })
       return
     }
-    if (!form.value.serviceName) {
-      toast.add({ severity: 'error', summary: 'Error', detail: 'Service name is required', life: 3000 })
-      return
-    }
-    if (!form.value.memberPersonId) {
-      toast.add({ severity: 'error', summary: 'Error', detail: 'Member is required', life: 3000 })
-      return
-    }
-    if (!form.value.serviceDate) {
-      toast.add({ severity: 'error', summary: 'Error', detail: 'Service date is required', life: 3000 })
-      return
-    }
 
-    // Ride-specific validation
-    if (isRideService.value) {
-      if (!form.value.destination) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Destination is required for ride services', life: 3000 })
+    if (!isDraft.value) {
+      if (!form.value.serviceName) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Service name is required', life: 3000 })
         return
       }
-      if (!form.value.transportationType || !['Round Trip', 'One Way'].includes(form.value.transportationType)) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
+      if (!form.value.memberPersonId) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Member is required', life: 3000 })
         return
       }
-      // Time fields are optional; no time validation is enforced.
+      if (!form.value.serviceDate) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Service date is required', life: 3000 })
+        return
+      }
+
+      if (isRideService.value) {
+        if (!form.value.destination) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Destination is required for ride services', life: 3000 })
+          return
+        }
+        if (!form.value.transportationType || !['Round Trip', 'One Way'].includes(form.value.transportationType)) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
+          return
+        }
+      }
     }
 
     isSubmitting.value = true
@@ -490,14 +501,13 @@ const handleSubmit = async (notify = false, saveAsDraft = false) => {
       destination: form.value.destination || null
     }
 
-    // POST accepts an optional status (Draft only); PATCH accepts client-supplied statuses.
-    // For normal saves we let the API derive the status from the volunteer assignment.
-    if (!isEdit.value && saveAsDraft) {
+    if (isDraft.value) {
       payload.status = 'Draft'
     } else if (isEdit.value) {
-      // Only send status on PATCH if it's a client-supplied value (non-derived).
-      const clientStatuses = ['Draft', 'Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
-      if (clientStatuses.includes(form.value.status)) {
+      // Only send status on PATCH for non-derived client values.
+      // Draft is excluded here because isDraft.value is false in this branch.
+      const nonDraftClientStatuses = CLIENT_STATUSES.filter(s => s !== 'Draft')
+      if (nonDraftClientStatuses.includes(form.value.status)) {
         payload.status = form.value.status
       }
     }
@@ -509,10 +519,11 @@ const handleSubmit = async (notify = false, saveAsDraft = false) => {
       result = await apiCall('createServiceRequest', {}, payload)
     }
 
+    const displayId = result.requestNumber ?? result.serviceRequestId
     toast.add({
       severity: 'success',
       summary: 'Success',
-      detail: isEdit.value ? 'Service request updated' : 'Service request created',
+      detail: isEdit.value ? `Service request #${displayId} updated` : `Service request #${displayId} created`,
       life: 3000
     })
 
@@ -537,18 +548,10 @@ const handleSubmit = async (notify = false, saveAsDraft = false) => {
   }
 }
 
+const isPublishing = computed(() => isEdit.value && wasLoadedAsDraft.value && !isDraft.value)
+
 const splitButtonModel = computed(() => {
-  const items = [
-    {
-      label: 'Save and Notify',
-      command: () => handleSubmit(true, false),
-      disabled: computedStatus.value === 'Draft' || computedStatus.value === 'Completed'
-    }
-  ]
-  if (!isEdit.value) {
-    items.push({ label: 'Save as Draft', command: () => handleSubmit(false, true) })
-  }
-  return items
+  return [{ label: 'Save Only', icon: 'pi pi-upload', command: () => handleSubmit(false) }]
 })
 
 const handleCancel = () => {
@@ -585,6 +588,24 @@ const handleComplete = async () => {
   }
 }
 
+const isDeleting = ref(false)
+
+const handleDeleteDraft = async () => {
+  isDeleting.value = true
+  try {
+    await apiCall('deleteServiceRequest', { serviceRequestId: serviceRequestId.value })
+    toast.add({ severity: 'success', summary: 'Success', detail: 'Draft deleted', life: 3000 })
+    setTimeout(() => {
+      router.push({ name: 'meta-service-requests' })
+    }, 500)
+  } catch (err) {
+    console.error(err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete draft', life: 5000 })
+  } finally {
+    isDeleting.value = false
+  }
+}
+
 const handleCancelRequest = async (reason) => {
   cancelPopover.value.hide()
   isCancelling.value = true
@@ -616,10 +637,20 @@ const handleCancelRequest = async (reason) => {
             <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}</div>
           </div>
           <div class="header-right">
+            <div v-if="!isEdit || wasLoadedAsDraft" class="draft-toggle">
+              <Checkbox v-model="isDraft" binary input-id="isDraftCheckbox" />
+              <label for="isDraftCheckbox" style="cursor: pointer; font-weight: 500;">Draft</label>
+            </div>
             <Tag
               v-if="!isEdit || !isLoadingRequest"
               :value="computedStatus"
-              :severity="computedStatus === 'Confirmed' ? 'info' : computedStatus === 'Completed' ? 'success' : computedStatus === 'Draft' ? 'secondary' : 'warn'"
+              :severity="
+                computedStatus === 'Confirmed' ? 'info'
+                : computedStatus === 'Completed' ? 'success'
+                : computedStatus === 'Draft' ? 'secondary'
+                : computedStatus.includes('cancelled') ? 'danger'
+                : 'warn'
+              "
             />
             <Button
               v-if="isEdit && isConfirmed"
@@ -766,13 +797,13 @@ const handleCancelRequest = async (reason) => {
             </div>
 
             <div v-if="form.transportationType === 'Round Trip'">
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Appointment</label>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Arrive</label>
               <Select
                 v-model="form.apptTime"
                 :options="apptOptions"
                 option-label="label"
                 option-value="value"
-                placeholder="Appt time"
+                placeholder="Arrival time"
                 filter
                 style="width: 100%;"
               />
@@ -881,25 +912,36 @@ const handleCancelRequest = async (reason) => {
           <div class="form-actions">
             <template v-if="isEdit">
               <Button
+                v-if="wasLoadedAsDraft"
                 type="button"
-                label="Cancel Request"
+                label="Delete Draft"
                 severity="danger"
-                :disabled="isSubmitting || isCancelling || isCancelled"
-                @click="(e) => cancelPopover.toggle(e)"
+                :loading="isDeleting"
+                :disabled="isSubmitting || isDeleting"
+                @click="handleDeleteDraft"
               />
-              <Popover ref="cancelPopover">
-                <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
-                  <Button
-                    v-for="reason in CANCEL_REASONS"
-                    :key="reason"
-                    :label="reason"
-                    text
-                    severity="danger"
-                    style="justify-content: flex-start;"
-                    @click="handleCancelRequest(reason)"
-                  />
-                </div>
-              </Popover>
+              <template v-else>
+                <Button
+                  type="button"
+                  label="Cancel Request"
+                  severity="danger"
+                  :disabled="isSubmitting || isCancelling || isCancelled"
+                  @click="(e) => cancelPopover.toggle(e)"
+                />
+                <Popover ref="cancelPopover">
+                  <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
+                    <Button
+                      v-for="reason in CANCEL_REASONS"
+                      :key="reason"
+                      :label="reason"
+                      text
+                      severity="danger"
+                      style="justify-content: flex-start;"
+                      @click="handleCancelRequest(reason)"
+                    />
+                  </div>
+                </Popover>
+              </template>
             </template>
             <div class="form-actions-right">
               <Button
@@ -909,12 +951,22 @@ const handleCancelRequest = async (reason) => {
                 @click="handleCancel"
                 :disabled="isSubmitting"
               />
+              <Button
+                v-if="isDraft"
+                type="button"
+                label="Save Draft"
+                :loading="isSubmitting"
+                :disabled="!isFormValid || isSubmitting"
+                @click="handleSubmit(false)"
+              />
               <SplitButton
-                :label="isEdit ? 'Update' : 'Create'"
+                v-else
+                label="Save and Notify"
+                icon="pi pi-envelope"
                 :loading="isSubmitting"
                 :disabled="!isFormValid || isSubmitting"
                 :model="splitButtonModel"
-                @click="handleSubmit(false, false)"
+                @click="handleSubmit(true)"
               />
             </div>
           </div>
@@ -969,6 +1021,12 @@ const handleCancelRequest = async (reason) => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.draft-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .form {

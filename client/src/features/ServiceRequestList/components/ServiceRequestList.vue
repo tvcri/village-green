@@ -110,14 +110,9 @@ onActivated(() => {
     // watch will fire and handle the fetch
     return
   }
-  // Always refetch when activated (returning from detail/create/edit)
+  // Refetch when activated (returning from detail/create/edit) but retain filters
   navigatedToDetail.value = false
-  selectedMember.value = 'All members'
-  selectedVolunteer.value = 'All volunteers'
-  selectedService.value = 'All services'
-  selectedStatuses.value = ['open', 'confirmed']
   fetchRequests()
-  village.value = null
 })
 
 watch([selectedStatuses, selectedVillage], () => {
@@ -127,7 +122,7 @@ watch([selectedStatuses, selectedVillage], () => {
 const hasLoadedOnce = ref(false)
 watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
 
-const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled']
+const statusOptions = ['open', 'confirmed', 'draft', 'completed', 'unmatched', 'cancelled']
 
 const memberOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
@@ -166,13 +161,13 @@ const filteredRequests = computed(() => {
       serviceMatch = r.serviceName === selectedService.value
     }
 
-    // Hybrid ID search: match the value shown in the "#" column — requestNumber
-    // if present (legacy), else serviceRequestId (VG-created). Matches what the
-    // user sees, so a legacy row isn't matched via its hidden id.
+    // ID search matches the value shown in the "#" column — the normalized
+    // displayNumber (requestNumber if present, else serviceRequestId). Matches
+    // what the user sees, so a legacy row isn't matched via its hidden id.
     let idMatch = true
     const idQuery = idSearch.value.trim().toLowerCase()
     if (idQuery) {
-      const displayedId = String(r.requestNumber || r.serviceRequestId || '').toLowerCase()
+      const displayedId = String(r.displayNumber ?? '').toLowerCase()
       idMatch = displayedId.includes(idQuery)
     }
 
@@ -255,7 +250,7 @@ const getStatusSeverity = (status) => {
 }
 
 const columnsForCsv = [
-  { header: 'Request #', key: 'requestNumber' },
+  { header: 'Request #', key: 'displayNumber' },
   { header: 'Status', key: 'status' },
   { header: 'Service', key: 'serviceName' },
   { header: 'Member', key: 'memberFullName' },
@@ -515,8 +510,9 @@ const clearFilters = () => {
     <DataTable
       v-else
       :value="filteredRequests"
-      :sortField="sortField"
-      :sortOrder="sortDir === 'asc' ? 1 : -1"
+      lazy
+      :sort-field="sortField"
+      :sort-order="sortDir === 'asc' ? 1 : -1"
       class="request-table-responsive desktop-only"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
@@ -541,15 +537,15 @@ const clearFilters = () => {
       <Column field="memberFullName" header="Member" sortable style="width: 15%"></Column>
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
       <Column field="city" header="City" sortable style="width: 13%"></Column>
-      <Column field="requestNumber" header="#" sortable style="width: 10%">
+      <Column field="displayNumber" header="#" sortable style="width: 10%">
         <template #body="slotProps">
-          {{ slotProps.data.requestNumber || slotProps.data.serviceRequestId || '—' }}
+          {{ slotProps.data.displayNumber ?? '—' }}
         </template>
       </Column>
       <Column v-if="isMetaMode" header="Actions" style="width: 8%">
         <template #body="slotProps">
           <Button
-            v-if="['open', 'confirmed'].includes(slotProps.data.status?.toLowerCase())"
+            v-if="['open', 'confirmed', 'draft'].includes(slotProps.data.status?.toLowerCase())"
             icon="pi pi-pencil"
             class="p-button-rounded p-button-text p-button-sm"
             @click="navigateToEditRequest(slotProps.data.serviceRequestId)"
@@ -574,7 +570,7 @@ const clearFilters = () => {
         </div>
         <div class="card-row">
           <span class="label">#:</span>
-          <span>{{ request.requestNumber || request.serviceRequestId || '—' }}</span>
+          <span>{{ request.displayNumber ?? '—' }}</span>
         </div>
         <div class="card-row">
           <span class="label">Member:</span>

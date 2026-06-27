@@ -69,7 +69,11 @@ module.exports.patchServiceRequest = async function patchServiceRequest (req, re
 
 module.exports.deleteServiceRequest = async function deleteServiceRequest (req, res, next) {
   try {
-    // TODO: Implement deleteServiceRequest
+    const serviceRequestId = req.params.serviceRequestId
+    const deleted = await ServiceRequestService.deleteServiceRequest(serviceRequestId)
+    if (!deleted) {
+      throw new SmError.NotFoundError()
+    }
     res.json({})
   }
   catch (err) {

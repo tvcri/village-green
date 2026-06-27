@@ -172,6 +172,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     for (const s of status) {
       if (s === 'open') dbStatuses.push('Open')
       else if (s === 'confirmed') dbStatuses.push('Confirmed')
+      else if (s === 'draft') dbStatuses.push('Draft')
       else if (s === 'completed') dbStatuses.push('Completed')
       else if (s === 'unmatched') dbStatuses.push('Unmatched')
       else if (s === 'cancelled') {
@@ -365,4 +366,12 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       return serviceRequestId
     }
   })
+}
+
+module.exports.deleteServiceRequest = async function (serviceRequestId) {
+  const [result] = await dbUtils.pool.query(
+    'DELETE FROM service_request WHERE id = ?',
+    [serviceRequestId]
+  )
+  return result.affectedRows > 0
 }
