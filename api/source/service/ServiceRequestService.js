@@ -92,6 +92,8 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   }
 
   if (projections.includes('notificationHistory')) {
+    // MySQL JSON_ARRAYAGG does not support an ORDER BY clause (MariaDB does);
+    // the array order is not significant, so none is applied.
     columns.push(`(
       SELECT JSON_ARRAYAGG(
         JSON_OBJECT(
