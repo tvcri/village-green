@@ -1,0 +1,13 @@
+{
+  "name": "village-green-api-tests",
+  "private": true,
+  "type": "module",
+  "description": "Black-box API integration tests for Village Green (authorization / information-exposure focus). See README.md.",
+  "scripts": {
+    "test": "node run.js",
+    "test:keep": "node run.js --keep"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.2"
+  }
+}

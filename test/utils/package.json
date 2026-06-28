@@ -1,6 +1,7 @@
 {
   "type": "module",
   "dependencies": {
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "ms": "^2.1.3"
   }
 }
