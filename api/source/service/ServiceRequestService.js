@@ -148,7 +148,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     'sr.zip AS zip',
     'sr.phone AS phone',
     `COALESCE(
-      (SELECT ${dbUtils.jsonArrayAggDistinct('ne.event_type')}
+      (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.event_type)')}
        FROM notification_event ne
        WHERE ne.service_request_id = sr.id),
       JSON_ARRAY()
