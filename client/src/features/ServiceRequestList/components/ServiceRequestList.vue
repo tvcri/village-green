@@ -94,6 +94,7 @@ const { state: allVillages } = useAsyncState(
   { immediate: true }
 )
 
+const pageRows = ref(12)
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
 const hasActivatedOnce = ref(false)
@@ -194,13 +195,6 @@ const filteredRequests = computed(() => {
     }
 
     return memberMatch && volunteerMatch && serviceMatch && statusMatch && idMatch
-  })
-
-  result.sort((a, b) => {
-    const aVal = a[sortField.value] ?? ''
-    const bVal = b[sortField.value] ?? ''
-    const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0
-    return sortDir.value === 'asc' ? cmp : -cmp
   })
 
   return result
@@ -381,7 +375,6 @@ const clearFilters = () => {
     <div class="header-row">
       <div class="title-group">
         <h1>Service Requests</h1>
-        <span class="subtitle">Last 30 days</span>
       </div>
       <div class="header-actions">
         <Button
@@ -521,15 +514,28 @@ const clearFilters = () => {
     <DataTable
       v-else
       :value="filteredRequests"
-      lazy
-      :sort-field="sortField"
-      :sort-order="sortDir === 'asc' ? 1 : -1"
+      paginator
+      paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+      :rows="pageRows"
+
+      sort-field="startAt"
+      :sort-order="1"
       class="request-table-responsive desktop-only"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
-      @sort="onSort"
       @filter="trackEvent('filter_applied')"
     >
+      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords, rowsPerPage }">
+        <div class="paginator-container">
+          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
+          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
+          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
+          <Select
+            v-model="pageRows"
+            :options="[12, 25, 50, 100]"
+          />
+        </div>
+      </template>
       <Column field="startAt" header="Date" sortable style="width: 12%">
         <template #body="slotProps">
           {{ slotProps.data.startAt ? formatDate(slotProps.data.startAt) : '—' }}
@@ -894,6 +900,20 @@ h1 {
 
 .request-table-responsive {
   cursor: pointer;
+}
+
+.paginator-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.paginator-info {
+  font-size: 0.9rem;
+  color: var(--color-text-dim);
+  min-width: 8rem;
+  text-align: center;
 }
 
 /* Keep the row action icons (bell + edit) side by side; the narrow Actions

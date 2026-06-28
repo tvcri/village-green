@@ -9,7 +9,7 @@ export default defineConfig(({ mode, command }) => {
     base: command === 'build' ? './' : '/',
     plugins: [
       vue(), 
-      // VueDevtools()
+      VueDevtools()
     ],
     server: {
       // Proxy requests for Env.js to the API server in development only

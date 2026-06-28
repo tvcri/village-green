@@ -1020,7 +1020,7 @@ const handleCancelRequest = async (reason) => {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1.75rem;
 }
 
 .draft-toggle {
