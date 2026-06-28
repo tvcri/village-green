@@ -11,12 +11,14 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
     }
     const status = req.query.status
     const villageId = req.query.villageId
+    const hasNotifications = req.query.hasNotifications
     const villageIdsGranted = Object.keys(req.userObject.grants)
     const response = await ServiceRequestService.getServiceRequests({
       villageIdsGranted,
       elevate,
       status,
-      villageId
+      villageId,
+      hasNotifications
     })
     res.json(response)
   }

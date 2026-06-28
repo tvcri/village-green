@@ -119,7 +119,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   return rows[0] ?? null
 }
 
-module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate, status, villageId }) {
+module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate, status, villageId, hasNotifications }) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.request_number AS requestNumber',
@@ -146,7 +146,13 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     'sr.address AS address',
     'sr.city AS city',
     'sr.zip AS zip',
-    'sr.phone AS phone'
+    'sr.phone AS phone',
+    `COALESCE(
+      (SELECT JSON_ARRAYAGG(DISTINCT ne.event_type)
+       FROM notification_event ne
+       WHERE ne.service_request_id = sr.id),
+      JSON_ARRAY()
+    ) AS notifications`
   ]
   const joins = new Set([
     'service_request sr',
@@ -183,6 +189,11 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
       predicates.statements.push('sr.status IN ?')
       predicates.binds.push([dbStatuses])
     }
+  }
+  if (hasNotifications === false) {
+    predicates.statements.push(
+      'NOT EXISTS (SELECT 1 FROM notification_event ne WHERE ne.service_request_id = sr.id)'
+    )
   }
 
   const orderBy = ['sr.finish_at DESC']
