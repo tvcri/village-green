@@ -57,8 +57,6 @@ const openHistory = (row) => {
 }
 
 const selectedStatuses = ref(['open', 'confirmed'])
-const sortField = ref('startAt')
-const sortDir = ref('asc')
 
 const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
   () => getServiceRequests({
@@ -147,29 +145,6 @@ const activeFilterCount = computed(() => {
   if (idSearch.value.trim()) count++
   return count
 })
-
-const toggleSort = (field) => {
-  if (sortField.value === field) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortField.value = field
-    sortDir.value = 'asc'
-  }
-}
-
-const onSort = (event) => {
-  sortField.value = event.sortField
-  sortDir.value = event.sortOrder === 1 ? 'asc' : 'desc'
-}
-
-const toggleStatus = (status) => {
-  const idx = selectedStatuses.value.indexOf(status)
-  if (idx >= 0) {
-    selectedStatuses.value.splice(idx, 1)
-  } else {
-    selectedStatuses.value.push(status)
-  }
-}
 
 const getStatusSeverity = (status) => {
   const statusLower = status?.toLowerCase() || ''
