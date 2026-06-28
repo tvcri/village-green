@@ -1492,6 +1492,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ElevateQuery'
         - $ref: '#/components/parameters/ServiceRequestStatusQuery'
+        - $ref: '#/components/parameters/HasNotificationsQuery'
         - name: villageId
           in: query
           description: Filter to specific villages (omit for all granted villages)
@@ -3200,6 +3201,15 @@ components:
         volunteerAddress:
           $ref: '#/components/schemas/PersonAddress'
           nullable: true
+        notifications:
+          type: array
+          items:
+            type: string
+            enum:
+              - open
+              - confirmed
+              - cancelled
+              - reminder
         notificationHistory:
           type: array
           nullable: true
@@ -4040,6 +4050,12 @@ components:
           - memberAddress
           - volunteerAddress
           - notificationHistory
+    HasNotificationsQuery:
+      name: hasNotifications
+      in: query
+      required: false
+      schema:
+        type: boolean
     UserGroupIdPath:
       name: userGroupId
       in: path
