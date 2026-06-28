@@ -301,8 +301,9 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
     'sr.city AS city',
     'sr.phone AS phone',
     `COALESCE(
-      (SELECT JSON_ARRAYAGG(t.event_type)
-       FROM (SELECT DISTINCT ne.event_type FROM notification_event ne WHERE ne.service_request_id = sr.id) t),
+      (SELECT ${dbUtils.jsonArrayAggDistinct('ne.event_type')}
+       FROM notification_event ne
+       WHERE ne.service_request_id = sr.id),
       JSON_ARRAY()
     ) AS notifications`
   ]
