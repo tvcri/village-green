@@ -15,11 +15,7 @@ import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
-import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
-
 defineOptions({ name: 'VillageServiceRequestList' })
-
-const { trackEvent } = useAnalytics()
 
 const router = useRouter()
 const route = useRoute()
@@ -145,8 +141,6 @@ const filteredRequests = computed(() => {
     return memberMatch && volunteerMatch && serviceMatch && statusMatch && idMatch
   })
 })
-
-const isEmpty = computed(() => !isLoading.value && filteredRequests.value.length === 0)
 
 const activeFilterCount = computed(() => {
   let count = 0

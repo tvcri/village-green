@@ -35,6 +35,7 @@ function getStatusSeverity(status) {
     case 'open': return 'warn'
     case 'confirmed': return 'info'
     case 'completed': return 'success'
+    case 'draft': return 'secondary'
     case 'unmatched': return 'secondary'
     default: return 'info'
   }
@@ -43,8 +44,6 @@ function getStatusSeverity(status) {
 
 <template>
   <div>
-    <slot name="header-actions" />
-
     <div v-if="isLoading && !hasLoadedOnce" class="loading-state">
       <p>Loading service requests...</p>
     </div>
@@ -59,7 +58,6 @@ function getStatusSeverity(status) {
       v-else
       :value="rows"
       paginator
-      paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
       :rows="pageRows"
       sort-field="startAt"
       :sort-order="1"
