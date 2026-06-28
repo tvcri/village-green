@@ -56,8 +56,6 @@ const openHistory = (row) => {
 }
 
 const selectedStatuses = ref(['open', 'confirmed'])
-const sortField = ref('startAt')
-const sortDir = ref('asc')
 
 const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
   () => villageId.value ? getVillageServiceRequests(villageId.value) : null,
@@ -169,11 +167,6 @@ const activeFilterCount = computed(() => {
   if (idSearch.value.trim()) count++
   return count
 })
-
-const onSort = (event) => {
-  sortField.value = event.sortField
-  sortDir.value = event.sortOrder === 1 ? 'asc' : 'desc'
-}
 
 const getStatusSeverity = (status) => {
   const statusLower = status?.toLowerCase() || ''
