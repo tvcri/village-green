@@ -6,6 +6,7 @@ import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
+import OverlayBadge from 'primevue/overlaybadge'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
 import { useToast } from 'primevue/usetoast'
@@ -312,7 +313,17 @@ const clearFilters = () => {
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
     >
       <template #actions="{ data }">
+        <OverlayBadge v-if="data.notifications?.length === 0" value="!" severity="danger">
+          <Button
+            icon="pi pi-bell"
+            v-tooltip="'Show Notifications'"
+            class="p-button-rounded p-button-text p-button-sm"
+            aria-label="Notification history"
+            @click.stop="openHistory(data)"
+          />
+        </OverlayBadge>
         <Button
+          v-else
           icon="pi pi-bell"
           v-tooltip="'Show Notifications'"
           class="p-button-rounded p-button-text p-button-sm"
