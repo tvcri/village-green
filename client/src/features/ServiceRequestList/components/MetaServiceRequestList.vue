@@ -35,6 +35,7 @@ const selectedMember = ref('All members')
 const selectedVolunteer = ref('All volunteers')
 const selectedService = ref('All services')
 const idSearch = ref('')
+const noNotifications = ref(false)
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
@@ -52,7 +53,8 @@ const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncSt
     status: selectedStatuses.value,
     villageId: selectedVillage.value !== 'All villages'
       ? [(allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId].filter(Boolean)
-      : []
+      : [],
+    hasNotifications: noNotifications.value ? false : undefined
   }),
   { immediate: true }
 )
@@ -72,7 +74,7 @@ onActivated(() => {
   fetchRequests()
 })
 
-watch([selectedStatuses, selectedVillage], () => { fetchRequests() })
+watch([selectedStatuses, selectedVillage, noNotifications], () => { fetchRequests() })
 
 const hasLoadedOnce = ref(false)
 watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
@@ -129,6 +131,7 @@ const activeFilterCount = computed(() => {
   if (selectedService.value && selectedService.value !== 'All services') count++
   if (selectedVillage.value && selectedVillage.value !== 'All villages') count++
   if (idSearch.value.trim()) count++
+  if (noNotifications.value) count++
   return count
 })
 
@@ -209,6 +212,7 @@ const clearFilters = () => {
   selectedStatuses.value = []
   selectedVillage.value = 'All villages'
   idSearch.value = ''
+  noNotifications.value = false
 }
 </script>
 
@@ -294,6 +298,13 @@ const clearFilters = () => {
               :options="['All villages', ...(allVillages ?? []).map(v => v.name)]"
               placeholder="-- All villages --"
             />
+          </div>
+          <div class="search-box">
+            <label class="filter-group-label">Notifications:</label>
+            <div class="status-filter">
+              <Checkbox v-model="noNotifications" input-id="no-notifications" :binary="true" />
+              <label for="no-notifications">No notifications</label>
+            </div>
           </div>
         </div>
       </div>
