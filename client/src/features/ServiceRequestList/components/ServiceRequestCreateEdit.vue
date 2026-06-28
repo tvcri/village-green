@@ -637,10 +637,6 @@ const handleCancelRequest = async (reason) => {
             <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}</div>
           </div>
           <div class="header-right">
-            <div v-if="!isEdit || wasLoadedAsDraft" class="draft-toggle">
-              <Checkbox v-model="isDraft" binary input-id="isDraftCheckbox" />
-              <label for="isDraftCheckbox" style="cursor: pointer; font-weight: 500;">Draft</label>
-            </div>
             <Tag
               v-if="!isEdit || !isLoadingRequest"
               :value="computedStatus"
