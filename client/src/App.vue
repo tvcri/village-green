@@ -10,9 +10,11 @@ import GlobalErrorModal from './components/global/GlobalErrorModal.vue'
 
 const oidcWorker = useOidcWorker()
 const version = computed(() => VG?.Env?.version || '')
+const isDev = VG?.Env?.nodeEnv === 'development'
 </script>
 
 <template>
+  <div v-if="isDev" class="dev-instance" aria-hidden="true">TEST DEPLOYMENT</div>
   <div class="app-container">
     <Toast />
     <GlobalErrorModal />
@@ -57,6 +59,25 @@ const version = computed(() => VG?.Env?.version || '')
   width: 100%;
   border-left: 1px solid var(--color-border-light);
   border-right: 1px solid var(--color-border-light);
+}
+
+.dev-instance {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  max-width: 1200px;
+  height: 20px;
+  background-color: #783d1066;
+  pointer-events: none;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* color: #fff; */
+  font-size: 12px;
+  font-weight: 700;
 }
 
 
