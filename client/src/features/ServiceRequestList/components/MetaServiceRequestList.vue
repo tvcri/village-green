@@ -78,7 +78,7 @@ watch([selectedStatuses, selectedVillage, noNotifications], () => { fetchRequest
 const hasLoadedOnce = ref(false)
 watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
 
-const statusOptions = ['open', 'confirmed', 'draft', 'completed', 'unmatched', 'cancelled']
+const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled'] // draft is temporarily removed
 
 const memberOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
@@ -318,7 +318,7 @@ const clearFilters = () => {
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
     >
       <template #actions="{ data }">
-        <span class="bell-wrapper" :class="{ 'bell-unnotified': data.notifications?.length === 0 }">
+        <span class="bell-wrapper">
           <Button
             icon="pi pi-bell"
             v-tooltip="'Show Notifications'"
@@ -326,6 +326,7 @@ const clearFilters = () => {
             aria-label="Notification history"
             @click.stop="openHistory(data)"
           />
+          <i v-if="data.notifications?.length === 0" class="pi pi-exclamation-triangle bell-alert-icon" />
         </span>
         <Button
           v-if="['open', 'confirmed', 'draft'].includes(data.status?.toLowerCase())"
@@ -376,5 +377,5 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
   .service-request-list { padding: 1rem; }
 }
 .bell-wrapper { position: relative; display: inline-flex; }
-.bell-unnotified::after { content: '!'; position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; background: var(--p-red-500, #ef4444); color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
+.bell-alert-icon { position: absolute; top: 0; right: 0; font-size: 0.6rem; color: #f59e0b; pointer-events: none; }
 </style>
