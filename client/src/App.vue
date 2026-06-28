@@ -38,7 +38,7 @@ const version = computed(() => VG?.Env?.version || '')
 
     <main class="app-main">
       <router-view v-slot="{ Component }">
-        <keep-alive include="ServiceRequestList,MemberList,VolunteerList,PersonList">
+        <keep-alive include="MetaServiceRequestList,VillageServiceRequestList,MemberList,VolunteerList,PersonList">
           <component :is="Component" />
         </keep-alive>
       </router-view>
