@@ -309,6 +309,7 @@ const clearFilters = () => {
       <template #actions="{ data }">
         <Button
           icon="pi pi-bell"
+          v-tooltip="'Show Notifications'"
           class="p-button-rounded p-button-text p-button-sm"
           aria-label="Notification history"
           @click.stop="openHistory(data)"
@@ -316,6 +317,7 @@ const clearFilters = () => {
         <Button
           v-if="['open', 'confirmed', 'draft'].includes(data.status?.toLowerCase())"
           icon="pi pi-pencil"
+          v-tooltip="'Edit Request'"
           class="p-button-rounded p-button-text p-button-sm"
           @click.stop="navigateToEditRequest(data.serviceRequestId)"
         />

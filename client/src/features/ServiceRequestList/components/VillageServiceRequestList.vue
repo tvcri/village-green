@@ -314,6 +314,7 @@ const clearFilters = () => {
       <template #actions="{ data }">
         <Button
           icon="pi pi-bell"
+          v-tooltip="'Show Notifications'"
           class="p-button-rounded p-button-text p-button-sm"
           aria-label="Notification history"
           @click.stop="openHistory(data)"
