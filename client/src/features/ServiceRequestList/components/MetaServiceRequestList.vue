@@ -449,7 +449,7 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .status-filter { display: flex; align-items: center; gap: 0.375rem; }
 .loading-state, .error-state, .empty-state { padding: 2rem; text-align: center; color: var(--color-text-dim); }
-.request-table-responsive { width: 100%; }
+.request-table-responsive { width: 100%; cursor: pointer; }
 .paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
 .paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }
 .row-actions { display: flex; gap: 0.25rem; }
