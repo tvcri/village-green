@@ -6,7 +6,6 @@ import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
-import OverlayBadge from 'primevue/overlaybadge'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
 import { useToast } from 'primevue/usetoast'
@@ -319,7 +318,7 @@ const clearFilters = () => {
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
     >
       <template #actions="{ data }">
-        <OverlayBadge v-if="data.notifications?.length === 0" value="!" severity="danger">
+        <span class="bell-wrapper" :class="{ 'bell-unnotified': data.notifications?.length === 0 }">
           <Button
             icon="pi pi-bell"
             v-tooltip="'Show Notifications'"
@@ -327,15 +326,7 @@ const clearFilters = () => {
             aria-label="Notification history"
             @click.stop="openHistory(data)"
           />
-        </OverlayBadge>
-        <Button
-          v-else
-          icon="pi pi-bell"
-          v-tooltip="'Show Notifications'"
-          class="p-button-rounded p-button-text p-button-sm"
-          aria-label="Notification history"
-          @click.stop="openHistory(data)"
-        />
+        </span>
         <Button
           v-if="['open', 'confirmed', 'draft'].includes(data.status?.toLowerCase())"
           icon="pi pi-pencil"
@@ -384,4 +375,6 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
 }
+.bell-wrapper { position: relative; display: inline-flex; }
+.bell-unnotified::after { content: '!'; position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; background: var(--p-red-500, #ef4444); color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>
