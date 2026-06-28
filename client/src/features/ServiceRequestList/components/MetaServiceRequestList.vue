@@ -326,7 +326,7 @@ const clearFilters = () => {
             aria-label="Notification history"
             @click.stop="openHistory(data)"
           />
-          <i v-if="data.notifications?.length === 0" class="pi pi-exclamation-triangle bell-alert-icon" />
+          <span v-if="data.notifications?.length === 0" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
         <Button
           v-if="['open', 'confirmed', 'draft'].includes(data.status?.toLowerCase())"
@@ -377,5 +377,5 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
   .service-request-list { padding: 1rem; }
 }
 .bell-wrapper { position: relative; display: inline-flex; }
-.bell-alert-icon { position: absolute; top: 0; right: 0; font-size: 0.6rem; color: #f59e0b; pointer-events: none; }
+.bell-alert-icon { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #ff9800; color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>
