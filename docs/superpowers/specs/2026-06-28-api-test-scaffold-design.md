@@ -35,7 +35,7 @@ during exploration:
   `getVillages`, `getFriends` filter by `Object.keys(grants)` unless `elevate=true`).
   `elevate` is **admin-only** — non-admins get `InvalidElevationError`.
 - **By-ID endpoints are NOT grant-filtered.** `getServiceRequest(serviceRequestId)`
-  (`controllers/ServiceRequest.js:41`) and `getPerson(personId)`
+  (`controllers/ServiceRequest.js:43`) and `getPerson(personId)`
   (`controllers/Person.js:51`), plus their PATCH/DELETE, operate on a bare id with **no
   village-grant guard**. A user granted only on village A, holding
   `vg:service-request:read`, can `GET /service-requests/{id}` for a request in village B —
@@ -46,7 +46,7 @@ during exploration:
   routes reuse the ordinary list components in "meta mode" (`isMetaMode = !route.params.villageId`,
   `ServiceRequestList.vue`). The roll-up is therefore *entirely* a server-side property of
   the `getServiceRequests` list endpoint. In
-  [ServiceRequestService.js:111-119](../../../api/source/service/ServiceRequestService.js#L111-L119)
+  [ServiceRequestService.js:167-175](../../../api/source/service/ServiceRequestService.js#L167-L175)
   the grant filter (`sr.village_id IN (granted)`) is **always** applied for non-elevated
   requests, and a client-supplied `villageId` is **ANDed** on top — so a `villageId` can
   only ever *narrow within* a user's grants, never expand scope. This is a good (testable
@@ -221,7 +221,7 @@ excluding the rest — *even when the client supplies a `villageId`*. These are 
 - **Multi-value filter bug (likely RED):** `multi`
   `GET /service-requests?villageId=<Quahog>&villageId=<Innsmouth>` →
   characterizes the `[villageId]` double-wrap at
-  [ServiceRequestService.js:118](../../../api/source/service/ServiceRequestService.js#L118)
+  [ServiceRequestService.js:174](../../../api/source/service/ServiceRequestService.js#L174)
   (a nested-array bind that misrenders the `IN` list for multiple villages).
 
 ### 3. Cross-village information-exposure — the core (`service-request/authz.test.js`, `persons/authz.test.js`)

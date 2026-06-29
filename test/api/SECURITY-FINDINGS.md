@@ -35,7 +35,7 @@ administer.
 
 In `getServiceRequests`, the client `villageId` filter is bound as `[villageId]` where
 `villageId` is already an array
-([ServiceRequestService.js:118](../../api/source/service/ServiceRequestService.js#L118)),
+([ServiceRequestService.js:174](../../api/source/service/ServiceRequestService.js#L174)),
 double-wrapping it. A single value works by accident; **multiple** selected villages render
 a nested row-constructor — the generated SQL is `sr.village_id IN (('1', '2'))` — which
 MySQL rejects with `ER_OPERAND_COLUMNS` ("Operand should contain 1 column(s)"), so the
