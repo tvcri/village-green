@@ -24,6 +24,7 @@ function getClientEnv(){
     const envJS = 
     `const VG = {
         Env: {
+            nodeEnv: "${config.nodeEnv}",
             version: "${config.version}",
             consoleMode: "${config.client.consoleMode}",
             apiBase: "${config.client.apiBase}",

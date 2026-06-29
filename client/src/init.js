@@ -6,7 +6,7 @@ else if (VG.Env.pathPrefix) {
   VG.Env.apiBase = `${window.location.origin}${VG.Env.pathPrefix}api`
 }
 else {
-  VG.Env.apiBase = new URL(`../api`, window.location.href).toString() // change when nextgen client is served from root instead of /client-v2
+  VG.Env.apiBase = new URL(`./api`, window.location.href).toString() // change when nextgen client is served from root instead of /client-v2
 }
 VG.Env.apiUrl = VG.Env.apiBase
 

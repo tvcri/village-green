@@ -1,5 +1,6 @@
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
+import Tooltip from 'primevue/tooltip'
 import { createApp, h } from 'vue'
 import App from './App.vue'
 import { setupOidcHandler } from './auth/useOidcWorker.js'
@@ -42,6 +43,7 @@ try {
   })
 
   app.use(ToastService)
+  app.directive('tooltip', Tooltip)
   app.use(router)
   app.provide('worker', VG.oidcWorker)
   // Debug: log current route after router is ready

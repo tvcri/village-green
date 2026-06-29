@@ -299,7 +299,13 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
-    'sr.phone AS phone'
+    'sr.phone AS phone',
+    `COALESCE(
+      (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.event_type)')}
+       FROM notification_event ne
+       WHERE ne.service_request_id = sr.id),
+      JSON_ARRAY()
+    ) AS notifications`
   ]
   const joins = new Set([
     'service_request sr',
