@@ -282,7 +282,6 @@ const serviceNameOptions = [
   'Household Chores/Handy Help',
   'Errand: Shopping',
   'Errand: Pick up/delivery',
-  'Member Added',
   'Errand: Other'
 ]
 
