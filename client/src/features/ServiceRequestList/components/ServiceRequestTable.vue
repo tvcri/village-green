@@ -6,6 +6,7 @@ import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
+import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 
 defineOptions({ name: 'ServiceRequestTable' })
 
@@ -20,25 +21,13 @@ const props = defineProps({
 const emit = defineEmits(['row-click'])
 
 const { trackEvent } = useAnalytics()
+const { getStatusSeverity } = useStatusSeverity()
 
 const pageRows = ref(10)
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString()
-}
-
-function getStatusSeverity(status) {
-  const s = status?.toLowerCase() || ''
-  if (s.includes('cancelled')) return 'danger'
-  switch (s) {
-    case 'open': return 'warn'
-    case 'confirmed': return 'info'
-    case 'completed': return 'success'
-    case 'draft': return 'secondary'
-    case 'unmatched': return 'secondary'
-    default: return 'info'
-  }
 }
 </script>
 

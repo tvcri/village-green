@@ -316,7 +316,7 @@ const clearFilters = () => {
             aria-label="Notification history"
             @click.stop="openHistory(data)"
           />
-          <span v-if="data.requestNumber == null" class="bell-alert-icon" aria-hidden="true"></span>
+          <span v-if="data.requestNumber == null && !data.notifications?.length" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
       </template>
     </ServiceRequestTable>

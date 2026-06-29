@@ -287,7 +287,7 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
         [serviceRequestId]
       )
       const current = currentRows[0]
-      if (!current) return serviceRequestId
+      if (!current) return null
 
       const updates = []
       const values = []

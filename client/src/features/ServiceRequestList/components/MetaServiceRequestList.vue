@@ -50,7 +50,7 @@ const openHistory = (row) => {
 const onNotified = (updated) => {
   requests.value = requests.value.map(r =>
     r.serviceRequestId === updated.serviceRequestId
-      ? { ...r, notifications: updated.notificationHistory }
+      ? { ...r, notifications: updated.notificationHistory.map(e => e.eventType) }
       : r
   )
 }

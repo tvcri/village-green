@@ -253,17 +253,17 @@ const seedNext = (field, val, delta = 15) => {
 }
 
 watch(() => form.value.startTime, (val) => {
-  if (seedDepth > 0 || val == null) return
+  if (seedDepth > 0 || val == null || !formLoaded.value) return
   seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.apptTime, (val) => {
-  if (seedDepth > 0 || val == null) return
+  if (seedDepth > 0 || val == null || !formLoaded.value) return
   seedNext('returnTime', val)
 }, { flush: 'sync' })
 
 watch(() => form.value.returnTime, (val) => {
-  if (seedDepth > 0 || val == null) return
+  if (seedDepth > 0 || val == null || !formLoaded.value) return
   // Seed finish using the same duration as start→arrival, so the ride home
   // mirrors the outbound leg. Fall back to +15 if start/arrival aren't set.
   const start = form.value.startTime

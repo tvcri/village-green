@@ -12,7 +12,7 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
     const status = req.query.status
     const villageId = req.query.villageId
     const rawHasNotifications = req.query.hasNotifications
-    const hasNotifications = rawHasNotifications === false ? false
+    const hasNotifications = rawHasNotifications === 'true' ? true
       : rawHasNotifications === 'false' ? false
       : undefined
     const villageIdsGranted = Object.keys(req.userObject.grants)
@@ -63,7 +63,10 @@ module.exports.patchServiceRequest = async function patchServiceRequest (req, re
     const serviceRequestId = req.params.serviceRequestId
     // The service commits in a transaction and returns the id; fetch the full
     // record afterward so the read sees committed data.
-    await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
+    const patched = await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
+    if (!patched) {
+      throw new SmError.NotFoundError()
+    }
     const projections = req.query.projection ?? []
     const response = await ServiceRequestService.getServiceRequest(serviceRequestId, projections)
     res.json(response)
