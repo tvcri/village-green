@@ -39,11 +39,13 @@ const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
 const historyIsVgManaged = ref(false)
+const historyRequestStatus = ref(null)
 
 const openHistory = (row) => {
   historyRequestId.value = row.serviceRequestId
   historyRequestLabel.value = row.displayNumber
   historyIsVgManaged.value = row.requestNumber == null
+  historyRequestStatus.value = row.status
   historyDialogVisible.value = true
 }
 
@@ -350,6 +352,7 @@ const clearFilters = () => {
       :service-request-id="historyRequestId"
       :display-label="historyRequestLabel"
       :is-vg-managed="historyIsVgManaged"
+      :status="historyRequestStatus"
       @notified="onNotified"
     />
   </div>

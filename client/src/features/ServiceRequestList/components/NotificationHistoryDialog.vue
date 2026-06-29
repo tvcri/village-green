@@ -14,6 +14,7 @@ const props = defineProps({
   serviceRequestId: { type: [String, Number], default: null },
   displayLabel: { type: [String, Number], default: null },
   isVgManaged: { type: Boolean, default: false },
+  status: { type: String, default: null },
 })
 
 const emit = defineEmits(['update:visible', 'notified'])
@@ -81,7 +82,7 @@ async function sendNotification() {
     </p>
     <NotificationHistoryList v-else :history="history" />
 
-    <template v-if="isVgManaged && history.length === 0" #footer>
+    <template v-if="isVgManaged && history.length === 0 && status?.toLowerCase() !== 'draft'" #footer>
       <p v-if="sendError" class="send-error">{{ sendError }}</p>
       <Button
         label="Send Notification"
