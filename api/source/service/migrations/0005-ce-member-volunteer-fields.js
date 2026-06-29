@@ -223,6 +223,11 @@ const upFn = async (pool) => {
     // ---------------------------------------------------------------------
     await addColumnIfMissing(connection, 'volunteer', 'provider_type',
       `ALTER TABLE volunteer ADD COLUMN provider_type varchar(50) DEFAULT NULL`)
+    // Volunteer lifecycle: ~258 of 938 providers are inactive in the CE export
+    // (Active=False). Modeled as a nullable boolean (NULL = unknown) to match the
+    // member/person boolean columns; the data load coerces the CSV True/False.
+    await addColumnIfMissing(connection, 'volunteer', 'active',
+      `ALTER TABLE volunteer ADD COLUMN active tinyint(1) DEFAULT NULL AFTER provider_type`)
 
     // volunteer_capability (base-schema bridge table) lacks a natural unique
     // key, so the CE data load's INSERT ... ON DUPLICATE KEY UPDATE would
@@ -311,6 +316,7 @@ const downFn = async (pool) => {
     await run(connection, `DROP TABLE IF EXISTS person_disability`)
     await run(connection, `DROP TABLE IF EXISTS disability`)
 
+    await dropColumnIfExists(connection, 'volunteer', 'active')
     await dropColumnIfExists(connection, 'volunteer', 'provider_type')
 
     // Reverse the volunteer_capability unique key: restore the plain
