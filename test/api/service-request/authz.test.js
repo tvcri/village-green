@@ -74,8 +74,9 @@ test('full_v1 cannot create a request in Innsmouth', async () => {
   const { status } = await vgFetch(SR, {
     token: tokens.users.full_v1,
     body: {
+      // status is server-derived (POST only accepts 'Draft'); omit it so the body
+      // is schema-valid and the request actually exercises the authz path.
       villageId: String(villages.innsmouth.id),
-      status: 'Open',
       memberPersonId: String(persons.innsmouthMember.id),
       serviceName: 'cross-village create attempt',
     },

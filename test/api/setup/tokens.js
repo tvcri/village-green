@@ -46,9 +46,12 @@ export function buildTokens (oidc) {
   })
 
   // Tampered signature -> 401 (kid valid, signature verification fails).
-  const valid = tokens.users.full_v1
-  const last = valid.slice(-1)
-  tokens.special.badSignature = valid.slice(0, -1) + (last === 'A' ? 'B' : 'A')
+  // Flip the FIRST signature char, not the last: the first base64url char of the
+  // signature always maps to significant bytes, so the decode reliably changes.
+  // Flipping the LAST char is flaky — its trailing padding bits can decode to the
+  // same bytes, leaving the signature valid (~1/16 of random signatures).
+  const [h, p, s] = tokens.users.full_v1.split('.')
+  tokens.special.badSignature = `${h}.${p}.${(s[0] === 'A' ? 'B' : 'A')}${s.slice(1)}`
 
   // Token signed with the known-insecure kid -> rejected pre-verify by the kid blocklist.
   // The insecure key is NOT added to the served JWKS, so the API still boots.

@@ -41,10 +41,11 @@ test('read-only scope can GET but is forbidden from writing', async () => {
   const get = await vgFetch(SR, { token: tokens.special.readOnly })
   assert.equal(get.status, 200)
 
-  // Body is schema-valid so the only thing that can fail is the write-scope check.
+  // Body is schema-valid (only villageId required; status is server-derived) so
+  // the only thing that can fail is the write-scope check.
   const post = await vgFetch(SR, {
     token: tokens.special.readOnly,
-    body: { villageId: String(villages.quahog.id), status: 'Open' },
+    body: { villageId: String(villages.quahog.id) },
   })
   assert.equal(post.status, 403)
 })
