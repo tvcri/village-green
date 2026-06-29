@@ -36,11 +36,21 @@ const idSearch = ref('')
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
+const historyIsVgManaged = ref(false)
 
 const openHistory = (row) => {
   historyRequestId.value = row.serviceRequestId
   historyRequestLabel.value = row.displayNumber
+  historyIsVgManaged.value = false
   historyDialogVisible.value = true
+}
+
+const onNotified = (updated) => {
+  requests.value = requests.value.map(r =>
+    r.serviceRequestId === updated.serviceRequestId
+      ? { ...r, notifications: updated.notificationHistory }
+      : r
+  )
 }
 
 const selectedStatuses = ref(['open', 'confirmed'])
@@ -253,20 +263,6 @@ const clearFilters = () => {
             <span class="toggle-icon">▼</span>
             <span class="filters-title">
               Filters
-              <span v-if="requests && requests.length && (filteredRequests.length < requests.length || activeFilterCount > 0)" class="filter-count-tag">
-                {{ filteredRequests.length }} of {{ requests.length }} requests
-                <span
-                  role="button"
-                  class="clear-filters-icon"
-                  @click.stop.prevent="clearFilters()"
-                  @keydown.enter.stop.prevent="clearFilters()"
-                  @keydown.space.stop.prevent="clearFilters()"
-                  tabindex="0"
-                  title="Clear all filters"
-                >
-                  ✕
-                </span>
-              </span>
             </span>
           </button>
         </div>
@@ -320,7 +316,7 @@ const clearFilters = () => {
             aria-label="Notification history"
             @click.stop="openHistory(data)"
           />
-          <i v-if="data.notifications?.length === 0" class="pi pi-exclamation-triangle bell-alert-icon" />
+          <span v-if="data.requestNumber == null" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
       </template>
     </ServiceRequestTable>
@@ -329,6 +325,8 @@ const clearFilters = () => {
       v-model:visible="historyDialogVisible"
       :service-request-id="historyRequestId"
       :display-label="historyRequestLabel"
+      :is-vg-managed="historyIsVgManaged"
+      @notified="onNotified"
     />
   </div>
 </template>
@@ -364,5 +362,5 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
   .service-request-list { padding: 1rem; }
 }
 .bell-wrapper { position: relative; display: inline-flex; }
-.bell-alert-icon { position: absolute; top: 0; right: 0; font-size: 0.6rem; color: #f59e0b; pointer-events: none; }
+.bell-alert-icon { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #ff9800; color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>

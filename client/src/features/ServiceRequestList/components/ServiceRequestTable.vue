@@ -21,7 +21,7 @@ const emit = defineEmits(['row-click'])
 
 const { trackEvent } = useAnalytics()
 
-const pageRows = ref(12)
+const pageRows = ref(10)
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -71,7 +71,7 @@ function getStatusSeverity(status) {
           <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
           <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
           <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-          <Select v-model="pageRows" :options="[12, 25, 50, 100]" />
+          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
         </div>
       </template>
 

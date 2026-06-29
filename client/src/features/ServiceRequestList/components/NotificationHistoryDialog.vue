@@ -1,9 +1,10 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
+import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { getServiceRequest } from '../api/serviceRequestApi.js'
+import { getServiceRequest, updateServiceRequest } from '../api/serviceRequestApi.js'
 import NotificationHistoryList from './NotificationHistoryList.vue'
 
 defineOptions({ name: 'NotificationHistoryDialog' })
@@ -12,9 +13,10 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   serviceRequestId: { type: [String, Number], default: null },
   displayLabel: { type: [String, Number], default: null },
+  isVgManaged: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:visible'])
+const emit = defineEmits(['update:visible', 'notified'])
 
 const dialogVisible = computed({
   get: () => props.visible,
@@ -43,6 +45,23 @@ watch(
     }
   },
 )
+
+const isSending = ref(false)
+const sendError = ref(null)
+
+async function sendNotification() {
+  isSending.value = true
+  sendError.value = null
+  try {
+    const updated = await updateServiceRequest(props.serviceRequestId, { notify: true }, ['notificationHistory'])
+    emit('notified', updated)
+    dialogVisible.value = false
+  } catch {
+    sendError.value = 'Failed to send notification.'
+  } finally {
+    isSending.value = false
+  }
+}
 </script>
 
 <template>
@@ -61,6 +80,16 @@ watch(
       Couldn't load notification history.
     </p>
     <NotificationHistoryList v-else :history="history" />
+
+    <template v-if="isVgManaged && history.length === 0" #footer>
+      <p v-if="sendError" class="send-error">{{ sendError }}</p>
+      <Button
+        label="Send Notification"
+        icon="pi pi-envelope"
+        :loading="isSending"
+        @click="sendNotification"
+      />
+    </template>
   </Dialog>
 </template>
 
@@ -76,5 +105,11 @@ watch(
 .dialog-state.error {
   color: var(--color-text-error);
   margin: 0;
+}
+
+.send-error {
+  color: var(--color-text-error);
+  margin: 0 auto 0 0;
+  font-size: 0.875rem;
 }
 </style>

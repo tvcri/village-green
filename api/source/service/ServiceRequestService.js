@@ -192,7 +192,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
   }
   if (hasNotifications === false) {
     predicates.statements.push(
-      'NOT EXISTS (SELECT 1 FROM notification_event ne WHERE ne.service_request_id = sr.id)'
+      'NOT EXISTS (SELECT 1 FROM notification_event ne WHERE ne.service_request_id = sr.id) AND sr.request_number IS NULL'
     )
   }
 

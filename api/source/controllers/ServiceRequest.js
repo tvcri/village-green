@@ -64,7 +64,8 @@ module.exports.patchServiceRequest = async function patchServiceRequest (req, re
     // The service commits in a transaction and returns the id; fetch the full
     // record afterward so the read sees committed data.
     await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
-    const response = await ServiceRequestService.getServiceRequest(serviceRequestId)
+    const projections = req.query.projection ?? []
+    const response = await ServiceRequestService.getServiceRequest(serviceRequestId, projections)
     res.json(response)
   }
   catch (err) {

@@ -34,15 +34,25 @@ const selectedMember = ref('All members')
 const selectedVolunteer = ref('All volunteers')
 const selectedService = ref('All services')
 const idSearch = ref('')
-const noNotifications = ref(false)
+const notificationFilter = ref('All requests')
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
+const historyIsVgManaged = ref(false)
 
 const openHistory = (row) => {
   historyRequestId.value = row.serviceRequestId
   historyRequestLabel.value = row.displayNumber
+  historyIsVgManaged.value = row.requestNumber == null
   historyDialogVisible.value = true
+}
+
+const onNotified = (updated) => {
+  requests.value = requests.value.map(r =>
+    r.serviceRequestId === updated.serviceRequestId
+      ? { ...r, notifications: updated.notificationHistory }
+      : r
+  )
 }
 
 const selectedStatuses = ref(['open', 'confirmed'])
@@ -53,7 +63,7 @@ const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncSt
     villageId: selectedVillage.value !== 'All villages'
       ? [(allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId].filter(Boolean)
       : [],
-    hasNotifications: noNotifications.value ? false : undefined
+    hasNotifications: notificationFilter.value === 'Not notified' ? false : undefined
   }),
   { immediate: true }
 )
@@ -73,7 +83,7 @@ onActivated(() => {
   fetchRequests()
 })
 
-watch([selectedStatuses, selectedVillage, noNotifications], () => { fetchRequests() })
+watch([selectedStatuses, selectedVillage, notificationFilter], () => { fetchRequests() })
 
 const hasLoadedOnce = ref(false)
 watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
@@ -130,7 +140,7 @@ const activeFilterCount = computed(() => {
   if (selectedService.value && selectedService.value !== 'All services') count++
   if (selectedVillage.value && selectedVillage.value !== 'All villages') count++
   if (idSearch.value.trim()) count++
-  if (noNotifications.value) count++
+  if (notificationFilter.value !== 'All requests') count++
   return count
 })
 
@@ -211,7 +221,7 @@ const clearFilters = () => {
   selectedStatuses.value = []
   selectedVillage.value = 'All villages'
   idSearch.value = ''
-  noNotifications.value = false
+  notificationFilter.value = 'All requests'
 }
 </script>
 
@@ -299,11 +309,8 @@ const clearFilters = () => {
             />
           </div>
           <div class="search-box">
-            <label class="filter-group-label">Notifications:</label>
-            <div class="status-filter">
-              <Checkbox v-model="noNotifications" input-id="no-notifications" :binary="true" />
-              <label for="no-notifications">No notifications</label>
-            </div>
+            <label>Notifications:</label>
+            <Select v-model="notificationFilter" :options="['All requests', 'Not notified']" />
           </div>
         </div>
       </div>
@@ -326,7 +333,7 @@ const clearFilters = () => {
             aria-label="Notification history"
             @click.stop="openHistory(data)"
           />
-          <span v-if="data.notifications?.length === 0" class="bell-alert-icon" aria-hidden="true"></span>
+          <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
         <Button
           v-if="['open', 'confirmed', 'draft'].includes(data.status?.toLowerCase())"
@@ -342,6 +349,8 @@ const clearFilters = () => {
       v-model:visible="historyDialogVisible"
       :service-request-id="historyRequestId"
       :display-label="historyRequestLabel"
+      :is-vg-managed="historyIsVgManaged"
+      @notified="onNotified"
     />
   </div>
 </template>

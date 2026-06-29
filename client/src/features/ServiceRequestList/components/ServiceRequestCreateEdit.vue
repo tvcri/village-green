@@ -551,7 +551,7 @@ const handleSubmit = async (notify = false) => {
 const isPublishing = computed(() => isEdit.value && wasLoadedAsDraft.value && !isDraft.value)
 
 const splitButtonModel = computed(() => {
-  return [{ label: 'Save Only', icon: 'pi pi-upload', command: () => handleSubmit(false) }]
+  return [{ label: 'Save and Notify', icon: 'pi pi-envelope', command: () => handleSubmit(true) }]
 })
 
 const handleCancel = () => {
@@ -736,8 +736,8 @@ const handleCancelRequest = async (reason) => {
               />
             </div>
 
-            <div>
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Transportation Type<span v-if="isRideService" class="req">*</span></label>
+            <div v-if="isRideService">
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Transportation Type<span class="req">*</span></label>
               <Select
                 v-model="form.transportationType"
                 :options="availableTransportationTypes.map(t => ({ label: t, value: t }))"
@@ -957,12 +957,12 @@ const handleCancelRequest = async (reason) => {
               />
               <SplitButton
                 v-else
-                label="Save and Notify"
-                icon="pi pi-envelope"
+                label="Save"
+                icon="pi pi-upload"
                 :loading="isSubmitting"
                 :disabled="!isFormValid || isSubmitting"
                 :model="splitButtonModel"
-                @click="handleSubmit(true)"
+                @click="handleSubmit(false)"
               />
             </div>
           </div>

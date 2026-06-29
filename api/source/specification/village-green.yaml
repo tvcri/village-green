@@ -1579,6 +1579,7 @@ paths:
       operationId: patchServiceRequest
       parameters:
       - $ref: '#/components/parameters/ServiceRequestIdPath'
+      - $ref: '#/components/parameters/ServiceRequestProjectionQuery'
       requestBody:
         required: true
         content:
