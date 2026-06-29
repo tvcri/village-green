@@ -44,11 +44,13 @@ jobs:
         run: npm test
 
       # Keep the API server log on failure to make debugging a red run easy.
-      - name: Upload API server log
+      - name: Upload logs and test report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: api-server-log
-          path: test/api/.api.log
-          include-hidden-files: true # .api.log is a dotfile; off by default in v4
+          name: api-test-artifacts
+          path: |
+            test/api/.api.log
+            test/api/.test-report.tap
+          include-hidden-files: true # dotfiles; off by default in v4
           if-no-files-found: ignore

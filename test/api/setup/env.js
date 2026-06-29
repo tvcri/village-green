@@ -40,5 +40,6 @@ export const config = {
     tokensFile: path.join(apiTestDir, '.tokens.json'),
     composeFile: path.join(apiTestDir, 'docker-compose.yml'),
     apiLog: path.join(apiTestDir, '.api.log'),
+    testReport: path.join(apiTestDir, '.test-report.tap'),
   },
 }

@@ -1,5 +1,6 @@
 node_modules/
 .tokens.json
 .api.log
+.test-report.tap
 .coverage/
 .coverage-tmp/

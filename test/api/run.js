@@ -137,12 +137,21 @@ function generateCoverage () {
 
 function runTests () {
   return new Promise((resolve) => {
-    const child = spawn('node', ['--test', '--test-concurrency=1'], {
+    // spec -> console (live, human-readable); tap -> file (readable + parseable,
+    // easy to share/inspect after the run). Reporters pair with destinations in order.
+    const child = spawn('node', [
+      '--test', '--test-concurrency=1',
+      '--test-reporter=spec', '--test-reporter-destination=stdout',
+      '--test-reporter=tap', `--test-reporter-destination=${config.paths.testReport}`,
+    ], {
       cwd: config.paths.apiTestDir,
       env: { ...process.env },
       stdio: 'inherit',
     })
-    child.on('exit', (code) => resolve(code ?? 1))
+    child.on('exit', (code) => {
+      log(`test report (TAP): ${path.relative(config.repoRoot, config.paths.testReport)}`)
+      resolve(code ?? 1)
+    })
   })
 }
 
