@@ -36,7 +36,7 @@ const routes = [
   {
     path: '/villages/:villageId/service-requests',
     name: 'service-requests',
-    component: () => import('../features/ServiceRequestList/components/ServiceRequestList.vue'),
+    component: () => import('../features/ServiceRequestList/components/VillageServiceRequestList.vue'),
   },
   {
     path: '/villages/:villageId/service-requests/:id',
@@ -92,7 +92,7 @@ const routes = [
   {
     path: '/meta/service-requests',
     name: 'meta-service-requests',
-    component: () => import('../features/ServiceRequestList/components/ServiceRequestList.vue'),
+    component: () => import('../features/ServiceRequestList/components/MetaServiceRequestList.vue'),
   },
   {
     path: '/meta/service-requests/create',

@@ -33,8 +33,8 @@ async function queryPersons (inPredicates = {}) {
   const joins = new Set([
     'person p',
     'JOIN village v ON v.id = p.village_id',
-    'LEFT JOIN member m ON m.person_id = p.id',
-    'LEFT JOIN volunteer vol ON vol.person_id = p.id'
+    'LEFT JOIN active_member m ON m.person_id = p.id',
+    'LEFT JOIN active_volunteer vol ON vol.person_id = p.id'
   ])
   const orderBy = ['p.full_name']
   const predicates = { statements: [], binds: [] }
@@ -84,8 +84,8 @@ module.exports.getPerson = async function (personId, projections = []) {
   const joins = new Set([
     'person p',
     'JOIN village v ON v.id = p.village_id',
-    'LEFT JOIN member m ON m.person_id = p.id',
-    'LEFT JOIN volunteer vol ON vol.person_id = p.id'
+    'LEFT JOIN active_member m ON m.person_id = p.id',
+    'LEFT JOIN active_volunteer vol ON vol.person_id = p.id'
   ])
   const predicates = { statements: ['p.id = ?'], binds: [personId] }
 
@@ -96,7 +96,7 @@ module.exports.getPerson = async function (personId, projections = []) {
       'memberLevel', member_level,
       'serviceNotes', service_notes,
       'joinDate', DATE_FORMAT(join_date, '%Y-%m-%d')
-    ) FROM member WHERE person_id = p.id) AS memberInfo`)
+    ) FROM active_member WHERE person_id = p.id) AS memberInfo`)
   }
 
   if (projections.includes('volunteerInfo')) {
@@ -111,7 +111,7 @@ module.exports.getPerson = async function (personId, projections = []) {
         JOIN capability c ON c.id = vc.capability_id
         WHERE vc.volunteer_id = vol2.id
       )
-    ) FROM volunteer vol2 WHERE vol2.person_id = p.id) AS volunteerInfo`)
+    ) FROM active_volunteer vol2 WHERE vol2.person_id = p.id) AS volunteerInfo`)
   }
 
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
@@ -204,8 +204,8 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   const joins = new Set([
     'person p',
     'JOIN village v ON v.id = p.village_id',
-    'LEFT JOIN member m ON m.person_id = p.id',
-    'LEFT JOIN volunteer vol ON vol.person_id = p.id'
+    'LEFT JOIN active_member m ON m.person_id = p.id',
+    'LEFT JOIN active_volunteer vol ON vol.person_id = p.id'
   ])
   const predicates = { statements: [], binds: [] }
 
