@@ -11,10 +11,7 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
     }
     const status = req.query.status
     const villageId = req.query.villageId
-    const rawHasNotifications = req.query.hasNotifications
-    const hasNotifications = rawHasNotifications === 'true' ? true
-      : rawHasNotifications === 'false' ? false
-      : undefined
+    const hasNotifications = req.query.hasNotifications
     const villageIdsGranted = Object.keys(req.userObject.grants)
     const response = await ServiceRequestService.getServiceRequests({
       villageIdsGranted,
