@@ -94,6 +94,19 @@ const upFn = async (pool) => {
   const connection = await pool.getConnection()
   try {
     // ---------------------------------------------------------------------
+    // person: trim whitespace from name columns
+    // ---------------------------------------------------------------------
+    await run(connection,
+      `UPDATE person
+          SET
+            full_name  = TRIM(full_name),
+            first_name = TRIM(first_name),
+            last_name  = TRIM(last_name)
+        WHERE full_name != TRIM(full_name)
+           OR first_name != TRIM(first_name)
+           OR last_name != TRIM(last_name)`)
+
+    // ---------------------------------------------------------------------
     // person: address normalization (street/unit + generated address)
     // ---------------------------------------------------------------------
     // 1) Add the new source columns (plain, not yet generated).
@@ -199,6 +212,10 @@ const upFn = async (pool) => {
       `ALTER TABLE member ADD COLUMN created_date date DEFAULT NULL AFTER join_date`)
     await addColumnIfMissing(connection, 'member', 'status',
       `ALTER TABLE member ADD COLUMN status varchar(50) DEFAULT NULL AFTER created_date`)
+    // Backfill pre-existing rows: any member that existed before this migration
+    // has no CE status data, so treat them as Active rather than letting them
+    // silently vanish through the active_member view (added in migration 0007).
+    await run(connection, `UPDATE member SET status = 'Active' WHERE status IS NULL`)
     await addColumnIfMissing(connection, 'member', 'drop_reason',
       `ALTER TABLE member ADD COLUMN drop_reason varchar(100) DEFAULT NULL AFTER status`)
     // Household group.
@@ -228,6 +245,19 @@ const upFn = async (pool) => {
     // member/person boolean columns; the data load coerces the CSV True/False.
     await addColumnIfMissing(connection, 'volunteer', 'active',
       `ALTER TABLE volunteer ADD COLUMN active tinyint(1) DEFAULT NULL AFTER provider_type`)
+    // Same resilience backfill as member.status above — existing volunteers are
+    // treated as active until the CE data load sets the real value.
+    await run(connection, `UPDATE volunteer SET active = 1 WHERE active IS NULL`)
+
+    // ---------------------------------------------------------------------
+    // active_member / active_volunteer views
+    // ---------------------------------------------------------------------
+    await run(connection,
+      `CREATE OR REPLACE VIEW active_member AS
+         SELECT * FROM member WHERE status = 'Active'`)
+    await run(connection,
+      `CREATE OR REPLACE VIEW active_volunteer AS
+         SELECT * FROM volunteer WHERE active = 1`)
 
     // volunteer_capability (base-schema bridge table) lacks a natural unique
     // key, so the CE data load's INSERT ... ON DUPLICATE KEY UPDATE would
@@ -311,6 +341,9 @@ const upFn = async (pool) => {
 const downFn = async (pool) => {
   const connection = await pool.getConnection()
   try {
+    await run(connection, `DROP VIEW IF EXISTS active_volunteer`)
+    await run(connection, `DROP VIEW IF EXISTS active_member`)
+
     await run(connection, `DROP TABLE IF EXISTS volunteer_vetting`)
     await run(connection, `DROP TABLE IF EXISTS vetting_type`)
     await run(connection, `DROP TABLE IF EXISTS person_disability`)
