@@ -309,9 +309,9 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
   ]
   const joins = new Set([
     'service_request sr',
-    'LEFT JOIN active_member m ON sr.member_person_id = m.person_id',
+    'LEFT JOIN member m ON sr.member_person_id = m.person_id',
     'LEFT JOIN person mp ON sr.member_person_id = mp.id',
-    'LEFT JOIN active_volunteer vol ON sr.volunteer_person_id = vol.person_id',
+    'LEFT JOIN volunteer vol ON sr.volunteer_person_id = vol.person_id',
     'LEFT JOIN person vp ON sr.volunteer_person_id = vp.id'
   ])
   const predicates = { statements: ['sr.village_id = ?'], binds: [villageId] }
