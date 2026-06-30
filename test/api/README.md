@@ -84,7 +84,7 @@ Deliberately scoped to authorization / information-exposure on a few resources. 
   startup readiness probe.
 - **Client / UI:** out of scope.
 
-(The 6 red tests are known *bugs*, not coverage gaps — see SECURITY-FINDINGS.md.)
+(The 7 red tests are known *bugs*, not coverage gaps — see SECURITY-FINDINGS.md.)
 
 ## Layout
 

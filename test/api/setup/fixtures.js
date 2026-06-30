@@ -113,6 +113,30 @@ export const serviceRequests = {
   },
 }
 
+// FCV (Friendly Caller/Visitor) submissions — the data behind GET /friends.
+// One per village so grant-filtering and the query filters are observable.
+// volunteer/member personIds reference the seeded persons above.
+export const fcvSubmissions = {
+  fcvV1: {
+    id: 1, villageId: villages.quahog.id,
+    volunteerPersonId: persons.quahogVolunteer.id, memberPersonId: persons.quahogMember.id,
+    visitDate: '2026-06-01', timeSpentMinutes: 60, contactType: 'In-person',
+    activityTypes: ['Ride', 'Friendly visit'], notes: 'Quahog check-in', submittedAt: '2026-06-01 13:00:00',
+  },
+  fcvV2: {
+    id: 2, villageId: villages.innsmouth.id,
+    volunteerPersonId: persons.innsmouthVolunteer.id, memberPersonId: persons.innsmouthMember.id,
+    visitDate: '2026-06-02', timeSpentMinutes: 30, contactType: 'Phone',
+    activityTypes: ['Phone call'], notes: 'Innsmouth call', submittedAt: '2026-06-02 14:00:00',
+  },
+  fcvV3: {
+    id: 3, villageId: villages.miskatonic.id,
+    volunteerPersonId: persons.miskatonicVolunteer.id, memberPersonId: persons.miskatonicMember.id,
+    visitDate: '2026-06-03', timeSpentMinutes: 45, contactType: 'In-person',
+    activityTypes: ['Friendly visit'], notes: 'Miskatonic visit', submittedAt: '2026-06-03 15:00:00',
+  },
+}
+
 // Scope strings for the token's `scope` claim (space-delimited; the API does
 // hierarchical prefix matching, so `vg:service-request` covers `:read` + write).
 // `full` is the all-resources scope so canonical users can reach every endpoint

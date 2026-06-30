@@ -3,13 +3,13 @@
 // `--keep` re-runs start clean. Uses explicit IDs from fixtures.js.
 import mysql from 'mysql2/promise'
 import { config } from './env.js'
-import { villages, users, persons, members, volunteers, serviceRequests } from './fixtures.js'
+import { villages, users, persons, members, volunteers, serviceRequests, fcvSubmissions } from './fixtures.js'
 
 // Tables we own, child-before-parent for clean truncation.
 const TABLES = [
-  'notification_event', 'service_request', 'volunteer_vetting', 'volunteer_capability',
-  'volunteer', 'member', 'person_disability', 'person', 'village_grant',
-  'user_group_user_map', 'user_group', 'user_data', 'village',
+  'notification_event', 'service_request', 'fcv_submission', 'volunteer_vetting',
+  'volunteer_capability', 'volunteer', 'member', 'person_disability', 'person',
+  'village_grant', 'user_group_user_map', 'user_group', 'user_data', 'village',
 ]
 
 export async function seed () {
@@ -70,6 +70,17 @@ export async function seed () {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
         [sr.id, sr.requestNumber, sr.villageId, sr.memberPersonId, sr.volunteerPersonId,
           sr.status, sr.serviceName, sr.destination, sr.finishAt],
+      )
+    }
+
+    for (const f of Object.values(fcvSubmissions)) {
+      await conn.query(
+        `INSERT INTO fcv_submission
+           (id, villageId, volunteerPersonId, memberPersonId, visitDate, timeSpentMinutes,
+            contactType, activityTypes, notes, submittedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), ?, ?)`,
+        [f.id, f.villageId, f.volunteerPersonId, f.memberPersonId, f.visitDate, f.timeSpentMinutes,
+          f.contactType, JSON.stringify(f.activityTypes), f.notes, f.submittedAt],
       )
     }
   } finally {

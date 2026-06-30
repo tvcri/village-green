@@ -46,6 +46,19 @@ selected.
 - Note: not an information-exposure issue (the grant filter is always ANDed on top, so it
   can only *under*-return, never leak), but a correctness bug.
 
+## 4. Multi-value `villageId` filter on `/friends` is mis-bound (RED, correctness not security)
+
+`FriendService.getFriends` ([FriendService.js](../../api/source/service/FriendService.js))
+carries the **same defect as #3**: the client `villageId` filter is bound as `[villageId]`
+where `villageId` is already an array. With more than one village selected
+(`?villageId=1&villageId=2`) the generated SQL becomes `fcv.villageId IN (('1', '2'))`, which
+MySQL rejects with `ER_OPERAND_COLUMNS`, so the endpoint returns **500**. A single value works
+by accident.
+
+- Asserted in: `friends/list.test.js`
+- Note: like #3, the caller's grant filter is always ANDed on top, so this can only
+  *under*-return, never leak — a correctness bug, not an exposure.
+
 ---
 
 ### What is verified as already-correct (GREEN)
