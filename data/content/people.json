@@ -2213,6 +2213,387 @@
       "realBlurb": "Miskatonic geologist-narrator of 'At the Mountains of Madness.'",
       "tag": "background",
       "villageHint": "Arkham"
+    },
+    {
+      "name": "Edith Wharton",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Novelist who summered at Land's End in Newport and skewered its society.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to the garden club",
+        "destination": "the Newport horticultural society",
+        "description": "Will take notes on everyone for the next novel. Assume you are a character. You are."
+      }
+    },
+    {
+      "name": "Henry James",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Novelist who spent formative years in 1860s Newport.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Julia Ward Howe",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Wrote 'Battle Hymn of the Republic'; summered at Oak Glen in Portsmouth.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to the lecture hall",
+        "destination": "the Newport reading room",
+        "description": "Mine eyes have seen the glory. Also the parking situation. Bring the suffrage pamphlets."
+      }
+    },
+    {
+      "name": "Maud Howe Elliott",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Pulitzer-winning author and Newport civic force; daughter of Julia Ward Howe.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "S. J. Perelman",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Humorist and Marx Brothers screenwriter who grew up in Providence.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Ride to the typewriter shop",
+        "destination": "the downtown stationer",
+        "description": "Needs a new ribbon and a fresh supply of withering adjectives. Brown class of '25."
+      }
+    },
+    {
+      "name": "Edwin O'Connor",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Providence novelist of 'The Last Hurrah,' the great machine-politics tale.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Ann Hood",
+      "bucket": "arts-music-lit",
+      "realBlurb": "West Warwick-born novelist and memoirist.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Jhumpa Lahiri",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Pulitzer-winning author raised in Kingston, RI.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Bill Cowsill",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Eldest of the Newport family band that inspired 'The Partridge Family.'",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Band-equipment shuttle",
+        "destination": "the rehearsal hall",
+        "description": "The whole family is the band. Mom's in the band. The bus seats nine. 'Hair' on repeat."
+      }
+    },
+    {
+      "name": "Susan Cowsill",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Youngest Cowsill sibling and a working musician to this day.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Barbara 'Mini-Mom' Cowsill",
+      "bucket": "arts-music-lit",
+      "realBlurb": "The mother who actually sang in the Cowsills.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Kristin Hersh",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Throwing Muses leader, born in Atlanta but a Newport/Aquidneck product.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Tanya Donelly",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Belly and Throwing Muses singer with deep Newport roots.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "John McCauley",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Deer Tick frontman from the Providence scene.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Scott Hamilton",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Providence-born mainstream jazz saxophonist.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Jerry Harrison",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Talking Heads keyboardist/guitarist (Modern Lovers alum).",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Meredith Vieira",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Providence-born TV journalist and game-show host.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Eddie Dowling",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Woonsocket-born Pulitzer-winning Broadway producer and actor.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Theodore Foster",
+      "bucket": "colonial-historical",
+      "realBlurb": "Early U.S. senator; the town of Foster, RI is named for him.",
+      "tag": "background",
+      "villageHint": "Chepachet"
+    },
+    {
+      "name": "Jabez Bowen",
+      "bucket": "colonial-historical",
+      "realBlurb": "Revolutionary-era deputy governor and Brown benefactor.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Christopher Champlin",
+      "bucket": "colonial-historical",
+      "realBlurb": "Newport merchant prince of the colonial Atlantic trade.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Caleb Carr",
+      "bucket": "colonial-historical",
+      "realBlurb": "Colonial governor who died in office in 1695.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Walter Clarke",
+      "bucket": "colonial-historical",
+      "realBlurb": "Quaker governor who hid the colony's charter from Governor Andros.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Discreet document transport",
+        "destination": "an undisclosed brother's house",
+        "description": "Carrying one (1) Royal Charter. If Governor Andros asks, you've never seen it. He won't take an oath, so don't make him."
+      }
+    },
+    {
+      "name": "John Coggeshall",
+      "bucket": "colonial-historical",
+      "realBlurb": "First President of the Colony, 1647; voted to acquit Anne Hutchinson.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Nicholas Cooke",
+      "bucket": "colonial-historical",
+      "realBlurb": "Revolutionary war governor who kept RI in the fight.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "William Greene",
+      "bucket": "colonial-historical",
+      "realBlurb": "Revolutionary-era governor of Rhode Island.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Job Almy",
+      "bucket": "colonial-historical",
+      "realBlurb": "Portsmouth Quaker farmer of the old Aquidneck families.",
+      "tag": "background",
+      "villageHint": "Innsmouth"
+    },
+    {
+      "name": "Princess Red Wing",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Narragansett-Wampanoag historian and keeper of the Tomaquag museum.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Ella Sekatau",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Narragansett ethnohistorian and medicine woman.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Canonchet",
+      "bucket": "colonial-historical",
+      "realBlurb": "Narragansett war leader of King Philip's War ('I shall die before my heart is soft').",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Quaiapen",
+      "bucket": "colonial-historical",
+      "realBlurb": "The only female sachem of King Philip's War; built Queen's Fort.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Clem Labine",
+      "bucket": "sports",
+      "realBlurb": "Woonsocket-born Brooklyn Dodgers relief ace.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Chris Terreri",
+      "bucket": "sports",
+      "realBlurb": "Providence-born NHL goaltender and Stanley Cup winner.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Brian Lawton",
+      "bucket": "sports",
+      "realBlurb": "Cumberland, RI native; first U.S.-born No. 1 NHL draft pick.",
+      "tag": "background",
+      "villageHint": "Chepachet"
+    },
+    {
+      "name": "Will Blackmon",
+      "bucket": "sports",
+      "realBlurb": "Providence-raised NFL defensive back.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Len Wilkens",
+      "bucket": "sports",
+      "realBlurb": "Hall of Fame coach who led the Providence Reds-era hardwood faithful.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Abdul Alhazred",
+      "bucket": "fictional-ri",
+      "realBlurb": "Lovecraft's 'Mad Arab,' fictional author of the Necronomicon.",
+      "tag": "gag",
+      "villageHint": "Arkham",
+      "gag": {
+        "serviceName": "Ride to the rare-book dealer",
+        "destination": "the Miskatonic acquisitions desk",
+        "description": "Selling one (1) heavily annotated manuscript. Do not let him read from it at the light. Do not, in fact, make eye contact."
+      }
+    },
+    {
+      "name": "Francis Wayland Thurston",
+      "bucket": "fictional-ri",
+      "realBlurb": "Providence narrator who pieced together 'The Call of Cthulhu.'",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "George Gammell Angell",
+      "bucket": "fictional-ri",
+      "realBlurb": "Brown professor of Semitic languages and keeper of the Cthulhu file.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Inspector Legrasse",
+      "bucket": "fictional-ri",
+      "realBlurb": "Detective who raided the Cthulhu cult in the bayou.",
+      "tag": "background",
+      "villageHint": "Innsmouth"
+    },
+    {
+      "name": "Nathaniel Wingate Peaslee",
+      "bucket": "fictional-ri",
+      "realBlurb": "Miskatonic professor of 'The Shadow Out of Time' whose mind went traveling.",
+      "tag": "gag",
+      "villageHint": "Arkham",
+      "gag": {
+        "serviceName": "Ride to the psychiatrist",
+        "destination": "Miskatonic Health Behavioral Wellness",
+        "description": "Lost five years and came back writing in a script that predates humanity. Be patient; he's catching up on current events."
+      }
+    },
+    {
+      "name": "Andrea Perron",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Eldest Perron daughter who wrote the books behind 'The Conjuring.'",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Cindy Perron",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Perron sister of the Harrisville farmhouse haunting.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Daisy Bruguière",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Late Gilded-Age Newport hostess of the Wakehurst estate.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Eldridge Snow",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Old Pawtuxet Valley name behind the Autocrat coffee-syrup trade.",
+      "tag": "gag",
+      "villageHint": "Pawtuxet",
+      "gag": {
+        "serviceName": "Coffee-milk supply run",
+        "destination": "the Autocrat plant, Lincoln",
+        "description": "Two jugs of coffee syrup; it's the official state drink and he will quiz you on the ratio. Two tablespoons per glass."
+      }
+    },
+    {
+      "name": "Stuyvesant Fish",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Railroad president whose firing was hastened by his wife Mamie's social snubs.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Frederick W. Vanderbilt",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Banjo-playing Vanderbilt who built Rough Point, then fled Newport's social grind.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "James Van Alen",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Anglophile 'American Prince of Wales' who left the U.S. over Prohibition.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "One-way ride to the steamship pier",
+        "destination": "the transatlantic dock",
+        "description": "Relocating permanently to France; democracy has become inconvenient and the bar has closed. Steamer trunks only."
+      }
     }
   ],
   "loginPersonas": [
