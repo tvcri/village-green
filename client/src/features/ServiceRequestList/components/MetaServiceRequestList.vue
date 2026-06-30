@@ -38,13 +38,11 @@ const notificationFilter = ref('All requests')
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
-const historyIsVgManaged = ref(false)
 const historyRequestStatus = ref(null)
 
 const openHistory = (row) => {
   historyRequestId.value = row.serviceRequestId
   historyRequestLabel.value = row.displayNumber
-  historyIsVgManaged.value = row.requestNumber == null
   historyRequestStatus.value = row.status
   historyDialogVisible.value = true
 }
@@ -52,7 +50,7 @@ const openHistory = (row) => {
 const onNotified = (updated) => {
   requests.value = requests.value.map(r =>
     r.serviceRequestId === updated.serviceRequestId
-      ? { ...r, notifications: updated.notificationHistory.map(e => e.eventType) }
+      ? { ...r, notifications: updated.notificationHistory?.map(e => e.eventType) ?? [] }
       : r
   )
 }
@@ -351,7 +349,7 @@ const clearFilters = () => {
       v-model:visible="historyDialogVisible"
       :service-request-id="historyRequestId"
       :display-label="historyRequestLabel"
-      :is-vg-managed="historyIsVgManaged"
+      :allow-send-button="true"
       :status="historyRequestStatus"
       @notified="onNotified"
     />
