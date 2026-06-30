@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -15,7 +15,8 @@ const props = defineProps({
   isLoading: { type: Boolean, required: true },
   hasLoadedOnce: { type: Boolean, required: true },
   error: { required: true },
-  showVillageColumn: { type: Boolean, default: false }
+  showVillageColumn: { type: Boolean, default: false },
+  flashRowId: { type: String, default: null }
 })
 
 const emit = defineEmits(['row-click'])
@@ -24,6 +25,11 @@ const { trackEvent } = useAnalytics()
 const { getStatusSeverity } = useStatusSeverity()
 
 const pageRows = ref(10)
+
+const rowClass = computed(() => {
+  const id = props.flashRowId
+  return (row) => row.serviceRequestId === id ? 'row-flash' : null
+})
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -51,6 +57,7 @@ function formatDate(dateStr) {
       sort-field="startAt"
       :sort-order="1"
       class="request-table-responsive desktop-only"
+      :row-class="rowClass"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
       @row-click="(event) => emit('row-click', event)"
       @filter="trackEvent('filter_applied')"
@@ -96,6 +103,7 @@ function formatDate(dateStr) {
         v-for="request in rows"
         :key="request.serviceRequestId"
         class="request-card"
+        :class="{ 'row-flash': request.serviceRequestId === flashRowId }"
         @click="emit('row-click', { data: request })"
       >
         <div class="card-header">
@@ -128,6 +136,7 @@ function formatDate(dateStr) {
 .card-row .label { font-weight: 500; color: var(--color-text-dim); min-width: 80px; }
 .desktop-only { display: table; }
 .mobile-only { display: none; }
+  :deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 @media (max-width: 768px) {
   .desktop-only { display: none; }
   .mobile-only { display: flex; }

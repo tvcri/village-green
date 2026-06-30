@@ -17,6 +17,7 @@ import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
@@ -52,6 +53,7 @@ const { state: persons, execute: fetchPersons } = useAsyncState(
 )
 
 useScrollRestore('volunteers', 'volunteer-detail')
+const flashRowId = ref(null)
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
 const hasActivatedOnce = ref(false)
@@ -76,6 +78,11 @@ onActivated(() => {
   }
   if (navigatedToDetail.value && villageId.value === villageIdWhenNavigatedAway.value) {
     navigatedToDetail.value = false
+    const id = consumePendingHighlight()
+    if (id) {
+      flashRowId.value = id
+      setTimeout(() => { flashRowId.value = null }, 2000)
+    }
     return
   }
   navigatedToDetail.value = false
@@ -126,6 +133,7 @@ const volunteersForCsv = computed(() => {
 const clearSearch = () => searchText.immediate('')
 
 const navigateToVolunteer = (volunteer) => {
+  setPendingHighlight(volunteer.personId)
   navigatedToDetail.value = true
   villageIdWhenNavigatedAway.value = villageId.value
   router.push({
@@ -283,6 +291,7 @@ async function handleCreateSheet() {
       :value="filteredVolunteers"
       class="volunteer-table-responsive desktop-only"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
+      :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToVolunteer(event.data)"
       @filter="trackEvent('filter_applied')"
     >
@@ -310,6 +319,7 @@ async function handleCreateSheet() {
         v-for="volunteer in filteredVolunteers"
         :key="volunteer.volunteerId"
         class="volunteer-card"
+        :class="{ 'row-flash': volunteer.personId === flashRowId }"
         @click="navigateToVolunteer(volunteer)"
       >
         <h3>{{ volunteer.fullName }}</h3>
@@ -408,6 +418,8 @@ h1 {
 .volunteer-table-responsive {
   cursor: pointer;
 }
+
+:deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 
 /* Capabilities Badge */
 .capabilities-list {

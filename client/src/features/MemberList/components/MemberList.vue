@@ -16,6 +16,7 @@ import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageMembers } from '../api/memberApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
@@ -55,6 +56,7 @@ const { state: persons, execute: fetchPersons } = useAsyncState(
 )
 
 useScrollRestore('members', 'member-detail')
+const flashRowId = ref(null)
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
 const hasActivatedOnce = ref(false)
@@ -78,6 +80,11 @@ onActivated(() => {
   }
   if (navigatedToDetail.value && villageId.value === villageIdWhenNavigatedAway.value) {
     navigatedToDetail.value = false
+    const id = consumePendingHighlight()
+    if (id) {
+      flashRowId.value = id
+      setTimeout(() => { flashRowId.value = null }, 2000)
+    }
     return
   }
   navigatedToDetail.value = false
@@ -116,6 +123,7 @@ const membersForCsv = computed(() => {
 const clearSearch = () => searchText.immediate('')
 
 const navigateToMember = (member) => {
+  setPendingHighlight(member.personId)
   navigatedToDetail.value = true
   villageIdWhenNavigatedAway.value = villageId.value
   router.push({
@@ -260,6 +268,7 @@ async function handleCreateSheet() {
       :value="filteredMembers"
       class="member-table-responsive desktop-only"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
+      :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToMember(event.data)"
       @filter="trackEvent('filter_applied')"
     >
@@ -284,6 +293,7 @@ async function handleCreateSheet() {
         v-for="member in filteredMembers"
         :key="member.memberId"
         class="member-card"
+        :class="{ 'row-flash': member.personId === flashRowId }"
         @click="navigateToMember(member)"
       >
         <h3>{{ member.fullName }}</h3>
@@ -353,6 +363,8 @@ h1 {
 .member-table-responsive {
   cursor: pointer;
 }
+
+:deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 
 /* Mobile Card List */
 .member-cards {

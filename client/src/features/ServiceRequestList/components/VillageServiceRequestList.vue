@@ -14,6 +14,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 defineOptions({ name: 'VillageServiceRequestList' })
 
@@ -69,6 +70,7 @@ const { state: village, execute: fetchVillage } = useAsyncState(
 
 const hasActivatedOnce = ref(false)
 const villageIdAtDeactivation = ref(null)
+const flashRowId = ref(null)
 
 const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
   selectedMember.value = 'All members'
@@ -84,7 +86,7 @@ onDeactivated(() => {
   villageIdAtDeactivation.value = villageId.value
 })
 
-onActivated(() => {
+onActivated(async () => {
   resumeVillageWatch()
   if (!hasActivatedOnce.value) {
     hasActivatedOnce.value = true
@@ -94,7 +96,12 @@ onActivated(() => {
   if (villageChanged) {
     return
   }
-  fetchRequests()
+  const id = consumePendingHighlight()
+  await fetchRequests()
+  if (id) {
+    flashRowId.value = id
+    setTimeout(() => { flashRowId.value = null }, 2000)
+  }
 })
 
 const hasLoadedOnce = ref(false)
@@ -226,6 +233,7 @@ async function handleCreateSheet() {
 }
 
 const navigateToRequest = (serviceRequestId, rowVillageId) => {
+  setPendingHighlight(serviceRequestId)
   router.push({ name: 'service-request-detail', params: { villageId: rowVillageId ?? villageId.value, id: serviceRequestId } })
 }
 
@@ -307,6 +315,7 @@ const clearFilters = () => {
       :is-loading="isLoading"
       :has-loaded-once="hasLoadedOnce"
       :error="error"
+      :flash-row-id="flashRowId"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
     >
       <template #actions="{ data }">

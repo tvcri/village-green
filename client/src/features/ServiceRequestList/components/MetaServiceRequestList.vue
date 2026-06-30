@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch, onMounted, onActivated } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
@@ -13,11 +13,13 @@ import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getServiceRequests } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 defineOptions({ name: 'MetaServiceRequestList' })
 
 const router = useRouter()
+const route = useRoute()
 
 let toast = null
 onMounted(() => { toast = useToast() })
@@ -76,13 +78,19 @@ const { state: allVillages } = useAsyncState(
 )
 
 const hasActivatedOnce = ref(false)
+const flashRowId = ref(null)
 
-onActivated(() => {
+onActivated(async () => {
   if (!hasActivatedOnce.value) {
     hasActivatedOnce.value = true
     return
   }
-  fetchRequests()
+  const id = consumePendingHighlight()
+  await fetchRequests()
+  if (id) {
+    flashRowId.value = id
+    setTimeout(() => { flashRowId.value = null }, 2000)
+  }
 })
 
 watch([selectedStatuses, selectedVillage, notificationFilter], () => { fetchRequests() })
@@ -205,6 +213,7 @@ async function handleCreateSheet() {
 }
 
 const navigateToRequest = (serviceRequestId, rowVillageId) => {
+  setPendingHighlight(serviceRequestId)
   router.push({ name: 'service-request-detail', params: { villageId: rowVillageId, id: serviceRequestId }, query: { from: 'meta' } })
 }
 
@@ -213,6 +222,7 @@ const navigateToCreateRequest = () => {
 }
 
 const navigateToEditRequest = (serviceRequestId) => {
+  setPendingHighlight(serviceRequestId)
   router.push({ name: 'meta-service-request-edit', params: { id: serviceRequestId } })
 }
 
@@ -324,6 +334,7 @@ const clearFilters = () => {
       :has-loaded-once="hasLoadedOnce"
       :error="error"
       :show-village-column="true"
+      :flash-row-id="flashRowId"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
     >
       <template #actions="{ data }">
