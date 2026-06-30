@@ -115,8 +115,12 @@ export const serviceRequests = {
 
 // Scope strings for the token's `scope` claim (space-delimited; the API does
 // hierarchical prefix matching, so `vg:service-request` covers `:read` + write).
+// `full` is the all-resources scope so canonical users can reach every endpoint
+// in the suite (the broad `vg:<resource>` form covers `:read` + write; friends
+// only defines a `:read` scope). Narrow variants below intentionally omit scopes
+// to exercise per-resource scope enforcement.
 export const scopes = {
-  full: 'vg:service-request vg:village vg:person',
+  full: 'vg:service-request vg:village vg:person vg:member vg:volunteer vg:friends:read vg:user vg:op',
   readOnly: 'vg:service-request:read vg:village:read vg:person:read',
   noServiceRequest: 'vg:village:read vg:person:read',
 }
