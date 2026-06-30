@@ -73,12 +73,14 @@ This prints a text summary and writes an HTML report to `test/api/.coverage/inde
 (both gitignored), scoped to `api/source/**` — the code the API actually executes while
 serving the tests. The report generates even on a red run.
 
-Current coverage is **~53%** of `api/source` statements. Well-exercised: `FriendService` /
-`PersonService` (~85%), the service-request controller/service (~75%), and the auth layer.
-Thinner: `VillageService` (~36%), `UserService` (~45%), and `OperationService` (~7% — the
-unexercised appdata/ce-dump/SSE paths) / `JobService` (the `job` table isn't scaffolded in
-the test schema). The controllers themselves are now broadly covered (Member/Volunteer ~55%
-even while stubbed, via the auth/scope gating tests).
+Current coverage is **~54%** of `api/source` statements. Well-exercised: `PersonService`
+(~94%), `FriendService` (~85%), the service-request and village controllers (~77-86%), and
+the auth layer. Thinner: `VillageService` (~65%), `UserService` (~45%), and `OperationService`
+(~7% — the unexercised appdata/ce-dump/SSE paths) / `JobService` (the `job` table isn't
+scaffolded in the test schema). The controllers themselves are broadly covered (Member/
+Volunteer ~55% even while stubbed, via the auth/scope gating tests). Grant-management writes
+are exercised against a disposable `scratch` village/user so the canonical fixtures stay
+intact.
 
 ## Not yet covered (known gaps)
 
