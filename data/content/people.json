@@ -1,0 +1,2310 @@
+{
+  "figures": [
+    {
+      "name": "Roger Williams",
+      "bucket": "Historical",
+      "realBlurb": "Banished from Massachusetts Bay in 1636, he founded Providence on land bought from the Narragansett and championed soul-liberty and separation of church and state.",
+      "gag": {
+        "serviceName": "Ride needed (banished, again)",
+        "destination": "Narragansett Bay canoe launch, Seekonk side",
+        "description": "Booted out of Salem mid-winter — needs a lift to the riverbank to start a whole new colony before the snow sets in. Will pay in religious tolerance."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Anne Hutchinson",
+      "bucket": "Historical",
+      "realBlurb": "Antinomian dissenter exiled from Massachusetts in 1638; helped settle Portsmouth on Aquidneck Island after holding theological meetings in her home.",
+      "gag": {
+        "serviceName": "Errand: host a Bible study",
+        "destination": "Portsmouth, Aquidneck Island",
+        "description": "Needs folding chairs delivered for a women's theology meeting the magistrates definitely won't approve of. Discretion appreciated."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Nathanael Greene",
+      "bucket": "Historical",
+      "realBlurb": "Quaker-raised Coventry foundryman who became Washington's most trusted general and wore down Cornwallis in the brutal Southern Campaign.",
+      "gag": {
+        "serviceName": "Ride to the foundry (and back, slowly)",
+        "destination": "Greene's anchor forge, Coventry",
+        "description": "Walks with a limp and got kicked out of Quaker meeting for soldiering — needs a patient driver who won't mind a strategic retreat or three on the way home."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Gilbert Stuart",
+      "bucket": "Historical",
+      "realBlurb": "Saunderstown-born portraitist whose unfinished 1796 'Athenaeum' portrait of Washington became the face on the one-dollar bill; his father ran America's first snuff mill.",
+      "gag": {
+        "serviceName": "Ride to the paint store (URGENT)",
+        "destination": "Art supply shop, Newport",
+        "description": "Out of Naples yellow with Washington sitting for him in an hour. Also grab snuff. Warning: he will leave the portrait unfinished anyway."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Oliver Hazard Perry",
+      "bucket": "Historical",
+      "realBlurb": "South Kingstown naval hero of the 1813 Battle of Lake Erie who reported victory with 'We have met the enemy and they are ours.'",
+      "gag": {
+        "serviceName": "Ride to the marina (boat #2)",
+        "destination": "Lake Erie boat ramp",
+        "description": "His flagship got shot to splinters mid-battle, so he rowed to a backup ship. Needs a lift to the second boat. Bring oars and a flag reading DON'T GIVE UP THE SHIP."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Matthew C. Perry",
+      "bucket": "Historical",
+      "realBlurb": "Newport-born commodore (Oliver's younger brother) who sailed 'Black Ships' into Tokyo Bay in 1853–54 and forced Japan to open to Western trade.",
+      "gag": {
+        "serviceName": "Errand: door-knocking, very far away",
+        "destination": "Tokyo Bay (one way)",
+        "description": "Needs help knocking on a country's door that has been politely closed for 200 years. Will not take no for an answer. Steam-powered ride preferred."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Ambrose Burnside",
+      "bucket": "Historical",
+      "realBlurb": "Bristol firearms inventor, three-time RI governor, first NRA president, and Civil War general whose facial hair gave us the word 'sideburns.'",
+      "gag": {
+        "serviceName": "Ride to the barber",
+        "destination": "Barber shop, Bristol",
+        "description": "The sideburns won't trim themselves and Fredericksburg didn't go great. Needs a steady hand and someone to tell him the assault was a bad idea."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Esek Hopkins",
+      "bucket": "Historical",
+      "realBlurb": "Scituate-born first Commander-in-Chief of the Continental Navy (1775); his raid on Nassau was the new navy's first amphibious operation.",
+      "gag": {
+        "serviceName": "Ride to the docks (whole fleet)",
+        "destination": "Continental Navy yard, Providence",
+        "description": "Got the entire brand-new American navy — all eight ships of it — and nowhere to park. Carpool the crew? Court-martial pending, so hurry."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Thomas Tew",
+      "bucket": "Historical",
+      "realBlurb": "Newport 'gentleman pirate' of the 1690s whose Red Sea raids made him fabulously rich; he was killed in 1695 when a cannon shot disemboweled him.",
+      "gag": {
+        "serviceName": "Ride to Miskatonic Health Surgery",
+        "destination": "Miskatonic General, Innsmouth",
+        "description": "Needs a same-day cannonballectomy and a second opinion. Tip jar overflowing with Mughal gold. Please don't ask where it came from."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Ida Lewis",
+      "bucket": "Historical",
+      "realBlurb": "Keeper of Newport's Lime Rock Light who rescued at least 18 people (locals say up to 36); the lighthouse was renamed in her honor — the only such case in the U.S.",
+      "gag": {
+        "serviceName": "Late ride to the harbor (someone's drowning)",
+        "destination": "Lime Rock, Newport Harbor",
+        "description": "Two soldiers in the water again. She'll row; just needs a ride to her boat 'Rescue' and someone to hold her lamp. The 'Grace Darling of America' does not do dry feet."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Metacomet (King Philip)",
+      "bucket": "Historical",
+      "realBlurb": "Wampanoag sachem who led the devastating 1675–76 war against the New England colonies; he was killed near Mount Hope in Bristol.",
+      "gag": {
+        "serviceName": "Ride to Mount Hope",
+        "destination": "Mount Hope, Bristol",
+        "description": "Diplomatic talks have completely broken down. Needs a discreet ride back to the home base before the colonial militias circle the swamp. No questions."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Sullivan Ballou",
+      "bucket": "Historical",
+      "realBlurb": "Smithfield-born major in the 2nd RI Infantry whose tender July 1861 letter to his wife Sarah ('my love for you is deathless') became famous after Bull Run, where he was mortally wounded.",
+      "gag": {
+        "serviceName": "Errand: please mail this letter",
+        "destination": "Post office, then Bull Run, Virginia",
+        "description": "Has one last letter for Sarah and a bad feeling about the morning. Needs it delivered no matter what. Bring tissues — the driver will cry."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Stephen Hopkins",
+      "bucket": "Historical",
+      "realBlurb": "Ten-term RI governor and Declaration signer who quipped 'My hand trembles, but my heart does not' as he signed with a palsied hand.",
+      "gag": {
+        "serviceName": "Ride to the signing",
+        "destination": "Independence Hall, Philadelphia",
+        "description": "His hand shakes too much to drive himself to commit treason against the Crown. Heart's steady, though. Bring a steady pen."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "William Blackstone (Blaxton)",
+      "bucket": "Historical",
+      "realBlurb": "Eccentric early settler who planted New England's first apple orchard and reportedly rode a trained bull around the Cumberland/Lonsdale area.",
+      "gag": {
+        "serviceName": "Ride needed (my bull is tired)",
+        "destination": "Study Hill orchard, Cumberland",
+        "description": "Usually commutes by trained white bull, but he's saddle-sore. Needs a lift to the orchard to hand out apples to passing strangers. Bull stays home."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Samuel Slater",
+      "bucket": "Historical",
+      "realBlurb": "'Father of the American Industrial Revolution' who smuggled British textile-mill secrets in his head and built the first water-powered cotton mill in Pawtucket (1793).",
+      "gag": {
+        "serviceName": "Discreet ride to the riverfront",
+        "destination": "Slater Mill, Pawtucket",
+        "description": "Memorized an entire factory in his head and crossed an ocean. Needs a ride to the falls and a friend who can keep an industrial secret from the British."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Abraham Whipple",
+      "bucket": "Historical",
+      "realBlurb": "Providence sea captain who in 1772 led the burning of the British revenue schooner Gaspee — arguably the first armed act of the Revolution.",
+      "gag": {
+        "serviceName": "Late-night ride to the sandbar (bring rowboats)",
+        "destination": "Gaspee Point, Warwick",
+        "description": "A British customs boat has run aground and it would be a shame if something happened to it. Muffled oars only. Marshmallows optional."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Elizabeth Buffum Chace",
+      "bucket": "Historical",
+      "realBlurb": "Valley Falls Quaker abolitionist and suffragist who ran an Underground Railroad station and is sometimes called 'the conscience of Rhode Island.'",
+      "gag": {
+        "serviceName": "Discreet overnight transport (no questions)",
+        "destination": "Valley Falls safe house, Central Falls",
+        "description": "Needs a quiet, reliable driver for guests passing through after dark on their way to freedom. The conscience of Rhode Island vouches for you."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Thomas Wilson Dorr",
+      "bucket": "Historical",
+      "realBlurb": "Led the 1842 Dorr Rebellion for voting rights; his cannons literally failed to fire at the Providence arsenal and his rebel stand fizzled on Acote's Hill in Chepachet.",
+      "gag": {
+        "serviceName": "Ride to the arsenal (and a gunsmith)",
+        "destination": "Providence Arsenal, then Acote's Hill, Chepachet",
+        "description": "Storming the arsenal for the right to vote, but his Revolutionary-War cannons keep misfiring. Needs a lift and someone who knows why old powder gets damp."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "George M. Cohan",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "Providence-born 'Yankee Doodle Dandy' songwriter and showman who wrote 'Give My Regards to Broadway' and 'Over There'; claimed a Fourth of July birthday.",
+      "gag": {
+        "serviceName": "Ride to the train station (regards to deliver)",
+        "destination": "Union Station, then Broadway",
+        "description": "Born on the Fourth of July (he insists), needs a ride to catch the New York train. Has many regards that absolutely must be given to Broadway in person."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "H.P. Lovecraft",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "Providence horror writer (1890–1937) who set cosmic dread in New England, walked the city's old streets by night, and is buried in Swan Point Cemetery.",
+      "gag": {
+        "serviceName": "Late ride (cosmic dread, mild)",
+        "destination": "College Hill, Providence (by moonlight only)",
+        "description": "Won't go out before dark, fears refrigeration and the ocean, and needs a 2 a.m. walking-tour ride past the Fleur-de-Lys building. Driver must not be eldritch. Probably."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Edgar Allan Poe",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "Courted Providence poet Sarah Helen Whitman in 1848, proposed to her in a cemetery, and lost her when he broke his sobriety pledge two days before the wedding.",
+      "gag": {
+        "serviceName": "Ride to the cemetery (it's a date)",
+        "destination": "Swan Point Cemetery, then the Athenaeum, Providence",
+        "description": "Has a proposal planned among the gravestones and a wedding in two days. Please confiscate any alcohol along the route. Nevermore late, ideally."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Sarah Helen Whitman",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "Providence Transcendentalist poet, spiritualist, and Poe's fiancée who dumped him over a broken sobriety pledge and later defended his reputation for life.",
+      "gag": {
+        "serviceName": "Ride home (engagement off)",
+        "destination": "Benefit Street, Providence",
+        "description": "Needs a quiet lift away from the Athenaeum after calling off the wedding. Bring her handkerchief and ether. Will write a defense of him later anyway."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Spalding Gray",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "Barrington-born monologuist of 'Swimming to Cambodia,' famous for performing seated at a plain table; he died by suicide in NY Harbor in 2004.",
+      "gag": {
+        "serviceName": "Errand: move one table and a glass of water",
+        "destination": "Trinity Rep, Providence",
+        "description": "Needs his plain wooden table and notebook hauled to the theater for tonight's monologue. That's the whole set. He'll talk; you carry."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "David Byrne",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "Talking Heads frontman who met his bandmates at RISD in Providence in the early '70s; the band famously formed out of the art-school scene.",
+      "gag": {
+        "serviceName": "Ride to RISD (with an oversized item)",
+        "destination": "Rhode Island School of Design, Providence",
+        "description": "Needs help loading an enormous gray suit and his bicycle for a gig. May ask, en route, how he got here, and where that highway goes to. Same as it ever was."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Cormac McCarthy",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "Born in Providence in 1933 before his family moved to Tennessee; the bleak Western novelist of 'Blood Meridian' and 'The Road' started life an Ocean Stater.",
+      "gag": {
+        "serviceName": "Ride west (no commas)",
+        "destination": "Anywhere bleak and far from Providence",
+        "description": "Born here but won't say so warmly. Needs a long ride across desolate country. Will narrate the landscape unpunctuated. No quotation marks permitted in the car."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Galway Kinnell",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "Pawtucket-born Pulitzer-winning poet ('The Book of Nightmares'), known for tender, earthy verse and reading 'St. Francis and the Sow.'",
+      "gag": {
+        "serviceName": "Ride to the farm (poetry emergency)",
+        "destination": "A sow's pen, somewhere rural RI",
+        "description": "Needs to get to a pig to remind it of its own loveliness, in verse. Bring boots. The Pawtucket Pulitzer poet pays in blessings."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Nelson Eddy / RISD muralists",
+      "bucket": "Writers/Artists/Performers",
+      "realBlurb": "RISD students have a long tradition of guerrilla art, murals, and 'unsanctioned' public installations across Providence's old industrial spaces.",
+      "gag": {
+        "serviceName": "Cargo ride (don't ask about the cinderblocks)",
+        "destination": "An abandoned mill, Olneyville",
+        "description": "Needs 200 pounds of art supplies and a ladder moved at odd hours for a project the building's owner has not been told about. Standard RISD stuff."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Buddy Cianci",
+      "bucket": "Politicians/Characters",
+      "realBlurb": "Providence's longest-serving and twice-convicted mayor, who assaulted a man with an ashtray and a fireplace log, did federal time, and sold 'Mayor's Own Marinara Sauce.'",
+      "gag": {
+        "serviceName": "Ride to the press conference (case of marinara in trunk)",
+        "destination": "City Hall, Providence",
+        "description": "Back from prison and running again. Needs a lift, a comb for the toupee, and trunk space for jars of his own marinara. Leave the ashtray at home."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Lincoln Chafee",
+      "bucket": "Politicians/Characters",
+      "realBlurb": "Former Warwick blacksmith-turned-senator, governor, and briefly presidential candidate who once campaigned on adopting the metric system.",
+      "gag": {
+        "serviceName": "Ride to the forge, then the debate",
+        "destination": "Warwick smithy, then a TV studio",
+        "description": "Needs a lift to shoe a horse, then to a debate where he'll propose the metric system again. Distance measured in kilometers, naturally."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Claiborne Pell",
+      "bucket": "Politicians/Characters",
+      "realBlurb": "Newport patrician senator behind the Pell Grant; a believer in psychic phenomena who also championed the arts and humanities endowments.",
+      "gag": {
+        "serviceName": "Ride to the university (grant business)",
+        "destination": "Financial aid office, then a parapsychology lecture",
+        "description": "Wants to hand out college grants to deserving students, then catch a talk on psychic spoon-bending. Patrician manners; will tip generously."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Theodore Francis Green",
+      "bucket": "Politicians/Characters",
+      "realBlurb": "RI governor and senator who served in the U.S. Senate into his 90s, becoming one of the oldest senators in history; the Providence airport bears his name.",
+      "gag": {
+        "serviceName": "Ride to the Senate (he's 93)",
+        "destination": "The airport that's named after him",
+        "description": "Still working at an age when most folks have retired twice. Needs a steady ride to catch his flight to Washington. Yes, the airport is literally named for him."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Vincent 'Buddy' the Statehouse pigeon (civic mascot)",
+      "bucket": "Politicians/Characters",
+      "realBlurb": "Rhode Island's gilded Independent Man statue tops the State House dome — struck by lightning many times and once removed for repairs after taking a bolt.",
+      "gag": {
+        "serviceName": "Ride down from a great height (lightning damage)",
+        "destination": "RI State House dome, Providence",
+        "description": "The Independent Man took ANOTHER lightning strike and needs a lift to the gilder for re-gold-leafing. Bring a very tall ladder and a lightning rod."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "John O. Pastore",
+      "bucket": "Politicians/Characters",
+      "realBlurb": "First Italian-American U.S. governor and senator; his 1969 grilling of Mister Rogers helped save public-TV funding.",
+      "gag": {
+        "serviceName": "Ride to a Senate hearing (be nice)",
+        "destination": "Capitol Hill committee room",
+        "description": "Gruff exterior, soft heart. Needs a ride to a budget hearing where a man in a cardigan is going to make him cry on the record. Bring a hankie."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Mercy Brown",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Exeter teenager exhumed in 1892 during a 'vampire' panic; her heart was burned and fed to her dying brother as a tuberculosis cure. New England's last vampire scare.",
+      "gag": {
+        "serviceName": "Late-night ride to the Exeter cemetery (bring a shovel)",
+        "destination": "Chestnut Hill Baptist Church cemetery, Exeter",
+        "description": "Needs a discreet midnight lift to her own graveside. Bring a shovel, a lantern, and an open mind. The town's worried about consumption again."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Little Bett (the Learned Elephant)",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "A traveling circus elephant shot dead on a Chepachet bridge in May 1826 by men hiding in a grist mill; the town commemorates her with a plaque each May 25.",
+      "gag": {
+        "serviceName": "XL ride (very large passenger)",
+        "destination": "Chepachet bridge, Glocester — avoid the grist mill",
+        "description": "Needs a calm, sturdy ride across town for tonight's show. Please route AROUND the Hawkins grist mill; the locals have been twitchy and armed. Peanuts provided."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Nibbles Woodaway (the Big Blue Bug)",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "The 58-foot, 4,000-pound fiberglass termite mascot looming over I-95 in Providence since 1980, dressed up for every holiday; named by Geraldine Perry in a 1990 contest.",
+      "gag": {
+        "serviceName": "Errand: seasonal costume delivery",
+        "destination": "I-95 overpass, Providence",
+        "description": "Needs a Santa hat, reindeer antlers, and a blinking red nose hauled up to the gantry before the holiday traffic. 928 times life-size, so size up the ladder."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Mr. Potato Head",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Created by Pawtucket's Hasbro in 1952, the first toy advertised on TV; he became an unofficial RI tourism mascot with giant statues across the state.",
+      "gag": {
+        "serviceName": "Ride to the doctor (lost my ear again)",
+        "destination": "Hasbro HQ, Pawtucket",
+        "description": "Misplaced an ear, a mustache, and possibly the nose. Needs a lift to swap parts. Driver: please check the seat cushions before pulling away."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Michael Townsend & the Secret Mall Apartment crew",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Eight artists who built and secretly lived in a hidden apartment inside the Providence Place Mall from 2003–2007, hauling in a couch, china cabinet, and ~5,000 lbs of cinderblock.",
+      "gag": {
+        "serviceName": "Cargo ride (5,000 lbs of cinderblock, discreet)",
+        "destination": "Providence Place Mall service entrance",
+        "description": "Needs cinderblocks, a couch, and a china cabinet quietly moved into a 'forgotten' corner of the mall. Use the freight elevator. Tell no one. It's art."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "The Perron Family",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Family who moved into a 1736 Harrisville farmhouse in 1971 and reported hauntings that inspired 'The Conjuring'; the alleged spirit was wrongly pinned on Bathsheba Sherman.",
+      "gag": {
+        "serviceName": "Errand: the broom keeps moving itself",
+        "destination": "Old Arnold Estate farmhouse, Harrisville",
+        "description": "Need a handyman who isn't afraid of cold spots, self-relocating brooms, or piles of dirt that reappear on a clean floor. Salt provided. Stay till sunup if you dare."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Alan Shawn Feinstein",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Cranston philanthropist (1931–2024) famed for newspaper-ad and billboard giveaways, his gold jacket, and inspiring 600,000+ kids to do 'good deeds' as Feinstein Junior Scholars.",
+      "gag": {
+        "serviceName": "Ride to the billboard (and the bank)",
+        "destination": "A billboard over Route 2, Cranston",
+        "description": "Wants to give away money to whoever does the most good deeds this week, and needs a lift to update the billboard. Wear sunglasses; the gold jacket is bright."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "The Awful Awful (Newport Creamery)",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Rhode Island's beloved frozen drink — 'Awful Big, Awful Good' — sold at Newport Creamery, a fixture of local diner culture and 'cabinet' (milkshake) lore.",
+      "gag": {
+        "serviceName": "Errand: emergency cabinet run",
+        "destination": "Newport Creamery, anywhere RI",
+        "description": "Out-of-staters keep calling it a 'milkshake.' Needs three Awful Awfuls and coffee milk delivered, plus someone to gently correct the vocabulary. Awful big tip."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "The Independent Man",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "The 11-foot gilded statue atop the State House dome, struck by lightning dozens of times; he's been shot at, repaired, and re-gilded over the decades.",
+      "gag": {
+        "serviceName": "Ride to the gilder (re-gold-leafing)",
+        "destination": "Foundry, off Allens Avenue, Providence",
+        "description": "Took yet another lightning bolt to the gold leaf. Needs a careful ride down from the dome and back up. Spear stays with him; he's independent about it."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Coffee Milk (state drink)",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Coffee milk — milk with coffee syrup — was named Rhode Island's official state beverage in 1993 after a fierce legislative showdown with Del's Lemonade fans.",
+      "gag": {
+        "serviceName": "Errand: syrup supply run",
+        "destination": "Eclipse/Autocrat factory, Lincoln",
+        "description": "The diner's out of coffee syrup and there's a line of regulars getting restless. Needs cases delivered before the breakfast rush. Do NOT bring Del's; politics."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Del's Lemonade cart",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Frozen lemonade dynasty whose recipe traces to 1840s Italy; the green-and-yellow carts are an inescapable RI summer institution.",
+      "gag": {
+        "serviceName": "Cargo ride (frozen, melting fast)",
+        "destination": "A beach in Narragansett",
+        "description": "Cart of frozen lemonade needs to reach the boardwalk before it slushes. Refrigerated vehicle a plus. Lost the 1993 state-drink vote and is still bitter (and lemony)."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Quahog (the clam)",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "The hard-shell clam ('quahog,' from Narragansett 'poquauhock') is RI's state shell and the heart of stuffies, chowder, and clam-cake culture.",
+      "gag": {
+        "serviceName": "Ride to the clam shack (in a bucket)",
+        "destination": "Aunt Carrie's, Point Judith",
+        "description": "A bucket of quahogs requests transport to become stuffies before the chowder cook-off. Red, white, or clear broth — driver must not take sides. Sandy seats likely."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "The Gaspee (burning reenactors)",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Each June, Pawtuxet Village holds Gaspee Days, culminating in the ceremonial burning of a mock British schooner to mark the 1772 raid.",
+      "gag": {
+        "serviceName": "Cargo ride (one mock British schooner, flammable)",
+        "destination": "Pawtuxet Village waterfront, Cranston/Warwick line",
+        "description": "Need a wooden boat hauled to the cove for the annual ceremonial burning. Marshmallows in back. Fire marshal already notified. Colonial costume optional."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Lizzie Borden",
+      "bucket": "Nearby Notables",
+      "realBlurb": "Fall River, Massachusetts woman acquitted in 1893 of the hatchet murders of her father and stepmother; the case spawned a famous rhyme and an enduring true-crime legend.",
+      "gag": {
+        "serviceName": "Errand: hardware store run (just gardening, honest)",
+        "destination": "Hardware store, Fall River, MA",
+        "description": "Needs a ride to return a hatchet and pick up a much smaller, less alarming garden tool. Will offer you pears in the barn. Maybe decline the pears."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Robert Goddard",
+      "bucket": "Nearby Notables",
+      "realBlurb": "Worcester, Massachusetts physicist and 'father of modern rocketry' who launched the first liquid-fueled rocket in 1926; once mocked by the press, later vindicated by the space age.",
+      "gag": {
+        "serviceName": "Ride to the launch field (fragile cargo)",
+        "destination": "Aunt Effie's farm field, Auburn, MA",
+        "description": "Has a liquid-fueled rocket to test and a newspaper that doubts he understands physics. Needs careful transport and someone to ignore the skeptics. May go up 41 feet."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Emily Dickinson (sparingly nearby)",
+      "bucket": "Nearby Notables",
+      "realBlurb": "Amherst, Massachusetts poet of reclusive habit who rarely left her home and conducted much of her social life through letters and a famously private upstairs room.",
+      "gag": {
+        "serviceName": "Errand: please leave it at the door (don't knock)",
+        "destination": "The Homestead, Amherst, MA",
+        "description": "Needs groceries left on the step — she'll lower a basket. Do not ring; do not loiter; do not expect to see her face. A note slipped under the door is plenty."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Frederick Law Olmsted (Roger Williams Park ties)",
+      "bucket": "Nearby Notables",
+      "realBlurb": "Landscape architect whose firm shaped Roger Williams Park in Providence and the broader 'Emerald' parks movement across New England.",
+      "gag": {
+        "serviceName": "Ride to survey the park (bring stakes)",
+        "destination": "Roger Williams Park, Providence",
+        "description": "Wants to walk every winding path before redesigning the carriage roads. Needs a ride, survey stakes, and patience — he'll stop to admire every sightline."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "John Brown",
+      "bucket": "Historical",
+      "realBlurb": "Wealthy Providence merchant, China-trade magnate, and Brown University benefactor whose fortune was entangled in the slave trade — a complicated founding figure.",
+      "gag": {
+        "serviceName": "Ride to the wharf (heavy ledgers)",
+        "destination": "Brown's wharf, then the East Side mansion, Providence",
+        "description": "Needs his counting-house ledgers and China-trade tea chests moved up the hill. The university would like a word about the ledgers' contents. Bring a strong back."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Moses Brown",
+      "bucket": "Historical",
+      "realBlurb": "John's Quaker brother, an abolitionist who freed his enslaved workers, founded a school, and bankrolled Samuel Slater's Pawtucket mill.",
+      "gag": {
+        "serviceName": "Ride to the meeting house, then the mill",
+        "destination": "Moses Brown School, then Slater Mill, Pawtucket",
+        "description": "Needs a quiet ride to Quaker meeting and then to check on the new water-powered mill he's funding. Will gently disagree with his brother the whole way."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Sarah Doyle / Pembroke pioneers",
+      "bucket": "Historical",
+      "realBlurb": "Providence educator and women's-rights advocate who helped found the women's college (later Pembroke) at Brown in the 1890s.",
+      "gag": {
+        "serviceName": "Ride to the college (admissions fight)",
+        "destination": "Brown University gates, Providence",
+        "description": "Needs a lift to argue, again, that women should be allowed to study here. Bring petitions and patience. The future Pembroke College thanks you."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Rocky Point Park (the Shore Dinner Hall)",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Beloved Warwick amusement park (closed 1995) famous for its enormous Shore Dinner Hall serving clam cakes and chowder to thousands at once.",
+      "gag": {
+        "serviceName": "Catering haul (clam cakes for 1,000)",
+        "destination": "Rocky Point Shore Dinner Hall, Warwick",
+        "description": "Needs vats of chowder and mountains of clam cakes moved to the great hall before the crowd arrives. Nostalgia heavy; portions heavier. Watch the seagulls."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "George 'Cap' Wirth / Crescent Park Carousel",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "The 1895 Charles I. D. Looff carousel at Crescent Park in East Providence is a National Historic Landmark — a masterwork of hand-carved horses.",
+      "gag": {
+        "serviceName": "Cargo ride (one hand-carved carousel horse)",
+        "destination": "Crescent Park Looff Carousel, East Providence",
+        "description": "A prancing wooden horse needs gentle transport to the restorer and back to the spinning platform. Padding essential. Calliope music not included but encouraged."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Doris Duke",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Tobacco heiress whose Newport mansion 'Rough Point' and her preservation of dozens of colonial buildings reshaped the city; an eccentric, fabulously wealthy recluse.",
+      "gag": {
+        "serviceName": "Ride for two camels (yes, camels)",
+        "destination": "Rough Point, Bellevue Avenue, Newport",
+        "description": "Her pet camels, Princess and Baby, need transport along the cliffs. Also: please help move 80 colonial houses she's decided to save. The heiress tips in mansions."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "Bristol Fourth of July Committee",
+      "bucket": "Oddballs/Legends",
+      "realBlurb": "Bristol, RI hosts the oldest continuous Fourth of July celebration in America (since 1785), complete with a red-white-and-blue center line painted down the parade route.",
+      "gag": {
+        "serviceName": "Errand: paint the road (patriotically)",
+        "destination": "Hope Street parade route, Bristol",
+        "description": "Needs red, white, and blue paint hauled to repaint the center line before the nation's oldest July 4th parade. Be punctual; they've done this every year since 1785."
+      },
+      "tag": "gag"
+    },
+    {
+      "name": "William Coddington",
+      "bucket": "colonial-historical",
+      "realBlurb": "Founded Newport in 1639; later Quaker governor of the colony.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Nicholas Easton",
+      "bucket": "colonial-historical",
+      "realBlurb": "Newport co-founder and colonial president; Easton's Beach bears his name.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Dr. John Clarke",
+      "bucket": "colonial-historical",
+      "realBlurb": "Founded America's second Baptist church and drafted RI's 1663 charter.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to the print shop",
+        "destination": "the Athenaeum",
+        "description": "Needs to drop off a 56-page pamphlet titled 'Ill Newes from New-England.' Wait time included."
+      }
+    },
+    {
+      "name": "Samuel Gorton",
+      "bucket": "colonial-historical",
+      "realBlurb": "Firebrand who founded Warwick after being jailed for calling magistrates 'Just Asses.'",
+      "tag": "gag",
+      "villageHint": "Pawtuxet",
+      "gag": {
+        "serviceName": "Ride to the town meeting",
+        "destination": "the Warwick town hall",
+        "description": "Please do not let him address the magistrates. He will call them 'Just Asses.' Again."
+      }
+    },
+    {
+      "name": "Mary Dyer",
+      "bucket": "colonial-historical",
+      "realBlurb": "Quaker martyr who signed the Portsmouth Compact; hanged in Boston in 1660.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "William Dyer",
+      "bucket": "colonial-historical",
+      "realBlurb": "RI's first attorney general and Mary Dyer's husband.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Obadiah Holmes",
+      "bucket": "colonial-historical",
+      "realBlurb": "Baptist preacher whipped 30 lashes in Boston for an unlicensed service.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Joseph Bucklin",
+      "bucket": "colonial-historical",
+      "realBlurb": "Fired the shot that wounded the Gaspee's captain — 'the first blood of the Revolution.'",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Simeon Potter",
+      "bucket": "colonial-historical",
+      "realBlurb": "Bristol privateer and Gaspee raider with a dubious fortune.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Nicholas Brown Jr.",
+      "bucket": "colonial-historical",
+      "realBlurb": "Merchant whose gift renamed the college 'Brown' in 1804.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Canonicus",
+      "bucket": "colonial-historical",
+      "realBlurb": "Narragansett sachem who deeded Providence land to Roger Williams.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Miantonomi",
+      "bucket": "colonial-historical",
+      "realBlurb": "Narragansett sachem who sold Aquidneck and Shawomet to the settlers.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Ninigret",
+      "bucket": "colonial-historical",
+      "realBlurb": "Niantic sachem who navigated the colonial wars by staying neutral.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Roger Mowry",
+      "bucket": "colonial-historical",
+      "realBlurb": "Kept Providence's first licensed tavern in 1655.",
+      "tag": "gag",
+      "villageHint": "Cabinet, RI",
+      "gag": {
+        "serviceName": "Package-store run before the storm",
+        "destination": "Mowry's Tavern",
+        "description": "Town meeting tonight; needs a barrel of flip and someone to keep the fire stoked."
+      }
+    },
+    {
+      "name": "Benedict Arnold",
+      "bucket": "colonial-historical",
+      "realBlurb": "First governor under the 1663 charter (and the traitor's great-grandfather).",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "William Brenton",
+      "bucket": "colonial-historical",
+      "realBlurb": "Colonial governor and vast landowner of Brenton's Neck.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Gabriel Bernon",
+      "bucket": "colonial-historical",
+      "realBlurb": "Huguenot refugee who helped found Providence's first Anglican church.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Pardon Tillinghast",
+      "bucket": "colonial-historical",
+      "realBlurb": "Baptist elder and merchant who built Providence's first wharf.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Joseph Wanton",
+      "bucket": "colonial-historical",
+      "realBlurb": "Loyalist governor deposed in 1775 for refusing the revolution.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "William Barton",
+      "bucket": "colonial-historical",
+      "realBlurb": "Led the daring 1777 raid that captured British General Prescott from his bed.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Late-night ride, discreet",
+        "destination": "a farmhouse on the West Road",
+        "description": "Pick up one (1) British general, still in his nightshirt. Quiet engine, please."
+      }
+    },
+    {
+      "name": "Christopher Greene",
+      "bucket": "colonial-historical",
+      "realBlurb": "Colonel who led RI's Black Regiment at the Battle of Rhode Island.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Silas Talbot",
+      "bucket": "colonial-historical",
+      "realBlurb": "Revolutionary naval officer and first captain of the USS Constitution.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Stephen Olney",
+      "bucket": "colonial-historical",
+      "realBlurb": "Captain who stormed the redoubt at Yorktown.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Zachariah Allen",
+      "bucket": "colonial-historical",
+      "realBlurb": "Inventor and mill owner who pioneered fire-prevention engineering.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "George Henry Corliss",
+      "bucket": "colonial-historical",
+      "realBlurb": "Built the colossal steam engine that powered the 1876 Centennial Exposition.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Heavy-equipment delivery",
+        "destination": "the Centennial fairgrounds",
+        "description": "One 1,400-horsepower steam engine, some assembly required. Do not lift with your back."
+      }
+    },
+    {
+      "name": "Sissieretta Jones",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Providence soprano, the first Black artist to headline Carnegie Hall.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Nelson W. Aldrich",
+      "bucket": "politics-crime",
+      "realBlurb": "Powerful Gilded-Age senator, 'General Manager of the Nation.'",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "John Chafee",
+      "bucket": "politics-crime",
+      "realBlurb": "Marine, RI governor, senator, and Navy secretary.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Bruce Sundlun",
+      "bucket": "politics-crime",
+      "realBlurb": "Governor who took office during the 1991 credit-union collapse.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Raymond L. S. Patriarca",
+      "bucket": "politics-crime",
+      "realBlurb": "Ran New England's crime syndicate from a Federal Hill vending office for decades.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Ride to Federal Hill",
+        "destination": "Coin-O-Matic, Atwells Ave",
+        "description": "Just a quiet errand to 'the office.' Don't write anything down. Don't make eye contact with the vending machines."
+      }
+    },
+    {
+      "name": "Vincent 'Fat Vinny' Teresa",
+      "bucket": "politics-crime",
+      "realBlurb": "Mobster-turned-informant who wrote a tell-all memoir.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Joseph Bradford",
+      "bucket": "colonial-historical",
+      "realBlurb": "Newport merchant in the colonial triangle trade.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "William Ellery",
+      "bucket": "colonial-historical",
+      "realBlurb": "Newport lawyer and Declaration of Independence signer.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Aaron Lopez",
+      "bucket": "colonial-historical",
+      "realBlurb": "Newport's wealthiest colonial merchant and a leader of Touro Synagogue.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Henry Collins",
+      "bucket": "colonial-historical",
+      "realBlurb": "Newport merchant called the 'Lorenzo de' Medici of Rhode Island.'",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Sarah Kemble Knight",
+      "bucket": "colonial-historical",
+      "realBlurb": "Colonial diarist who recorded a famous 1704 horseback journey.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Jemima Wilkinson",
+      "bucket": "colonial-historical",
+      "realBlurb": "Cumberland preacher who, after a fever, declared herself the 'Public Universal Friend.'",
+      "tag": "gag",
+      "villageHint": "Cabinet, RI",
+      "gag": {
+        "serviceName": "Ride to the revival",
+        "destination": "the meeting field",
+        "description": "Use no gendered pronouns; the rider is the Public Universal Friend. Genuinely ahead of their time."
+      }
+    },
+    {
+      "name": "Ann Smith Franklin",
+      "bucket": "colonial-historical",
+      "realBlurb": "First woman to run a newspaper in America (Ben Franklin's sister-in-law).",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "George Washington Greene",
+      "bucket": "colonial-historical",
+      "realBlurb": "Historian and grandson of General Nathanael Greene.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Prudence Crandall",
+      "bucket": "nearby-new-england",
+      "realBlurb": "Teacher who opened New England's first school for Black girls.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Wilfred Harold 'Lefty' Flynn",
+      "bucket": "politics-crime",
+      "realBlurb": "Bootleg-era Narragansett Bay rum-runner of local legend.",
+      "tag": "gag",
+      "villageHint": "Pawtuxet",
+      "gag": {
+        "serviceName": "Ride to the dock, no headlights",
+        "destination": "a cove past Conimicut Light",
+        "description": "Cargo is 'Canadian.' If the Coast Guard asks, we are night fishing for tautog."
+      }
+    },
+    {
+      "name": "Paul Cuffe",
+      "bucket": "nearby-new-england",
+      "realBlurb": "Black Quaker sea captain and entrepreneur from just over the Massachusetts line.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Oliver Hazard Perry Jr.",
+      "bucket": "colonial-historical",
+      "realBlurb": "Naval namesake descendant active in Newport maritime circles.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Stephen Decatur Sr.",
+      "bucket": "colonial-historical",
+      "realBlurb": "Revolutionary privateer whose son became a naval legend.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Welcome Arnold",
+      "bucket": "colonial-historical",
+      "realBlurb": "Providence merchant and Revolutionary-era assemblyman.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "John Howland",
+      "bucket": "colonial-historical",
+      "realBlurb": "Barber and reformer who championed Rhode Island's free public schools.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Ride to the barbershop, then the statehouse",
+        "destination": "the General Assembly",
+        "description": "Will cut your hair AND lobby for public education in the same appointment. Efficient."
+      }
+    },
+    {
+      "name": "Sullivan Dorr",
+      "bucket": "colonial-historical",
+      "realBlurb": "China-trade merchant whose Providence mansion still stands.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Tristam Burges",
+      "bucket": "politics-crime",
+      "realBlurb": "Congressman nicknamed the 'Bald Eagle of Rhode Island' for his oratory.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "James Mitchell Varnum",
+      "bucket": "colonial-historical",
+      "realBlurb": "Revolutionary general and lawyer who argued an early judicial-review case.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Job Durfee",
+      "bucket": "politics-crime",
+      "realBlurb": "Chief justice who presided over the Dorr treason trial.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Wilkins Updike",
+      "bucket": "colonial-historical",
+      "realBlurb": "South County lawyer and antiquarian who chronicled the Narragansett planters.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Thomas Poynton Ives",
+      "bucket": "colonial-historical",
+      "realBlurb": "Brown & Ives partner who built Providence's mercantile fortune.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Sarah Updike Goddard",
+      "bucket": "colonial-historical",
+      "realBlurb": "Printer who ran Providence's first newspaper with her son.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Esek Wilbur",
+      "bucket": "colonial-historical",
+      "realBlurb": "Quaker farmer-preacher of the South County plains.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Caesar Lyndon",
+      "bucket": "colonial-historical",
+      "realBlurb": "Enslaved-then-free clerk to a colonial governor; kept a vivid Newport ledger.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Newport Gardner",
+      "bucket": "colonial-historical",
+      "realBlurb": "Enslaved musician who bought his freedom and founded a Newport singing school.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Duchess Quamino",
+      "bucket": "colonial-historical",
+      "realBlurb": "The 'Pastry Queen of Rhode Island,' a celebrated freed Newport baker.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Catering pickup",
+        "destination": "the Quamino kitchen",
+        "description": "Three dozen frosted cakes for the Bellevue Ave set. Handle the boxes like they're made of spun sugar — they are."
+      }
+    },
+    {
+      "name": "Cornelius Vanderbilt II",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Built The Breakers, the grandest of the Newport cottages.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Alice Claypoole Vanderbilt",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "'Alice of the Breakers,' who ruled Newport society for 35 years.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Wardrobe-change shuttle",
+        "destination": "The Breakers",
+        "description": "Needs a ride home between the third and fourth outfit of the day. Allow closet space in the car."
+      }
+    },
+    {
+      "name": "Alva Vanderbilt Belmont",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Built Marble House, then became a militant suffrage leader.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to Marble House, then the rally",
+        "destination": "the Chinese Tea House",
+        "description": "Drop the gowns, grab the 'Votes for Women' banner. She contains multitudes and will not be late to either."
+      }
+    },
+    {
+      "name": "William Kissam Vanderbilt",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Railroad heir who gifted Marble House to Alva for her 39th birthday.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Caroline Schermerhorn Astor",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "'The Mrs. Astor,' arbiter of the Gilded Age 'Four Hundred.'",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to the Summer Ball",
+        "destination": "Beechwood",
+        "description": "Park her directly in front of her own portrait. She prefers to be seen twice."
+      }
+    },
+    {
+      "name": "John Jacob Astor IV",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Inventor, sci-fi novelist, and the richest man to die on the Titanic.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Ward McAllister",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Social arbiter who coined 'the Four Hundred.'",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Harry Lehr",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "'King Lehr,' Newport's society jester who once threw a dinner for 100 dogs.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Catering pickup (urgent)",
+        "destination": "the Newport Casino lawn",
+        "description": "Stewed liver and dog biscuits for 100 canine guests. The prince of Corsica (a monkey) eats first."
+      }
+    },
+    {
+      "name": "Mamie Fish",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Caustic-witted hostess of the Triumvirate ('A toad, my pet, a toad').",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Tessie Oelrichs",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Comstock-silver heiress who built Rosecliff and threw the all-white Bal Blanc.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Party-supply run (all white)",
+        "destination": "Rosecliff",
+        "description": "White roses, white swans, and a fleet of mock white ships for the harbor. No color admitted, including the driver's car."
+      }
+    },
+    {
+      "name": "Hermann Oelrichs",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Shipping magnate and swimmer who dared anyone to prove sharks attack.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to Bailey's Beach",
+        "destination": "the bathing pavilion",
+        "description": "Wants to settle a $1,000 bet that no man with a rod and line can reel him in. Bring a stopwatch."
+      }
+    },
+    {
+      "name": "Edward Berwind",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Coal baron who built The Elms with no backup electrical system.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Julia Berwind",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Kept The Elms running Gilded-Age style into the 1960s; drove her own car, scandalously.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "White-glove driving inspection",
+        "destination": "The Elms carriage house",
+        "description": "She'll drive herself, thanks. Please inspect the steering wheel with white gloves on her return."
+      }
+    },
+    {
+      "name": "George Peabody Wetmore",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "RI governor and senator; his family kept Chateau-sur-Mer for a century.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Oliver Hazard Perry Belmont",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Built Belcourt, whose entire first floor was stables for his beloved horses.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Equine transport",
+        "destination": "Belcourt",
+        "description": "Fifteen horses, each with a gold nameplate and pure-white monogrammed sheets. The horses ride; he'll walk."
+      }
+    },
+    {
+      "name": "August Belmont",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Rothschild's American agent and namesake of the Belmont Stakes.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Stanford White",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Architect of Rosecliff and the original Madison Square Garden.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Richard Morris Hunt",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Architect of The Breakers, Marble House, and the Statue of Liberty base.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Tina Weymouth",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Talking Heads bassist who met the band at RISD.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Chris Frantz",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Talking Heads drummer and RISD alum.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Seth MacFarlane",
+      "bucket": "arts-music-lit",
+      "realBlurb": "RISD grad who created Family Guy and set it in Quahog, RI.",
+      "tag": "gag",
+      "villageHint": "Quahog",
+      "gag": {
+        "serviceName": "Ride to the recording studio",
+        "destination": "the voiceover booth",
+        "description": "Will voice half the passengers in the car. Pays in cutaway gags."
+      }
+    },
+    {
+      "name": "Brian Chippendale",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Lightning Bolt drummer of the Fort Thunder Providence noise scene.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Dale Chihuly",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Glass sculptor who studied and taught at RISD.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Fragile cargo transport",
+        "destination": "the RISD glass studio",
+        "description": "One enormous hand-blown chandelier. Drive like every pothole is personal. It is."
+      }
+    },
+    {
+      "name": "Chris Van Allsburg",
+      "bucket": "arts-music-lit",
+      "realBlurb": "RISD-trained author of The Polar Express and Jumanji.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Roz Chast",
+      "bucket": "arts-music-lit",
+      "realBlurb": "New Yorker cartoonist and RISD graduate.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Martin Mull",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Actor-comedian and RISD-trained painter.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Nelson Eddy",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Providence-born singer and matinee idol of 1930s film operettas.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Bobby Hackett",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Providence-born jazz cornetist.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Eileen Farrell",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Woonsocket-born opera soprano with a jazz second act.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Napoleon Lajoie",
+      "bucket": "sports",
+      "realBlurb": "Woonsocket-born Hall of Fame second baseman.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Gabby Hartnett",
+      "bucket": "sports",
+      "realBlurb": "Woonsocket Hall of Fame catcher, 'Old Tomato Face.'",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Hugh Duffy",
+      "bucket": "sports",
+      "realBlurb": "Cranston-raised Hall of Famer who hit .440 in 1894.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Davey Lopes",
+      "bucket": "sports",
+      "realBlurb": "Providence-born second baseman and base-stealing Dodger.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Rocco Baldelli",
+      "bucket": "sports",
+      "realBlurb": "Woonsocket-born outfielder turned Twins manager.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Vinny Paz",
+      "bucket": "sports",
+      "realBlurb": "Cranston boxer who came back to win titles after a broken neck.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Ride to the gym (cleared by the doctor)",
+        "destination": "the boxing club",
+        "description": "Yes, in the halo brace. No, he will not stop training. Pazmanian Devil rules apply."
+      }
+    },
+    {
+      "name": "Ernie DiGregorio",
+      "bucket": "sports",
+      "realBlurb": "Providence College guard and NBA Rookie of the Year.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Marvin Barnes",
+      "bucket": "sports",
+      "realBlurb": "Providence College star ('I'm not getting on no time machine').",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Ride to the airport",
+        "destination": "T.F. Green",
+        "description": "Refuses any flight that lands before it takes off. 'That's a time machine, baby.' Book a later one."
+      }
+    },
+    {
+      "name": "Ernie Calverley",
+      "bucket": "sports",
+      "realBlurb": "URI legend famous for a 55-foot game-tying shot in 1946.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Harold Stirling Vanderbilt",
+      "bucket": "sports",
+      "realBlurb": "Three-time America's Cup defender who also invented contract bridge.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to the yacht, then the card table",
+        "destination": "Fort Adams",
+        "description": "Defend the Cup by day, invent a card game by night. Bring a fresh deck and a stiff breeze."
+      }
+    },
+    {
+      "name": "Brad Faxon",
+      "bucket": "sports",
+      "realBlurb": "Pro golfer raised in Barrington, RI.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Ted Turner",
+      "bucket": "sports",
+      "realBlurb": "Won the 1977 America's Cup off Newport aboard Courageous.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "George Wein",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Founded the Newport Jazz and Folk Festivals.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to the festival field",
+        "destination": "Fort Adams State Park",
+        "description": "Dylan went electric here in '65. Bring earplugs and an open mind."
+      }
+    },
+    {
+      "name": "Henry Hassenfeld",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Co-founded Hasbro (Hassenfeld Brothers) in Providence.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Angelo DeLucia",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Brought the family's frozen-lemonade recipe from Naples to Cranston: Del's.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Del's run (no spoon, no straw)",
+        "destination": "the Del's stand",
+        "description": "Two large lemonades. Ask for a spoon and be judged for life. Squeeze, sip, repeat."
+      }
+    },
+    {
+      "name": "Nibbles Woodaway",
+      "bucket": "oddballs-legends",
+      "realBlurb": "The 58-foot Big Blue Bug over I-95, RI's most beloved termite.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Oversized-load escort",
+        "destination": "the Big Blue Bug, I-95",
+        "description": "Nibbles needs a lift to the parade. He is 58 feet long and dressed for the holiday. Wide turns only."
+      }
+    },
+    {
+      "name": "Claus von Bulow",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Tried (twice) over wife Sunny's coma at their Newport mansion Clarendon Court.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Eileen Slocum",
+      "bucket": "gilded-age-newport",
+      "realBlurb": "Grande dame of 20th-century Newport society and GOP doyenne.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Irene Castle",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Ballroom-dance superstar of the 1910s who summered in the area.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Van Wickle",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Namesake of the Brown gates that open inward once a year.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Theodore Francis Green Jr.",
+      "bucket": "politics-crime",
+      "realBlurb": "Scion of the Green political line, active in Providence civic life.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Rowland Hazard",
+      "bucket": "oddballs-legends",
+      "realBlurb": "South County woolen magnate whose family seeded Peace Dale.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Sarah Doyle",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Pioneer of women's education at Brown; the Women's Center bears her name.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Christiana Carteaux Bannister",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Narragansett-Black entrepreneur and patron; ran Boston salons, retired to Providence.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Edward Mitchell Bannister",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Providence painter, a founder of the Providence Art Club.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Gilbert Stuart Newton",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Painter and nephew of Gilbert Stuart.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Paul Caranci",
+      "bucket": "politics-crime",
+      "realBlurb": "North Providence historian and former deputy secretary of state.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Matt Brown",
+      "bucket": "politics-crime",
+      "realBlurb": "Young former RI secretary of state.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Sheldon Whitehouse",
+      "bucket": "politics-crime",
+      "realBlurb": "RI senator and former state attorney general.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Jack Reed",
+      "bucket": "politics-crime",
+      "realBlurb": "Senator and West Point graduate from Cranston.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Bruce Sundlun Jr.",
+      "bucket": "politics-crime",
+      "realBlurb": "Heir to the Sundlun civic name in Rhode Island politics.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Vincent 'Buddy' Vallone",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Federal Hill restaurateur of local legend.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Sunday-gravy delivery",
+        "destination": "Atwells Ave (under the pinecone)",
+        "description": "Six quarts of gravy and a tray of braciole. Park by La Pigna arch; everyone will wave."
+      }
+    },
+    {
+      "name": "Peter Griffin",
+      "bucket": "fictional-ri",
+      "realBlurb": "Hapless Quahog everyman and patriarch of the Griffin family.",
+      "tag": "gag",
+      "villageHint": "Quahog",
+      "gag": {
+        "serviceName": "Ride home from the Drunken Clam",
+        "destination": "31 Spooner Street",
+        "description": "Cut him off two beers ago. Watch for the giant chicken; they have unfinished business."
+      }
+    },
+    {
+      "name": "Lois Griffin",
+      "bucket": "fictional-ri",
+      "realBlurb": "Griffin matriarch and long-suffering piano teacher.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Chris Griffin",
+      "bucket": "fictional-ri",
+      "realBlurb": "The Griffins' sweet, dim teenage son.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Meg Griffin",
+      "bucket": "fictional-ri",
+      "realBlurb": "The perpetually put-upon Griffin daughter.",
+      "tag": "gag",
+      "villageHint": "Quahog",
+      "gag": {
+        "serviceName": "Ride to literally anywhere",
+        "destination": "the mall",
+        "description": "Be nice to her. Genuinely. Nobody else is. 'Shut up, Meg' is not permitted in this vehicle."
+      }
+    },
+    {
+      "name": "Stewie Griffin",
+      "bucket": "fictional-ri",
+      "realBlurb": "Football-headed Griffin baby and aspiring world-dominator.",
+      "tag": "gag",
+      "villageHint": "Quahog",
+      "gag": {
+        "serviceName": "Ride to the 'science fair'",
+        "destination": "an undisclosed warehouse",
+        "description": "Cargo: one weather-control device. Do not ask. Do not touch the red button. Victory is mine."
+      }
+    },
+    {
+      "name": "Brian Griffin",
+      "bucket": "fictional-ri",
+      "realBlurb": "The Griffins' talking, martini-drinking, novel-writing dog.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Glenn Quagmire",
+      "bucket": "fictional-ri",
+      "realBlurb": "The Griffins' next-door neighbor and aviator. Giggity.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Joe Swanson",
+      "bucket": "fictional-ri",
+      "realBlurb": "Quahog police officer and wheelchair-using neighbor.",
+      "tag": "gag",
+      "villageHint": "Quahog",
+      "gag": {
+        "serviceName": "Wheelchair-van ride to physical therapy",
+        "destination": "the rehab center",
+        "description": "He'll out-bench-press the driver. Accessible van required; ramp must actually work."
+      }
+    },
+    {
+      "name": "Bonnie Swanson",
+      "bucket": "fictional-ri",
+      "realBlurb": "Joe's wife, perpetually (and eternally) pregnant.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Cleveland Brown",
+      "bucket": "fictional-ri",
+      "realBlurb": "Mild-mannered Griffin friend and deli owner.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Mayor Adam West",
+      "bucket": "fictional-ri",
+      "realBlurb": "Quahog's gloriously unhinged mayor.",
+      "tag": "gag",
+      "villageHint": "Quahog",
+      "gag": {
+        "serviceName": "Ride to City Hall",
+        "destination": "the Quahog mayor's office",
+        "description": "He's at war with the number six and a squirrel he believes is a Soviet spy. Humor him; he signs the budget."
+      }
+    },
+    {
+      "name": "Tom Tucker",
+      "bucket": "fictional-ri",
+      "realBlurb": "Vain Quahog Channel 5 news anchor.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Tricia Takanawa",
+      "bucket": "fictional-ri",
+      "realBlurb": "Channel 5's deadpan field reporter.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Ollie Williams",
+      "bucket": "fictional-ri",
+      "realBlurb": "Channel 5's extremely concise weatherman.",
+      "tag": "gag",
+      "villageHint": "Quahog",
+      "gag": {
+        "serviceName": "Ride to the weather desk",
+        "destination": "Channel 5 studios",
+        "description": "Ask him the forecast. He'll say 'IT'S GONNA RAIN!' That's the whole ride."
+      }
+    },
+    {
+      "name": "Dr. Elmer Hartman",
+      "bucket": "fictional-ri",
+      "realBlurb": "Quahog's spectacularly incompetent physician.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Mort Goldman",
+      "bucket": "fictional-ri",
+      "realBlurb": "Anxious Quahog pharmacist.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Carter Pewterschmidt",
+      "bucket": "fictional-ri",
+      "realBlurb": "Lois's tycoon father and Quahog's richest man.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Seamus Levine",
+      "bucket": "fictional-ri",
+      "realBlurb": "Quahog's salty wooden-limbed sailor.",
+      "tag": "gag",
+      "villageHint": "Quahog",
+      "gag": {
+        "serviceName": "Ride to the docks",
+        "destination": "the Quahog harbor",
+        "description": "He is mostly wood. Keep the cigarette lighter away from him. Arrr."
+      }
+    },
+    {
+      "name": "Consuela",
+      "bucket": "fictional-ri",
+      "realBlurb": "Quahog's immovable housekeeper. 'No, no.'",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Herbert",
+      "bucket": "fictional-ri",
+      "realBlurb": "The Griffins' creaky-voiced elderly neighbor.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Herbert West",
+      "bucket": "fictional-ri",
+      "realBlurb": "Lovecraft's 'Re-Animator,' a Miskatonic medical man with a reagent problem.",
+      "tag": "gag",
+      "villageHint": "Arkham",
+      "gag": {
+        "serviceName": "After-hours ride to the morgue",
+        "destination": "Miskatonic Health Surgery Center (loading dock)",
+        "description": "Cargo is 'medical supplies' that should not glow. If the cargo knocks, do not open it. Keep the engine running."
+      }
+    },
+    {
+      "name": "Charles Dexter Ward",
+      "bucket": "fictional-ri",
+      "realBlurb": "Providence antiquarian who dug too deep into his ancestor Curwen.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Joseph Curwen",
+      "bucket": "fictional-ri",
+      "realBlurb": "Pawtuxet's unnervingly long-lived colonial alchemist.",
+      "tag": "gag",
+      "villageHint": "Pawtuxet",
+      "gag": {
+        "serviceName": "Ride to the Pawtuxet farmhouse",
+        "destination": "the Curwen farm (the one with the smell)",
+        "description": "He looks great for 250. Don't read the Latin on the cellar door. Don't go in the cellar. Don't, actually."
+      }
+    },
+    {
+      "name": "Randolph Carter",
+      "bucket": "fictional-ri",
+      "realBlurb": "Lovecraft's recurring dreamer-adventurer.",
+      "tag": "background",
+      "villageHint": "Arkham"
+    },
+    {
+      "name": "Richard Upton Pickman",
+      "bucket": "fictional-ri",
+      "realBlurb": "Boston-Arkham painter with disquietingly accurate models.",
+      "tag": "background",
+      "villageHint": "Arkham"
+    },
+    {
+      "name": "Henry Armitage",
+      "bucket": "fictional-ri",
+      "realBlurb": "Miskatonic University librarian and keeper of the Necronomicon.",
+      "tag": "gag",
+      "villageHint": "Arkham",
+      "gag": {
+        "serviceName": "Library transport (handle with gloves)",
+        "destination": "the Miskatonic University Library, restricted stacks",
+        "description": "Returning one (1) very old book. Do not read aloud from it at the stop sign. Late fees are the least of it."
+      }
+    },
+    {
+      "name": "Wilbur Whateley",
+      "bucket": "fictional-ri",
+      "realBlurb": "The unsettlingly tall Dunwich prodigy with a secret in the attic.",
+      "tag": "gag",
+      "villageHint": "Dunwich",
+      "gag": {
+        "serviceName": "Oversized ride to the university",
+        "destination": "Miskatonic University",
+        "description": "Needs the big van; he's nine feet tall and growing. The twin brother stays home. Trust us, the twin stays home."
+      }
+    },
+    {
+      "name": "Lavinia Whateley",
+      "bucket": "fictional-ri",
+      "realBlurb": "Albino Dunwich matriarch of the Whateley line.",
+      "tag": "background",
+      "villageHint": "Dunwich"
+    },
+    {
+      "name": "Obed Marsh",
+      "bucket": "fictional-ri",
+      "realBlurb": "Innsmouth sea captain who struck a very bad bargain with the deep.",
+      "tag": "gag",
+      "villageHint": "Innsmouth",
+      "gag": {
+        "serviceName": "Ride to the Esoteric Order",
+        "destination": "the Innsmouth waterfront hall",
+        "description": "Bring the gold. Don't comment on the 'Innsmouth look.' Be home before the tide."
+      }
+    },
+    {
+      "name": "Asenath Waite",
+      "bucket": "fictional-ri",
+      "realBlurb": "Innsmouth-born woman of unusually forceful... personality.",
+      "tag": "background",
+      "villageHint": "Innsmouth"
+    },
+    {
+      "name": "Robert Olmstead",
+      "bucket": "fictional-ri",
+      "realBlurb": "Traveler who took the cheap bus into Innsmouth and regretted it.",
+      "tag": "background",
+      "villageHint": "Innsmouth"
+    },
+    {
+      "name": "Zadok Allen",
+      "bucket": "fictional-ri",
+      "realBlurb": "Innsmouth's 96-year-old town drunk and unreliable oracle.",
+      "tag": "gag",
+      "villageHint": "Innsmouth",
+      "gag": {
+        "serviceName": "Package-store run",
+        "destination": "the Innsmouth waterfront",
+        "description": "Buy him a bottle and he'll tell you EVERYTHING about 1846. Maybe more than you want. Iä."
+      }
+    },
+    {
+      "name": "Keziah Mason",
+      "bucket": "fictional-ri",
+      "realBlurb": "Arkham's witch of 'The Dreams in the Witch House' and odd geometry.",
+      "tag": "background",
+      "villageHint": "Arkham"
+    },
+    {
+      "name": "Walter Gilman",
+      "bucket": "fictional-ri",
+      "realBlurb": "Miskatonic math student who rented the wrong angled room.",
+      "tag": "background",
+      "villageHint": "Arkham"
+    },
+    {
+      "name": "Thomas F. Malone",
+      "bucket": "fictional-ri",
+      "realBlurb": "Detective of 'The Horror at Red Hook.'",
+      "tag": "background",
+      "villageHint": "Kingsport"
+    },
+    {
+      "name": "Crawford Tillinghast",
+      "bucket": "fictional-ri",
+      "realBlurb": "Inventor of the 'From Beyond' resonator. Probably shouldn't have.",
+      "tag": "background",
+      "villageHint": "Kingsport"
+    },
+    {
+      "name": "Erich Zann",
+      "bucket": "fictional-ri",
+      "realBlurb": "Mute violist whose late-night music kept something at bay.",
+      "tag": "background",
+      "villageHint": "Kingsport"
+    },
+    {
+      "name": "Edward Pickman Derby",
+      "bucket": "fictional-ri",
+      "realBlurb": "Arkham poet who married very, very unwisely.",
+      "tag": "background",
+      "villageHint": "Arkham"
+    },
+    {
+      "name": "Carolyn Perron",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Mother whose 1971 Harrisville farmhouse inspired 'The Conjuring.'",
+      "tag": "gag",
+      "villageHint": "Cabinet, RI",
+      "gag": {
+        "serviceName": "Ride to anywhere but home",
+        "destination": "the Warrens' office",
+        "description": "The clocks all stop at 3:07 a.m. The dog won't go inside. Please hurry, and bring a priest if you've got one."
+      }
+    },
+    {
+      "name": "Roger Perron",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Father of the Harrisville family at the center of the Conjuring case.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Bathsheba Sherman",
+      "bucket": "oddballs-legends",
+      "realBlurb": "19th-c. Harrisville woman of grim local legend.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Ed Warren",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Self-styled demonologist of the Conjuring cases.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Lorraine Warren",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Self-described clairvoyant and paranormal investigator.",
+      "tag": "gag",
+      "villageHint": "Cabinet, RI",
+      "gag": {
+        "serviceName": "Ride to the 'occult museum'",
+        "destination": "the Warren collection",
+        "description": "Do not touch anything in the back room. Especially not the doll. Genuinely, leave the doll alone."
+      }
+    },
+    {
+      "name": "Little Bett",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Touring elephant shot crossing a Chepachet bridge in 1826.",
+      "tag": "gag",
+      "villageHint": "Chepachet",
+      "gag": {
+        "serviceName": "Oversized transport to the parade",
+        "destination": "the Ancients & Horribles Parade",
+        "description": "One elephant. Route AROUND the grist-mill bridge; the locals get twitchy and armed. Peanuts in the glovebox."
+      }
+    },
+    {
+      "name": "Peleg Walker",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Ramtail Factory watchman whose ghost still rings the mill bell.",
+      "tag": "gag",
+      "villageHint": "Chepachet",
+      "gag": {
+        "serviceName": "Night ride to the mill",
+        "destination": "the Ramtail Factory ruins, Foster",
+        "description": "He works the night shift. He has worked it since 1822. The bell rings itself; ignore it."
+      }
+    },
+    {
+      "name": "Michael Townsend",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Artist who secretly built an apartment inside the Providence Place Mall.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Discreet cargo haul",
+        "destination": "a 'forgotten' corner of Providence Place Mall",
+        "description": "5,000 lbs of cinderblock and one futon, in through the parking garage. Tell no one. It's art."
+      }
+    },
+    {
+      "name": "Rocky Marciano",
+      "bucket": "nearby-new-england",
+      "realBlurb": "Undefeated heavyweight champ from Brockton, just up the line.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Ruth Buzzi",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Wequetequock-raised 'Laugh-In' comedian with a mean purse.",
+      "tag": "background",
+      "villageHint": "Cabinet, RI"
+    },
+    {
+      "name": "Viola Davis",
+      "bucket": "arts-music-lit",
+      "realBlurb": "EGOT-winning actress raised in Central Falls, RI.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "James Woods",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Warwick-raised actor; recurring Family Guy guest as himself.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Debra Messing",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Actress who grew up in East Greenwich, RI.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "The Big Nazo Creatures",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Providence's roving troupe of giant foam alien puppets.",
+      "tag": "gag",
+      "villageHint": "Providence",
+      "gag": {
+        "serviceName": "Ride to WaterFire",
+        "destination": "the downtown rivers",
+        "description": "Eight foam aliens in the back. They will honk at pedestrians. Roll the windows down; they need air holes."
+      }
+    },
+    {
+      "name": "H. P. Tillinghast",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Old Pawtuxet Valley mill family name still on the road signs.",
+      "tag": "background",
+      "villageHint": "Pawtuxet"
+    },
+    {
+      "name": "Sarah Tirrell",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Foster farmwife tied to the Ramtail haunting lore.",
+      "tag": "background",
+      "villageHint": "Chepachet"
+    },
+    {
+      "name": "Captain William Mayes",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Pirate who owned Newport's White Horse Tavern, still standing.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to the tavern",
+        "destination": "the White Horse Tavern",
+        "description": "Oldest tavern in America; he should know, he owned it. Cash only, preferably Spanish pieces of eight."
+      }
+    },
+    {
+      "name": "Thomas Paine (the pirate)",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Buccaneer-turned-Newport-pillar who helped build Trinity Church.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "Samuel Cranston",
+      "bucket": "politics-crime",
+      "realBlurb": "RI's 30-term governor, once held captive seven years by pirates.",
+      "tag": "gag",
+      "villageHint": "Newport",
+      "gag": {
+        "serviceName": "Ride to the harbor (cautiously)",
+        "destination": "the Newport waterfront",
+        "description": "Was held by pirates for seven years; came home the night his wife was to remarry. Watch the docks. Always watch the docks."
+      }
+    },
+    {
+      "name": "Ned Low",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Sadistic pirate whose crew was hanged en masse at Newport in 1723.",
+      "tag": "background",
+      "villageHint": "Newport"
+    },
+    {
+      "name": "George M. Cohan Jr.",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Heir to the Providence showman's name and grin.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Christopher Lloyd",
+      "bucket": "arts-music-lit",
+      "realBlurb": "Actor (Doc Brown) raised partly in New England; great-time-machine energy.",
+      "tag": "background",
+      "villageHint": "Quahog"
+    },
+    {
+      "name": "Wendy Lawton",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Foster-Glocester storyteller of the Ancients & Horribles tradition.",
+      "tag": "background",
+      "villageHint": "Chepachet"
+    },
+    {
+      "name": "Cynthia Wilcox",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Chepachet shopkeeper whose family ran the village store for generations.",
+      "tag": "background",
+      "villageHint": "Chepachet"
+    },
+    {
+      "name": "Betsey Williams",
+      "bucket": "oddballs-legends",
+      "realBlurb": "Descendant of Roger Williams who gave her farm to Roger Williams Park.",
+      "tag": "background",
+      "villageHint": "Providence"
+    },
+    {
+      "name": "Doctor Jekyll Munoz",
+      "bucket": "fictional-ri",
+      "realBlurb": "Lovecraft's Dr. Munoz of 'Cool Air,' who must be kept very, very cold.",
+      "tag": "gag",
+      "villageHint": "Kingsport",
+      "gag": {
+        "serviceName": "Refrigerated ride (55 degrees, no warmer)",
+        "destination": "his chilled apartment",
+        "description": "Crank the A/C to maximum. If it fails, do NOT open the door. Things go badly above 55."
+      }
+    },
+    {
+      "name": "Robert Suydam",
+      "bucket": "fictional-ri",
+      "realBlurb": "Reclusive scholar of forbidden lore from 'The Horror at Red Hook.'",
+      "tag": "background",
+      "villageHint": "Kingsport"
+    },
+    {
+      "name": "Barnabas Marsh",
+      "bucket": "fictional-ri",
+      "realBlurb": "Latter-day heir to the Innsmouth Marsh line and refinery.",
+      "tag": "background",
+      "villageHint": "Innsmouth"
+    },
+    {
+      "name": "Eliza Orne",
+      "bucket": "fictional-ri",
+      "realBlurb": "Old Innsmouth-Arkham family name whispered in the histories.",
+      "tag": "background",
+      "villageHint": "Innsmouth"
+    },
+    {
+      "name": "Abigail Prinn",
+      "bucket": "fictional-ri",
+      "realBlurb": "Witch of pulp-horror Arkham, executed but not entirely gone.",
+      "tag": "background",
+      "villageHint": "Arkham"
+    },
+    {
+      "name": "Nahum Gardner",
+      "bucket": "fictional-ri",
+      "realBlurb": "Farmer of 'The Colour Out of Space,' whose well went wrong.",
+      "tag": "gag",
+      "villageHint": "Dunwich",
+      "gag": {
+        "serviceName": "Ride to the agricultural extension",
+        "destination": "the county agronomist",
+        "description": "Bring a sample of the well water and the gray, crumbling vegetables. Wear gloves. Maybe don't drink the coffee he offers."
+      }
+    },
+    {
+      "name": "Ammi Pierce",
+      "bucket": "fictional-ri",
+      "realBlurb": "Dunwich neighbor and witness to the blasted heath.",
+      "tag": "background",
+      "villageHint": "Dunwich"
+    },
+    {
+      "name": "Daniel Upton",
+      "bucket": "fictional-ri",
+      "realBlurb": "Friend and biographer of the ill-fated Edward Derby.",
+      "tag": "background",
+      "villageHint": "Arkham"
+    },
+    {
+      "name": "Frank Pabodie",
+      "bucket": "fictional-ri",
+      "realBlurb": "Miskatonic engineer who built the drill for the Antarctic expedition.",
+      "tag": "background",
+      "villageHint": "Arkham"
+    },
+    {
+      "name": "William Dyer (the geologist)",
+      "bucket": "fictional-ri",
+      "realBlurb": "Miskatonic geologist-narrator of 'At the Mountains of Madness.'",
+      "tag": "background",
+      "villageHint": "Arkham"
+    }
+  ],
+  "loginPersonas": [
+    {
+      "name": "Roger Williams",
+      "suggestedRole": "owner",
+      "rationale": "The literal founder of the place — perfect as the village 'owner'/proprietor. Tolerant by design, lets everyone in.",
+      "exampleLogin": "roger.williams@villagegreen.demo"
+    },
+    {
+      "name": "Theodore Francis Green",
+      "suggestedRole": "owner",
+      "rationale": "Longest-serving elder statesman; a believable senior owner/proprietor figure who's seen every administration come and go.",
+      "exampleLogin": "tf.green@villagegreen.demo"
+    },
+    {
+      "name": "Stephen Hopkins",
+      "suggestedRole": "manage",
+      "rationale": "Ten-term governor and signer — a steady hand for managing members and volunteers. 'My hand trembles, but my heart does not.'",
+      "exampleLogin": "stephen.hopkins@villagegreen.demo"
+    },
+    {
+      "name": "Buddy Cianci",
+      "suggestedRole": "manage",
+      "rationale": "Quintessential city manager/operator who knew everyone and everything — great for a 'manage' role. (Keep him away from billing.)",
+      "exampleLogin": "buddy.cianci@villagegreen.demo"
+    },
+    {
+      "name": "Elizabeth Buffum Chace",
+      "suggestedRole": "full",
+      "rationale": "Organizer and 'conscience of Rhode Island' — a trustworthy full-access coordinator who actually moved people from A to B.",
+      "exampleLogin": "elizabeth.chace@villagegreen.demo"
+    },
+    {
+      "name": "Ida Lewis",
+      "suggestedRole": "full",
+      "rationale": "Dependable, on-call rescuer — the model volunteer-coordinator with full request access. Always answers the late-night call.",
+      "exampleLogin": "ida.lewis@villagegreen.demo"
+    },
+    {
+      "name": "Nathanael Greene",
+      "suggestedRole": "full",
+      "rationale": "Washington's logistics-and-strategy general — a natural operations coordinator with full access to dispatch volunteers.",
+      "exampleLogin": "nathanael.greene@villagegreen.demo"
+    },
+    {
+      "name": "Lincoln Chafee",
+      "suggestedRole": "full",
+      "rationale": "Earnest multi-office public servant; a fine general-purpose coordinator. May insist all distances be logged in kilometers.",
+      "exampleLogin": "lincoln.chafee@villagegreen.demo"
+    },
+    {
+      "name": "Claiborne Pell",
+      "suggestedRole": "full",
+      "rationale": "Genteel grant-giver — good for a benefits/aid coordinator who hands out resources to members in need.",
+      "exampleLogin": "claiborne.pell@villagegreen.demo"
+    },
+    {
+      "name": "John O. Pastore",
+      "suggestedRole": "manage",
+      "rationale": "Gruff-but-fair committee chair energy; solid for moderating members and approving requests.",
+      "exampleLogin": "john.pastore@villagegreen.demo"
+    },
+    {
+      "name": "Moses Brown",
+      "suggestedRole": "manage",
+      "rationale": "Principled benefactor and institution-builder — believable as a manager of programs and donations.",
+      "exampleLogin": "moses.brown@villagegreen.demo"
+    },
+    {
+      "name": "Sarah Doyle",
+      "suggestedRole": "manage",
+      "rationale": "Educator and organizer; a natural fit for managing onboarding and member education.",
+      "exampleLogin": "sarah.doyle@villagegreen.demo"
+    },
+    {
+      "name": "Lincoln (Esek) Hopkins",
+      "suggestedRole": "restricted",
+      "rationale": "Fleet commander who got court-martialed — fun as a 'restricted' account whose privileges were dialed back after an incident.",
+      "exampleLogin": "esek.hopkins@villagegreen.demo"
+    },
+    {
+      "name": "Thomas Wilson Dorr",
+      "suggestedRole": "restricted",
+      "rationale": "The rebel whose cannons misfired and who was convicted of treason — a thematically perfect 'restricted/limited' demo account.",
+      "exampleLogin": "thomas.dorr@villagegreen.demo"
+    },
+    {
+      "name": "Abraham Whipple",
+      "suggestedRole": "restricted",
+      "rationale": "Burned a British ship — useful as a restricted account that can request rides but not approve anyone else's. Wanted by the Crown.",
+      "exampleLogin": "abraham.whipple@villagegreen.demo"
+    }
+  ]
+}
