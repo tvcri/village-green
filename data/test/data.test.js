@@ -7,6 +7,7 @@ import { VILLAGES, ROLE } from '../generator/constants.js'
 import { buildVillagesAndUsers } from '../generator/builders/villages.js'
 import { buildPersons } from '../generator/builders/persons.js'
 import { buildMembership } from '../generator/builders/membership.js'
+import { buildDataset } from '../generator/data.js'
 
 const content = {
   people: JSON.parse(readFileSync(fileURLToPath(new URL('../content/people.json', import.meta.url)), 'utf8')),
@@ -14,6 +15,11 @@ const content = {
 
 const services = JSON.parse(readFileSync(fileURLToPath(new URL('../content/services.json', import.meta.url)), 'utf8'))
 const fullContent = { people: content.people, services }
+
+function fullContentWithDest () {
+  const destinations = JSON.parse(readFileSync(fileURLToPath(new URL('../content/destinations.json', import.meta.url)), 'utf8'))
+  return { people: content.people, services, destinations }
+}
 
 test('villages: 10 villages with 1-based ids', () => {
   const { village, villageIdByName } = buildVillagesAndUsers(content, makeRng(1))
@@ -91,4 +97,42 @@ test('users/grants: admin, multi-village coordinator, and zero-grants user exist
   // every role value appears somewhere
   const roles = new Set(village_grant.map(g => g.roleId))
   for (const r of Object.values(ROLE)) assert.ok(roles.has(r), `missing role ${r}`)
+})
+
+test('service requests honor deriveStatus and reference valid people', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const personIds = new Set(ds.person.map(p => p.id))
+  const villageIds = new Set(ds.village.map(v => v.id))
+  const statuses = new Set(['Draft', 'Open', 'Confirmed', 'Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled'])
+  for (const sr of ds.service_request) {
+    assert.ok(villageIds.has(sr.village_id))
+    assert.ok(statuses.has(sr.status), `bad status ${sr.status}`)
+    if (sr.status === 'Confirmed' || sr.status === 'Completed') assert.ok(sr.volunteer_person_id, `${sr.status} needs a volunteer`)
+    if (sr.status === 'Open') assert.equal(sr.volunteer_person_id, null)
+    if (sr.member_person_id) assert.ok(personIds.has(sr.member_person_id))
+    if (sr.volunteer_person_id) assert.ok(personIds.has(sr.volunteer_person_id))
+  }
+  // a spread of statuses is present
+  const seen = new Set(ds.service_request.map(s => s.status))
+  for (const s of ['Open', 'Confirmed', 'Completed', 'Draft']) assert.ok(seen.has(s), `missing status ${s}`)
+})
+
+test('notifications reference requests; recipients is a JSON string', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const srIds = new Set(ds.service_request.map(s => s.id))
+  for (const n of ds.notification_event) {
+    assert.ok(srIds.has(n.service_request_id))
+    assert.equal(typeof n.recipients, 'string')
+    assert.doesNotThrow(() => JSON.parse(n.recipients))
+  }
+})
+
+test('buildDataset is deterministic and complete', () => {
+  const a = buildDataset(fullContentWithDest(), 20260630)
+  const b = buildDataset(fullContentWithDest(), 20260630)
+  assert.deepEqual(a, b)
+  assert.equal(a.capability.length, 13)
+  assert.ok(a.person.length >= 220, `person count ${a.person.length}`)
+  assert.ok(a.service_request.length >= 150, `service_request count ${a.service_request.length}`)
+  assert.ok(a.fcv_submission.length >= 30, `fcv_submission count ${a.fcv_submission.length}`)
 })
