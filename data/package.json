@@ -1,0 +1,17 @@
+{
+  "name": "village-green-demo-data",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic RI-lore demo dataset generator + loaders for Village Green",
+  "scripts": {
+    "test": "node --test",
+    "seed": "node generator/cli.js --sql",
+    "emit": "node generator/cli.js --emit",
+    "import": "node generator/cli.js --import",
+    "roundtrip": "node generator/cli.js --roundtrip"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.0"
+  }
+}
