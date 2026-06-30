@@ -59,6 +59,22 @@ by accident.
 - Note: like #3, the caller's grant filter is always ANDed on top, so this can only
   *under*-return, never leak — a correctness bug, not an exposure.
 
+## 5. Cross-village person writes via the Person endpoints (RED)
+
+The Person controller ([controllers/Person.js](../../api/source/controllers/Person.js))
+applies **no village-grant check** on any write path:
+
+- `POST /persons` (`createPerson`) trusts `body.villageId`, so a caller can inject a person
+  into a village they hold no grant on.
+- `PATCH /persons/{id}` (`patchPerson`) and `DELETE /persons/{id}` (`deletePerson`) resolve
+  the row with a grant-blind `PersonService.getPerson`, so a caller can modify or delete any
+  person by id — including persons in villages they do not administer.
+
+Same class as #2 (cross-village writes), for the person resource.
+
+- Asserted in: `persons/write.test.js`
+- Expected secure behavior: **403/404** for a person/village outside the caller's grants.
+
 ---
 
 ### What is verified as already-correct (GREEN)
