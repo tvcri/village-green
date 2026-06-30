@@ -144,7 +144,7 @@ export const fcvSubmissions = {
 // only defines a `:read` scope). Narrow variants below intentionally omit scopes
 // to exercise per-resource scope enforcement.
 export const scopes = {
-  full: 'vg:service-request vg:village vg:person vg:member vg:volunteer vg:friends:read vg:user vg:op',
+  full: 'vg:service-request vg:village vg:person vg:member vg:volunteer vg:friends:read vg:user vg:op vg:read',
   readOnly: 'vg:service-request:read vg:village:read vg:person:read',
   noServiceRequest: 'vg:village:read vg:person:read',
 }
