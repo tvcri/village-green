@@ -33,8 +33,10 @@ export function buildRequests (plan, membership, content, rng) {
     if (CANCELLED.has(sr.status)) events.push('cancelled')
     for (const et of events) {
       neId += 1
+      const createdAt = addDays(BASE_DATE, -rng.int(1, 60))
+      const sentAt = addDays(createdAt, rng.int(0, 1))
       notification_event.push({ id: neId, event_type: et, service_request_id: sr.id,
-        created_at: dt(addDays(BASE_DATE, -rng.int(1, 60))), sent_at: dt(addDays(BASE_DATE, -rng.int(1, 60))), recipients: recips })
+        created_at: dt(createdAt), sent_at: dt(sentAt), recipients: recips })
     }
   }
 

@@ -4,9 +4,9 @@ import { VILLAGES } from '../constants.js'
 // mostly DISTINCT people (members receive services; volunteers provide them).
 const SIZE = {
   big: { members: 55, volunteers: 52 },
-  medium: { members: 20, volunteers: 14 },
-  small: { members: 9, volunteers: 6 },
-  tiny: { members: 4, volunteers: 3 },
+  medium: { members: 11, volunteers: 7 },
+  small: { members: 5, volunteers: 4 },
+  tiny: { members: 3, volunteers: 2 },
 }
 
 const RI_STREETS = ['Benefit St', 'Thayer St', 'Hope St', 'Wickenden St', 'Atwells Ave',
