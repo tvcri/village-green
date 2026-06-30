@@ -20,7 +20,7 @@ import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
-import { setPendingHighlight } from '../lib/pendingHighlight.js'
+import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
 
