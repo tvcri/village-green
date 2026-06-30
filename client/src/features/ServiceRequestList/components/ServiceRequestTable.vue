@@ -137,6 +137,8 @@ function formatDate(dateStr) {
 .card-row .label { font-weight: 500; color: var(--color-text-dim); min-width: 80px; }
 .desktop-only { display: table; }
 .mobile-only { display: none; }
+  :deep(.p-datatable-tbody > tr > td) { padding: 0.4rem 0.75rem; }
+  :deep(.p-datatable-thead > tr > th) { padding: 0.4rem 0.75rem; }
   :deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 @media (max-width: 768px) {
   .desktop-only { display: none; }

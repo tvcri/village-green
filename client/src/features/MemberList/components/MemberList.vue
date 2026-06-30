@@ -366,6 +366,8 @@ h1 {
   cursor: pointer;
 }
 
+:deep(.p-datatable-tbody > tr > td) { padding: 0.75rem 0.75rem; }
+:deep(.p-datatable-thead > tr > th) { padding: 0.75rem 0.75rem; }
 :deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 
 /* Mobile Card List */
