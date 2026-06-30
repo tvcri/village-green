@@ -27,7 +27,7 @@ const isDev = VG?.Env?.nodeEnv === 'development'
 
     <header class="app-header">
       <div class="app-title-container">
-        <img src="/house.svg" alt="Village Green Logo" class="app-logo" />
+        <img src="/tvcri-logo.svg" alt="Village Green Logo" class="app-logo" />
         <h1 class="app-title">Village Green</h1>
       </div>
       <div class="header-controls">
@@ -69,7 +69,7 @@ const isDev = VG?.Env?.nodeEnv === 'development'
   margin: 0 auto;
   max-width: 1200px;
   height: 20px;
-  background-color: #783d1066;
+  background-color: #783d1022;
   pointer-events: none;
   z-index: 9999;
   display: flex;
@@ -94,7 +94,7 @@ const isDev = VG?.Env?.nodeEnv === 'development'
 
 .app-title-container {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 1rem;
   flex: 1;
 }
@@ -107,6 +107,7 @@ const isDev = VG?.Env?.nodeEnv === 'development'
 
 .app-title {
   margin: 0;
+  line-height: 1;
   font-size: 2.5rem;
   font-weight: 700;
   color: var(--color-text-primary);
