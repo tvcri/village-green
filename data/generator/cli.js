@@ -13,9 +13,17 @@ const val = (f, d) => { const a = args.find(x => x.startsWith(f + '=')); return 
 
 async function emitJsonl (dataset) {
   // need live column order (excludes generated cols) -> requires the dev DB schema present
-  const columnMap = await withDb((conn) => columnMapFromDb(conn, TABLE_ORDER))
+  const { columnMap, lastMigration } = await withDb(async (conn) => {
+    const cMap = await columnMapFromDb(conn, TABLE_ORDER)
+    let lm = 6 // sensible fallback if _migrations table is absent
+    try {
+      const [[row]] = await conn.query('SELECT COUNT(*) AS n FROM `_migrations`')
+      if (row && typeof row.n === 'number' && row.n > 0) lm = row.n
+    } catch { /* table may not exist in some test environments */ }
+    return { columnMap: cMap, lastMigration: lm }
+  })
   const meta = { version: '1.0.0-demo', commit: { branch: 'na', sha: 'na', tag: 'na', describe: 'na' },
-    date: '2026-06-30T12:00:00.000Z', lastMigration: 6 }
+    date: '2026-06-30T12:00:00.000Z', lastMigration }
   return buildJsonl(dataset, columnMap, meta)
 }
 

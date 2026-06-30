@@ -51,8 +51,11 @@ That's it. The SQL seeder writes directly to MySQL and does not need the API run
 The `import` and `roundtrip` commands use the app's `/op/appdata` endpoint. This endpoint:
 
 - Is **opt-in** — the API must be started with `VG_EXPERIMENTAL_APPDATA=true`
-- Requires the **mock OIDC** service on `:18080` — tokens are minted by POSTing to `/api/get-token` with the admin username
-- Uses the scope: `vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:friends:read`
+- Requires the **mock OIDC** service on `:18080` — the loader mints a bearer token by sending a **GET** to `/api/get-token` with the admin username; the dataset is then **POSTed** to `/op/appdata`
+- The loader token uses the narrow scope `vg:op` (sufficient for `/op/appdata`)
+
+> **Note:** When logging in via the mock-OIDC browser form to use the app itself, enter the wider scope string into the form:
+> `vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:friends:read`
 
 This path exercises the otherwise-untested `/op/appdata` endpoint and **may surface endpoint bugs**. The SQL `seed` command is the always-works fallback and is recommended for most development use.
 

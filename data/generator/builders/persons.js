@@ -20,15 +20,34 @@ const RI_TOWNS = { Arkham: 'Arkham', Quahog: 'Quahog', Providence: 'Providence',
 function poolForVillage (vName, theme, figures, used, rng) {
   const avail = figures.filter(f => !used.has(f.name))
   const hinted = avail.filter(f => f.villageHint === vName)
+  // themed: only include figures NOT hinted for a DIFFERENT village — so a
+  // figure reserved for Innsmouth isn't consumed by Arkham's themed pass
+  const themeAvail = avail.filter(f => !f.villageHint || f.villageHint === vName)
   let themed = []
-  if (theme === 'family-guy') themed = avail.filter(f => f.bucket === 'fictional-ri' && /quahog|griffin|family guy/i.test(f.realBlurb || ''))
-  else if (theme.startsWith('lovecraft')) themed = avail.filter(f => /lovecraft|innsmouth|arkham|dunwich|kingsport|cthulhu|miskatonic/i.test((f.realBlurb || '') + f.bucket))
-  else if (theme === 'gilded-age') themed = avail.filter(f => f.bucket === 'gilded-age-newport')
-  // hinted first, then themed, then anyone — caller slices what it needs
-  // de-dupe by name so the same figure can't appear in multiple sub-arrays
+  if (theme === 'family-guy') themed = themeAvail.filter(f => f.bucket === 'fictional-ri' && /quahog|griffin|family guy/i.test(f.realBlurb || ''))
+  else if (theme.startsWith('lovecraft')) themed = themeAvail.filter(f => /lovecraft|innsmouth|arkham|dunwich|kingsport|cthulhu|miskatonic/i.test((f.realBlurb || '') + f.bucket))
+  else if (theme === 'gilded-age') themed = themeAvail.filter(f => f.bucket === 'gilded-age-newport')
+  // Bias gag-tagged figures toward member slots so their bespoke Easter-egg
+  // service requests surface.  Apply AFTER the seeded shuffles (deterministic):
+  //   tier 1 (hinted): gag-hinted for this village, then bg-hinted
+  //   tier 2 (themed): gag-themed, then bg-themed  [other-hinted excluded above]
+  //   tier 3 (avail):  gag-avail with NO villageHint (general pool, spread
+  //                    evenly across villages), then bg-avail, then gag figures
+  //                    hinted for OTHER villages (de-dupe keeps them out of the
+  //                    wrong village's member slots; they serve as overflow only)
+  // De-dupe by name so the same figure can't appear in multiple sub-arrays.
+  const shHinted  = rng.shuffle(hinted)
+  const shThemed  = rng.shuffle(themed)
+  const shAvail   = rng.shuffle(avail)
+
+  const gagSort   = (arr) => [...arr.filter(f => f.tag === 'gag'), ...arr.filter(f => f.tag !== 'gag')]
+  const availGagUnhinted = shAvail.filter(f => f.tag === 'gag' && !f.villageHint)
+  const availBg          = shAvail.filter(f => f.tag !== 'gag')
+  const availGagOther    = shAvail.filter(f => f.tag === 'gag' && f.villageHint && f.villageHint !== vName)
+
   const seen = new Set()
   const out = []
-  for (const f of [...rng.shuffle(hinted), ...rng.shuffle(themed), ...rng.shuffle(avail)]) {
+  for (const f of [...gagSort(shHinted), ...gagSort(shThemed), ...availGagUnhinted, ...availBg, ...availGagOther]) {
     if (!seen.has(f.name)) { seen.add(f.name); out.push(f) }
   }
   return out
