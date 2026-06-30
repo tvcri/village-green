@@ -1,11 +1,11 @@
 <script setup>
 import { computed, ref, watch, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
+import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -42,6 +42,7 @@ onMounted(() => {
 const villageId = computed(() => route.params.villageId)
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
+const pageRows = ref(10)
 const sortField = ref('fullName')
 const sortDir = ref('asc')
 
@@ -55,7 +56,6 @@ const { state: persons, execute: fetchPersons } = useAsyncState(
   { immediate: false }
 )
 
-useScrollRestore('members', 'member-detail')
 const flashRowId = ref(null)
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
@@ -266,12 +266,23 @@ async function handleCreateSheet() {
     <DataTable
       v-else
       :value="filteredMembers"
+      paginator
+      :rows="pageRows"
       class="member-table-responsive desktop-only"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
+      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
       :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToMember(event.data)"
       @filter="trackEvent('filter_applied')"
     >
+      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
+        <div class="paginator-container">
+          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
+          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
+          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
+          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+        </div>
+      </template>
+
       <Column field="fullName" header="Name" sortable style="width: 25%"></Column>
       <Column header="Level" sortable style="width: 25%">
         <template #body="slotProps">
@@ -412,6 +423,9 @@ h1 {
 .mobile-only {
   display: none;
 }
+
+.paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
+.paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }
 
 @media (max-width: 768px) {
   .member-list {
