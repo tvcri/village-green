@@ -2,10 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgFetch } from '../lib/client.js'
 import { tokens } from '../lib/context.js'
-import { villages, serviceRequests as sr } from '../setup/fixtures.js'
+import { serviceRequests as sr } from '../setup/fixtures.js'
 
 const SR = '/service-requests'
-const allVillageIds = Object.values(villages).map(v => String(v.id))
+// villages that actually have service requests (excludes the data-less scratch village)
+const allVillageIds = [...new Set(Object.values(sr).map(r => String(r.villageId)))]
 
 test('non-admin cannot elevate -> 403', async () => {
   const { status } = await vgFetch(SR, { token: tokens.users.full_v1, query: { elevate: 'true' } })

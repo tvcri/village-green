@@ -10,6 +10,10 @@ export const villages = {
   quahog: { id: 1, name: 'Quahog' },
   innsmouth: { id: 2, name: 'Innsmouth' },
   miskatonic: { id: 3, name: 'Miskatonic' },
+  // Disposable village for destructive write tests (grant CRUD, etc.). Nothing
+  // else references it — no persons / service requests / FCV, and no read test
+  // asserts its contents — so tests may mutate it freely. Reseeded each run.
+  scratch: { id: 4, name: 'Pawtuxet' },
 }
 
 // roleId: 1=restricted, 2=full, 3=manage, 4=owner
@@ -52,6 +56,12 @@ export const users = {
   // Authenticated with valid scope but zero grants — must see nothing.
   nogrants: {
     userId: 8, name: 'Mr. Calimari', username: 'mr.calimari@quahog.test',
+    grants: [], privileges: [],
+  },
+  // Disposable grant target for write tests — seeded with NO grants, asserted
+  // nowhere, so its access (or the scratch village's grants) can be mutated freely.
+  scratch: {
+    userId: 9, name: 'Scratch Tester', username: 'scratch.tester@scratch.test',
     grants: [], privileges: [],
   },
 }
