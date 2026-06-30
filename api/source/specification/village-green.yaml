@@ -1369,6 +1369,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ElevateQuery'
         - $ref: '#/components/parameters/ServiceRequestStatusQuery'
+        - $ref: '#/components/parameters/HasNotificationsQuery'
         - name: villageId
           in: query
           description: Filter to specific villages (omit for all granted villages)
@@ -1455,6 +1456,7 @@ paths:
       operationId: patchServiceRequest
       parameters:
       - $ref: '#/components/parameters/ServiceRequestIdPath'
+      - $ref: '#/components/parameters/ServiceRequestProjectionQuery'
       requestBody:
         required: true
         content:
@@ -2893,6 +2895,41 @@ components:
           type: string
           maxLength: 200
           nullable: true
+    ServiceRequestNotificationHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventType:
+          type: string
+          enum:
+          - open
+          - confirmed
+          - cancelled
+          - reminder
+        createdAt:
+          type: string
+          format: date-time
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+        failedAt:
+          type: string
+          format: date-time
+          nullable: true
+        recipients:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - fullName
+            properties:
+              id:
+                type: integer
+              fullName:
+                type: string
     ServiceRequest:
       additionalProperties: false
       type: object
@@ -2907,6 +2944,10 @@ components:
           nullable: true
         villageId:
           $ref: '#/components/schemas/VillageId'
+        villageName:
+          type: string
+          maxLength: 100
+          nullable: true
         memberPersonId:
           $ref: '#/components/schemas/PersonId'
           nullable: true
@@ -2993,6 +3034,20 @@ components:
         volunteerAddress:
           $ref: '#/components/schemas/PersonAddress'
           nullable: true
+        notifications:
+          type: array
+          items:
+            type: string
+            enum:
+              - open
+              - confirmed
+              - cancelled
+              - reminder
+        notificationHistory:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/ServiceRequestNotificationHistory'
     ServiceRequestId:
       $ref: '#/components/schemas/StringIntId'
     ServiceRequestPatch:
@@ -3017,10 +3072,18 @@ components:
           minLength: 1
           pattern: ^[0-9]{1,10}$
           nullable: true
+        notify:
+          type: boolean
+          default: false
         status:
           type: string
-          maxLength: 50
           nullable: true
+          enum:
+          - Draft
+          - Completed
+          - Member cancelled
+          - Volunteer cancelled
+          - Hub cancelled
         serviceName:
           type: string
           maxLength: 200
@@ -3082,7 +3145,6 @@ components:
       type: object
       required:
       - villageId
-      - status
       properties:
         requestNumber:
           type: integer
@@ -3100,10 +3162,14 @@ components:
           minLength: 1
           pattern: ^[0-9]{1,10}$
           nullable: true
+        notify:
+          type: boolean
+          default: false
         status:
           type: string
-          maxLength: 50
-          minLength: 1
+          enum:
+          - Draft
+          nullable: true
         serviceName:
           type: string
           maxLength: 200
@@ -3807,6 +3873,7 @@ components:
           enum:
           - open
           - confirmed
+          - draft
           - completed
           - unmatched
           - cancelled
@@ -3823,6 +3890,13 @@ components:
           enum:
           - memberAddress
           - volunteerAddress
+          - notificationHistory
+    HasNotificationsQuery:
+      name: hasNotifications
+      in: query
+      required: false
+      schema:
+        type: boolean
     UserGroupIdPath:
       name: userGroupId
       in: path

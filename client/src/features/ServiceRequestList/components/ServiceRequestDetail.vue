@@ -7,6 +7,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
+import NotificationHistoryList from './NotificationHistoryList.vue'
 
 const route = useRoute()
 const { getStatusSeverity } = useStatusSeverity()
@@ -14,7 +15,7 @@ const { getStatusSeverity } = useStatusSeverity()
 const serviceRequestId = computed(() => route.params.id)
 
 const { state: request } = useAsyncState(
-  () => getServiceRequest(serviceRequestId.value, ['memberAddress', 'volunteerAddress']),
+  () => getServiceRequest(serviceRequestId.value, ['memberAddress', 'volunteerAddress', 'notificationHistory']),
   { immediate: true }
 )
 
@@ -247,6 +248,12 @@ function formatTimeRange(startStr, finishStr) {
             />
           </template>
         </div>
+
+        <!-- Notifications Section -->
+        <div class="section notifications-section">
+          <h3 class="section-header">Notifications</h3>
+          <NotificationHistoryList :history="request.notificationHistory ?? []" />
+        </div>
       </template>
     </Card>
 
@@ -354,6 +361,12 @@ function formatTimeRange(startStr, finishStr) {
 
 .section:last-child {
   margin-bottom: 0;
+}
+
+/* The notification list is a single grid child; without this it would sit in
+   one of the section's 3 columns and wrap chips at ~1/3 width. Span all columns. */
+.notifications-section > :deep(.notification-history) {
+  grid-column: 1 / -1;
 }
 
 .section-header {

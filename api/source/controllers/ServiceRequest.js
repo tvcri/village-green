@@ -11,12 +11,14 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
     }
     const status = req.query.status
     const villageId = req.query.villageId
+    const hasNotifications = req.query.hasNotifications
     const villageIdsGranted = Object.keys(req.userObject.grants)
     const response = await ServiceRequestService.getServiceRequests({
       villageIdsGranted,
       elevate,
       status,
-      villageId
+      villageId,
+      hasNotifications
     })
     res.json(response)
   }
@@ -27,7 +29,10 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
 
 module.exports.createServiceRequest = async function createServiceRequest (req, res, next) {
   try {
-    const response = await ServiceRequestService.createServiceRequest(req.body)
+    // The service commits in a transaction and returns the new id; fetch the
+    // full record afterward so the read sees committed data.
+    const serviceRequestId = await ServiceRequestService.createServiceRequest(req.body)
+    const response = await ServiceRequestService.getServiceRequest(serviceRequestId)
     res.status(201).json(response)
   }
   catch (err) {
@@ -53,7 +58,14 @@ module.exports.getServiceRequest = async function getServiceRequest (req, res, n
 module.exports.patchServiceRequest = async function patchServiceRequest (req, res, next) {
   try {
     const serviceRequestId = req.params.serviceRequestId
-    const response = await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
+    // The service commits in a transaction and returns the id; fetch the full
+    // record afterward so the read sees committed data.
+    const patched = await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
+    if (!patched) {
+      throw new SmError.NotFoundError()
+    }
+    const projections = req.query.projection ?? []
+    const response = await ServiceRequestService.getServiceRequest(serviceRequestId, projections)
     res.json(response)
   }
   catch (err) {
@@ -63,7 +75,11 @@ module.exports.patchServiceRequest = async function patchServiceRequest (req, re
 
 module.exports.deleteServiceRequest = async function deleteServiceRequest (req, res, next) {
   try {
-    // TODO: Implement deleteServiceRequest
+    const serviceRequestId = req.params.serviceRequestId
+    const deleted = await ServiceRequestService.deleteServiceRequest(serviceRequestId)
+    if (!deleted) {
+      throw new SmError.NotFoundError()
+    }
     res.json({})
   }
   catch (err) {

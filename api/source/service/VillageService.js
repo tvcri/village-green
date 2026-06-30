@@ -123,8 +123,8 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
       )
       FROM
         person p
-        LEFT JOIN member m ON p.id = m.person_id
-        LEFT JOIN volunteer vol ON p.id = vol.person_id
+        LEFT JOIN active_member m ON p.id = m.person_id
+        LEFT JOIN active_volunteer vol ON p.id = vol.person_id
       WHERE
         p.village_id = v.id
       GROUP BY
@@ -140,7 +140,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
         'techSupport', SUM(CASE WHEN c.name = 'Tech Support' THEN 1 ELSE 0 END)
       )
       FROM person p
-      JOIN volunteer vol ON p.id = vol.person_id
+      JOIN active_volunteer vol ON p.id = vol.person_id
       JOIN volunteer_capability vc ON vol.id = vc.volunteer_id
       JOIN capability c ON vc.capability_id = c.id
       WHERE p.village_id = v.id
@@ -223,6 +223,52 @@ module.exports.deleteVillage = async function (villageId) {
   await dbUtils.pool.query('DELETE FROM village WHERE id = ?', [villageId])
 }
 
+module.exports.getVillageMembers = async function (villageId) {
+  const columns = [
+    'p.full_name AS fullName',
+    'CAST(m.id AS CHAR) AS memberId',
+    'CAST(m.person_id AS CHAR) AS personId',
+    'p.full_name AS fullName',
+    'm.member_number AS memberNumber',
+    'm.member_level AS memberLevel',
+    'm.service_notes AS serviceNotes',
+    'DATE_FORMAT(m.join_date, "%Y-%m-%d") AS joinDate'
+  ]
+  const joins = new Set([
+    'active_member m',
+    'JOIN person p ON p.id = m.person_id'
+  ])
+  const predicates = { statements: ['p.village_id = ?'], binds: [villageId] }
+  const orderBy = ['p.full_name']
+  const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
+  const [rows] = await dbUtils.pool.query(sql)
+  return rows
+}
+
+module.exports.getVillageVolunteers = async function (villageId) {
+  const columns = [
+    'p.full_name AS fullName',
+    'CAST(vol.id AS CHAR) AS volunteerId',
+    'CAST(vol.person_id AS CHAR) AS personId',
+  `  COALESCE(CAST(
+      CONCAT('[', GROUP_CONCAT(CONCAT('"',c.name,'"') ORDER BY c.name), ']')
+      AS JSON), JSON_ARRAY()) AS capabilities`
+  ]
+  const joins = new Set([
+    'active_volunteer vol',
+    'JOIN person p ON p.id = vol.person_id',
+    'LEFT JOIN volunteer_capability vc ON vc.volunteer_id = vol.id',
+    'LEFT JOIN capability c ON c.id = vc.capability_id'
+  ])
+  const predicates = { statements: ['p.village_id = ?'], binds: [villageId] }
+  const groupBy = ['vol.id']
+  const orderBy = ['p.full_name']
+  const sql = dbUtils.makeQueryString({columns, joins, predicates, groupBy, orderBy, format: true})
+  let [rows] = await dbUtils.pool.query(sql)
+  return rows
+}
+
+
 module.exports.getVillagePersons = async function (villageId) {
   return await PersonService.getPersonsByVillage(villageId)
 }
@@ -254,7 +300,13 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
-    'sr.phone AS phone'
+    'sr.phone AS phone',
+    `COALESCE(
+      (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.event_type)')}
+       FROM notification_event ne
+       WHERE ne.service_request_id = sr.id),
+      JSON_ARRAY()
+    ) AS notifications`
   ]
   const joins = new Set([
     'service_request sr',

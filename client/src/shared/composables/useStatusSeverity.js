@@ -11,6 +11,7 @@ export const useStatusSeverity = () => {
         return 'info'
       case 'completed':
         return 'success'
+      case 'draft':
       case 'unmatched':
         return 'secondary'
       default:
