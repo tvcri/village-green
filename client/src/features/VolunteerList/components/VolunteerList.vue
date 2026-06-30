@@ -277,11 +277,16 @@ async function handleCreateSheet() {
     <DataTable
       v-else
       :value="filteredVolunteers"
-      row-hover
+      rowHover
       paginator
       :rows="pageRows"
       class="volunteer-table-responsive desktop-only"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
+      :pt="{
+        tableContainer: { style: 'overflow: visible;' },
+        thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' },
+        headerRow: { style: 'background: var(--color-background-light);' },
+        bodyRow: { style: { cursor: 'pointer' } }
+      }"
       :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToVolunteer(event.data)"
       @filter="trackEvent('filter_applied')"

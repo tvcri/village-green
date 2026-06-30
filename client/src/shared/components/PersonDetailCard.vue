@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import Card from 'primevue/card'
+import Tag from 'primevue/tag'
 import PersonMap from '../../components/PersonMap.vue'
 
 const props = defineProps({
@@ -144,13 +145,12 @@ const copyEmail = async (email) => {
         <div class="detail-field capabilities-field">
           <span class="label">Capabilities:</span>
           <div class="capabilities-list">
-            <span
+            <Tag
               v-for="cap in person.capabilities"
               :key="cap"
+              :value="cap"
               class="capability-badge"
-            >
-              {{ cap }}
-            </span>
+            />
           </div>
         </div>
       </div>
@@ -326,11 +326,11 @@ const copyEmail = async (email) => {
 
 .capability-badge {
   display: inline-block;
-  padding: 0.35rem 0.7rem;
+  padding: 0.3rem 0.6rem;
   background-color: var(--color-background-dark);
   border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  font-size: 0.85rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
   color: var(--color-text-dim);
 }
 

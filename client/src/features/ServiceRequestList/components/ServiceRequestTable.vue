@@ -59,7 +59,12 @@ function formatDate(dateStr) {
       :sort-order="1"
       class="request-table-responsive desktop-only"
       :row-class="rowClass"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
+      :pt="{
+        tableContainer: { style: 'overflow: visible;' },
+        thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' },
+        headerRow: { style: 'background: var(--color-background-light);' },
+        bodyRow: { style: { cursor: 'pointer' } }
+      }"
       @row-click="(event) => emit('row-click', event)"
       @filter="trackEvent('filter_applied')"
     >
@@ -125,7 +130,7 @@ function formatDate(dateStr) {
 
 <style scoped>
 .loading-state, .error-state, .empty-state { padding: 2rem; text-align: center; color: var(--color-text-dim); }
-.request-table-responsive { width: 100%; cursor: pointer; }
+.request-table-responsive { width: 100%; cursor: pointer; box-shadow: var(--box-shadow-card); border: 1px solid var(--color-border-default); }
 .paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
 .paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }
 .row-actions { display: flex; gap: 0.25rem; }

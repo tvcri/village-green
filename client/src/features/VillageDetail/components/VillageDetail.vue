@@ -246,6 +246,7 @@ h2 {
 
 .chart-container {
   background-color: var(--color-background-light);
+  box-shadow: var(--box-shadow-card);
   border: 1px solid var(--color-border-default);
   border-radius: 6px;
   padding: 1.5rem;

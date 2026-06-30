@@ -248,7 +248,7 @@ const navigate = (crumb) => {
           />
           <button
             :class="index === breadcrumbs.length - 1 ? 'breadcrumb-current' : ['breadcrumb-link', 'breadcrumb-link-label']"
-            @click="navigate(crumb)"
+            @click="index === breadcrumbs.length - 1 ? menuRefs.get(index)?.toggle($event) : navigate(crumb)"
           >
             {{ crumb.label }}
           </button>
@@ -339,6 +339,7 @@ const navigate = (crumb) => {
   border: none;
   padding: 0;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .breadcrumb-separator {
