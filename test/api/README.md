@@ -73,7 +73,7 @@ This prints a text summary and writes an HTML report to `test/api/.coverage/inde
 (both gitignored), scoped to `api/source/**` — the code the API actually executes while
 serving the tests. The report generates even on a red run.
 
-Current coverage is **~51%** of `api/source` statements. Well-exercised: `FriendService` /
+Current coverage is **~53%** of `api/source` statements. Well-exercised: `FriendService` /
 `PersonService` (~85%), the service-request controller/service (~75%), and the auth layer.
 Thinner: `VillageService` (~36%), `UserService` (~45%), and `OperationService` (~7% — the
 unexercised appdata/ce-dump/SSE paths) / `JobService` (the `job` table isn't scaffolded in
