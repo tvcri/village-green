@@ -373,6 +373,7 @@ h1 {
   gap: 1rem;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   margin-bottom: 1rem;
 }
 
@@ -416,8 +417,9 @@ h1 {
 /* Capabilities Badge */
 .capabilities-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
+  overflow: hidden;
 }
 
 .capability-badge {
@@ -431,8 +433,10 @@ h1 {
 }
 
 .no-capabilities {
+  display: inline-block;
+  height: 1.813rem;
+  line-height: 1.813rem;
   color: var(--color-text-dim);
-  font-style: italic;
 }
 
 /* Mobile Card List */
