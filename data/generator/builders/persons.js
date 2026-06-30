@@ -75,9 +75,10 @@ export function buildPersons (content, villageIdByName, rng) {
     let i = 0
     // members
     for (let k = 0; k < target.members && i < pool.length; k++, i++) members.push(makePerson(pool[i], villageId, v.name))
-    // volunteers — mostly new people; ~10% reuse a member person
+    // volunteers — mostly new people; ~6% reuse a member person (keeps the
+    // member/volunteer overlap comfortably under the 10% ceiling despite variance)
     for (let k = 0; k < target.volunteers; k++) {
-      if (rng.bool(0.10) && members.length) { volunteers.push(rng.pick(members)); continue }
+      if (rng.bool(0.06) && members.length) { volunteers.push(rng.pick(members)); continue }
       if (i >= pool.length) break
       volunteers.push(makePerson(pool[i++], villageId, v.name))
     }

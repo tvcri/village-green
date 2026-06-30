@@ -66,11 +66,11 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   }
   assert.ok(m.volunteer.some(r => r.active === 1) && m.volunteer.some(r => r.active === 0))
 
-  // overlap: persons who are BOTH member and volunteer <= 15% of volunteers
-  // (implementation targets ~10% but small villages introduce natural variance; 15% guards the invariant)
+  // overlap: persons who are BOTH member and volunteer <= 10% of volunteers
+  // (members receive services; volunteers provide them — mostly distinct populations)
   const memberPersons = new Set(m.member.map(r => r.person_id))
   const both = m.volunteer.filter(r => memberPersons.has(r.person_id)).length
-  assert.ok(both <= Math.ceil(m.volunteer.length * 0.15), `overlap ${both}/${m.volunteer.length}`)
+  assert.ok(both <= Math.ceil(m.volunteer.length * 0.10), `overlap ${both}/${m.volunteer.length}`)
 
   // junctions reference valid parents
   const volIds = new Set(m.volunteer.map(v => v.id))
