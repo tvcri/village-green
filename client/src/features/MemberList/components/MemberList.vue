@@ -432,10 +432,6 @@ h1 {
     padding: 1rem;
   }
 
-  .search-input {
-    max-width: 100%;
-  }
-
   .desktop-only {
     display: none;
   }

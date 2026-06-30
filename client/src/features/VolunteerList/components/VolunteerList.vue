@@ -453,59 +453,6 @@ h1 {
   font-style: italic;
 }
 
-/* Desktop Table */
-.volunteer-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.volunteer-table thead {
-  background-color: var(--color-background-dark);
-}
-
-.volunteer-table th {
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  border-bottom: 1px solid var(--color-border-default);
-}
-
-.volunteer-table th.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-
-.volunteer-table th.sortable:hover {
-  background-color: var(--color-background-subtle);
-}
-
-.sort-indicator {
-  margin-left: 0.5rem;
-  font-size: 0.75rem;
-  opacity: 0.7;
-}
-
-.volunteer-table td {
-  padding: 1rem;
-  border-bottom: 1px solid var(--color-border-default);
-  color: var(--color-text-primary);
-}
-
-.volunteer-table tbody tr.clickable {
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.volunteer-table tbody tr.clickable:hover {
-  background-color: var(--color-background-subtle);
-}
-
 /* Mobile Card List */
 .volunteer-cards {
   display: flex;
