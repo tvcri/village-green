@@ -257,10 +257,15 @@ async function handleCreateSheet() {
     <DataTable
       v-else
       :value="filteredMembers"
+      row-hover
       paginator
       :rows="pageRows"
       class="member-table-responsive desktop-only"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
+      :pt="{
+        tableContainer: { style: 'overflow: visible;' },
+        thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' },
+        headerRow: { style: 'background: var(--color-background-light);' },
+      }"
       :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToMember(event.data)"
       @filter="trackEvent('filter_applied')"
@@ -339,7 +344,7 @@ async function handleCreateSheet() {
 }
 
 h1 {
-  margin: 1rem 0 0 0;
+  margin: 0;
   color: var(--color-text-primary);
 }
 
@@ -366,8 +371,6 @@ h1 {
   cursor: pointer;
 }
 
-:deep(.p-datatable-tbody > tr > td) { padding: 0.75rem 0.75rem; }
-:deep(.p-datatable-thead > tr > th) { padding: 0.75rem 0.75rem; }
 :deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 
 /* Mobile Card List */

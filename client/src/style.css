@@ -418,5 +418,5 @@ textarea:focus {
 
 @keyframes row-flash-anim {
   0%   { background-color: rgba(0, 123, 255, 0.35); }
-  100% { background-color: transparent; }
+  100% { background-color: inherit; }
 }

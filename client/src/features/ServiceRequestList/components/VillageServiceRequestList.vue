@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
+import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
@@ -28,8 +29,12 @@ useScrollRestore('service-requests', 'service-request-detail')
 const villageId = computed(() => route.params.villageId)
 
 const isCreatingSheet = ref(false)
-const selectedMember = ref('All members')
-const selectedVolunteer = ref('All volunteers')
+const selectedMember = ref('')
+const selectedVolunteer = ref('')
+const appliedMember = ref('')
+const appliedVolunteer = ref('')
+const memberSuggestions = ref([])
+const volunteerSuggestions = ref([])
 const selectedService = ref('All services')
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
@@ -70,8 +75,10 @@ const villageIdAtDeactivation = ref(null)
 const flashRowId = ref(null)
 
 const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
-  selectedMember.value = 'All members'
-  selectedVolunteer.value = 'All volunteers'
+  selectedMember.value = ''
+  selectedVolunteer.value = ''
+  appliedMember.value = ''
+  appliedVolunteer.value = ''
   selectedService.value = 'All services'
   selectedStatuses.value = ['open', 'confirmed']
   fetchRequests()
@@ -106,38 +113,59 @@ watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
 
 const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled']
 
-const memberOptions = computed(() => {
+const memberNames = computed(() => {
   if (!Array.isArray(requests.value)) return []
-  const members = new Set(requests.value.map(r => r.memberFullName).filter(Boolean))
-  return ['All members', ...Array.from(members).sort()]
+  return Array.from(new Set(requests.value.map(r => r.memberFullName).filter(Boolean))).sort()
 })
 
-const volunteerOptions = computed(() => {
+const volunteerNames = computed(() => {
   if (!Array.isArray(requests.value)) return []
-  const volunteers = new Set(requests.value.map(r => r.volunteerFullName).filter(Boolean))
-  return ['All volunteers', ...Array.from(volunteers).sort()]
+  return Array.from(new Set(requests.value.map(r => r.volunteerFullName).filter(Boolean))).sort()
 })
+
+const filterMemberSuggestions = (event) => {
+  const q = event.query.toLowerCase()
+  memberSuggestions.value = memberNames.value.filter(n => n.toLowerCase().includes(q))
+}
+
+const filterVolunteerSuggestions = (event) => {
+  const q = event.query.toLowerCase()
+  volunteerSuggestions.value = volunteerNames.value.filter(n => n.toLowerCase().includes(q))
+}
+
+const onMemberSelect = (event) => { appliedMember.value = event.value }
+const onVolunteerSelect = (event) => { appliedVolunteer.value = event.value }
+
+watch(selectedMember, (val) => { if (!val) appliedMember.value = '' })
+watch(selectedVolunteer, (val) => { if (!val) appliedVolunteer.value = '' })
 
 const serviceOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
-  const services = new Set(requests.value.map(r => r.serviceName).filter(Boolean))
-  return ['All services', ...Array.from(services).sort()]
+  const seen = new Map()
+  for (const r of requests.value) {
+    if (r.serviceName) {
+      const key = r.serviceName.toLowerCase().replace(/:\s*/g, ': ').trim()
+      if (!seen.has(key)) seen.set(key, r.serviceName)
+    }
+  }
+  return ['All services', ...Array.from(seen.values()).sort()]
 })
 
 const filteredRequests = computed(() => {
   if (!Array.isArray(requests.value)) return []
   return requests.value.filter(r => {
     let memberMatch = true
-    if (selectedMember.value && selectedMember.value !== 'All members') {
-      memberMatch = r.memberFullName === selectedMember.value
+    if (appliedMember.value) {
+      memberMatch = r.memberFullName === appliedMember.value
     }
     let volunteerMatch = true
-    if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') {
-      volunteerMatch = r.volunteerFullName === selectedVolunteer.value
+    if (appliedVolunteer.value) {
+      volunteerMatch = r.volunteerFullName === appliedVolunteer.value
     }
     let serviceMatch = true
     if (selectedService.value && selectedService.value !== 'All services') {
-      serviceMatch = r.serviceName === selectedService.value
+      const normalize = s => s?.toLowerCase().replace(/:\s*/g, ': ').trim()
+      serviceMatch = normalize(r.serviceName) === normalize(selectedService.value)
     }
     let statusMatch = true
     if (selectedStatuses.value.length > 0) {
@@ -154,8 +182,8 @@ const filteredRequests = computed(() => {
 
 const activeFilterCount = computed(() => {
   let count = 0
-  if (selectedMember.value && selectedMember.value !== 'All members') count++
-  if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') count++
+  if (appliedMember.value) count++
+  if (appliedVolunteer.value) count++
   if (selectedService.value && selectedService.value !== 'All services') count++
   return count
 })
@@ -228,8 +256,10 @@ const navigateToRequest = (serviceRequestId, rowVillageId) => {
 }
 
 const clearFilters = () => {
-  selectedMember.value = 'All members'
-  selectedVolunteer.value = 'All volunteers'
+  selectedMember.value = ''
+  selectedVolunteer.value = ''
+  appliedMember.value = ''
+  appliedVolunteer.value = ''
   selectedService.value = 'All services'
   selectedStatuses.value = []
 }
@@ -244,8 +274,8 @@ const clearFilters = () => {
     </div>
 
     <div class="filter-row">
-      <div class="filter-select"><Select v-model="selectedMember" :options="memberOptions" placeholder="Member" /></div>
-      <div class="filter-select"><Select v-model="selectedVolunteer" :options="volunteerOptions" placeholder="Volunteer" /></div>
+      <div class="filter-select"><AutoComplete v-model="selectedMember" :suggestions="memberSuggestions" placeholder="Member" show-clear force-selection fluid @complete="filterMemberSuggestions" @item-select="onMemberSelect" /></div>
+      <div class="filter-select"><AutoComplete v-model="selectedVolunteer" :suggestions="volunteerSuggestions" placeholder="Volunteer" show-clear force-selection fluid @complete="filterVolunteerSuggestions" @item-select="onVolunteerSelect" /></div>
       <div class="filter-select"><Select v-model="selectedService" :options="serviceOptions" placeholder="Service" /></div>
       <div class="status-filters">
         <div v-for="status in statusOptions" :key="status" class="status-filter">
@@ -298,10 +328,10 @@ const clearFilters = () => {
 
 <style scoped>
 .service-request-list { padding: 2rem; }
-.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .title-group { display: flex; flex-direction: column; gap: 0.25rem; }
-h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
-.filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+h1 { margin: 0; color: var(--color-text-primary); }
+.filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 2rem; }
 .filter-select { width: 160px; flex-shrink: 0; }
 .status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
 .status-filter { display: flex; align-items: center; gap: 0.375rem; }

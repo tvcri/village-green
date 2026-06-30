@@ -52,6 +52,7 @@ function formatDate(dateStr) {
     <DataTable
       v-else
       :value="rows"
+      row-hover
       paginator
       :rows="pageRows"
       sort-field="startAt"
@@ -79,15 +80,16 @@ function formatDate(dateStr) {
       </Column>
       <Column v-if="showVillageColumn" field="villageName" header="Village" sortable style="width: 15%"></Column>
       <Column field="serviceName" header="Service" sortable style="width: 20%"></Column>
-      <Column field="status" header="Status" sortable style="width: 12%">
+      <Column field="status" header="Status" sortable headerClass="text-center" style="width: 12%;">
         <template #body="slotProps">
           <Tag :value="slotProps.data.status" :severity="getStatusSeverity(slotProps.data.status)" />
         </template>
       </Column>
       <Column field="memberFullName" header="Member" sortable style="width: 15%"></Column>
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
-      <Column field="city" header="City" sortable style="width: 13%"></Column>
-      <Column field="displayNumber" header="#" sortable style="width: 10%">
+      <Column field="city" header="Destination" sortable style="width: 13%"></Column>
+      <Column field="displayNumber" header="#" sortable style="width: 10%;">
+          
         <template #body="slotProps">{{ slotProps.data.displayNumber ?? '—' }}</template>
       </Column>
       <Column header="Actions" style="width: 10%">
@@ -135,6 +137,7 @@ function formatDate(dateStr) {
 .status-badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: var(--color-background-subtle); }
 .card-row { display: flex; gap: 0.5rem; font-size: 0.9rem; padding: 0.2rem 0; }
 .card-row .label { font-weight: 500; color: var(--color-text-dim); min-width: 80px; }
+.text-center { text-align: center; }
 .desktop-only { display: table; }
 .mobile-only { display: none; }
   :deep(.p-datatable-tbody > tr > td) { padding: 0.4rem 0.75rem; }

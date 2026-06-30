@@ -141,7 +141,7 @@ const navigateTo = (section) => {
 
 <template>
   <div class="village-detail">
-    <h1>{{ village?.name ?? 'Village' }}</h1>
+    <h1>{{ village?.name }}</h1>
 
     <div class="nav-section">
       <Button label="Members" @click="navigateTo('members')" />
@@ -220,7 +220,7 @@ const navigateTo = (section) => {
 }
 
 h1 {
-  margin: 1rem 0 2rem 0;
+  margin: 0rem 0 2rem 0;
   color: var(--color-text-primary);
 }
 

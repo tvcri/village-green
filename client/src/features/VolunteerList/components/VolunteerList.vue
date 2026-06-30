@@ -277,6 +277,7 @@ async function handleCreateSheet() {
     <DataTable
       v-else
       :value="filteredVolunteers"
+      row-hover
       paginator
       :rows="pageRows"
       class="volunteer-table-responsive desktop-only"
@@ -353,11 +354,11 @@ async function handleCreateSheet() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 h1 {
-  margin: 1rem 0 0 0;
+  margin: 0;
   color: var(--color-text-primary);
 }
 
@@ -409,8 +410,6 @@ h1 {
   cursor: pointer;
 }
 
-:deep(.p-datatable-tbody > tr > td) { padding: 0.75rem 0.75rem; }
-:deep(.p-datatable-thead > tr > th) { padding: 0.75rem 0.75rem; }
 :deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 
 /* Capabilities Badge */
