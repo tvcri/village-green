@@ -257,7 +257,7 @@ async function handleCreateSheet() {
     <DataTable
       v-else
       :value="filteredMembers"
-      row-hover
+      rowHover
       paginator
       :rows="pageRows"
       class="member-table-responsive desktop-only"
@@ -265,6 +265,7 @@ async function handleCreateSheet() {
         tableContainer: { style: 'overflow: visible;' },
         thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' },
         headerRow: { style: 'background: var(--color-background-light);' },
+        bodyRow: { style: { cursor: 'pointer' } }
       }"
       :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToMember(event.data)"
@@ -368,7 +369,8 @@ h1 {
 }
 
 .member-table-responsive {
-  cursor: pointer;
+  box-shadow: var(--box-shadow-card);
+  border: 1px solid var(--color-border-default);
 }
 
 :deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }

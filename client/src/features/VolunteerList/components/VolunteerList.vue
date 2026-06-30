@@ -407,7 +407,8 @@ h1 {
 }
 
 .volunteer-table-responsive {
-  cursor: pointer;
+  box-shadow: var(--box-shadow-card);
+  border: 1px solid var(--color-border-default);
 }
 
 :deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
@@ -425,13 +426,15 @@ h1 {
   padding: 0.3rem 0.6rem;
   background-color: var(--color-background-dark);
   border: 1px solid var(--color-border-default);
-  border-radius: 3px;
-  font-size: 0.8rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
   color: var(--color-text-dim);
 }
 
 .no-capabilities {
   color: var(--color-text-dim);
+  padding: 0.25rem 0.6rem;
+
 }
 
 /* Mobile Card List */

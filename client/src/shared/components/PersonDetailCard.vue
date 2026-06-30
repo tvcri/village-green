@@ -235,13 +235,14 @@ const copyEmail = async (email) => {
 .detail-field .value {
   color: var(--color-text-primary);
   font-size: 1rem;
+  font-weight: 600;
   word-break: break-word;
 }
 
 
 .section {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;
@@ -308,6 +309,7 @@ const copyEmail = async (email) => {
   display: flex;
   gap: 1rem;
   align-items: center;
+  font-weight: 600
 }
 
 
