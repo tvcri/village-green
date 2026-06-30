@@ -286,7 +286,7 @@ async function handleCreateSheet() {
       paginator
       :rows="pageRows"
       class="volunteer-table-responsive desktop-only"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
+      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' }, bodyRow: { style: 'height: 47.38px;' } }"
       :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToVolunteer(event.data)"
       @filter="trackEvent('filter_applied')"
@@ -433,9 +433,6 @@ h1 {
 }
 
 .no-capabilities {
-  display: inline-block;
-  height: 1.813rem;
-  line-height: 1.813rem;
   color: var(--color-text-dim);
 }
 
