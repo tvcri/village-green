@@ -235,41 +235,35 @@ async function handleCreateSheet() {
   <div class="volunteer-list">
     <div class="header-row">
       <h1>Volunteers</h1>
-      <ExportButton
-        :disabled="isLoading || isCreatingSheet"
-        @download="handleDownloadCsv"
-        @export="handleCreateSheet"
-      />
+      <div class="header-controls">
+        <IconField>
+          <InputText
+            v-model="searchText"
+            type="text"
+            placeholder="Search by name..."
+          />
+          <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
+        </IconField>
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
+      </div>
     </div>
 
-    <div class="filter-section">
-      <div class="search-and-capabilities">
-        <div class="search-box">
-          <IconField style="width: 100%">
-            <InputText
-              v-model="searchText"
-              type="text"
-              placeholder="Search by name..."
-              style="width: 100%"
-            />
-            <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
-          </IconField>
-        </div>
-
-        <div class="capability-filters">
-          <div
-            v-for="capability in capabilityOptions"
-            :key="capability"
-            class="capability-filter"
-          >
-            <Checkbox
-              v-model="selectedCapabilities"
-              :input-id="`capability-${capability}`"
-              :value="capability"
-            />
-            <label :for="`capability-${capability}`">{{ capability }}</label>
-          </div>
-        </div>
+    <div class="capability-filters">
+      <div
+        v-for="capability in capabilityOptions"
+        :key="capability"
+        class="capability-filter"
+      >
+        <Checkbox
+          v-model="selectedCapabilities"
+          :input-id="`capability-${capability}`"
+          :value="capability"
+        />
+        <label :for="`capability-${capability}`">{{ capability }}</label>
       </div>
     </div>
 
@@ -360,7 +354,7 @@ async function handleCreateSheet() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 h1 {
@@ -368,23 +362,10 @@ h1 {
   color: var(--color-text-primary);
 }
 
-.filter-section {
-  margin-bottom: 1.5rem;
+.header-controls {
   display: flex;
-  gap: 1rem;
   align-items: center;
-}
-
-.search-and-capabilities {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  align-items: stretch;
-  width: 100%;
-}
-
-.search-box {
-  width: 250px;
+  gap: 0.75rem;
 }
 
 .capability-filters {
@@ -392,6 +373,7 @@ h1 {
   gap: 1rem;
   flex-wrap: wrap;
   align-items: center;
+  margin-bottom: 1rem;
 }
 
 .capability-filter {

@@ -229,24 +229,20 @@ async function handleCreateSheet() {
   <div class="member-list">
     <div class="header-row">
       <h1>Members</h1>
-      <ExportButton
-        :disabled="isLoading || isCreatingSheet"
-        @download="handleDownloadCsv"
-        @export="handleCreateSheet"
-      />
-    </div>
-
-    <div class="filter-section">
-      <div class="search-box">
-        <IconField style="width: 100%">
+      <div class="header-controls">
+        <IconField>
           <InputText
             v-model="searchText"
             type="text"
             placeholder="Search by name..."
-            style="width: 100%"
           />
           <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
         </IconField>
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
       </div>
     </div>
 
@@ -339,7 +335,7 @@ async function handleCreateSheet() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 h1 {
@@ -347,15 +343,10 @@ h1 {
   color: var(--color-text-primary);
 }
 
-.filter-section {
-  margin-bottom: 1.5rem;
+.header-controls {
   display: flex;
-  gap: 1rem;
   align-items: center;
-}
-
-.search-box {
-  width: 250px;
+  gap: 0.75rem;
 }
 
 .loading-state,
