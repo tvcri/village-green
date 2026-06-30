@@ -68,6 +68,7 @@ function formatDate(dateStr) {
           <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
           <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
           <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <slot name="paginator-extra" />
         </div>
       </template>
 

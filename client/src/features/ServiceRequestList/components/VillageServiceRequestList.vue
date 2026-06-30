@@ -252,13 +252,6 @@ const clearFilters = () => {
       <div class="title-group">
         <h1>Service Requests</h1>
       </div>
-      <div class="header-actions">
-        <ExportButton
-          :disabled="isLoading || isCreatingSheet"
-          @download="handleDownloadCsv"
-          @export="handleCreateSheet"
-        />
-      </div>
     </div>
 
     <div class="filter-section">
@@ -318,6 +311,13 @@ const clearFilters = () => {
       :flash-row-id="flashRowId"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
     >
+      <template #paginator-extra>
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
+      </template>
       <template #actions="{ data }">
         <span class="bell-wrapper">
           <Button

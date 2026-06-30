@@ -238,11 +238,6 @@ async function handleCreateSheet() {
           />
           <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
         </IconField>
-        <ExportButton
-          :disabled="isLoading || isCreatingSheet"
-          @download="handleDownloadCsv"
-          @export="handleCreateSheet"
-        />
       </div>
     </div>
 
@@ -276,6 +271,11 @@ async function handleCreateSheet() {
           <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
           <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
           <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <ExportButton
+            :disabled="isLoading || isCreatingSheet"
+            @download="handleDownloadCsv"
+            @export="handleCreateSheet"
+          />
         </div>
       </template>
 

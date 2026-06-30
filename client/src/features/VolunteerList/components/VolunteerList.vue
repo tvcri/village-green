@@ -244,26 +244,20 @@ async function handleCreateSheet() {
           />
           <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
         </IconField>
-        <ExportButton
-          :disabled="isLoading || isCreatingSheet"
-          @download="handleDownloadCsv"
-          @export="handleCreateSheet"
-        />
-      </div>
-    </div>
-
-    <div class="capability-filters">
-      <div
-        v-for="capability in capabilityOptions"
-        :key="capability"
-        class="capability-filter"
-      >
-        <Checkbox
-          v-model="selectedCapabilities"
-          :input-id="`capability-${capability}`"
-          :value="capability"
-        />
-        <label :for="`capability-${capability}`">{{ capability }}</label>
+        <div class="capability-filters">
+          <div
+            v-for="capability in capabilityOptions"
+            :key="capability"
+            class="capability-filter"
+          >
+            <Checkbox
+              v-model="selectedCapabilities"
+              :input-id="`capability-${capability}`"
+              :value="capability"
+            />
+            <label :for="`capability-${capability}`">{{ capability }}</label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -313,6 +307,11 @@ async function handleCreateSheet() {
           <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
           <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
           <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <ExportButton
+            :disabled="isLoading || isCreatingSheet"
+            @download="handleDownloadCsv"
+            @export="handleCreateSheet"
+          />
         </div>
       </template>
     </DataTable>
@@ -373,8 +372,6 @@ h1 {
   gap: 1rem;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  margin-bottom: 1rem;
 }
 
 .capability-filter {
