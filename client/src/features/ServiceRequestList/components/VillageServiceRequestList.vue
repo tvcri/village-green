@@ -2,8 +2,8 @@
 import { computed, ref, watch, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
-import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
@@ -269,15 +269,10 @@ const clearFilters = () => {
     </div>
 
     <div class="filter-row">
-      <div class="filter-select"><AutoComplete v-model="selectedMember" :suggestions="memberSuggestions" placeholder="Member" show-clear force-selection fluid @complete="filterMemberSuggestions" @item-select="onMemberSelect" /></div>
-      <div class="filter-select"><AutoComplete v-model="selectedVolunteer" :suggestions="volunteerSuggestions" placeholder="Volunteer" show-clear force-selection fluid @complete="filterVolunteerSuggestions" @item-select="onVolunteerSelect" /></div>
-      <div class="filter-select"><Select v-model="selectedService" :options="serviceOptions" placeholder="Service" /></div>
-      <div class="status-filters">
-        <div v-for="status in statusOptions" :key="status" class="status-filter">
-          <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
-          <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
-        </div>
-      </div>
+      <AutoComplete v-model="selectedMember" :suggestions="memberSuggestions" placeholder="Member" show-clear force-selection fluid @complete="filterMemberSuggestions" @item-select="onMemberSelect" />
+      <AutoComplete v-model="selectedVolunteer" :suggestions="volunteerSuggestions" placeholder="Volunteer" show-clear force-selection fluid @complete="filterVolunteerSuggestions" @item-select="onVolunteerSelect" />
+      <Select v-model="selectedService" :options="serviceOptions" placeholder="Service" />
+      <MultiSelect v-model="selectedStatuses" :options="statusOptions" :option-label="s => s.charAt(0).toUpperCase() + s.slice(1)" placeholder="Status" :max-selected-labels="5" selected-items-label="{0} statuses" showClear/>
       <Button v-if="activeFilterCount > 0" icon="pi pi-times" text rounded v-tooltip="'Clear filters'" @click="clearFilters" />
     </div>
 
@@ -325,9 +320,6 @@ const clearFilters = () => {
 .title-group { display: flex; flex-direction: column; gap: 0.25rem; }
 h1 { margin: 0; color: var(--color-text-primary); }
 .filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 2rem; }
-.filter-select { width: 160px; flex-shrink: 0; }
-.status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
-.status-filter { display: flex; align-items: center; gap: 0.375rem; }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
 }
