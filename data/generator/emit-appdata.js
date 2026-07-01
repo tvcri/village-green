@@ -17,9 +17,16 @@ export function buildJsonl (dataset, columnMap, meta) {
     totalRows: tables.reduce((s, t) => s + dataset[t].length, 0),
   }))
   for (const t of tables) {
-    const cols = columnMap[t]
-    lines.push(JSON.stringify({ table: t, columns: cols.map(c => '`' + c + '`').join(','), rowCount: dataset[t].length }))
-    for (const row of dataset[t]) lines.push(JSON.stringify(rowToArray(cols, row)))
+    const rows = dataset[t]
+    // Emit only the columns the builders actually populate (in live-schema order).
+    // Columns the dataset never sets — e.g. user_data.created / statusDate — are
+    // left out so their DB DEFAULT applies on import; emitting an explicit null
+    // would violate NOT NULL. Mirrors insertRows() in db.js.
+    const present = new Set()
+    for (const row of rows) for (const k of Object.keys(row)) present.add(k)
+    const cols = columnMap[t].filter(c => present.has(c))
+    lines.push(JSON.stringify({ table: t, columns: cols.map(c => '`' + c + '`').join(','), rowCount: rows.length }))
+    for (const row of rows) lines.push(JSON.stringify(rowToArray(cols, row)))
   }
   return lines.join('\n') + '\n'
 }

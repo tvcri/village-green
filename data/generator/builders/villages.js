@@ -1,5 +1,10 @@
 import { VILLAGES, ROLE } from '../constants.js'
 
+// The dev login you type into the mock OIDC form (its `preferred_username`).
+// This user is granted OWNER of every village below. Change it if you log in
+// as someone else.
+const ADMIN_LOGIN = 'admin'
+
 // Build villages, demo login users, and their grants from content.people.loginPersonas
 // plus a few synthesized per-village coordinators. Deterministic given rng.
 export function buildVillagesAndUsers (content, rng) {
@@ -20,6 +25,12 @@ export function buildVillagesAndUsers (content, rng) {
   // 1) System admin — admin privilege, NO grants (sees all via elevate).
   addUser('samuel.slater@millworks.test', { realm_access: { roles: ['admin'] } })
 
+  // 1b) The dev login (the "admin" user you enter in the mock OIDC form) —
+  // granted OWNER of every village so it shows up as an owner everywhere, not
+  // just via admin/elevate.
+  const adminUid = addUser(ADMIN_LOGIN, { realm_access: { roles: ['admin'] } })
+  for (const v of village) grant(adminUid, v.name, ROLE.owner)
+
   // 2) An owner for each of the two big villages.
   grant(addUser('roger.williams@providence.test'), 'Arkham', ROLE.owner)
   grant(addUser('hp.lovecraft@miskatonic.test'), 'Arkham', ROLE.full)
@@ -30,15 +41,15 @@ export function buildVillagesAndUsers (content, rng) {
   for (const v of ['Quahog', 'Innsmouth', 'Arkham']) grant(coord, v, ROLE.full)
 
   // 4) One of each remaining role somewhere.
-  grant(addUser('nathanael.greene@newport.test'), 'Newport', ROLE.manage)
+  grant(addUser('nathanael.greene@newport.test'), 'Oldport', ROLE.manage)
   grant(addUser('gilbert.stuart@gmail.test'), 'Quahog', ROLE.restricted)
 
   // 5) A coordinator (full) for every other village so each has a steward.
   const stewards = {
-    Providence: 'ann.franklin@providence.test', Newport: 'ida.lewis@lighthouse.test',
+    'New York System': 'ann.franklin@providence.test', Oldport: 'ida.lewis@lighthouse.test',
     Innsmouth: 'obed.marsh@innsmouth.test', Kingsport: 'richard.pickman@kingsport.test',
-    Dunwich: 'wilbur.whateley@dunwich.test', Chepachet: 'betty.bett@chepachet.test',
-    Pawtuxet: 'abraham.whipple@pawtuxet.test', 'Cabinet, RI': 'roger.mowry@cabinet.test',
+    Dunwich: 'wilbur.whateley@dunwich.test', Chipwhich: 'betty.bett@chepachet.test',
+    Pawstuxnet: 'abraham.whipple@pawtuxet.test', Cabinet: 'roger.mowry@cabinet.test',
   }
   for (const [vname, username] of Object.entries(stewards)) grant(addUser(username), vname, ROLE.full)
 

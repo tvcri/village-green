@@ -14,14 +14,14 @@ export const ROLE = { restricted: 1, full: 2, manage: 3, owner: 4 }
 export const VILLAGES = [
   { name: 'Arkham', size: 'big', theme: 'lovecraft-health' },
   { name: 'Quahog', size: 'big', theme: 'family-guy' },
-  { name: 'Providence', size: 'medium', theme: 'providence' },
-  { name: 'Newport', size: 'medium', theme: 'gilded-age' },
+  { name: 'New York System', size: 'medium', theme: 'providence' },
+  { name: 'Oldport', size: 'medium', theme: 'gilded-age' },
   { name: 'Innsmouth', size: 'small', theme: 'lovecraft' },
   { name: 'Kingsport', size: 'small', theme: 'lovecraft' },
   { name: 'Dunwich', size: 'small', theme: 'lovecraft' },
-  { name: 'Chepachet', size: 'small', theme: 'chepachet' },
-  { name: 'Pawtuxet', size: 'small', theme: 'gaspee' },
-  { name: 'Cabinet, RI', size: 'tiny', theme: 'made-up' },
+  { name: 'Chipwhich', size: 'small', theme: 'chepachet' },
+  { name: 'Pawstuxnet', size: 'small', theme: 'gaspee' },
+  { name: 'Cabinet', size: 'tiny', theme: 'made-up' },
 ]
 
 // Parent-before-child insert order (FK checks are disabled during load, but stay tidy).

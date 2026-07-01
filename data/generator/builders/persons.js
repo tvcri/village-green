@@ -12,9 +12,9 @@ const SIZE = {
 const RI_STREETS = ['Benefit St', 'Thayer St', 'Hope St', 'Wickenden St', 'Atwells Ave',
   'Westminster St', 'Spooner St', 'Water St', 'Bellevue Ave', 'Ocean Dr', 'Federal Hill',
   'Angell St', 'Power St', 'College St', 'Elmgrove Ave', 'Broadway', 'Smith St']
-const RI_TOWNS = { Arkham: 'Arkham', Quahog: 'Quahog', Providence: 'Providence',
-  Newport: 'Newport', Innsmouth: 'Innsmouth', Kingsport: 'Kingsport', Dunwich: 'Dunwich',
-  Chepachet: 'Chepachet', Pawtuxet: 'Warwick', 'Cabinet, RI': 'Glocester' }
+const RI_TOWNS = { Arkham: 'Arkham', Quahog: 'Quahog', 'New York System': 'Providence',
+  Oldport: 'Newport', Innsmouth: 'Innsmouth', Kingsport: 'Kingsport', Dunwich: 'Dunwich',
+  Chipwhich: 'Chepachet', Pawstuxnet: 'Warwick', Cabinet: 'Glocester' }
 
 // Which figure buckets/villageHints belong to which village theme.
 function poolForVillage (vName, theme, figures, used, rng) {
