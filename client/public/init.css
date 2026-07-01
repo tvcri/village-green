@@ -1,4 +1,13 @@
 
+html, body {
+  margin: 0;
+  background-color: #18181b;
+}
+
+html:not(.app-dark), html:not(.app-dark) body {
+  background-color: #ffffff;
+}
+
 #loading-mask {
   position: absolute;
   left: 0;
@@ -9,8 +18,21 @@
   display: flex;
   align-items: start;
   justify-content: center;
-  background-color: #2a3037;
-  color: #d0cec5;
+  background-color: hsl(132 39% 12% / 1);
+  color: rgba(255, 255, 255, 0.87);
+}
+
+html:not(.app-dark) #loading-mask {
+  background-color: #ffffff;
+  color: rgba(0, 0, 0, 0.87);
+}
+
+html:not(.app-dark) #loading .loading-indicator {
+  color: rgba(0, 0, 0, 0.87);
+}
+
+html:not(.app-dark) #loading-text a {
+  color: rgba(0, 0, 0, 0.87);
 }
 
 #loading {
@@ -19,20 +41,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 16px; /* space between items */
+  justify-content: center;
+  gap: 16px;
 }
 
 #loading .loading-indicator {
-  background: url("../img/loading.svg") no-repeat;
-  background-position: center top;
-  background-size: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   color: #d0cec5;
   font: bold 42px helvetica, sans-serif;
-  padding: 50px 0px;
-  margin: 0;
   text-align: center;
-  height: auto;
 }
 
 #loading-text {

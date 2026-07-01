@@ -262,7 +262,7 @@ textarea:focus {
 :root.app-dark {
   color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #18181b;
+  background-color: hsl(132 39% 12% / 1);
 
   --color-text-primary: rgba(255, 255, 255, 0.87);
   --color-text-dim: #a1a1aa;

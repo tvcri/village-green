@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import Toast from 'primevue/toast'
 import ReauthPrompt from './auth/ReauthPrompt.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
@@ -11,6 +11,10 @@ import GlobalErrorModal from './components/global/GlobalErrorModal.vue'
 const oidcWorker = useOidcWorker()
 const version = computed(() => VG?.Env?.version || '')
 const isDev = VG?.Env?.nodeEnv === 'development'
+
+onMounted(() => {
+  document.getElementById('loading-mask')?.remove()
+})
 </script>
 
 <template>
