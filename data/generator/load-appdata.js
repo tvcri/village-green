@@ -16,7 +16,7 @@ export async function mintToken (oidcBase = config.oidc.base) {
 
 // POST the JSONL to /op/appdata. Returns the progress/result body (JSONL lines).
 export async function importAppData (apiBase, token, jsonl) {
-  const url = new URL('/op/appdata', apiBase)
+  const url = new URL('/api/op/appdata', apiBase)
   url.searchParams.set('elevate', 'true')
   const res = await fetch(url, {
     method: 'POST',
