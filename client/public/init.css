@@ -18,7 +18,7 @@ html:not(.app-dark), html:not(.app-dark) body {
   display: flex;
   align-items: start;
   justify-content: center;
-  background-color: hsl(132 39% 12% / 1);
+  background-color: #18181b;
   color: rgba(255, 255, 255, 0.87);
 }
 
