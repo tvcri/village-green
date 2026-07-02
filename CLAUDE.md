@@ -1,5 +1,9 @@
 # Village Green — project guidance
 
+## Interaction rules
+
+**Questions are questions, not commands.** When the user asks a question — including "why", "how", "is this possible", "does X work" — answer it and stop. Do not make code changes, propose fixes, or begin implementation. The user will use imperative language ("fix", "change", "add", "update") when they want action.
+
 ## Project board draft issues
 
 When the user asks to **add a project draft issue** (or "add this to the

@@ -136,25 +136,6 @@
   box-sizing: border-box;
 }
 
-/* CORA Risk Gradients */
-.sm-cora-risk-very-high {
-  background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
-}
-.sm-cora-risk-high {
-  background: linear-gradient(135deg, #c2410c 0%, #7c2d12 100%);
-}
-.sm-cora-risk-moderate {
-  background: linear-gradient(135deg, #ca8a04 0%, #713f12 100%);
-}
-.sm-cora-risk-low {
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
-}
-.sm-cora-risk-very-low {
-  background: linear-gradient(135deg, #15803d 0%, #14532d 100%);
-}
-
-
-
 body {
   margin: 0;
   font-family: 'Open Sans';
@@ -185,104 +166,6 @@ textarea:focus {
   border-color: var(--p-primary-300) !important;
 }
 
-/* Collection tab panel styles (shared across Assets, STIGs, Labels tabs) */
-.collection-tab-panel {
-  height: calc(100% - 1rem);
-  padding: 0.5rem;
-  overflow: hidden;
-}
-
-.collection-tab-panel .panel-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background-color: var(--color-background-subtle);
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-}
-
-.collection-tab-panel .panel-header {
-  padding: 0.5rem 1rem;
-  background-color: var(--color-background-light);
-  border-bottom: 1px solid var(--color-border-default);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 30px;
-}
-
-.collection-tab-panel .panel-header h3 {
-  margin: 0;
-  color: var(--color-text-primary);
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.collection-tab-panel .grid-container {
-  flex: 1;
-  overflow: hidden;
-  background-color: var(--color-background-dark);
-  position: relative;
-}
-
-.collection-tab-panel .badge {
-  font-size: 0.75rem;
-  background-color: var(--color-background-dark);
-  padding: 0.15rem 0.4rem;
-  border-radius: 3px;
-  color: var(--color-text-dim);
-  font-family: monospace;
-}
-
-.collection-tab-panel .empty-state,
-.collection-tab-panel .loading-state,
-.collection-tab-panel .error-state {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: var(--color-text-dim);
-  font-style: italic;
-  width: 100%;
-}
-
-.collection-tab-panel .error-state {
-  color: var(--color-text-error);
-}
-
-/* Thin scrollbar utility */
-.sm-scrollbar-thin {
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border-default) rgba(255,255,255,0.04);
-}
-
-.sm-scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sm-scrollbar-thin::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.04);
-}
-
-.sm-scrollbar-thin::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.sm-scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-default);
-  border-radius: 999px;
-  border: none;
-  min-height: 28px;
-}
-
-.sm-scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-border-hover);
-}
 
 .p-datatable-mask {
   background: var(--color-background-subtle) !important;
@@ -379,7 +262,7 @@ textarea:focus {
 :root.app-dark {
   color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #18181b;
+  background-color: hsl(132 39% 12% / 1);
 
   --color-text-primary: rgba(255, 255, 255, 0.87);
   --color-text-dim: #a1a1aa;
@@ -387,7 +270,7 @@ textarea:focus {
   --color-text-dark: #18181b;
 
   --color-background-darkest: #000000;
-  --color-background-dark: #1a1a1e;
+  --color-background-dark: #1f1f23;
   --color-background-light: #27272a;
   --color-background-subtle: rgba(255, 255, 255, 0.05);
 
@@ -415,3 +298,11 @@ textarea:focus {
   background-color: #18181b;
   color: rgba(255, 255, 255, 0.87);
 }
+
+@keyframes row-flash-anim {
+  0%   { background-color: rgba(0, 123, 255, 0.35); }
+  100% { background-color: transparent; }
+}
+
+.paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
+.paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }

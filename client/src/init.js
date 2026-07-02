@@ -200,10 +200,6 @@ function appendError(message, showReauth = true) {
 }
 
 async function loadApp() {
-  const loadingMask = document.getElementById('loading-mask')
-  if (loadingMask) {
-    loadingMask.remove()
-  }
   import('./main.js').catch((error) => {
     console.error('Failed to load main.js:', error)
     appendError(`Failed to load application: ${error.message || 'Unknown error'}`, false)

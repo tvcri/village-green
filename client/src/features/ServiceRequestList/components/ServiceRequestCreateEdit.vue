@@ -20,6 +20,7 @@ import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
+import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
 
@@ -528,6 +529,7 @@ const handleSubmit = async (notify = false) => {
 
     if (isEdit.value) {
       setTimeout(() => {
+        setPendingHighlight(serviceRequestId.value)
         router.push({ name: 'meta-service-requests' })
       }, 500)
     } else {
@@ -554,6 +556,7 @@ const splitButtonModel = computed(() => {
 })
 
 const handleCancel = () => {
+  if (isEdit.value) setPendingHighlight(serviceRequestId.value)
   router.push({ name: 'meta-service-requests' })
 }
 
@@ -576,6 +579,7 @@ const handleComplete = async () => {
     await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: 'Completed' })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request marked as completed', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
@@ -595,6 +599,7 @@ const handleDeleteDraft = async () => {
     await apiCall('deleteServiceRequest', { serviceRequestId: serviceRequestId.value })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Draft deleted', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
@@ -612,6 +617,7 @@ const handleCancelRequest = async (reason) => {
     await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason, notify: true })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request cancelled', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
