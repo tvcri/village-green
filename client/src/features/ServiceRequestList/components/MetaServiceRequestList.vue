@@ -77,17 +77,19 @@ const { state: allVillages } = useAsyncState(
 
 const hasActivatedOnce = ref(false)
 const flashRowId = ref(null)
+const flashTimer = ref(null)
 
 onActivated(async () => {
   if (!hasActivatedOnce.value) {
     hasActivatedOnce.value = true
     return
   }
-  const id = consumePendingHighlight()
   await fetchRequests()
+  const id = consumePendingHighlight()
   if (id) {
     flashRowId.value = id
-    setTimeout(() => { flashRowId.value = null }, 2000)
+    clearTimeout(flashTimer.value)
+    flashTimer.value = setTimeout(() => { flashRowId.value = null }, 2000)
   }
 })
 

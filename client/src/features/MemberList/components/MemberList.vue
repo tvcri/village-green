@@ -57,6 +57,7 @@ const { state: persons, execute: fetchPersons } = useAsyncState(
 )
 
 const flashRowId = ref(null)
+const flashTimer = ref(null)
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
 const hasActivatedOnce = ref(false)
@@ -83,7 +84,8 @@ onActivated(() => {
     const id = consumePendingHighlight()
     if (id) {
       flashRowId.value = id
-      setTimeout(() => { flashRowId.value = null }, 2000)
+      clearTimeout(flashTimer.value)
+      flashTimer.value = setTimeout(() => { flashRowId.value = null }, 2000)
     }
     return
   }
@@ -422,8 +424,6 @@ h1 {
   display: none;
 }
 
-.paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
-.paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }
 
 @media (max-width: 768px) {
   .member-list {

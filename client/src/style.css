@@ -303,3 +303,6 @@ textarea:focus {
   0%   { background-color: rgba(0, 123, 255, 0.35); }
   100% { background-color: transparent; }
 }
+
+.paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
+.paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }

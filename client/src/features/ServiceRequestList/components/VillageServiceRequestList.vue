@@ -68,6 +68,7 @@ const { state: village, execute: fetchVillage } = useAsyncState(
 const hasActivatedOnce = ref(false)
 const villageIdAtDeactivation = ref(null)
 const flashRowId = ref(null)
+const flashTimer = ref(null)
 
 const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
   selectedMember.value = ''
@@ -93,13 +94,15 @@ onActivated(async () => {
   }
   const villageChanged = villageId.value !== villageIdAtDeactivation.value
   if (villageChanged) {
+    consumePendingHighlight()
     return
   }
-  const id = consumePendingHighlight()
   await fetchRequests()
+  const id = consumePendingHighlight()
   if (id) {
     flashRowId.value = id
-    setTimeout(() => { flashRowId.value = null }, 2000)
+    clearTimeout(flashTimer.value)
+    flashTimer.value = setTimeout(() => { flashRowId.value = null }, 2000)
   }
 })
 

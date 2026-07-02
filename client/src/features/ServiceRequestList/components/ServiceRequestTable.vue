@@ -16,7 +16,7 @@ const props = defineProps({
   hasLoadedOnce: { type: Boolean, required: true },
   error: { required: true },
   showVillageColumn: { type: Boolean, default: false },
-  flashRowId: { type: String, default: null }
+  flashRowId: { type: [String, Number], default: null }
 })
 
 const emit = defineEmits(['row-click'])
@@ -28,7 +28,7 @@ const pageRows = ref(10)
 
 const rowClass = computed(() => {
   const id = props.flashRowId
-  return (row) => row.serviceRequestId === id ? 'row-flash' : null
+  return (row) => String(row.serviceRequestId) === String(id) ? 'row-flash' : null
 })
 
 function formatDate(dateStr) {
@@ -111,7 +111,7 @@ function formatDate(dateStr) {
         v-for="request in rows"
         :key="request.serviceRequestId"
         class="request-card"
-        :class="{ 'row-flash': request.serviceRequestId === flashRowId }"
+        :class="{ 'row-flash': String(request.serviceRequestId) === String(flashRowId) }"
         @click="emit('row-click', { data: request })"
       >
         <div class="card-header">
@@ -131,8 +131,6 @@ function formatDate(dateStr) {
 <style scoped>
 .loading-state, .error-state, .empty-state { padding: 2rem; text-align: center; color: var(--color-text-dim); }
 .request-table-responsive { width: 100%; cursor: pointer; box-shadow: var(--box-shadow-card); border: 1px solid var(--color-border-default); }
-.paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
-.paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }
 .row-actions { display: flex; gap: 0.25rem; }
 .request-cards { display: flex; flex-direction: column; gap: 1rem; }
 .request-card { background: var(--color-background-light); border: 1px solid var(--color-border-default); border-radius: 8px; padding: 1rem; cursor: pointer; transition: box-shadow 0.2s ease; }
