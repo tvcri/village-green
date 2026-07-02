@@ -2,10 +2,14 @@
 <html lang="en" class="app-dark">
   <head>
     <meta charset="UTF-8" />
-    <title>Village Green | Preview</title>
+    <title>Village Green</title>
     <link rel="stylesheet" type="text/css" href="init.css" />
     <link rel="icon" type="image/svg+xml" href="house.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      const _t = localStorage.getItem('vg-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      if (_t !== 'dark') document.documentElement.classList.remove('app-dark')
+    </script>
     <script type="text/javascript" src="./Env.js"></script>
     <script type="module" src="/src/init.js"></script>
   </head>
@@ -13,7 +17,8 @@
 		<div id="loading-mask">
 			<div id="loading">
 				<div id="indicator" class="loading-indicator">
-					<img src="house.svg" alt="House icon" width="48px" height="48px" style="position: relative;bottom: -7px;left: 0px;">
+					<img src="loading.svg" alt="" width="80px" height="80px">
+					<img src="tvcri-logo.svg" alt="TVCRI Logo" width="192px" height="192px">
 					<span id="loading-header">Village Green</span>
 					<div id="loading-text"></div>
 				</div>

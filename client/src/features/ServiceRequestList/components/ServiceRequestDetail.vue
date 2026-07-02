@@ -75,6 +75,22 @@ function formatTimeRange(startStr, finishStr) {
   return `${start} - ${finish}`
 }
 
+const timeDisplay = computed(() => {
+  if (!request.value?.startAt) return null
+  const r = request.value
+  const start = formatTimeOnly(r.startAt)
+  const finish = formatTimeOnly(r.finishAt)
+  if (r.requestNumber == null && r.transportationType === 'Round Trip') {
+    return [
+      { label: 'Start / Arrive', value: [start, formatTimeOnly(r.apptTime)].map(t => t ?? '—').join(' - ') },
+      { label: 'Return / Finish', value: [formatTimeOnly(r.returnTime), finish].map(t => t ?? '—').join(' - ') }
+    ]
+  }
+  return [
+    { label: 'Start / Finish', value: [start, finish].map(t => t ?? '—').join(' / ') }
+  ]
+})
+
 </script>
 
 <template>
@@ -82,7 +98,7 @@ function formatTimeRange(startStr, finishStr) {
     <Card v-if="request" class="detail-card">
       <template #header>
         <div class="card-header-wrapper">
-          <h2 class="card-title">{{ request.serviceName ?? 'Service Request' }}</h2>
+          <h2 class="card-title">{{ `${request.serviceName ?? 'Service Request'} (#${request.requestNumber ?? request.serviceRequestId})` }}</h2>
           <Tag
             v-if="request.status"
             :value="request.status"
@@ -96,7 +112,7 @@ function formatTimeRange(startStr, finishStr) {
           <h3 class="section-header">Member</h3>
           <div v-if="request.memberFullName" class="detail-field">
             <span class="label">Name:</span>
-            <span class="value"><strong>{{ request.memberFullName }}</strong></span>
+            <span class="value">{{ request.memberFullName }}</span>
           </div>
           <template v-if="request.memberAddress">
             <div v-if="request.memberAddress.address" class="detail-field">
@@ -137,7 +153,7 @@ function formatTimeRange(startStr, finishStr) {
           <h3 class="section-header">Volunteer</h3>
           <div class="detail-field">
             <span class="label">Name:</span>
-            <span class="value"><strong>{{ request.volunteerFullName }}</strong></span>
+            <span class="value">{{ request.volunteerFullName }}</span>
           </div>
           <template v-if="request.volunteerAddress">
             <div v-if="request.volunteerAddress.address" class="detail-field">
@@ -187,9 +203,9 @@ function formatTimeRange(startStr, finishStr) {
             <span class="value">{{ formatDateOnly(request.startAt) }}</span>
           </div>
 
-          <div v-if="request.startAt && request.finishAt" class="detail-field">
-            <span class="label">Start/Finish:</span>
-            <span class="value">{{ formatTimeRange(request.startAt, request.finishAt) }}</span>
+          <div v-for="row in timeDisplay" :key="row.label" class="detail-field">
+            <span class="label">{{ row.label }}:</span>
+            <span class="value">{{ row.value }}</span>
           </div>
 
           <div v-if="request.transportationType" class="detail-field">
@@ -266,6 +282,18 @@ function formatTimeRange(startStr, finishStr) {
 <style scoped>
 @import '../../../shared/styles/phone-link.css';
 
+.phone-numbers {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-weight: 600;
+}
+
+.phone-item i {
+  color: var(--color-text-dim);
+  font-size: 0.9rem;
+}
+
 .request-detail {
   padding: 2rem;
 }
@@ -331,6 +359,7 @@ function formatTimeRange(startStr, finishStr) {
 .detail-field .value {
   color: var(--color-text-primary);
   font-size: 1rem;
+  font-weight: 600;
   word-break: break-word;
 }
 
@@ -349,7 +378,7 @@ function formatTimeRange(startStr, finishStr) {
 
 .section {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;

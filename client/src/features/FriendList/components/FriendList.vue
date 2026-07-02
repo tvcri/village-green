@@ -354,6 +354,7 @@ function toggleNotes(event, friendId) {
       v-if="friends !== null && !isLoading"
       :value="sortedFriends"
       class="friend-table desktop-only"
+      row-hover
       stripedRows
       :sortField="sortField"
       :sortOrder="sortOrder"
