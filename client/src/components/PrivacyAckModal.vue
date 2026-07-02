@@ -1,35 +1,38 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { getPrivacyRules, createPrivacyAcknowledgement } from '../features/Admin/api/privacyApi.js'
+import { usePrivacyAck } from '../shared/composables/usePrivacyAck.js'
 
-const visible = ref(false)
+const { needsAck, pendingRulesId, clearAck } = usePrivacyAck()
+
 const rulesHtml = ref('')
-const pendingRulesId = ref(null)
 const acknowledging = ref(false)
 const error = ref(null)
+let loadedForRulesId = null
 
-onMounted(async () => {
-  if (!VG.curUser?.privacyStatus?.needsAck) return
-  pendingRulesId.value = VG.curUser.privacyStatus.pendingRulesId
+// Load (or reload) rules content whenever the modal becomes required.
+// Handles both cold-start and mid-session re-block (new version / interval).
+watch(needsAck, async (blocked) => {
+  if (!blocked) return
+  if (loadedForRulesId === pendingRulesId.value && rulesHtml.value) return
   try {
     const [rules, { marked }] = await Promise.all([getPrivacyRules(), import('marked')])
     rulesHtml.value = marked.parse(rules.content)
-    visible.value = true
+    loadedForRulesId = pendingRulesId.value
   }
   catch (err) {
     console.error('[PrivacyAckModal] Failed to load rules:', err)
   }
-})
+}, { immediate: true })
 
 async function acknowledge() {
   acknowledging.value = true
   error.value = null
   try {
     await createPrivacyAcknowledgement(pendingRulesId.value)
-    VG.curUser.privacyStatus.needsAck = false
-    visible.value = false
+    clearAck()
   }
   catch (err) {
     error.value = 'Failed to record acknowledgement. Please try again.'
@@ -43,7 +46,7 @@ async function acknowledge() {
 
 <template>
   <Dialog
-    v-model:visible="visible"
+    :visible="needsAck"
     modal
     :closable="false"
     :close-on-escape="false"
