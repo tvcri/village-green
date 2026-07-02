@@ -92,7 +92,8 @@ module.exports.getUser = async function getUser (req, res, next) {
   try {
     const projection = ['villageGrants', 'statistics']
     if (req.query.projection) {
-      projection.push(req.query.projection)
+      const extras = Array.isArray(req.query.projection) ? req.query.projection : [req.query.projection]
+      projection.push(...extras)
     }
 
     let response = await UserService.getUserByUserId(req.userObject.userId, projection)

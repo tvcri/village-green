@@ -4295,12 +4295,17 @@ components:
     UserPreferenceQuery:
       name: projection
       in: query
-      description: A query parameter that identifies a UserPreference
+      description: A query parameter that identifies one or more UserPreferences
+      style: form
+      explode: true
       schema:
-        type: string
-        enum:
-        - webPreferences
-        - privacyStatus
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - webPreferences
+          - privacyStatus
     UserProjectionQuery:
       name: projection
       in: query
