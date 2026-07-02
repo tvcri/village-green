@@ -48,14 +48,20 @@ async function acknowledge() {
     modal
     :closable="false"
     :close-on-escape="false"
-    header="Privacy Policy"
     style="width: 600px; max-width: 95vw"
+    :pt="{ mask: { class: 'privacy-modal-mask' } }"
   >
+    <template #header>
+      <div class="privacy-header">
+        <img src="/tvcri-logo.svg" alt="Village Green Logo" class="privacy-logo" />
+        <span>Data Privacy Agreement</span>
+      </div>
+    </template>
     <div class="privacy-content" v-html="rulesHtml" />
     <p v-if="error" class="privacy-error">{{ error }}</p>
     <template #footer>
       <Button
-        label="I Acknowledge"
+        label="I Agree"
         :loading="acknowledging"
         :disabled="acknowledging"
         @click="acknowledge"
@@ -65,6 +71,19 @@ async function acknowledge() {
 </template>
 
 <style scoped>
+.privacy-header {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.75rem;
+  font-size: 2rem;
+  font-weight:700
+}
+
+.privacy-logo {
+  height: 64px;
+  width: auto;
+}
+
 .privacy-content {
   max-height: 60vh;
   overflow-y: auto;

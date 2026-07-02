@@ -30,7 +30,7 @@ const navigateToPrivacy = () => {
       <Button label="Village Access List" @click="navigateToVillageAccess" />
       <Button label="User Access List" @click="navigateToUserAccess" />
       <Button label="Analytics" @click="navigateToAnalytics" />
-      <Button label="Privacy Rules" @click="navigateToPrivacy" />
+      <Button label="Privacy Agreement" @click="navigateToPrivacy" />
     </div>
   </div>
 </template>

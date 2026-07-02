@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import { marked } from 'marked'
@@ -12,9 +13,13 @@ const draftContent = ref('')
 const loading = ref(false)
 const publishing = ref(false)
 const saving = ref(false)
+const previewVisible = ref(false)
 
-const currentHtml = computed(() =>
-  currentRules.value ? marked.parse(currentRules.value.content) : null
+const savedContent = ref('')
+const isDirty = computed(() => draftContent.value !== savedContent.value)
+
+const draftHtml = computed(() =>
+  draftContent.value ? marked.parse(draftContent.value) : ''
 )
 
 onMounted(async () => {
@@ -26,6 +31,7 @@ async function loadRules() {
   try {
     currentRules.value = await getPrivacyRules()
     draftContent.value = currentRules.value?.content ?? ''
+    savedContent.value = draftContent.value
   }
   catch (err) {
     if (err?.status !== 404) {
@@ -42,6 +48,7 @@ async function publish() {
   publishing.value = true
   try {
     currentRules.value = await publishPrivacyRules(draftContent.value)
+    savedContent.value = draftContent.value
     toast.add({ severity: 'success', summary: 'Published', detail: 'New privacy rules version published. All users will be re-prompted.', life: 5000 })
   }
   catch (err) {
@@ -57,6 +64,7 @@ async function saveCorrections() {
   saving.value = true
   try {
     currentRules.value = await patchPrivacyRulesCurrent(draftContent.value)
+    savedContent.value = draftContent.value
     toast.add({ severity: 'success', summary: 'Saved', detail: 'Rules corrected. Existing acknowledgements remain valid.', life: 5000 })
   }
   catch (err) {
@@ -70,23 +78,19 @@ async function saveCorrections() {
 
 <template>
   <div class="privacy-admin">
-    <h1>Privacy Rules</h1>
+    <h1>Privacy Agreement</h1>
 
     <div v-if="loading">Loading…</div>
 
     <template v-else>
-      <section v-if="currentRules" class="current-rules">
-        <h2>Current Published Version</h2>
-        <p class="meta">
-          Published {{ currentRules.publishedAt }}
-          <span v-if="currentRules.modifiedAt"> · Last corrected {{ currentRules.modifiedAt }}</span>
-        </p>
-        <div class="rules-preview" v-html="currentHtml" />
-      </section>
+      <p v-if="currentRules" class="meta">
+        Current version published {{ currentRules.publishedAt }}
+        <span v-if="currentRules.modifiedAt"> · Last corrected {{ currentRules.modifiedAt }}</span>
+      </p>
       <p v-else class="no-rules">No privacy rules have been published yet.</p>
 
       <section class="draft-section">
-        <h2>Draft</h2>
+        <h2>Editor</h2>
         <p class="draft-hint">Edit the content below. "Publish" creates a new version and re-prompts all users. "Save corrections" edits the current version in place — existing acknowledgements remain valid.</p>
         <Textarea
           v-model="draftContent"
@@ -97,10 +101,17 @@ async function saveCorrections() {
         />
         <div class="draft-actions">
           <Button
+            label="Preview"
+            severity="secondary"
+            icon="pi pi-eye"
+            :disabled="!draftContent.trim()"
+            @click="previewVisible = true"
+          />
+          <Button
             label="Save corrections"
             severity="secondary"
             :loading="saving"
-            :disabled="publishing || saving || !draftContent.trim() || !currentRules"
+            :disabled="publishing || saving || !isDirty || !currentRules"
             @click="saveCorrections"
           />
           <Button
@@ -112,6 +123,24 @@ async function saveCorrections() {
         </div>
       </section>
     </template>
+
+    <Dialog
+      v-model:visible="previewVisible"
+      modal
+      :close-on-escape="true"
+      style="width: 600px; max-width: 95vw"
+    >
+      <template #header>
+        <div class="privacy-header">
+          <img src="/tvcri-logo.svg" alt="Village Green Logo" class="privacy-logo" />
+          <span>Data Privacy Agreement</span>
+        </div>
+      </template>
+      <div class="privacy-content" v-html="draftHtml" />
+      <template #footer>
+        <Button label="I Agree" disabled />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -140,16 +169,21 @@ h2 {
   margin: 0 0 1rem 0;
 }
 
-.current-rules {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
-  background: var(--color-background-light);
+.privacy-header {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.75rem;
+  font-size: 2rem;
+  font-weight: 700;
 }
 
-.rules-preview {
-  max-height: 300px;
+.privacy-logo {
+  height: 64px;
+  width: auto;
+}
+
+.privacy-content {
+  max-height: 60vh;
   overflow-y: auto;
   line-height: 1.6;
 }
