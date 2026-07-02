@@ -57,6 +57,11 @@ exports.createPrivacyAcknowledgement = async function (userId, rulesId, tokenCla
   return rows[0]
 }
 
+// Rich per-user status for REPORTING (the `privacyStatus` projection on
+// getUser/getUsers). This is NOT the enforcement path — the auth gate uses the
+// `privacyAckRequired` boolean computed in UserService.getUserObject. Both
+// derive "needs ack?" the same way (current version acked within interval), but
+// this one also returns the last-acked version and timestamp for display.
 exports.getPrivacyStatus = async function (userId) {
   const current = await exports.getPrivacyRules()
   if (!current) {
@@ -67,7 +72,7 @@ exports.getPrivacyStatus = async function (userId) {
     SELECT rulesId, DATE_FORMAT(acknowledgedAt, '%Y-%m-%dT%TZ') AS acknowledgedAt
     FROM privacy_acknowledgement
     WHERE userId = ?
-    ORDER BY acknowledgedAt DESC
+    ORDER BY id DESC
     LIMIT 1`
   const [rows] = await dbUtils.pool.query(sql, [userId])
   const lastAck = rows[0] ?? null

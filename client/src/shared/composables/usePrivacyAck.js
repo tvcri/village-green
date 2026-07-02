@@ -1,17 +1,17 @@
 import { ref } from 'vue'
 
-// Module-scoped singletons. Seeded once from the non-reactive VG global so
-// that mutations flow through Vue reactivity (VG.curUser itself is not reactive).
-const needsAck = ref(globalThis.VG?.curUser?.privacyStatus?.needsAck ?? false)
-const pendingRulesId = ref(globalThis.VG?.curUser?.privacyStatus?.pendingRulesId ?? null)
+// Module-scoped singleton. The block is driven entirely by the API: any 403
+// privacy_ack_required (at bootstrap or mid-session) calls requireAck(). There
+// is no client-side status snapshot to seed from — the API is the source of
+// truth. The modal acknowledges the version it fetched, so no id is tracked here.
+const needsAck = ref(false)
 
 export function usePrivacyAck() {
   function clearAck() {
     needsAck.value = false
   }
-  function requireAck(rulesId) {
-    if (rulesId != null) pendingRulesId.value = rulesId
+  function requireAck() {
     needsAck.value = true
   }
-  return { needsAck, pendingRulesId, clearAck, requireAck }
+  return { needsAck, clearAck, requireAck }
 }

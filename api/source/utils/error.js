@@ -37,12 +37,12 @@ class PrivilegeError extends SmError {
 }
 
 class PrivacyAckRequiredError extends SmError {
-  constructor(pendingRulesId) {
-    // message becomes the client-facing `error` discriminator; the handler
-    // reads message + detail directly (it does not call toJSON()).
+  constructor() {
+    // message is the client-facing `error` discriminator the interceptor matches
+    // on. No detail needed: the client fetches the current rules itself and acks
+    // the version it displays — the API is the source of truth.
     super('privacy_ack_required')
     this.status = 403
-    this.detail = { pendingRulesId }
   }
 }
 

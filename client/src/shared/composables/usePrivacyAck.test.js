@@ -1,15 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 describe('usePrivacyAck', () => {
-  beforeEach(() => {
-    globalThis.VG = { curUser: { privacyStatus: { needsAck: true, pendingRulesId: 7 } } }
-  })
-
-  it('seeds needsAck and pendingRulesId from VG.curUser on first import', async () => {
+  it('defaults to unblocked (no client-side seed; the API drives the block)', async () => {
     const { usePrivacyAck } = await import('./usePrivacyAck.js')
-    const { needsAck, pendingRulesId } = usePrivacyAck()
-    expect(needsAck.value).toBe(true)
-    expect(pendingRulesId.value).toBe(7)
+    const { needsAck } = usePrivacyAck()
+    expect(needsAck.value).toBe(false)
   })
 
   it('clearAck() sets needsAck false', async () => {
@@ -19,14 +14,13 @@ describe('usePrivacyAck', () => {
     expect(needsAck.value).toBe(false)
   })
 
-  it('requireAck(rulesId) sets needsAck true and updates pendingRulesId; shared across calls', async () => {
+  it('requireAck() sets needsAck true; shared across calls (singleton)', async () => {
     const { usePrivacyAck } = await import('./usePrivacyAck.js')
     const a = usePrivacyAck()
     a.clearAck()
     const b = usePrivacyAck()
-    b.requireAck(42)
-    // same singleton refs → a sees b's change
+    b.requireAck()
+    // same singleton ref → a sees b's change
     expect(a.needsAck.value).toBe(true)
-    expect(a.pendingRulesId.value).toBe(42)
   })
 })

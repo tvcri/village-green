@@ -23,6 +23,32 @@ export class ApiError extends Error {
 }
 
 /**
+ * Thrown when a request is rejected by the privacy-acknowledgement gate
+ * (403 privacy_ack_required). The gate is already handled by the time this
+ * throws — usePrivacyAck().requireAck() has flipped the reactive block and the
+ * ack modal (re)opens. It is thrown (rather than returning null) so callers
+ * never dereference a poisoned result; callers should let it propagate and use
+ * isPrivacyAckError() to skip their own generic error UX.
+ */
+export class PrivacyAckError extends ApiError {
+  constructor(url, body) {
+    super('privacy_ack_required', 403, url, body)
+    this.name = 'PrivacyAckError'
+  }
+}
+
+/**
+ * True when an error is the privacy-ack gate (handled globally by the ack
+ * modal). Callers use this in their catch blocks to suppress their own
+ * "failed to…" toast/UI for a request that was intercepted, not truly failed.
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+export function isPrivacyAckError(err) {
+  return err instanceof PrivacyAckError
+}
+
+/**
  * Extracts the HTTP status code from an error, regardless of its shape.
  * Works with ApiError (err.status) and any other error that carries a status.
  * @param {unknown} err
@@ -60,11 +86,12 @@ async function doFetch(url, opts) {
     }
     // Privacy acknowledgement gate: flip the reactive block so the router-view
     // unmounts and the ack modal (re)opens. Idempotent across concurrent 403s.
-    // This error is fully handled here — return null instead of throwing so it
-    // never reaches callers or the global error modal (the ack modal is the UX).
+    // Throw a distinct PrivacyAckError (rather than returning null) so callers
+    // never dereference a poisoned result; the global error modal and per-caller
+    // "failed" UX suppress it via isPrivacyAckError() (the ack modal is the UX).
     if (res.status === 403 && errorBody && errorBody.error === 'privacy_ack_required') {
-      usePrivacyAck().requireAck(errorBody.detail?.pendingRulesId ?? null)
-      return null
+      usePrivacyAck().requireAck()
+      throw new PrivacyAckError(url, errorBody)
     }
     // dev note: if not using useAsyncState you are responsible for handling the error
     throw new ApiError(`HTTP ${res.status}`, res.status, url, errorBody)

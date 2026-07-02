@@ -8,7 +8,9 @@ import Breadcrumbs from './components/Breadcrumbs.vue'
 import { useOidcWorker } from './auth/useOidcWorker.js'
 import GlobalErrorModal from './components/global/GlobalErrorModal.vue'
 import PrivacyAckModal from './components/PrivacyAckModal.vue'
+import { usePrivacyAck } from './shared/composables/usePrivacyAck.js'
 
+const { needsAck } = usePrivacyAck()
 const oidcWorker = useOidcWorker()
 const version = computed(() => VG?.Env?.version || '')
 const isDev = VG?.Env?.nodeEnv === 'development'
@@ -45,7 +47,7 @@ onMounted(() => {
     <Breadcrumbs />
 
     <main class="app-main">
-      <router-view v-slot="{ Component }">
+      <router-view v-if="!needsAck" v-slot="{ Component }">
         <keep-alive include="MetaServiceRequestList,VillageServiceRequestList,MemberList,VolunteerList,PersonList">
           <component :is="Component" />
         </keep-alive>

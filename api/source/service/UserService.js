@@ -324,6 +324,12 @@ exports.getUsers = async function(username, usernameMatch, privilege, status, pr
       privilege,
       status
     }, elevate, userObject)
+    if (projection?.includes('privacyStatus') && rows.length) {
+      const PrivacyService = require('./PrivacyService')
+      await Promise.all(rows.map(async row => {
+        row.privacyStatus = await PrivacyService.getPrivacyStatus(row.userId)
+      }))
+    }
     return (rows)
   }
   catch(err) {
@@ -551,13 +557,33 @@ exports.getUserObject = async function (username) {
         and cgDirect.userId is null
         and ud3.userId = ud.userId) dt
     where
-      dt.rn = 1) dt2) as grants     
+      dt.rn = 1) dt2) as grants,
+    -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
+    -- published and the user has no acknowledgement of the current version within
+    -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
+    (
+      case
+        when (select id from privacy_rules order by id desc limit 1) is null then 0
+        when exists (
+          select 1
+          from privacy_acknowledgement pa
+          where pa.userId = ud.userId
+            and pa.rulesId = (select id from privacy_rules order by id desc limit 1)
+            and pa.acknowledgedAt > (UTC_TIMESTAMP() - INTERVAL ? DAY)
+        ) then 0
+        else 1
+      end
+    ) as privacyAckRequired
   from
     user_data ud
   where
     ud.username = ?`
-  const [rows] = await dbUtils.pool.query(sql, [username])
-  return rows[0]
+  const [rows] = await dbUtils.pool.query(sql, [config.privacy.ackIntervalDays, username])
+  const row = rows[0]
+  if (row) {
+    row.privacyAckRequired = row.privacyAckRequired === 1
+  }
+  return row
 }
 
 exports.getUserWebPreferences = async function (userId) {

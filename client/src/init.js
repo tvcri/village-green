@@ -408,12 +408,23 @@ async function setupServiceWorker() {
 }
 
 async function getUserObject() {
-  const response = await fetch(`${VG.Env.apiBase}/user?projection=webPreferences&projection=privacyStatus`, {
+  const response = await fetch(`${VG.Env.apiBase}/user?projection=webPreferences`, {
     headers: {
       Authorization: `Bearer ${VG.oidcWorker.token}`,
     },
   })
   const user = await response.json()
+
+  // The privacy-ack gate blocks every endpoint (including /user) until the user
+  // acknowledges. On that 403, raise the ack block and return a minimal user so
+  // the app shell can mount — App.vue hides the router-view (v-if="!needsAck")
+  // and the ack modal takes over. The user is re-fetched after acknowledging.
+  if (response.status === 403 && user?.error === 'privacy_ack_required') {
+    const { usePrivacyAck } = await import('./shared/composables/usePrivacyAck.js')
+    usePrivacyAck().requireAck()
+    return { villageGrants: [] }
+  }
+
   user.villageGrants.sort((a, b) => {
     const nameA = a.village.name
     const nameB = b.village.name

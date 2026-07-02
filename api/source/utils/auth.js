@@ -3,7 +3,6 @@ const logger = require('./logger')
 const jwt = require('jsonwebtoken')
 const retry = require('async-retry')
 const UserService = require(`../service/UserService`)
-const PrivacyService = require('../service/PrivacyService')
 const SmError = require('./error')
 const state = require('./state')
 const JWKSCache = require('./jwksCache')
@@ -161,17 +160,20 @@ const setupUser = async function (req, res, next) {
     }
 }
 
-// Paths reachable even when the user still owes a privacy acknowledgement.
-// Matched against req.path (sub-path under the /api mount).
+// The only endpoints reachable while a user owes a privacy acknowledgement.
+// These are not conveniences — each is structurally required to bootstrap the
+// client or to escape the block. Everything else 403s. Matched against req.path
+// (the sub-path under the /api mount).
+//   - GET  /op/definition          client can't build its API layer without the spec
+//   - GET  /privacy/rules          the modal needs the agreement text to display
+//   - POST /privacy/acknowledgements  the act that clears the block (gating it deadlocks)
 const privacyAckAllowlist = [
+    { method: 'GET', path: '/op/definition' },
     { method: 'GET', path: '/privacy/rules' },
     { method: 'POST', path: '/privacy/acknowledgements' },
-    { method: 'GET', path: '/user' },
 ]
 
 function isPrivacyAckAllowlisted(req) {
-    // Operational/spec endpoints used during bootstrap are always allowed.
-    if (req.path === '/op/definition' || req.path.startsWith('/op/')) return true
     return privacyAckAllowlist.some(
         entry => entry.method === req.method && entry.path === req.path
     )
@@ -186,9 +188,10 @@ const requirePrivacyAck = async function (req, res, next) {
         if (!req.userObject?.userId) return next()
         if (isPrivacyAckAllowlisted(req)) return next()
 
-        const status = await PrivacyService.getPrivacyStatus(req.userObject.userId)
-        if (status.needsAck) {
-            throw new SmError.PrivacyAckRequiredError(status.pendingRulesId)
+        // privacyAckRequired is precomputed by setupUser via getUserObject — no
+        // extra query here. The gate is a plain boolean read.
+        if (req.userObject.privacyAckRequired) {
+            throw new SmError.PrivacyAckRequiredError()
         }
         next()
     }

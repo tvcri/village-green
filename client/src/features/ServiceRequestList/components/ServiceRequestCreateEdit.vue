@@ -15,7 +15,7 @@ import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
 import Popover from 'primevue/popover'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { apiCall } from '../../../shared/api/apiClient.js'
+import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
@@ -568,6 +568,9 @@ const handleSubmit = async (notify = false) => {
       resetForNewRequest()
     }
   } catch (err) {
+    // Privacy-ack gate already handled globally (ack modal opens); skip the
+    // misleading "failed" toast for a request that was intercepted, not failed.
+    if (isPrivacyAckError(err)) return
     console.error(err)
     toast.add({
       severity: 'error',
@@ -615,6 +618,7 @@ const handleComplete = async () => {
     }, 500)
   } catch (err) {
     statusOverride.value = null
+    if (isPrivacyAckError(err)) return
     console.error(err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to complete service request', life: 5000 })
   } finally {
@@ -634,6 +638,7 @@ const handleDeleteDraft = async () => {
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
+    if (isPrivacyAckError(err)) return
     console.error(err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete draft', life: 5000 })
   } finally {
@@ -652,6 +657,7 @@ const handleCancelRequest = async (reason) => {
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
+    if (isPrivacyAckError(err)) return
     console.error(err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to cancel service request', life: 5000 })
   } finally {

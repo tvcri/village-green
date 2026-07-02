@@ -4321,6 +4321,7 @@ components:
           enum:
           - villageGrants
           - statistics
+          - privacyStatus
           - userGroups
           - webPreferences
     UserStatusQuery:
