@@ -19,11 +19,17 @@ exports.getPrivacyRules = async function () {
   return rows[0] ?? null
 }
 
-exports.publishPrivacyRules = async function (content, userId) {
-  const sql = `
-    INSERT INTO privacy_rules (content, publishedAt, publishedByUserId)
-    VALUES (?, UTC_TIMESTAMP(), ?)`
-  await dbUtils.pool.query(sql, [content, userId])
+exports.publishPrivacyRules = async function (content, userId, tokenClaims) {
+  const [result] = await dbUtils.pool.query(
+    `INSERT INTO privacy_rules (content, publishedAt, publishedByUserId)
+     VALUES (?, UTC_TIMESTAMP(), ?)`,
+    [content, userId]
+  )
+  // Auto-acknowledge on behalf of the publisher: authoring a version implies
+  // agreement, so the admin who publishes never needs to see the ack modal.
+  // Ack the exact row just created (result.insertId), not "current", to avoid
+  // a race with a concurrent publish.
+  await exports.createPrivacyAcknowledgement(userId, result.insertId, tokenClaims)
   return exports.getPrivacyRules()
 }
 

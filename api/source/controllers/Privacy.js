@@ -28,7 +28,8 @@ module.exports.getPrivacyRules = async function getPrivacyRules(req, res, next) 
 module.exports.publishPrivacyRules = async function publishPrivacyRules(req, res, next) {
   try {
     if (!req.userObject.privileges?.admin) throw new SmError.PrivilegeError()
-    const rules = await PrivacyService.publishPrivacyRules(req.body.content, req.userObject.userId)
+    const tokenClaims = filterTokenClaims(req.access_token)
+    const rules = await PrivacyService.publishPrivacyRules(req.body.content, req.userObject.userId, tokenClaims)
     res.status(201).json(rules)
   }
   catch (err) {
