@@ -3,6 +3,7 @@ const logger = require('./logger')
 const jwt = require('jsonwebtoken')
 const retry = require('async-retry')
 const UserService = require(`../service/UserService`)
+const PrivacyService = require('../service/PrivacyService')
 const SmError = require('./error')
 const state = require('./state')
 const JWKSCache = require('./jwksCache')
@@ -160,6 +161,42 @@ const setupUser = async function (req, res, next) {
     }
 }
 
+// Paths reachable even when the user still owes a privacy acknowledgement.
+// Matched against req.path (sub-path under the /api mount).
+const privacyAckAllowlist = [
+    { method: 'GET', path: '/privacy/rules' },
+    { method: 'POST', path: '/privacy/acknowledgements' },
+    { method: 'GET', path: '/user' },
+]
+
+function isPrivacyAckAllowlisted(req) {
+    // Operational/spec endpoints used during bootstrap are always allowed.
+    if (req.path === '/op/definition' || req.path.startsWith('/op/')) return true
+    return privacyAckAllowlist.some(
+        entry => entry.method === req.method && entry.path === req.path
+    )
+}
+
+// express middleware: block protected requests when the caller owes a
+// privacy acknowledgement. Fail-closed — anything not allowlisted is blocked.
+// Expects to run after setupUser().
+const requirePrivacyAck = async function (req, res, next) {
+    try {
+        // No authenticated user (no token) → let auth/security layers handle it.
+        if (!req.userObject?.userId) return next()
+        if (isPrivacyAckAllowlisted(req)) return next()
+
+        const status = await PrivacyService.getPrivacyStatus(req.userObject.userId)
+        if (status.needsAck) {
+            throw new SmError.PrivacyAckRequiredError(status.pendingRulesId)
+        }
+        next()
+    }
+    catch (e) {
+        next(e)
+    }
+}
+
 // express-openapi-validator security handler
 const validateOauthSecurity = function (req, requiredScopes) {
     if (!req.access_token) {
@@ -307,6 +344,7 @@ async function initializeAuth() {
 module.exports = {
     validateToken,
     setupUser,
+    requirePrivacyAck,
     validateOauthSecurity,
     validateWebhookBearer,
     initializeAuth,
