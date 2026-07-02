@@ -12,6 +12,7 @@ export function buildMembership (plan, content, rng) {
   const disability = content.services.disabilities.map((name, i) => ({ id: i + 1, name }))
   const vetting_type = content.services.vettingTypes.map((v, i) => ({ id: i + 1, name: v.type || v }))
   const dropReasons = content.services.memberDropReasons
+  const serviceNotes = content.services.memberServiceNotes || []
 
   const member = []
   const volunteer = []
@@ -35,6 +36,8 @@ export function buildMembership (plan, content, rng) {
         status: inactive ? rng.pick(['Inactive', 'Dropped']) : 'Active',
         drop_reason: inactive ? rng.pick(dropReasons) : null,
         household_size: rng.int(1, 2),
+        // standing mobility/quirk notes; requests echo these as instructions
+        service_notes: serviceNotes.length && rng.bool(0.35) ? rng.pick(serviceNotes) : null,
       })
     }
     // ~1 household per village: link a second member to a primary as 'Spouse'

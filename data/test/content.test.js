@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { SERVICE_CATEGORIES } from '../generator/constants.js'
 
 const load = (name) =>
   JSON.parse(readFileSync(fileURLToPath(new URL(`../content/${name}`, import.meta.url)), 'utf8'))
@@ -13,12 +14,17 @@ const CAPS = new Set(['Circles', 'Errands', 'Friends', 'Governance', 'Healthcare
 
 test('services.json has the expected shape and valid capabilities', () => {
   const s = load('services.json')
-  assert.ok(Array.isArray(s.serviceNames) && s.serviceNames.length >= 40)
-  for (const sn of s.serviceNames) {
-    assert.equal(typeof sn.serviceName, 'string')
-    assert.ok(CAPS.has(sn.capability), `bad capability: ${sn.capability}`)
+  assert.ok(Array.isArray(s.catalog) && s.catalog.length >= 40)
+  for (const e of s.catalog) {
+    assert.equal(typeof e.description, 'string')
+    assert.ok(CAPS.has(e.capability), `bad capability: ${e.capability}`)
+    // serviceName is a UI serviceNameOptions value, or null = not a service request
+    assert.ok(e.serviceName === null || SERVICE_CATEGORIES.includes(e.serviceName),
+      `bad serviceName on "${e.description}": ${e.serviceName}`)
   }
-  assert.ok(Array.isArray(s.transportationTypes) && s.transportationTypes.length >= 4)
+  // enough request-eligible entries to drive a varied pool
+  assert.ok(s.catalog.filter(e => e.serviceName).length >= 40)
+  assert.ok(Array.isArray(s.memberServiceNotes) && s.memberServiceNotes.length >= 8)
   assert.ok(Array.isArray(s.memberDropReasons) && s.memberDropReasons.length >= 5)
   assert.ok(Array.isArray(s.vettingTypes) && s.vettingTypes.length >= 3)
   assert.ok(Array.isArray(s.disabilities) && s.disabilities.length >= 5)

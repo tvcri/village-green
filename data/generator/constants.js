@@ -10,6 +10,22 @@ export const CAPABILITIES = [
 
 export const ROLE = { restricted: 1, full: 2, manage: 3, owner: 4 }
 
+// service_request.service_name values are UI-enforced (serviceNameOptions in
+// ServiceRequestCreateEdit.vue) — keep this list in sync with the client.
+export const SERVICE_CATEGORIES = [
+  'Ride: Medical Appnt', 'Ride: Shopping', 'Ride: Activity/Event', 'Ride: Personal Care',
+  'Ride: Other', 'Tech Support', 'Household Chores/Handy Help',
+  'Errand: Shopping', 'Errand: Pick up/delivery', 'Errand: Other',
+]
+// The UI hides destination/address/city/phone for these (noLocationServices).
+export const NO_LOCATION_SERVICES = ['Tech Support', 'Household Chores/Handy Help']
+// Rides must be Round Trip or One Way; everything else is 'None' (UI watcher).
+export const TRANSPORT_RIDE_W = [['Round Trip', 4], ['One Way', 1]]
+
+export const RI_STREETS = ['Benefit St', 'Thayer St', 'Hope St', 'Wickenden St', 'Atwells Ave',
+  'Westminster St', 'Spooner St', 'Water St', 'Bellevue Ave', 'Ocean Dr', 'Federal Hill',
+  'Angell St', 'Power St', 'College St', 'Elmgrove Ave', 'Broadway', 'Smith St']
+
 // 10 villages; the two 'big' ones must reach 50+ members AND 50+ volunteers.
 export const VILLAGES = [
   { name: 'Arkham', size: 'big', theme: 'lovecraft-health' },

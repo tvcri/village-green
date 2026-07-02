@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { makeRng } from '../generator/rng.js'
-import { VILLAGES, ROLE } from '../generator/constants.js'
+import { VILLAGES, ROLE, SERVICE_CATEGORIES, NO_LOCATION_SERVICES } from '../generator/constants.js'
 import { buildVillagesAndUsers } from '../generator/builders/villages.js'
 import { buildPersons } from '../generator/builders/persons.js'
 import { buildMembership } from '../generator/builders/membership.js'
@@ -116,6 +116,49 @@ test('service requests honor deriveStatus and reference valid people', () => {
   // a spread of statuses is present
   const seen = new Set(ds.service_request.map(s => s.status))
   for (const s of ['Open', 'Confirmed', 'Completed', 'Draft']) assert.ok(seen.has(s), `missing status ${s}`)
+})
+
+test('service requests match the UI-enforced category/transport/location rules', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const noteByPerson = Object.fromEntries(ds.member.filter(m => m.service_notes).map(m => [m.person_id, m.service_notes]))
+  for (const sr of ds.service_request) {
+    assert.ok(SERVICE_CATEGORIES.includes(sr.service_name), `bad category ${sr.service_name}`)
+    const isRide = sr.service_name.startsWith('Ride:')
+    if (isRide) {
+      assert.ok(['Round Trip', 'One Way'].includes(sr.transportation_type), `ride needs RT/OW, got ${sr.transportation_type}`)
+      assert.ok(sr.destination, 'rides require a destination')
+    } else {
+      assert.equal(sr.transportation_type, 'None')
+    }
+    if (NO_LOCATION_SERVICES.includes(sr.service_name)) {
+      for (const f of ['destination', 'address', 'city', 'state', 'zip', 'phone']) {
+        assert.equal(sr[f], null, `${sr.service_name} must not set ${f}`)
+      }
+    } else {
+      // grid shows Destination + City columns — both must render
+      assert.ok(sr.destination, 'location services need a destination')
+      assert.ok(sr.city, 'location services need a city')
+      assert.ok(sr.address, 'location services need an address')
+    }
+    // UI time flow: RT = Start -> Arrival -> Return -> Finish; otherwise no appt/return
+    assert.ok(sr.start_at <= sr.finish_at)
+    if (sr.transportation_type === 'Round Trip') {
+      assert.ok(sr.appt_time && sr.return_time, 'round trips seed arrival + return')
+      assert.ok(sr.start_at < sr.appt_time && sr.appt_time < sr.return_time && sr.return_time < sr.finish_at,
+        `RT time order: ${sr.start_at} ${sr.appt_time} ${sr.return_time} ${sr.finish_at}`)
+    } else {
+      assert.equal(sr.appt_time, null)
+      assert.equal(sr.return_time, null)
+    }
+    // instructions echo the member's standing service note (or are absent)
+    if (sr.instructions) assert.equal(sr.instructions, noteByPerson[sr.member_person_id])
+  }
+  // flavor made it through: some members carry service notes, echoed on requests
+  assert.ok(ds.member.some(m => m.service_notes), 'some members should have service_notes')
+  assert.ok(ds.service_request.some(s => s.instructions), 'some requests should echo member notes')
+  // both trip types and a few date-only non-rides appear
+  const tt = new Set(ds.service_request.map(s => s.transportation_type))
+  for (const t of ['Round Trip', 'One Way', 'None']) assert.ok(tt.has(t), `missing transport ${t}`)
 })
 
 test('notifications reference requests; recipients is a JSON string', () => {

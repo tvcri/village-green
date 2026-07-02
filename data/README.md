@@ -1,6 +1,6 @@
 # Village Green — demo dataset generator
 
-Deterministic demo data for Village Green: 296 RI-history/lore figures, 116 gag service requests, spread across 10 villages. The dataset is fixed-seed so the same records load every time.
+Deterministic demo data for Village Green: a roster of 296 RI-history/lore figures (116 of them gag cameos with bespoke service requests), spread across 10 villages. The dataset is fixed-seed so the same records load every time.
 
 ## Prerequisites
 
@@ -88,25 +88,37 @@ vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:
 
 | Username | Village | Role / notes |
 |---|---|---|
+| `admin` | all 10 | **Admin** privilege + **Owner** grant on every village (the mock-OIDC form's default username) |
 | `samuel.slater@millworks.test` | — | **Admin** privilege (realm role `admin`), no village grants — sees all villages via elevate |
 | `roger.williams@providence.test` | Arkham | Owner |
 | `hp.lovecraft@miskatonic.test` | Arkham | Full |
 | `peter.griffin@quahog.test` | Quahog | Owner |
 | `john.brown@brownbros.test` | Quahog + Innsmouth + Arkham | Full ×3 — exercises the **meta roll-up** (3+ villages) |
-| `nathanael.greene@newport.test` | Newport | Manage |
+| `nathanael.greene@newport.test` | Oldport | Manage |
 | `gilbert.stuart@gmail.test` | Quahog | Restricted |
-| `ann.franklin@providence.test` | Providence | Full (steward) |
-| `ida.lewis@lighthouse.test` | Newport | Full (steward) |
+| `ann.franklin@providence.test` | New York System | Full (steward) |
+| `ida.lewis@lighthouse.test` | Oldport | Full (steward) |
 | `obed.marsh@innsmouth.test` | Innsmouth | Full (steward) |
 | `richard.pickman@kingsport.test` | Kingsport | Full (steward) |
 | `wilbur.whateley@dunwich.test` | Dunwich | Full (steward) |
-| `betty.bett@chepachet.test` | Chepachet | Full (steward) |
-| `abraham.whipple@pawtuxet.test` | Pawtuxet | Full (steward) |
-| `roger.mowry@cabinet.test` | Cabinet, RI | Full (steward) |
+| `betty.bett@chepachet.test` | Chipwhich | Full (steward) |
+| `abraham.whipple@pawtuxet.test` | Pawstuxnet | Full (steward) |
+| `roger.mowry@cabinet.test` | Cabinet | Full (steward) |
 | `mr.calimari@quahog.test` | — | No grants — valid login, sees nothing |
+
+## How the dataset is built
+
+Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows; ~35% of members get a standing `service_notes`) **→ service requests + FCV submissions**.
+
+Service requests are built in two passes:
+
+1. **Gag pass** — each gag-tagged figure who landed as a member gets one bespoke request from their `gag` block in `people.json`. The free-text gag title is keyword-mapped onto a real UI service name, title + blurb become the `description`, and the gag's destination is used as-is.
+2. **Volume pass** — each village gets ≈ 0.8 × its active-member count of ordinary requests: a random active member × a weighted-random `catalog` entry (`Ride: Medical Appnt` ×6, other rides ×3 — prod is medical-ride-heavy) × a random destination from a pool matched to the service (medical → Miskatonic Health, shopping → grocery/food landmarks, personal care → the barber, activities → landmarks).
+
+Field rules mirror the client UI (`ServiceRequestCreateEdit.vue`): `service_name` is always one of the ten `serviceNameOptions`; rides are `Round Trip` (~80%) or `One Way`, everything else `None`; Tech Support and Household Chores/Handy Help set no location fields, all others get destination/address/city/state; Round Trips carry `appt_time`/`return_time` in Start → Arrival → Return → Finish slot order. A member's `service_notes` is echoed into `instructions` on every one of that member's requests, matching how prod repeats standing mobility notes.
 
 ## Determinism
 
-The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 296 persons, 116 service request gags, households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
+The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 295 persons, ~200 service requests (105 of them bespoke gags), households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
 
 The cameos are real Rhode Island historical figures and Lovecraft-lore characters, with gag service requests written to match their biographies.

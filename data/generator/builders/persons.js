@@ -1,4 +1,4 @@
-import { VILLAGES } from '../constants.js'
+import { VILLAGES, RI_STREETS } from '../constants.js'
 
 // Target member/volunteer counts per village size. Members and volunteers are
 // mostly DISTINCT people (members receive services; volunteers provide them).
@@ -9,9 +9,6 @@ const SIZE = {
   tiny: { members: 3, volunteers: 2 },
 }
 
-const RI_STREETS = ['Benefit St', 'Thayer St', 'Hope St', 'Wickenden St', 'Atwells Ave',
-  'Westminster St', 'Spooner St', 'Water St', 'Bellevue Ave', 'Ocean Dr', 'Federal Hill',
-  'Angell St', 'Power St', 'College St', 'Elmgrove Ave', 'Broadway', 'Smith St']
 const RI_TOWNS = { Arkham: 'Arkham', Quahog: 'Quahog', 'New York System': 'Providence',
   Oldport: 'Newport', Innsmouth: 'Innsmouth', Kingsport: 'Kingsport', Dunwich: 'Dunwich',
   Chipwhich: 'Chepachet', Pawstuxnet: 'Warwick', Cabinet: 'Glocester' }
