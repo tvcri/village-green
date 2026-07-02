@@ -60,8 +60,11 @@ async function doFetch(url, opts) {
     }
     // Privacy acknowledgement gate: flip the reactive block so the router-view
     // unmounts and the ack modal (re)opens. Idempotent across concurrent 403s.
+    // This error is fully handled here — return null instead of throwing so it
+    // never reaches callers or the global error modal (the ack modal is the UX).
     if (res.status === 403 && errorBody && errorBody.error === 'privacy_ack_required') {
       usePrivacyAck().requireAck(errorBody.detail?.pendingRulesId ?? null)
+      return null
     }
     // dev note: if not using useAsyncState you are responsible for handling the error
     throw new ApiError(`HTTP ${res.status}`, res.status, url, errorBody)

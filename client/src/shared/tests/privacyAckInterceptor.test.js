@@ -17,7 +17,7 @@ describe('apiClient privacy-ack 403 interceptor', () => {
     }
   })
 
-  it('flips privacy ack gate on 403 privacy_ack_required and still throws', async () => {
+  it('flips the gate on 403 privacy_ack_required and resolves null (does NOT throw)', async () => {
     const { needsAck, pendingRulesId, clearAck } = usePrivacyAck()
     clearAck() // ensure starting state
     fetchMock.mockResolvedValueOnce({
@@ -25,7 +25,9 @@ describe('apiClient privacy-ack 403 interceptor', () => {
       status: 403,
       text: async () => JSON.stringify({ error: 'privacy_ack_required', detail: { pendingRulesId: 9 } }),
     })
-    await expect(api.get('/villages')).rejects.toMatchObject({ status: 403 })
+    // The interceptor fully handles this (opens the ack modal via the gate),
+    // so it must NOT propagate as an error to callers / the global error modal.
+    await expect(api.get('/villages')).resolves.toBeNull()
     expect(needsAck.value).toBe(true)
     expect(pendingRulesId.value).toBe(9)
   })
