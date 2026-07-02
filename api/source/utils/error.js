@@ -36,6 +36,16 @@ class PrivilegeError extends SmError {
   }
 }
 
+class PrivacyAckRequiredError extends SmError {
+  constructor(pendingRulesId) {
+    // message becomes the client-facing `error` discriminator; the handler
+    // reads message + detail directly (it does not call toJSON()).
+    super('privacy_ack_required')
+    this.status = 403
+    this.detail = { pendingRulesId }
+  }
+}
+
 class NotFoundError extends SmError {
   constructor(detail) {
     super('Resource not found.')
@@ -160,6 +170,7 @@ module.exports = {
   SmError,
   AuthorizeError,  
   PrivilegeError,
+  PrivacyAckRequiredError,
   NotFoundError,
   ClientError,
   UnprocessableError,
