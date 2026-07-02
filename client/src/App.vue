@@ -7,6 +7,7 @@ import HeaderMenu from './components/HeaderMenu.vue'
 import Breadcrumbs from './components/Breadcrumbs.vue'
 import { useOidcWorker } from './auth/useOidcWorker.js'
 import GlobalErrorModal from './components/global/GlobalErrorModal.vue'
+import PrivacyAckModal from './components/PrivacyAckModal.vue'
 
 const oidcWorker = useOidcWorker()
 const version = computed(() => VG?.Env?.version || '')
@@ -22,6 +23,7 @@ onMounted(() => {
   <div class="app-container">
     <Toast />
     <GlobalErrorModal />
+    <PrivacyAckModal />
     <ReauthPrompt
       v-if="oidcWorker.noTokenMessage.value"
       :redirect-oidc="oidcWorker.noTokenMessage.value?.redirectOidc"

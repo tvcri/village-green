@@ -408,7 +408,7 @@ async function setupServiceWorker() {
 }
 
 async function getUserObject() {
-  const response = await fetch(`${VG.Env.apiBase}/user?projection=webPreferences`, {
+  const response = await fetch(`${VG.Env.apiBase}/user?projection=webPreferences&projection=privacyStatus`, {
     headers: {
       Authorization: `Bearer ${VG.oidcWorker.token}`,
     },
