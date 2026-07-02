@@ -1,9 +1,15 @@
 'use strict';
 
+const mysql = require('mysql2/promise')
 const dbUtils = require('./utils')
+const config = require('../utils/config')
 const SmError = require('../utils/error')
 
 const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
+
+// Escaped inline rather than bound: makeQueryString applies binds positionally
+// across the whole query, and this path is static server config, not user input.
+const NAME_CLAIM_PATH = mysql.escape(`$.${config.oauth.claims.name}`)
 
 function deriveStatus(clientStatus, volunteerPersonId) {
   if (clientStatus === 'Draft' || clientStatus === 'Completed' || CANCELLED_STATUSES.includes(clientStatus)) {
@@ -56,14 +62,18 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.address AS address',
     'sr.city AS city',
     'sr.zip AS zip',
-    'sr.phone AS phone'
+    'sr.phone AS phone',
+    'CAST(sr.created_user_id AS CHAR) AS createdUserId',
+    'ud.username AS createdByUsername',
+    `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`
   ]
   const joins = new Set([
     'service_request sr',
     'LEFT JOIN member m ON sr.member_person_id = m.person_id',
     'LEFT JOIN person mp ON sr.member_person_id = mp.id',
     'LEFT JOIN volunteer vol ON sr.volunteer_person_id = vol.person_id',
-    'LEFT JOIN person vp ON sr.volunteer_person_id = vp.id'
+    'LEFT JOIN person vp ON sr.volunteer_person_id = vp.id',
+    'LEFT JOIN user_data ud ON sr.created_user_id = ud.userId'
   ])
   const predicates = { statements: ['sr.id = ?'], binds: [serviceRequestId] }
 
@@ -147,6 +157,9 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     'sr.city AS city',
     'sr.zip AS zip',
     'sr.phone AS phone',
+    'CAST(sr.created_user_id AS CHAR) AS createdUserId',
+    'ud.username AS createdByUsername',
+    `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`,
     `COALESCE(
       (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.event_type)')}
        FROM notification_event ne
@@ -160,7 +173,8 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     'LEFT JOIN member m ON sr.member_person_id = m.person_id',
     'LEFT JOIN person mp ON sr.member_person_id = mp.id',
     'LEFT JOIN volunteer vol ON sr.volunteer_person_id = vol.person_id',
-    'LEFT JOIN person vp ON sr.volunteer_person_id = vp.id'
+    'LEFT JOIN person vp ON sr.volunteer_person_id = vp.id',
+    'LEFT JOIN user_data ud ON sr.created_user_id = ud.userId'
   ])
   const predicates = { statements: [], binds: [] }
 
@@ -202,7 +216,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
   return rows
 }
 
-module.exports.createServiceRequest = async function (payload) {
+module.exports.createServiceRequest = async function (payload, userId) {
   const convertToMySQLDateTime = (isoString) => {
     if (!isoString) return null
     const date = new Date(isoString)
@@ -234,8 +248,9 @@ module.exports.createServiceRequest = async function (payload) {
           address,
           city,
           zip,
-          phone
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          phone,
+          created_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       const values = [
         payload.villageId,
@@ -256,7 +271,8 @@ module.exports.createServiceRequest = async function (payload) {
         payload.address || null,
         payload.city || null,
         payload.zip || null,
-        payload.phone || null
+        payload.phone || null,
+        userId
       ]
       const [result] = await connection.query(sql, values)
       const serviceRequestId = result.insertId

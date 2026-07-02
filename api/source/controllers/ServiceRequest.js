@@ -31,7 +31,7 @@ module.exports.createServiceRequest = async function createServiceRequest (req, 
   try {
     // The service commits in a transaction and returns the new id; fetch the
     // full record afterward so the read sees committed data.
-    const serviceRequestId = await ServiceRequestService.createServiceRequest(req.body)
+    const serviceRequestId = await ServiceRequestService.createServiceRequest(req.body, req.userObject.userId)
     const response = await ServiceRequestService.getServiceRequest(serviceRequestId)
     res.status(201).json(response)
   }
