@@ -292,7 +292,12 @@ exports.getUserByUserId = async function(userId, projection, elevate, userObject
     let rows = await _this.queryUsers( projection, {
       userId: userId
     }, elevate, userObject)
-    return (rows[0])
+    const result = rows[0]
+    if (result && projection?.includes('privacyStatus')) {
+      const PrivacyService = require('./PrivacyService')
+      result.privacyStatus = await PrivacyService.getPrivacyStatus(result.userId)
+    }
+    return result
   }
   catch(err) {
     throw ( {status: 500, message: err.message, stack: err.stack} )
