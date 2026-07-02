@@ -34,7 +34,7 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
   ])
   const groupBy = ['ud.userId']
 
-  const orderBy = ['ud.username']
+  const orderBy = ['displayName']
 
   // PROJECTIONS
   if (inProjection?.includes('villageGrants')) {
