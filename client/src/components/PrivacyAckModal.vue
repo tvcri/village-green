@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import { marked } from 'marked'
 import { getPrivacyRules, createPrivacyAcknowledgement } from '../features/Admin/api/privacyApi.js'
 
 const visible = ref(false)
@@ -15,7 +14,7 @@ onMounted(async () => {
   if (!VG.curUser?.privacyStatus?.needsAck) return
   pendingRulesId.value = VG.curUser.privacyStatus.pendingRulesId
   try {
-    const rules = await getPrivacyRules()
+    const [rules, { marked }] = await Promise.all([getPrivacyRules(), import('marked')])
     rulesHtml.value = marked.parse(rules.content)
     visible.value = true
   }
