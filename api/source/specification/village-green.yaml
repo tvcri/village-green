@@ -3269,6 +3269,16 @@ components:
           type: string
           format: date-time
           nullable: true
+        createdUserId:
+          $ref: '#/components/schemas/UserIdNullable'
+        createdByUsername:
+          type: string
+          maxLength: 255
+          nullable: true
+        createdByDisplayName:
+          type: string
+          maxLength: 255
+          nullable: true
         startAt:
           type: string
           format: date-time

@@ -349,7 +349,6 @@ const clearFilters = () => {
           <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
         <Button
-          v-if="['open', 'confirmed', 'draft'].includes(data.status?.toLowerCase())"
           icon="pi pi-pencil"
           v-tooltip="'Edit Request'"
           class="p-button-rounded p-button-text p-button-sm"

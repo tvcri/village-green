@@ -227,6 +227,8 @@ const computedStatus = computed(() => {
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
+const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
+
 const formattedCreatedAt = computed(() => {
   if (!form.value.createdAt) return ''
   const d = new Date(form.value.createdAt)
@@ -676,7 +678,7 @@ const handleCancelRequest = async (reason) => {
             <div class="title-row">
               <h2 class="card-title">{{ isEdit ? `Edit Service Request (#${existingRequest?.requestNumber ?? serviceRequestId})` : 'Create Service Request' }}</h2>
             </div>
-            <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}</div>
+            <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}<template v-if="createdByDisplayName"> by {{ createdByDisplayName }}</template></div>
           </div>
           <div class="header-right">
             <Tag
