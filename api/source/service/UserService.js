@@ -81,6 +81,36 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
     columns.push(`ud.webPreferences`)
   }
 
+  if (inProjection?.includes('privacyStatus')) {
+    // Correlated subqueries — one round-trip, no JS merge. needsAck is true
+    // unless the user's latest ack is of the current rules version AND within
+    // the configured interval. ackIntervalDays is a validated positive integer
+    // from server config (never user input), safe to inline as a literal.
+    const intervalDays = config.privacy.ackIntervalDays
+    columns.push(`(
+      select json_object(
+        'needsAck',
+          case
+            when (select id from privacy_rules order by id desc limit 1) is null then false
+            when exists (
+              select 1 from privacy_acknowledgement pa
+              where pa.userId = ud.userId
+                and pa.rulesId = (select id from privacy_rules order by id desc limit 1)
+                and pa.acknowledgedAt > (UTC_TIMESTAMP() - INTERVAL ${intervalDays} DAY)
+            ) then false
+            else true
+          end,
+        'pendingRulesId', (select id from privacy_rules order by id desc limit 1),
+        'lastAckedRulesId',
+          (select pa.rulesId from privacy_acknowledgement pa
+           where pa.userId = ud.userId order by pa.id desc limit 1),
+        'lastAcknowledgedAt',
+          (select date_format(pa.acknowledgedAt, '%Y-%m-%dT%TZ') from privacy_acknowledgement pa
+           where pa.userId = ud.userId order by pa.id desc limit 1)
+      )
+    ) as privacyStatus`)
+  }
+
   // PREDICATES
   let predicates = {
     statements: [],
@@ -292,12 +322,7 @@ exports.getUserByUserId = async function(userId, projection, elevate, userObject
     let rows = await _this.queryUsers( projection, {
       userId: userId
     }, elevate, userObject)
-    const result = rows[0]
-    if (result && projection?.includes('privacyStatus')) {
-      const PrivacyService = require('./PrivacyService')
-      result.privacyStatus = await PrivacyService.getPrivacyStatus(result.userId)
-    }
-    return result
+    return (rows[0])
   }
   catch(err) {
     throw ( {status: 500, message: err.message, stack: err.stack} )
@@ -324,12 +349,6 @@ exports.getUsers = async function(username, usernameMatch, privilege, status, pr
       privilege,
       status
     }, elevate, userObject)
-    if (projection?.includes('privacyStatus') && rows.length) {
-      const PrivacyService = require('./PrivacyService')
-      await Promise.all(rows.map(async row => {
-        row.privacyStatus = await PrivacyService.getPrivacyStatus(row.userId)
-      }))
-    }
     return (rows)
   }
   catch(err) {
