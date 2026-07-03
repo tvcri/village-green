@@ -20,6 +20,7 @@ import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
+import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
 
@@ -226,6 +227,8 @@ const computedStatus = computed(() => {
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
+const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
+
 const formattedCreatedAt = computed(() => {
   if (!form.value.createdAt) return ''
   const d = new Date(form.value.createdAt)
@@ -252,25 +255,51 @@ const seedNext = (field, val, delta = 15) => {
   seedDepth--
 }
 
-watch(() => form.value.startTime, (val) => {
-  if (seedDepth > 0 || val == null || !formLoaded.value) return
+const cascadeFromStart = (val) => {
+  if (val == null) {
+    seedDepth++
+    form.value.apptTime = null
+    form.value.returnTime = null
+    form.value.finishTime = null
+    seedDepth--
+    return
+  }
   seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
-}, { flush: 'sync' })
+}
 
-watch(() => form.value.apptTime, (val) => {
-  if (seedDepth > 0 || val == null || !formLoaded.value) return
+const cascadeFromAppt = (val) => {
+  if (val == null) return
   seedNext('returnTime', val)
-}, { flush: 'sync' })
+}
 
-watch(() => form.value.returnTime, (val) => {
-  if (seedDepth > 0 || val == null || !formLoaded.value) return
+const cascadeFromReturn = (val) => {
+  if (val == null) return
   // Seed finish using the same duration as start→arrival, so the ride home
   // mirrors the outbound leg. Fall back to +15 if start/arrival aren't set.
   const start = form.value.startTime
   const appt = form.value.apptTime
   const delta = (start != null && appt != null) ? (appt - start) : 15
   seedNext('finishTime', val, delta)
+}
+
+watch(() => form.value.startTime, (val) => {
+  if (seedDepth > 0 || !formLoaded.value) return
+  cascadeFromStart(val)
 }, { flush: 'sync' })
+
+watch(() => form.value.apptTime, (val) => {
+  if (seedDepth > 0 || !formLoaded.value) return
+  cascadeFromAppt(val)
+}, { flush: 'sync' })
+
+watch(() => form.value.returnTime, (val) => {
+  if (seedDepth > 0 || !formLoaded.value) return
+  cascadeFromReturn(val)
+}, { flush: 'sync' })
+
+const onStartHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromStart(form.value.startTime) }
+const onApptHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromAppt(form.value.apptTime) }
+const onReturnHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromReturn(form.value.returnTime) }
 
 const serviceNameOptions = [
   'Ride: Medical Appnt',
@@ -320,7 +349,12 @@ const slotsAfter = (after, current) => {
   return timeSlotOptions.filter(o => o.value > after || o.value === current)
 }
 
-const startOptions = computed(() => timeSlotOptions)
+const startOptions = computed(() => [
+  ...timeSlotOptions.filter(o => o.value >= START_OF_DAY),
+  ...timeSlotOptions.filter(o => o.value < START_OF_DAY)
+])
+
+const START_OF_DAY = 7 * 60 // 7:00 AM — open position for start time dropdown
 const apptOptions = computed(() => slotsAfter(form.value.startTime, form.value.apptTime))
 const returnOptions = computed(() => slotsAfter(form.value.apptTime, form.value.returnTime))
 const finishOptions = computed(() =>
@@ -528,6 +562,7 @@ const handleSubmit = async (notify = false) => {
 
     if (isEdit.value) {
       setTimeout(() => {
+        setPendingHighlight(serviceRequestId.value)
         router.push({ name: 'meta-service-requests' })
       }, 500)
     } else {
@@ -554,6 +589,7 @@ const splitButtonModel = computed(() => {
 })
 
 const handleCancel = () => {
+  if (isEdit.value) setPendingHighlight(serviceRequestId.value)
   router.push({ name: 'meta-service-requests' })
 }
 
@@ -576,6 +612,7 @@ const handleComplete = async () => {
     await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: 'Completed' })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request marked as completed', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
@@ -595,6 +632,7 @@ const handleDeleteDraft = async () => {
     await apiCall('deleteServiceRequest', { serviceRequestId: serviceRequestId.value })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Draft deleted', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
@@ -612,6 +650,7 @@ const handleCancelRequest = async (reason) => {
     await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason, notify: true })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request cancelled', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
@@ -633,7 +672,7 @@ const handleCancelRequest = async (reason) => {
             <div class="title-row">
               <h2 class="card-title">{{ isEdit ? `Edit Service Request (#${existingRequest?.requestNumber ?? serviceRequestId})` : 'Create Service Request' }}</h2>
             </div>
-            <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}</div>
+            <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}<template v-if="createdByDisplayName"> by {{ createdByDisplayName }}</template></div>
           </div>
           <div class="header-right">
             <Tag
@@ -786,8 +825,9 @@ const handleCancelRequest = async (reason) => {
                 option-label="label"
                 option-value="value"
                 placeholder="Start time"
-                filter
+                show-clear
                 style="width: 100%;"
+                @hide="onStartHide"
               />
             </div>
 
@@ -799,8 +839,9 @@ const handleCancelRequest = async (reason) => {
                 option-label="label"
                 option-value="value"
                 placeholder="Arrival time"
-                filter
+                show-clear
                 style="width: 100%;"
+                @hide="onApptHide"
               />
             </div>
 
@@ -812,8 +853,9 @@ const handleCancelRequest = async (reason) => {
                 option-label="label"
                 option-value="value"
                 placeholder="Return time"
-                filter
+                show-clear
                 style="width: 100%;"
+                @hide="onReturnHide"
               />
             </div>
 
@@ -825,7 +867,7 @@ const handleCancelRequest = async (reason) => {
                 option-label="label"
                 option-value="value"
                 placeholder="Finish time"
-                filter
+                show-clear
                 style="width: 100%;"
               />
             </div>

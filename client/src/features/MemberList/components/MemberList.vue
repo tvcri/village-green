@@ -1,24 +1,34 @@
 <script setup>
 import { computed, ref, watch, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
+import Button from 'primevue/button'
+import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageMembers } from '../api/memberApi.js'
+import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
 defineOptions({ name: 'MemberList' })
 
 const { trackEvent } = useAnalytics()
+
+const getMemberLevelSeverity = (level) => {
+  if (level === 'Primary') return 'success'
+  if (level === 'Secondary') return 'info'
+  return 'secondary'
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -32,6 +42,7 @@ onMounted(() => {
 const villageId = computed(() => route.params.villageId)
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
+const pageRows = ref(10)
 const sortField = ref('fullName')
 const sortDir = ref('asc')
 
@@ -40,7 +51,13 @@ const { state: members, isLoading, error, execute: fetchMembers } = useAsyncStat
   { immediate: true }
 )
 
-useScrollRestore('members', 'member-detail')
+const { state: persons, execute: fetchPersons } = useAsyncState(
+  () => villageId.value ? getVillagePersons(villageId.value) : null,
+  { immediate: false }
+)
+
+const flashRowId = ref(null)
+const flashTimer = ref(null)
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
 const hasActivatedOnce = ref(false)
@@ -49,6 +66,7 @@ const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => rou
   fetchedByWatch.value = true
   searchText.immediate('')
   fetchMembers()
+  persons.value = null
 })
 onDeactivated(pauseVillageWatch)
 onActivated(() => {
@@ -63,11 +81,18 @@ onActivated(() => {
   }
   if (navigatedToDetail.value && villageId.value === villageIdWhenNavigatedAway.value) {
     navigatedToDetail.value = false
+    const id = consumePendingHighlight()
+    if (id) {
+      flashRowId.value = id
+      clearTimeout(flashTimer.value)
+      flashTimer.value = setTimeout(() => { flashRowId.value = null }, 2000)
+    }
     return
   }
   navigatedToDetail.value = false
   searchText.immediate('')
   fetchMembers()
+  persons.value = null
 })
 
 const filteredMembers = computed(() => {
@@ -90,18 +115,17 @@ const filteredMembers = computed(() => {
 const isEmpty = computed(() => !isLoading.value && filteredMembers.value.length === 0)
 
 const membersForCsv = computed(() => {
-  if (!Array.isArray(members.value)) return []
-  return members.value.map(m => ({
-    ...m,
-    phone: m.phone?.phone ?? '',
-    cell: m.phone?.cell ?? '',
-    village: m.village?.name ?? ''
-  }))
+  if (!Array.isArray(members.value) || !Array.isArray(persons.value)) return []
+  return members.value.map(m => {
+    const p = persons.value?.find(p => p.personId === m.personId) ?? {}
+    return { ...p, ...m }
+  })
 })
 
 const clearSearch = () => searchText.immediate('')
 
 const navigateToMember = (member) => {
+  setPendingHighlight(member.personId)
   navigatedToDetail.value = true
   villageIdWhenNavigatedAway.value = villageId.value
   router.push({
@@ -112,15 +136,28 @@ const navigateToMember = (member) => {
 
 const columnsForCsv = [
   { header: 'Full Name', key: 'fullName' },
-  { header: 'Village', key: 'village' },
+  { header: 'Member #', key: 'memberNumber' },
+  { header: 'Member Level', key: 'memberLevel' },
+  { header: 'Join Date', key: 'joinDate' },
+  { header: 'Service Notes', key: 'serviceNotes' },
   { header: 'Email', key: 'email' },
   { header: 'Phone', key: 'phone' },
-  { header: 'Cell', key: 'cell' }
+  { header: 'Cell', key: 'cell' },
+  { header: 'Address', key: 'address' },
+  { header: 'City', key: 'city' },
+  { header: 'State', key: 'state' },
+  { header: 'Zip', key: 'zip' },
+  { header: 'Birth Date', key: 'birthDate' },
+  { header: 'Emergency Contact Name', key: 'emergencyContactName' },
+  { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
+  { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
+  { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
 ]
 
 const handleDownloadCsv = async () => {
+  if (!persons.value) await fetchPersons()
   const csv = toCsv(membersForCsv.value, columnsForCsv)
-  const villageName = members.value?.[0]?.village?.name || 'village'
+  const villageName = persons.value?.[0]?.village?.name || 'village'
   const filename = `${villageName}-members.csv`
   downloadCsv(csv, filename)
 }
@@ -129,7 +166,8 @@ async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
 
-    const villageName = members.value?.[0]?.village?.name || 'Village Green'
+    if (!persons.value) await fetchPersons()
+    const villageName = persons.value?.[0]?.village?.name || 'Village Green'
     const sheetName = `${villageName} Members`
 
     const result = await createSheet(
@@ -193,21 +231,12 @@ async function handleCreateSheet() {
   <div class="member-list">
     <div class="header-row">
       <h1>Members</h1>
-      <ExportButton
-        :disabled="isLoading || isCreatingSheet"
-        @download="handleDownloadCsv"
-        @export="handleCreateSheet"
-      />
-    </div>
-
-    <div class="filter-section">
-      <div class="search-box">
-        <IconField style="width: 100%">
+      <div class="header-controls">
+        <IconField>
           <InputText
             v-model="searchText"
             type="text"
             placeholder="Search by name..."
-            style="width: 100%"
           />
           <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
         </IconField>
@@ -230,36 +259,75 @@ async function handleCreateSheet() {
     <DataTable
       v-else
       :value="filteredMembers"
+      rowHover
+      paginator
+      :rows="pageRows"
       class="member-table-responsive desktop-only"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
+      :pt="{
+        tableContainer: { style: 'overflow: visible;' },
+        thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' },
+        headerRow: { style: 'background: var(--color-background-light);' },
+        bodyRow: { style: { cursor: 'pointer' } }
+      }"
+      :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToMember(event.data)"
       @filter="trackEvent('filter_applied')"
     >
-      <Column field="fullName" header="Name" sortable style="width: 50%"></Column>
-      <Column field="email" header="Email" sortable style="width: 30%"></Column>
-      <Column header="Phone" style="width: 20%">
+      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
+        <div class="paginator-container">
+          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
+          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
+          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
+          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <ExportButton
+            :disabled="isLoading || isCreatingSheet"
+            @download="handleDownloadCsv"
+            @export="handleCreateSheet"
+          />
+        </div>
+      </template>
+
+      <Column field="fullName" header="Name" sortable style="width: 25%"></Column>
+      <Column header="Level" sortable style="width: 25%">
         <template #body="slotProps">
-          {{ slotProps.data.phone?.phone || slotProps.data.phone?.cell || '—' }}
+          <Tag
+            v-if="slotProps.data.memberLevel"
+            :value="slotProps.data.memberLevel"
+            :severity="getMemberLevelSeverity(slotProps.data.memberLevel)"
+          />
+          <span v-else class="text-dim">—</span>
         </template>
       </Column>
+      <Column field="joinDate" header="Join Date" sortable style="width: 25%"></Column>
+      <Column field="memberNumber" header="Member #" sortable style="width: 25%"></Column>
     </DataTable>
 
     <!-- Mobile Card List -->
     <div class="member-cards mobile-only">
       <div
         v-for="member in filteredMembers"
-        :key="member.personId"
+        :key="member.memberId"
         class="member-card"
+        :class="{ 'row-flash': member.personId === flashRowId }"
         @click="navigateToMember(member)"
       >
         <h3>{{ member.fullName }}</h3>
         <div class="card-row">
-          <span class="label">Email:</span>
-          <span>{{ member.email ?? '—' }}</span>
+          <span class="label">Member #:</span>
+          <span>{{ member.memberNumber ?? '—' }}</span>
         </div>
         <div class="card-row">
-          <span class="label">Phone:</span>
-          <span>{{ member.phone?.phone || member.phone?.cell || '—' }}</span>
+          <span class="label">Level:</span>
+          <Tag
+            v-if="member.memberLevel"
+            :value="member.memberLevel"
+            :severity="getMemberLevelSeverity(member.memberLevel)"
+          />
+          <span v-else class="text-dim">—</span>
+        </div>
+        <div class="card-row">
+          <span class="label">Joined:</span>
+          <span>{{ member.joinDate ?? '—' }}</span>
         </div>
       </div>
     </div>
@@ -275,23 +343,18 @@ async function handleCreateSheet() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 h1 {
-  margin: 1rem 0 0 0;
+  margin: 0;
   color: var(--color-text-primary);
 }
 
-.filter-section {
-  margin-bottom: 1.5rem;
+.header-controls {
   display: flex;
-  gap: 1rem;
   align-items: center;
-}
-
-.search-box {
-  width: 250px;
+  gap: 0.75rem;
 }
 
 .loading-state,
@@ -308,8 +371,11 @@ h1 {
 }
 
 .member-table-responsive {
-  cursor: pointer;
+  box-shadow: var(--box-shadow-card);
+  border: 1px solid var(--color-border-default);
 }
+
+:deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 
 /* Mobile Card List */
 .member-cards {
@@ -358,13 +424,10 @@ h1 {
   display: none;
 }
 
+
 @media (max-width: 768px) {
   .member-list {
     padding: 1rem;
-  }
-
-  .search-input {
-    max-width: 100%;
   }
 
   .desktop-only {

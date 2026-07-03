@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -15,7 +15,8 @@ const props = defineProps({
   isLoading: { type: Boolean, required: true },
   hasLoadedOnce: { type: Boolean, required: true },
   error: { required: true },
-  showVillageColumn: { type: Boolean, default: false }
+  showVillageColumn: { type: Boolean, default: false },
+  flashRowId: { type: [String, Number], default: null }
 })
 
 const emit = defineEmits(['row-click'])
@@ -24,6 +25,11 @@ const { trackEvent } = useAnalytics()
 const { getStatusSeverity } = useStatusSeverity()
 
 const pageRows = ref(10)
+
+const rowClass = computed(() => {
+  const id = props.flashRowId
+  return (row) => String(row.serviceRequestId) === String(id) ? 'row-flash' : null
+})
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -46,12 +52,19 @@ function formatDate(dateStr) {
     <DataTable
       v-else
       :value="rows"
+      row-hover
       paginator
       :rows="pageRows"
       sort-field="startAt"
       :sort-order="1"
       class="request-table-responsive desktop-only"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
+      :row-class="rowClass"
+      :pt="{
+        tableContainer: { style: 'overflow: visible;' },
+        thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' },
+        headerRow: { style: 'background: var(--color-background-light);' },
+        bodyRow: { style: { cursor: 'pointer' } }
+      }"
       @row-click="(event) => emit('row-click', event)"
       @filter="trackEvent('filter_applied')"
     >
@@ -61,6 +74,7 @@ function formatDate(dateStr) {
           <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
           <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
           <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <slot name="paginator-extra" />
         </div>
       </template>
 
@@ -71,15 +85,16 @@ function formatDate(dateStr) {
       </Column>
       <Column v-if="showVillageColumn" field="villageName" header="Village" sortable style="width: 15%"></Column>
       <Column field="serviceName" header="Service" sortable style="width: 20%"></Column>
-      <Column field="status" header="Status" sortable style="width: 12%">
+      <Column field="status" header="Status" sortable headerClass="text-center" style="width: 12%;">
         <template #body="slotProps">
           <Tag :value="slotProps.data.status" :severity="getStatusSeverity(slotProps.data.status)" />
         </template>
       </Column>
       <Column field="memberFullName" header="Member" sortable style="width: 15%"></Column>
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
-      <Column field="city" header="City" sortable style="width: 13%"></Column>
-      <Column field="displayNumber" header="#" sortable style="width: 10%">
+      <Column field="city" header="Destination" sortable style="width: 13%"></Column>
+      <Column field="displayNumber" header="#" sortable style="width: 10%;">
+          
         <template #body="slotProps">{{ slotProps.data.displayNumber ?? '—' }}</template>
       </Column>
       <Column header="Actions" style="width: 10%">
@@ -96,6 +111,7 @@ function formatDate(dateStr) {
         v-for="request in rows"
         :key="request.serviceRequestId"
         class="request-card"
+        :class="{ 'row-flash': String(request.serviceRequestId) === String(flashRowId) }"
         @click="emit('row-click', { data: request })"
       >
         <div class="card-header">
@@ -114,9 +130,7 @@ function formatDate(dateStr) {
 
 <style scoped>
 .loading-state, .error-state, .empty-state { padding: 2rem; text-align: center; color: var(--color-text-dim); }
-.request-table-responsive { width: 100%; cursor: pointer; }
-.paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
-.paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }
+.request-table-responsive { width: 100%; cursor: pointer; box-shadow: var(--box-shadow-card); border: 1px solid var(--color-border-default); }
 .row-actions { display: flex; gap: 0.25rem; }
 .request-cards { display: flex; flex-direction: column; gap: 1rem; }
 .request-card { background: var(--color-background-light); border: 1px solid var(--color-border-default); border-radius: 8px; padding: 1rem; cursor: pointer; transition: box-shadow 0.2s ease; }
@@ -126,8 +140,12 @@ function formatDate(dateStr) {
 .status-badge { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: var(--color-background-subtle); }
 .card-row { display: flex; gap: 0.5rem; font-size: 0.9rem; padding: 0.2rem 0; }
 .card-row .label { font-weight: 500; color: var(--color-text-dim); min-width: 80px; }
+.text-center { text-align: center; }
 .desktop-only { display: table; }
 .mobile-only { display: none; }
+  :deep(.p-datatable-tbody > tr > td) { padding: 0.4rem 0.75rem; }
+  :deep(.p-datatable-thead > tr > th) { padding: 0.4rem 0.75rem; }
+  :deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 @media (max-width: 768px) {
   .desktop-only { display: none; }
   .mobile-only { display: flex; }

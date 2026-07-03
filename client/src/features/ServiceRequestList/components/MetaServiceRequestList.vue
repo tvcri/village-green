@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch, onMounted, onActivated } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
@@ -13,11 +13,13 @@ import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getServiceRequests } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 defineOptions({ name: 'MetaServiceRequestList' })
 
 const router = useRouter()
+const route = useRoute()
 
 let toast = null
 onMounted(() => { toast = useToast() })
@@ -38,13 +40,11 @@ const notificationFilter = ref('All requests')
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
-const historyIsVgManaged = ref(false)
 const historyRequestStatus = ref(null)
 
 const openHistory = (row) => {
   historyRequestId.value = row.serviceRequestId
   historyRequestLabel.value = row.displayNumber
-  historyIsVgManaged.value = row.requestNumber == null
   historyRequestStatus.value = row.status
   historyDialogVisible.value = true
 }
@@ -52,7 +52,7 @@ const openHistory = (row) => {
 const onNotified = (updated) => {
   requests.value = requests.value.map(r =>
     r.serviceRequestId === updated.serviceRequestId
-      ? { ...r, notifications: updated.notificationHistory.map(e => e.eventType) }
+      ? { ...r, notifications: updated.notificationHistory?.map(e => e.eventType) ?? [] }
       : r
   )
 }
@@ -76,13 +76,21 @@ const { state: allVillages } = useAsyncState(
 )
 
 const hasActivatedOnce = ref(false)
+const flashRowId = ref(null)
+const flashTimer = ref(null)
 
-onActivated(() => {
+onActivated(async () => {
   if (!hasActivatedOnce.value) {
     hasActivatedOnce.value = true
     return
   }
-  fetchRequests()
+  await fetchRequests()
+  const id = consumePendingHighlight()
+  if (id) {
+    flashRowId.value = id
+    clearTimeout(flashTimer.value)
+    flashTimer.value = setTimeout(() => { flashRowId.value = null }, 2000)
+  }
 })
 
 watch([selectedStatuses, selectedVillage, notificationFilter], () => { fetchRequests() })
@@ -205,6 +213,7 @@ async function handleCreateSheet() {
 }
 
 const navigateToRequest = (serviceRequestId, rowVillageId) => {
+  setPendingHighlight(serviceRequestId)
   router.push({ name: 'service-request-detail', params: { villageId: rowVillageId, id: serviceRequestId }, query: { from: 'meta' } })
 }
 
@@ -213,6 +222,7 @@ const navigateToCreateRequest = () => {
 }
 
 const navigateToEditRequest = (serviceRequestId) => {
+  setPendingHighlight(serviceRequestId)
   router.push({ name: 'meta-service-request-edit', params: { id: serviceRequestId } })
 }
 
@@ -324,6 +334,7 @@ const clearFilters = () => {
       :has-loaded-once="hasLoadedOnce"
       :error="error"
       :show-village-column="true"
+      :flash-row-id="flashRowId"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
     >
       <template #actions="{ data }">
@@ -338,7 +349,6 @@ const clearFilters = () => {
           <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
         <Button
-          v-if="['open', 'confirmed', 'draft'].includes(data.status?.toLowerCase())"
           icon="pi pi-pencil"
           v-tooltip="'Edit Request'"
           class="p-button-rounded p-button-text p-button-sm"
@@ -351,7 +361,7 @@ const clearFilters = () => {
       v-model:visible="historyDialogVisible"
       :service-request-id="historyRequestId"
       :display-label="historyRequestLabel"
-      :is-vg-managed="historyIsVgManaged"
+      :allow-send-button="true"
       :status="historyRequestStatus"
       @notified="onNotified"
     />

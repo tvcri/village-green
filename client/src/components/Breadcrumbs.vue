@@ -6,6 +6,7 @@ import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
+import { setPendingHighlight } from '../shared/lib/pendingHighlight.js'
 import Menu from 'primevue/menu'
 
 const router = useRouter()
@@ -241,6 +242,9 @@ const breadcrumbs = computed(() => {
 
 const navigate = (crumb) => {
   if (crumb.route) {
+    if (crumb.route.name === 'meta-service-requests' && route.name === 'service-request-detail') {
+      setPendingHighlight(route.params.id)
+    }
     router.push(crumb.route)
   }
 }
@@ -269,7 +273,7 @@ const navigate = (crumb) => {
           />
           <button
             :class="index === breadcrumbs.length - 1 ? 'breadcrumb-current' : ['breadcrumb-link', 'breadcrumb-link-label']"
-            @click="navigate(crumb)"
+            @click="index === breadcrumbs.length - 1 ? menuRefs.get(index)?.toggle($event) : navigate(crumb)"
           >
             {{ crumb.label }}
           </button>
@@ -360,6 +364,7 @@ const navigate = (crumb) => {
   border: none;
   padding: 0;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .breadcrumb-separator {

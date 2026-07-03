@@ -1,18 +1,23 @@
 <script setup>
 import { computed, ref, watch, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
+import Button from 'primevue/button'
+import Select from 'primevue/select'
+import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
+import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
@@ -32,15 +37,24 @@ onMounted(() => {
 const villageId = computed(() => route.params.villageId)
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
+const pageRows = ref(10)
+const selectedCapabilities = ref([])
 const sortField = ref('fullName')
 const sortDir = ref('asc')
+const capabilityOptions = ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support']
 
 const { state: volunteers, isLoading, error, execute: fetchVolunteers } = useAsyncState(
   () => villageId.value ? getVillageVolunteers(villageId.value) : null,
   { immediate: true }
 )
 
-useScrollRestore('volunteers', 'volunteer-detail')
+const { state: persons, execute: fetchPersons } = useAsyncState(
+  () => villageId.value ? getVillagePersons(villageId.value) : null,
+  { immediate: false }
+)
+
+const flashRowId = ref(null)
+const flashTimer = ref(null)
 const navigatedToDetail = ref(false)
 const villageIdWhenNavigatedAway = ref(null)
 const hasActivatedOnce = ref(false)
@@ -48,7 +62,9 @@ const fetchedByWatch = ref(false)
 const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
   fetchedByWatch.value = true
   searchText.immediate('')
+  selectedCapabilities.value = []
   fetchVolunteers()
+  persons.value = null
 })
 onDeactivated(pauseVillageWatch)
 onActivated(() => {
@@ -63,19 +79,38 @@ onActivated(() => {
   }
   if (navigatedToDetail.value && villageId.value === villageIdWhenNavigatedAway.value) {
     navigatedToDetail.value = false
+    const id = consumePendingHighlight()
+    if (id) {
+      flashRowId.value = id
+      clearTimeout(flashTimer.value)
+      flashTimer.value = setTimeout(() => { flashRowId.value = null }, 2000)
+    }
     return
   }
   navigatedToDetail.value = false
   searchText.immediate('')
+  selectedCapabilities.value = []
   fetchVolunteers()
+  persons.value = null
 })
 
 const filteredVolunteers = computed(() => {
   if (!Array.isArray(volunteers.value)) return []
 
-  let result = volunteers.value.filter(v =>
-    v.fullName?.toLowerCase().includes(searchText.value.toLowerCase())
-  )
+  let result = volunteers.value.filter(v => {
+    // Filter by name
+    const nameMatch = v.fullName?.toLowerCase().includes(searchText.value.toLowerCase())
+
+    // Filter by capabilities
+    let capabilityMatch = true
+    if (selectedCapabilities.value.length > 0) {
+      capabilityMatch = selectedCapabilities.value.some(cap =>
+        v.capabilities?.includes(cap)
+      )
+    }
+
+    return nameMatch && capabilityMatch
+  })
 
   result.sort((a, b) => {
     const aVal = a[sortField.value] ?? ''
@@ -90,18 +125,17 @@ const filteredVolunteers = computed(() => {
 const isEmpty = computed(() => !isLoading.value && filteredVolunteers.value.length === 0)
 
 const volunteersForCsv = computed(() => {
-  if (!Array.isArray(volunteers.value)) return []
-  return volunteers.value.map(v => ({
-    ...v,
-    phone: v.phone?.phone ?? '',
-    cell: v.phone?.cell ?? '',
-    village: v.village?.name ?? ''
-  }))
+  if (!Array.isArray(volunteers.value) || !Array.isArray(persons.value)) return []
+  return volunteers.value.map(v => {
+    const p = persons.value?.find(p => p.personId === v.personId) ?? {}
+    return { ...p, ...v, capabilities: v.capabilities?.join('; ') ?? '' }
+  })
 })
 
 const clearSearch = () => searchText.immediate('')
 
 const navigateToVolunteer = (volunteer) => {
+  setPendingHighlight(volunteer.personId)
   navigatedToDetail.value = true
   villageIdWhenNavigatedAway.value = villageId.value
   router.push({
@@ -112,15 +146,25 @@ const navigateToVolunteer = (volunteer) => {
 
 const columnsForCsv = [
   { header: 'Full Name', key: 'fullName' },
-  { header: 'Village', key: 'village' },
+  { header: 'Capabilities', key: 'capabilities' },
   { header: 'Email', key: 'email' },
   { header: 'Phone', key: 'phone' },
-  { header: 'Cell', key: 'cell' }
+  { header: 'Cell', key: 'cell' },
+  { header: 'Address', key: 'address' },
+  { header: 'City', key: 'city' },
+  { header: 'State', key: 'state' },
+  { header: 'Zip', key: 'zip' },
+  { header: 'Birth Date', key: 'birthDate' },
+  { header: 'Emergency Contact Name', key: 'emergencyContactName' },
+  { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
+  { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
+  { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
 ]
 
 const handleDownloadCsv = async () => {
+  if (!persons.value) await fetchPersons()
   const csv = toCsv(volunteersForCsv.value, columnsForCsv)
-  const villageName = volunteers.value?.[0]?.village?.name || 'village'
+  const villageName = persons.value?.[0]?.village?.name || 'village'
   const filename = `${villageName}-volunteers.csv`
   downloadCsv(csv, filename)
 }
@@ -129,7 +173,8 @@ async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
 
-    const villageName = volunteers.value?.[0]?.village?.name || 'Village Green'
+    if (!persons.value) await fetchPersons()
+    const villageName = persons.value?.[0]?.village?.name || 'Village Green'
     const sheetName = `${villageName} Volunteers`
 
     const result = await createSheet(
@@ -192,24 +237,29 @@ async function handleCreateSheet() {
   <div class="volunteer-list">
     <div class="header-row">
       <h1>Volunteers</h1>
-      <ExportButton
-        :disabled="isLoading || isCreatingSheet"
-        @download="handleDownloadCsv"
-        @export="handleCreateSheet"
-      />
-    </div>
-
-    <div class="filter-section">
-      <div class="search-box">
-        <IconField style="width: 100%">
+      <div class="header-controls">
+        <IconField>
           <InputText
             v-model="searchText"
             type="text"
             placeholder="Search by name..."
-            style="width: 100%"
           />
           <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
         </IconField>
+        <div class="capability-filters">
+          <div
+            v-for="capability in capabilityOptions"
+            :key="capability"
+            class="capability-filter"
+          >
+            <Checkbox
+              v-model="selectedCapabilities"
+              :input-id="`capability-${capability}`"
+              :value="capability"
+            />
+            <label :for="`capability-${capability}`">{{ capability }}</label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -229,36 +279,73 @@ async function handleCreateSheet() {
     <DataTable
       v-else
       :value="filteredVolunteers"
+      rowHover
+      paginator
+      :rows="pageRows"
       class="volunteer-table-responsive desktop-only"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
+      :pt="{
+        tableContainer: { style: 'overflow: visible;' },
+        thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' },
+        headerRow: { style: 'background: var(--color-background-light);' },
+        bodyRow: { style: { cursor: 'pointer' } }
+      }"
+      :row-class="(row) => row.personId === flashRowId ? 'row-flash' : null"
       @row-click="(event) => navigateToVolunteer(event.data)"
       @filter="trackEvent('filter_applied')"
     >
       <Column field="fullName" header="Name" sortable style="width: 50%"></Column>
-      <Column field="email" header="Email" sortable style="width: 30%"></Column>
-      <Column header="Phone" style="width: 20%">
+      <Column header="Capabilities" style="width: 50%">
         <template #body="slotProps">
-          {{ slotProps.data.phone?.phone || slotProps.data.phone?.cell || '—' }}
+          <div class="capabilities-list">
+            <Tag
+              v-for="cap in slotProps.data.capabilities"
+              :key="cap"
+              :value="cap"
+              class="capability-badge"
+            />
+            <span v-if="!slotProps.data.capabilities?.length" class="no-capabilities">
+              —
+            </span>
+          </div>
         </template>
       </Column>
+      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
+        <div class="paginator-container">
+          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
+          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
+          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
+          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <ExportButton
+            :disabled="isLoading || isCreatingSheet"
+            @download="handleDownloadCsv"
+            @export="handleCreateSheet"
+          />
+        </div>
+      </template>
     </DataTable>
 
     <!-- Mobile Card List -->
     <div class="volunteer-cards mobile-only">
       <div
         v-for="volunteer in filteredVolunteers"
-        :key="volunteer.personId"
+        :key="volunteer.volunteerId"
         class="volunteer-card"
+        :class="{ 'row-flash': volunteer.personId === flashRowId }"
         @click="navigateToVolunteer(volunteer)"
       >
         <h3>{{ volunteer.fullName }}</h3>
         <div class="card-row">
-          <span class="label">Email:</span>
-          <span>{{ volunteer.email ?? '—' }}</span>
-        </div>
-        <div class="card-row">
-          <span class="label">Phone:</span>
-          <span>{{ volunteer.phone?.phone || volunteer.phone?.cell || '—' }}</span>
+          <span class="label">Capabilities:</span>
+          <div v-if="volunteer.capabilities?.length" class="capabilities-list">
+            <span
+              v-for="cap in volunteer.capabilities"
+              :key="cap"
+              class="capability-badge"
+            >
+              {{ cap }}
+            </span>
+          </div>
+          <span v-else class="no-capabilities">None listed</span>
         </div>
       </div>
     </div>
@@ -274,31 +361,18 @@ async function handleCreateSheet() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 h1 {
-  margin: 1rem 0 0 0;
+  margin: 0;
   color: var(--color-text-primary);
 }
 
-.filter-section {
-  margin-bottom: 1.5rem;
+.header-controls {
   display: flex;
-  gap: 1rem;
   align-items: center;
-}
-
-.search-and-capabilities {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  align-items: stretch;
-  width: 100%;
-}
-
-.search-box {
-  width: 250px;
+  gap: 0.75rem;
 }
 
 .capability-filters {
@@ -340,14 +414,18 @@ h1 {
 }
 
 .volunteer-table-responsive {
-  cursor: pointer;
+  box-shadow: var(--box-shadow-card);
+  border: 1px solid var(--color-border-default);
 }
+
+:deep(tr.row-flash td) { animation: row-flash-anim 2s ease-out; }
 
 /* Capabilities Badge */
 .capabilities-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
+  overflow: hidden;
 }
 
 .capability-badge {
@@ -355,67 +433,15 @@ h1 {
   padding: 0.3rem 0.6rem;
   background-color: var(--color-background-dark);
   border: 1px solid var(--color-border-default);
-  border-radius: 3px;
-  font-size: 0.8rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
   color: var(--color-text-dim);
 }
 
 .no-capabilities {
   color: var(--color-text-dim);
-  font-style: italic;
-}
+  padding: 0.25rem 0.6rem;
 
-/* Desktop Table */
-.volunteer-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.volunteer-table thead {
-  background-color: var(--color-background-dark);
-}
-
-.volunteer-table th {
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  border-bottom: 1px solid var(--color-border-default);
-}
-
-.volunteer-table th.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-
-.volunteer-table th.sortable:hover {
-  background-color: var(--color-background-subtle);
-}
-
-.sort-indicator {
-  margin-left: 0.5rem;
-  font-size: 0.75rem;
-  opacity: 0.7;
-}
-
-.volunteer-table td {
-  padding: 1rem;
-  border-bottom: 1px solid var(--color-border-default);
-  color: var(--color-text-primary);
-}
-
-.volunteer-table tbody tr.clickable {
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.volunteer-table tbody tr.clickable:hover {
-  background-color: var(--color-background-subtle);
 }
 
 /* Mobile Card List */
@@ -466,6 +492,7 @@ h1 {
 .mobile-only {
   display: none;
 }
+
 
 @media (max-width: 768px) {
   .volunteer-list {
