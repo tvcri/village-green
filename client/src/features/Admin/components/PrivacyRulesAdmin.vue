@@ -4,7 +4,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
-import { marked } from 'marked'
+import { renderSimpleMarkdown } from '../../../shared/lib/htmlUtils.js'
 import { getPrivacyRules, publishPrivacyRules, patchPrivacyRulesCurrent } from '../api/privacyApi.js'
 
 const toast = useToast()
@@ -18,9 +18,7 @@ const previewVisible = ref(false)
 const savedContent = ref('')
 const isDirty = computed(() => draftContent.value !== savedContent.value)
 
-const draftHtml = computed(() =>
-  draftContent.value ? marked.parse(draftContent.value) : ''
-)
+const draftHtml = computed(() => renderSimpleMarkdown(draftContent.value))
 
 onMounted(async () => {
   await loadRules()
@@ -91,13 +89,13 @@ async function saveCorrections() {
 
       <section class="draft-section">
         <h2>Editor</h2>
-        <p class="draft-hint">Edit the content below. "Publish" creates a new version and re-prompts all users. "Save corrections" edits the current version in place — existing acknowledgements remain valid.</p>
+        <p class="draft-hint">Edit the content below. Blank lines separate paragraphs; **bold** and *italic* are supported. "Publish" creates a new version and re-prompts all users. "Save corrections" edits the current version in place — existing acknowledgements remain valid.</p>
         <Textarea
           v-model="draftContent"
           :auto-resize="false"
           rows="16"
           style="width: 100%; font-family: monospace; font-size: 0.875rem"
-          placeholder="Enter privacy rules in Markdown format…"
+          placeholder="Enter privacy rules text. Blank lines start new paragraphs; **bold** and *italic* are supported…"
         />
         <div class="draft-actions">
           <Button

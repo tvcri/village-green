@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 describe('usePrivacyAck', () => {
-  it('defaults to unblocked (no client-side seed; the API drives the block)', async () => {
+  it('defaults to unblocked before bootstrap seeds it', async () => {
     const { usePrivacyAck } = await import('./usePrivacyAck.js')
     const { needsAck } = usePrivacyAck()
     expect(needsAck.value).toBe(false)

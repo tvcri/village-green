@@ -1,9 +1,9 @@
 import { ref } from 'vue'
 
-// Module-scoped singleton. The block is driven entirely by the API: any 403
-// privacy_ack_required (at bootstrap or mid-session) calls requireAck(). There
-// is no client-side status snapshot to seed from — the API is the source of
-// truth. The modal acknowledges the version it fetched, so no id is tracked here.
+// Module-scoped singleton. Seeded at bootstrap from GET /user's privacyStatus
+// (allowlisted, so it's readable even while blocked) and kept in sync
+// mid-session by the apiClient 403 interceptor. The modal acknowledges the
+// version it fetched, so no id is tracked here — just the boolean gate.
 const needsAck = ref(false)
 
 export function usePrivacyAck() {

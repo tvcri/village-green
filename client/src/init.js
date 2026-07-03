@@ -415,14 +415,14 @@ async function getUserObject() {
   })
   const user = await response.json()
 
-  // The privacy-ack gate blocks every endpoint (including /user) until the user
-  // acknowledges. On that 403, raise the ack block and return a minimal user so
-  // the app shell can mount — App.vue hides the router-view (v-if="!needsAck")
-  // and the ack modal takes over. The user is re-fetched after acknowledging.
-  if (response.status === 403 && user?.error === 'privacy_ack_required') {
+  // GET /user is allowlisted by the privacy-ack gate, so this succeeds even
+  // while the user owes an ack — seed the block from the real status instead
+  // of mounting a stub user. App.vue hides the router-view (v-if="!needsAck")
+  // and the ack modal takes over; clearing it needs no reload since the real
+  // user (grants/prefs) was already loaded here.
+  if (user?.privacyStatus?.needsAck) {
     const { usePrivacyAck } = await import('./shared/composables/usePrivacyAck.js')
     usePrivacyAck().requireAck()
-    return { villageGrants: [] }
   }
 
   user.villageGrants.sort((a, b) => {

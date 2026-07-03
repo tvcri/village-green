@@ -4,8 +4,9 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { getPrivacyRules, createPrivacyAcknowledgement } from '../features/Admin/api/privacyApi.js'
 import { usePrivacyAck } from '../shared/composables/usePrivacyAck.js'
+import { renderSimpleMarkdown } from '../shared/lib/htmlUtils.js'
 
-const { needsAck } = usePrivacyAck()
+const { needsAck, clearAck } = usePrivacyAck()
 
 const rulesHtml = ref('')
 // The id of the rules version actually fetched and displayed. We acknowledge
@@ -22,8 +23,8 @@ async function loadRules() {
   loading.value = true
   loadError.value = false
   try {
-    const [rules, { marked }] = await Promise.all([getPrivacyRules(), import('marked')])
-    rulesHtml.value = marked.parse(rules.content)
+    const rules = await getPrivacyRules()
+    rulesHtml.value = renderSimpleMarkdown(rules.content)
     displayedRulesId.value = rules.id
   }
   catch (err) {
@@ -46,10 +47,10 @@ async function acknowledge() {
   error.value = null
   try {
     await createPrivacyAcknowledgement(displayedRulesId.value)
-    // Reload for a clean, fully-authorized bootstrap. On cold-start block the
-    // user object was a minimal stub (every endpoint 403'd), so we can't just
-    // unhide the app — reload re-fetches the real user now that the gate is clear.
-    window.location.reload()
+    // GET /user is allowlisted, so bootstrap already loaded the real user
+    // (grants/prefs) even while blocked — clearing the flag is enough to
+    // unhide the router-view in-place, no reload needed.
+    clearAck()
   }
   catch (err) {
     error.value = 'Failed to record acknowledgement. Please try again.'

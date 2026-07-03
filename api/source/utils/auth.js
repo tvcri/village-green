@@ -167,10 +167,14 @@ const setupUser = async function (req, res, next) {
 //   - GET  /op/definition          client can't build its API layer without the spec
 //   - GET  /privacy/rules          the modal needs the agreement text to display
 //   - POST /privacy/acknowledgements  the act that clears the block (gating it deadlocks)
+//   - GET  /user                   always the caller's own record (no other-party PII);
+//                                   lets bootstrap seed real grants/prefs/status instead
+//                                   of mounting a stub user and reloading after ack
 const privacyAckAllowlist = [
     { method: 'GET', path: '/op/definition' },
     { method: 'GET', path: '/privacy/rules' },
     { method: 'POST', path: '/privacy/acknowledgements' },
+    { method: 'GET', path: '/user' },
 ]
 
 function isPrivacyAckAllowlisted(req) {
