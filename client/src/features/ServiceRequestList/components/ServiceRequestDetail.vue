@@ -243,11 +243,6 @@ const timeDisplay = computed(() => {
             <span class="value">{{ formatDate(request.createdAt) }}</span>
           </div>
 
-          <div v-if="request.createdByUsername" class="detail-field">
-            <span class="label">Created By:</span>
-            <span class="value">{{ request.createdByDisplayName }}</span>
-          </div>
-
           <div v-if="request.requestNumber" class="detail-field">
             <span class="label">Request Number:</span>
             <span class="value">{{ request.requestNumber }}</span>
