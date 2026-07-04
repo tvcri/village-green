@@ -58,7 +58,7 @@ const flatPerson = computed(() => {
     v-model:visible="dialogVisible"
     modal
     header="Person Detail"
-    :style="{ width: '72rem' }"
+    :style="{ width: '65rem' }"
     :breakpoints="{ '1200px': '95vw' }"
   >
     <div v-if="isLoading" class="dialog-state">
@@ -66,7 +66,7 @@ const flatPerson = computed(() => {
       <span>Loading…</span>
     </div>
     <p v-else-if="error" class="dialog-state error">Failed to load person details.</p>
-    <PersonDetailCard v-else-if="flatPerson" :person="flatPerson" :person-type="personType" />
+    <PersonDetailCard v-else-if="flatPerson" :person="flatPerson" :person-type="personType" :column-count="3" />
   </Dialog>
 </template>
 
