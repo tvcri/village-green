@@ -21,6 +21,7 @@ import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
+import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
 
@@ -667,6 +668,14 @@ const handleCancelRequest = async (reason) => {
   }
 }
 
+const personDialogVisible = ref(false)
+const personDialogPersonId = ref(null)
+
+const openPersonDialog = (personId) => {
+  personDialogPersonId.value = personId
+  personDialogVisible.value = true
+}
+
 </script>
 
 <template>
@@ -729,28 +738,54 @@ const handleCancelRequest = async (reason) => {
 
             <div v-if="form.villageId">
               <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Member<span class="req">*</span></label>
-              <AutoComplete
-                v-model="selectedMember"
-                :suggestions="memberFilteredOptions"
-                option-label="label"
-                placeholder="Search member"
-                :force-selection="true"
-                showClear
-                @complete="filterMembers"
-              />
+              <div class="person-field-row">
+                <AutoComplete
+                  v-model="selectedMember"
+                  :suggestions="memberFilteredOptions"
+                  option-label="label"
+                  placeholder="Search member"
+                  :force-selection="true"
+                  showClear
+                  @complete="filterMembers"
+                />
+                <Button
+                  v-if="form.memberPersonId"
+                  type="button"
+                  icon="pi pi-id-card"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="View member details"
+                  v-tooltip.top="'View member details'"
+                  @click="openPersonDialog(form.memberPersonId)"
+                />
+              </div>
             </div>
 
             <div v-if="form.villageId">
               <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Volunteer</label>
-              <AutoComplete
-                v-model="selectedVolunteer"
-                :suggestions="volunteerFilteredOptions"
-                option-label="label"
-                placeholder="Search volunteer"
-                :force-selection="true"
-                showClear
-                @complete="filterVolunteers"
-              />
+              <div class="person-field-row">
+                <AutoComplete
+                  v-model="selectedVolunteer"
+                  :suggestions="volunteerFilteredOptions"
+                  option-label="label"
+                  placeholder="Search volunteer"
+                  :force-selection="true"
+                  showClear
+                  @complete="filterVolunteers"
+                />
+                <Button
+                  v-if="form.volunteerPersonId"
+                  type="button"
+                  icon="pi pi-id-card"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="View volunteer details"
+                  v-tooltip.top="'View volunteer details'"
+                  @click="openPersonDialog(form.volunteerPersonId)"
+                />
+              </div>
             </div>
           </div>
 
@@ -1016,6 +1051,10 @@ const handleCancelRequest = async (reason) => {
         </form>
       </template>
     </Card>
+    <PersonDetailDialog
+      v-model:visible="personDialogVisible"
+      :person-id="personDialogPersonId"
+    />
   </div>
 </template>
 
@@ -1039,6 +1078,12 @@ const handleCancelRequest = async (reason) => {
 .req {
   color: var(--color-error);
   margin-left: 0.15rem;
+}
+
+.person-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .card-header-wrapper {
