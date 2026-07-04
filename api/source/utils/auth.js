@@ -117,7 +117,7 @@ const setupUser = async function (req, res, next) {
                 throw new SmError.AuthorizeError("No token claim mappable to username found")
             }
             
-            const userObject = await UserService.getUserObject(username) ?? {username}
+            let userObject = await UserService.getUserObject(username) ?? {username}
 
             if (userObject.status === 'unavailable') {
                 throw new SmError.UserUnavailableError()
@@ -135,9 +135,15 @@ const setupUser = async function (req, res, next) {
                 refreshFields.lastClaims = JSON.stringify(tokenPayload)
             }
             if (refreshFields.lastAccess || refreshFields.lastClaims) {
-                const userId = await UserService.setUserData(userObject, refreshFields)
-                if (userId != userObject.userId) {
-                    userObject.userId = userId.toString()
+                const isNewUser = !userObject.userId
+                await UserService.setUserData(userObject, refreshFields)
+                if (isNewUser) {
+                    // Re-fetch instead of hand-patching the phantom {username} object:
+                    // setUserData's insert only wrote username + refreshFields, so the
+                    // fallback object never had privacyAckRequired, webPreferences,
+                    // grants, etc. A real getUserObject() call now finds the row and
+                    // returns the fully-computed shape used everywhere else.
+                    userObject = await UserService.getUserObject(username)
                 }
             }
 
