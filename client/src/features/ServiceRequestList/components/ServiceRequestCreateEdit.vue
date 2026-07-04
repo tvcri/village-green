@@ -148,6 +148,12 @@ const allMemberOptions = computed(() => {
   }))
 })
 
+const selectedMemberServiceNotes = computed(() => {
+  if (!Array.isArray(villageMembers.value) || !form.value.memberPersonId) return ''
+  const member = villageMembers.value.find(m => String(m.personId || m.id) === String(form.value.memberPersonId))
+  return member?.serviceNotes || ''
+})
+
 const allVolunteerOptions = computed(() => {
   if (!Array.isArray(villageVolunteers.value)) return []
   return villageVolunteers.value.map(v => ({
@@ -807,6 +813,14 @@ const openPersonDialog = (personId) => {
               </div>
             </div>
           </div>
+
+          <!-- Service Notes: display-only, sourced from the selected member's record -->
+          <template v-if="selectedMemberServiceNotes">
+            <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Service Notes</h3>
+            </div>
+            <div style="white-space: pre-wrap;">{{ selectedMemberServiceNotes }}</div>
+          </template>
 
           <!-- Hint shown until a village is selected -->
           <div v-if="!form.villageId" class="village-hint">
