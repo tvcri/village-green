@@ -44,6 +44,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'CAST(sr.member_person_id AS CHAR) AS memberPersonId',
     'CAST(m.id AS CHAR) AS memberId',
     'mp.full_name AS memberFullName',
+    'm.service_notes AS memberServiceNotes',
     'CAST(sr.volunteer_person_id AS CHAR) AS volunteerPersonId',
     'CAST(vol.id AS CHAR) AS volunteerId',
     'CAST(vv.id AS CHAR) AS volunteerVillageId',

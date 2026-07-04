@@ -192,6 +192,12 @@ const timeDisplay = computed(() => {
           </div>
         </div>
 
+        <!-- Service Notes Section -->
+        <div v-if="request.memberServiceNotes" class="section description-section">
+          <h3 class="section-header">Service Notes</h3>
+          <p class="description-text">{{ request.memberServiceNotes }}</p>
+        </div>
+
         <!-- Description Section -->
         <div v-if="request.description" class="section description-section">
           <h3 class="section-header">Description</h3>
