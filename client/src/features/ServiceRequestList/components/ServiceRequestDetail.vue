@@ -199,9 +199,10 @@ const timeDisplay = computed(() => {
         </div>
 
         <!-- Service Notes Section -->
-        <div v-if="request.memberServiceNotes" class="section description-section">
+        <div class="section description-section">
           <h3 class="section-header">Service Notes</h3>
-          <p class="description-text">{{ request.memberServiceNotes }}</p>
+          <p v-if="request.memberServiceNotes" class="description-text">{{ request.memberServiceNotes }}</p>
+          <p v-else class="description-text service-notes-empty">There are no service notes for this member</p>
         </div>
 
         <!-- Description Section -->
@@ -471,6 +472,11 @@ const timeDisplay = computed(() => {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.service-notes-empty {
+  font-style: italic;
+  color: var(--color-text-dim);
 }
 
 .map-section {

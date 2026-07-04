@@ -814,21 +814,25 @@ const openPersonDialog = (personId) => {
             </div>
           </div>
 
-          <!-- Service Notes: display-only, sourced from the selected member's record -->
-          <template v-if="selectedMemberServiceNotes">
-            <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
-              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Service Notes</h3>
-            </div>
-            <div style="white-space: pre-wrap;">{{ selectedMemberServiceNotes }}</div>
-          </template>
-
           <!-- Hint shown until a village is selected -->
           <div v-if="!form.villageId" class="village-hint">
             Select a village to continue…
           </div>
 
-          <!-- Remaining sections, revealed once a village is chosen -->
-          <template v-if="form.villageId">
+          <!-- Hint shown once village is selected but before a member is chosen -->
+          <div v-if="form.villageId && !form.memberPersonId" class="village-hint">
+            Select a member to continue…
+          </div>
+
+          <!-- Remaining sections, revealed once a member is chosen -->
+          <template v-if="form.villageId && form.memberPersonId">
+
+          <!-- Service Notes: display-only, sourced from the selected member's record -->
+          <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Service Notes</h3>
+          </div>
+          <div v-if="selectedMemberServiceNotes" style="white-space: pre-wrap;">{{ selectedMemberServiceNotes }}</div>
+          <div v-else class="service-notes-empty">There are no service notes for this member</div>
 
           <!-- Service Section -->
           <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
@@ -1106,6 +1110,11 @@ const openPersonDialog = (personId) => {
   color: var(--color-text-dim);
   font-style: italic;
   font-size: 0.9rem;
+}
+
+.service-notes-empty {
+  color: var(--color-text-dim);
+  font-style: italic;
 }
 
 .req {
