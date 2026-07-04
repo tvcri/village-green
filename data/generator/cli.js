@@ -62,10 +62,15 @@ async function doctor (dataset) {
   console.log(`doctor OK: ${TABLE_ORDER.length} tables checked, ${acknowledged} acknowledged-unset column(s)`)
 }
 
-const dataset = buildDataset(loadContent(), config.seed)
-await doctor(dataset)
+// Commands that GENERATE data build the dataset and run the doctor first.
+// Pure transport commands (--import a file, --export) skip both: they don't
+// use the builders, so builder drift shouldn't block restoring a backup.
+const generates = args.length === 0 ||
+  has('--seed-db') || has('--sql') || has('--seed-api') || has('--emit') || has('--roundtrip') || has('--doctor')
+const dataset = generates ? buildDataset(loadContent(), config.seed) : null
+if (generates) await doctor(dataset)
 
-if (has('--sql') || args.length === 0) {
+if (has('--seed-db') || has('--sql') || args.length === 0) {
   console.log('SQL seed:', await seedSql(dataset))
   await sanity()
 }
@@ -74,11 +79,16 @@ if (has('--emit')) {
   writeFileSync(out, await emitJsonl(dataset))
   console.log('wrote', out)
 }
-if (has('--import')) {
-  const path = val('--import', 'demo-appdata.jsonl')
-  const jsonl = (has('--import') && val('--import', null)) ? readFileSync(path, 'utf8') : await emitJsonl(dataset)
+if (has('--seed-api')) {
+  // generate -> POST to the app's import endpoint (the API-route twin of --seed-db)
   const token = await mintToken()
-  console.log(await importAppData(config.api.base, token, jsonl))
+  console.log(await importAppData(config.api.base, token, await emitJsonl(dataset)))
+}
+if (has('--import')) {
+  // POST an existing app-data FILE (generator-emitted or app-exported) as-is
+  const path = val('--import', 'demo-appdata.jsonl')
+  const token = await mintToken()
+  console.log(await importAppData(config.api.base, token, readFileSync(path, 'utf8')))
 }
 if (has('--export')) {
   // The app's own GET /op/appdata exporter — what's in the DB right now, as

@@ -25,16 +25,19 @@ That's it. The SQL seeder writes directly to MySQL and does not need the API run
 
 ## Commands
 
+The commands split into two families: **seed** commands *generate* the dataset and load it (via one of two routes), while **import/export** move *existing files* through the app's endpoints without generating anything.
+
 | Command | Direction | What it does |
 |---|---|---|
-| `npm run seed` | generator → DB | Direct-SQL seed into the dev DB (primary path; no API needed) |
-| `npm run emit` | generator → file | Write `demo-appdata.jsonl` — built **locally by this tool** from the builders + live column introspection. Deterministic: the meta `date` is pinned so the same seed yields a byte-identical file (don't expect a fresh timestamp) |
-| `npm run import` | file → app | POST the generated JSONL to the app's **import** endpoint (`POST /op/appdata`; needs the API + mock OIDC, see below) |
+| `npm run seed:db` (alias: `seed`) | generate → DB | Generate the dataset and load it with direct SQL INSERTs (primary path; no API needed) |
+| `npm run seed:api` | generate → app | Generate the same dataset and load it through the app's **import** endpoint (`POST /op/appdata`; needs the API + mock OIDC, see below) |
+| `npm run emit` | generate → file | Generate the dataset and write it to `demo-appdata.jsonl` **without loading it anywhere**. Deterministic: the meta `date` is pinned so the same seed yields a byte-identical file (don't expect a fresh timestamp) |
+| `npm run import` | file → app | POST an **existing** app-data file as-is (default `demo-appdata.jsonl`; pick another with `npm run import -- --import=<file>`). Works with emitted files *and* app exports — no generation, and no doctor gate, so it can restore a backup even while the builders are mid-drift |
 | `npm run export` | app → file | Call the app's **export** endpoint (`GET /op/appdata?format=jsonl`) and write `appdata-export.jsonl` — whatever is in the DB *right now*, serialized by the app itself (real timestamped meta, includes every table/column, not just what the generator sets) |
-| `npm run roundtrip` | all of the above | seed → emit → import → sanity check, exercising both load paths end to end |
-| `npm run doctor` | — | Schema-drift check only (also runs automatically before every command above) |
+| `npm run roundtrip` | all of the above | seed:db → emit → seed:api → sanity check, exercising both load paths end to end |
+| `npm run doctor` | — | Schema-drift check only (also runs automatically before every *generating* command above — not before `import`/`export`, which don't use the builders) |
 
-**`emit` vs `export`** — both produce app-data JSONL, but from opposite ends: `emit` is the *generator's* serializer (what the dataset *should* be; reproducible, git-diffable), `export` is the *app's* serializer (what the DB actually *contains*, e.g. after clicking around the UI). Comparing an `export` taken right after an `import` is a good way to catch bugs in the app's own export path.
+**`emit` vs `export`** — both produce app-data JSONL, but from opposite ends: `emit` is the *generator's* serializer (what the dataset *should* be; reproducible, git-diffable), `export` is the *app's* serializer (what the DB actually *contains*, e.g. after clicking around the UI). Comparing an `export` taken right after a `seed:api` is a good way to catch bugs in the app's own export path.
 
 ### Environment knobs
 
@@ -50,9 +53,9 @@ That's it. The SQL seeder writes directly to MySQL and does not need the API run
 | `VG_DEMO_SEED` | `20260630` | RNG seed (change to get a different but still deterministic dataset) |
 | `VG_DEMO_TOKEN` | _(unset)_ | Pre-minted bearer token (skips token mint from mock OIDC) |
 
-## App-data path (`emit` / `import` / `export` / `roundtrip`)
+## App-data path (`seed:api` / `import` / `export` / `roundtrip`)
 
-The `import`, `export`, and `roundtrip` commands use the app's `/op/appdata` endpoint (POST = import/overwrite, GET = export). This endpoint:
+The `seed:api`, `import`, `export`, and `roundtrip` commands use the app's `/op/appdata` endpoint (POST = import/overwrite, GET = export). This endpoint:
 
 - Is **opt-in** — the API must be started with `VG_EXPERIMENTAL_APPDATA=true`
 - Requires the **mock OIDC** service on `:18080` — the loader mints a bearer token by sending a **GET** to `/api/get-token` with the admin username, then POSTs (import) or GETs (export) `/op/appdata`
@@ -61,7 +64,7 @@ The `import`, `export`, and `roundtrip` commands use the app's `/op/appdata` end
 > **Note:** When logging in via the mock-OIDC browser form to use the app itself, enter the wider scope string into the form:
 > `vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:friends:read`
 
-This path exercises the otherwise-untested `/op/appdata` endpoint and **may surface endpoint bugs**. The SQL `seed` command is the always-works fallback and is recommended for most development use.
+This path exercises the otherwise-untested `/op/appdata` endpoint and **may surface endpoint bugs**. The SQL `seed:db` command is the always-works fallback and is recommended for most development use.
 
 ## KNOWN ISSUE — two SQL views are missing from this branch
 
