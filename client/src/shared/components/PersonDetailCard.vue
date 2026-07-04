@@ -141,9 +141,12 @@ const copyEmail = async (email) => {
           <span class="label">Join Date:</span>
           <span class="value">{{ person.joinDate }}</span>
         </div>
+      </div>
 
-        <div v-if="person.serviceNotes" class="detail-field">
-          <span class="label">Service Notes:</span>
+      <!-- Service Notes Section -->
+      <div v-if="person.serviceNotes" class="section">
+        <h3 class="section-header">Service Notes</h3>
+        <div class="detail-field service-notes-field">
           <span class="value">{{ person.serviceNotes }}</span>
         </div>
       </div>
@@ -360,6 +363,10 @@ const copyEmail = async (email) => {
 }
 
 .capabilities-field {
+  grid-column: 1 / -1;
+}
+
+.service-notes-field {
   grid-column: 1 / -1;
 }
 
