@@ -51,15 +51,12 @@ const flatPerson = computed(() => {
   const { memberInfo, volunteerInfo, ...rest } = person.value
   return { ...rest, ...memberInfo, ...volunteerInfo }
 })
-
-const title = computed(() => person.value?.fullName ?? 'Person')
 </script>
 
 <template>
   <Dialog
     v-model:visible="dialogVisible"
     modal
-    :header="title"
     :style="{ width: '72rem' }"
     :breakpoints="{ '1200px': '95vw' }"
   >
