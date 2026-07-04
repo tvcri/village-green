@@ -39,6 +39,8 @@ const mapAddress = computed(() => {
 const isMember = computed(() => props.personType === 'member' || props.personType === 'member, volunteer')
 const isVolunteer = computed(() => props.personType === 'volunteer' || props.personType === 'member, volunteer')
 
+const serviceNotesSpan = computed(() => Math.min(props.columnCount, 2))
+
 const copyEmail = async (email) => {
   try {
     await navigator.clipboard.writeText(email)
@@ -367,7 +369,7 @@ const copyEmail = async (email) => {
 }
 
 .service-notes-field {
-  grid-column: 1 / -1;
+  grid-column: span v-bind(serviceNotesSpan);
 }
 
 .map-section {
