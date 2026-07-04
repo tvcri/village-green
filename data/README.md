@@ -107,6 +107,8 @@ vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:
 | `roger.mowry@cabinet.test` | Cabinet | Full (steward) |
 | `mr.calimari@quahog.test` | — | No grants — valid login, sees nothing |
 
+Beyond these bespoke personas, a **coverage fill** pass tops up every village so it has at least one user of **each** grant role (Owner / Manage / Full / Restricted); the two big villages get 2–3 of each. Fill users are themed per village (`herbert.west@miskatonic.test`, `lois.griffin@quahog.test`, `alva.vanderbilt@newport.test`, `zadok.allen@innsmouth.test`, …) — see `FILL_LOGINS` in `generator/builders/villages.js` for the full roster. Any of them works as a mock-OIDC login. Every user carries a `name` claim in `lastClaims`, so creator attribution renders a display name rather than an email.
+
 ## How the dataset is built
 
 Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows; ~35% of members get a standing `service_notes`) **→ service requests + FCV submissions**.
@@ -116,7 +118,7 @@ Service requests are built in two passes:
 1. **Gag pass** — each gag-tagged figure who landed as a member gets one bespoke request from their `gag` block in `people.json`. The free-text gag title is keyword-mapped onto a real UI service name, title + blurb become the `description`, and the gag's destination is used as-is.
 2. **Volume pass** — each village gets ≈ 0.8 × its active-member count of ordinary requests: a random active member × a weighted-random `catalog` entry (`Ride: Medical Appnt` ×6, other rides ×3 — prod is medical-ride-heavy) × a random destination from a pool matched to the service (medical → Miskatonic Health, shopping → grocery/food landmarks, personal care → the barber, activities → landmarks).
 
-Field rules mirror the client UI (`ServiceRequestCreateEdit.vue`): `service_name` is always one of the ten `serviceNameOptions`; rides are `Round Trip` (~80%) or `One Way`, everything else `None`; Tech Support and Household Chores/Handy Help set no location fields, all others get destination/address/city/state; Round Trips carry `appt_time`/`return_time` in Start → Arrival → Return → Finish slot order. A member's `service_notes` is echoed into `instructions` on every one of that member's requests, matching how prod repeats standing mobility notes.
+Field rules mirror the client UI (`ServiceRequestCreateEdit.vue`): `service_name` is always one of the ten `serviceNameOptions`; rides are `Round Trip` (~80%) or `One Way`, everything else `None`; Tech Support and Household Chores/Handy Help set no location fields, all others get destination/address/city/state; Round Trips carry `appt_time`/`return_time` in Start → Arrival → Return → Finish slot order. A member's `service_notes` is echoed into `instructions` on every one of that member's requests, matching how prod repeats standing mobility notes. Every request's `created_user_id` points at a **manager or owner of its own village** (staff enter requests on behalf of members), so the app's creator attribution shows a plausible themed name.
 
 ## Maintaining the generator through schema changes
 
@@ -131,6 +133,6 @@ After merging schema changes from main: `npm test && npm run roundtrip` exercise
 
 ## Determinism
 
-The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 295 persons, ~200 service requests (105 of them bespoke gags), households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
+The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 296 persons, ~200 service requests (90 of them bespoke gags), households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
 
 The cameos are real Rhode Island historical figures and Lovecraft-lore characters, with gag service requests written to match their biographies.

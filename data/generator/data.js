@@ -1,5 +1,5 @@
 import { makeRng } from './rng.js'
-import { CAPABILITIES } from './constants.js'
+import { CAPABILITIES, ROLE } from './constants.js'
 import { buildVillagesAndUsers } from './builders/villages.js'
 import { buildPersons } from './builders/persons.js'
 import { buildMembership } from './builders/membership.js'
@@ -7,13 +7,22 @@ import { buildRequests } from './builders/requests.js'
 
 export function buildDataset (content, seed) {
   const rng = makeRng(seed)
-  const { village, user_data, village_grant, villageIdByName } = buildVillagesAndUsers(content, rng)
+  const { village, user_data, village_grant, villageIdByName, adminUserId } = buildVillagesAndUsers(content, rng)
   // requests builder needs villageId -> name; pass via a private field
   content.__villageById = Object.fromEntries(village.map(v => [v.id, v.name]))
 
+  // Service requests are entered by village staff — any manager or owner of
+  // the village is a plausible creator (created_user_id attribution). The dev
+  // admin owns every village but shouldn't dominate the byline, so skip it.
+  const creatorsByVillage = {}
+  for (const g of village_grant) {
+    if (g.userId === adminUserId) continue
+    if (g.roleId === ROLE.manage || g.roleId === ROLE.owner) (creatorsByVillage[g.villageId] ??= []).push(g.userId)
+  }
+
   const personsPlan = buildPersons(content, villageIdByName, rng)
   const membership = buildMembership(personsPlan, content, rng)
-  const requests = buildRequests(personsPlan, membership, content, rng)
+  const requests = buildRequests(personsPlan, membership, content, rng, creatorsByVillage)
 
   return {
     village, user_data, village_grant,

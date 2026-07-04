@@ -98,6 +98,9 @@ export function buildPersons (content, villageIdByName, rng) {
       if (i >= pool.length) break
       volunteers.push(makePerson(pool[i++], villageId, v.name))
     }
+    // every village must field at least one volunteer — if the name pool ran
+    // dry (the last villages get the leftovers), reuse a member
+    if (!volunteers.length && members.length) volunteers.push(rng.pick(members))
     byVillage[villageId] = { members, volunteers }
   }
   return { person, byVillage }

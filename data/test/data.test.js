@@ -100,6 +100,40 @@ test('users/grants: admin, multi-village coordinator, and zero-grants user exist
   for (const r of Object.values(ROLE)) assert.ok(roles.has(r), `missing role ${r}`)
 })
 
+test('grants cover every role in every village; requests are attributed to a manager/owner', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  // the blanket-owner dev admin doesn't count toward per-village coverage
+  const adminIds = new Set(ds.user_data.filter(u => u.username === 'admin').map(u => u.userId))
+  const count = {}
+  for (const g of ds.village_grant) {
+    if (adminIds.has(g.userId)) continue
+    count[g.villageId] = count[g.villageId] || {}
+    count[g.villageId][g.roleId] = (count[g.villageId][g.roleId] || 0) + 1
+  }
+  const bigIds = new Set(ds.village.filter(v => ['Arkham', 'Quahog'].includes(v.name)).map(v => v.id))
+  for (const v of ds.village) {
+    for (const [roleName, roleId] of Object.entries(ROLE)) {
+      const n = (count[v.id] || {})[roleId] || 0
+      assert.ok(n >= 1, `village ${v.name} has no ${roleName} user`)
+      if (bigIds.has(v.id)) assert.ok(n >= 2 && n <= 3, `big village ${v.name} should have 2-3 ${roleName} users, has ${n}`)
+    }
+  }
+  // every service request is created by a manager or owner of its own village
+  const creatorOk = new Set(ds.village_grant
+    .filter(g => !adminIds.has(g.userId) && (g.roleId === ROLE.manage || g.roleId === ROLE.owner))
+    .map(g => `${g.villageId}:${g.userId}`))
+  for (const sr of ds.service_request) {
+    assert.ok(sr.created_user_id, `request ${sr.id} has no creating user`)
+    assert.ok(creatorOk.has(`${sr.village_id}:${sr.created_user_id}`),
+      `request ${sr.id} creator ${sr.created_user_id} is not a manager/owner of village ${sr.village_id}`)
+  }
+  // every user carries a display-name claim for creator attribution
+  for (const u of ds.user_data) {
+    const claims = JSON.parse(u.lastClaims)
+    assert.ok(claims.name, `user ${u.username} needs a name claim`)
+  }
+})
+
 test('service requests honor deriveStatus and reference valid people', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   const personIds = new Set(ds.person.map(p => p.id))

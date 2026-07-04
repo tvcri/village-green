@@ -32,7 +32,7 @@ const gagCategory = (name) => {
   return 'Errand: Other'
 }
 
-export function buildRequests (plan, membership, content, rng) {
+export function buildRequests (plan, membership, content, rng, creatorsByVillage = {}) {
   const { byVillage } = plan
   const personById = Object.fromEntries(plan.person.map(p => [p.id, p]))
   const allDest = [...content.destinations.destinations, ...content.destinations.miskatonicHealth]
@@ -88,6 +88,7 @@ export function buildRequests (plan, membership, content, rng) {
   const makeRequest = (villageId, memberPersonId, opts = {}) => {
     srId += 1
     const vols = byVillage[villageId].volunteers
+    const creators = creatorsByVillage[villageId] || []
     let status = opts.status || rng.weighted(STATUS_W)
     // deriveStatus constraint: Confirmed/Completed MUST have a volunteer — if none in village, downgrade to Open
     if ((status === 'Confirmed' || status === 'Completed') && !vols.length) status = 'Open'
@@ -142,6 +143,8 @@ export function buildRequests (plan, membership, content, rng) {
       service_name: category,
       transportation_type: transportationType,
       destination, address, city, state, zip, phone,
+      // staff attribution — entered by a manager or owner of the village
+      created_user_id: creators.length ? rng.pick(creators) : null,
       created_at: dt(addDays(day, -rng.int(1, 14))),
       start_at: dt(atMinutes(day, startMin)),
       finish_at: dt(atMinutes(day, startMin + durMin)),
