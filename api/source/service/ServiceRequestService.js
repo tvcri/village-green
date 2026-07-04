@@ -41,6 +41,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.request_number AS requestNumber',
     'CAST(sr.village_id AS CHAR) AS villageId',
+    'v.name AS villageName',
     'CAST(sr.member_person_id AS CHAR) AS memberPersonId',
     'CAST(m.id AS CHAR) AS memberId',
     'mp.full_name AS memberFullName',
@@ -72,6 +73,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   ]
   const joins = new Set([
     'service_request sr',
+    'LEFT JOIN village v ON sr.village_id = v.id',
     'LEFT JOIN member m ON sr.member_person_id = m.person_id',
     'LEFT JOIN person mp ON sr.member_person_id = mp.id',
     'LEFT JOIN volunteer vol ON sr.volunteer_person_id = vol.person_id',

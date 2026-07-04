@@ -111,7 +111,10 @@ const timeDisplay = computed(() => {
         <div class="section-row">
           <!-- Member Section -->
           <div class="section" :class="request.volunteerFullName ? 'section-half' : 'section-full'">
-            <h3 class="section-header">Member</h3>
+            <h3 class="section-header">
+              Member
+              <Tag v-if="request.villageName" :value="request.villageName" severity="secondary" class="village-tag" />
+            </h3>
             <div v-if="request.memberFullName" class="detail-field">
               <span class="label">Name:</span>
               <span class="value">{{ request.memberFullName }}</span>
@@ -152,7 +155,10 @@ const timeDisplay = computed(() => {
 
           <!-- Volunteer Section -->
           <div v-if="request.volunteerFullName" class="section section-half">
-            <h3 class="section-header">Volunteer</h3>
+            <h3 class="section-header">
+              Volunteer
+              <Tag v-if="request.volunteerVillageName" :value="request.volunteerVillageName" severity="secondary" class="village-tag" />
+            </h3>
             <div class="detail-field">
               <span class="label">Name:</span>
               <span class="value">{{ request.volunteerFullName }}</span>
@@ -440,6 +446,17 @@ const timeDisplay = computed(() => {
   color: var(--color-primary);
   border-bottom: 2px solid var(--color-border-default);
   padding-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.village-tag {
+  text-transform: none;
+  font-weight: 700;
+  letter-spacing: normal;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
 }
 
 .description-section {
