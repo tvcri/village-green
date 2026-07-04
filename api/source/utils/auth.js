@@ -117,7 +117,7 @@ const setupUser = async function (req, res, next) {
                 throw new SmError.AuthorizeError("No token claim mappable to username found")
             }
             
-            const userObject = await UserService.getUserObject(username) ?? {username}
+            let userObject = await UserService.getUserObject(username) ?? {username}
 
             if (userObject.status === 'unavailable') {
                 throw new SmError.UserUnavailableError()
@@ -135,9 +135,15 @@ const setupUser = async function (req, res, next) {
                 refreshFields.lastClaims = JSON.stringify(tokenPayload)
             }
             if (refreshFields.lastAccess || refreshFields.lastClaims) {
-                const userId = await UserService.setUserData(userObject, refreshFields)
-                if (userId != userObject.userId) {
-                    userObject.userId = userId.toString()
+                const isNewUser = !userObject.userId
+                await UserService.setUserData(userObject, refreshFields)
+                if (isNewUser) {
+                    // Re-fetch instead of hand-patching the phantom {username} object:
+                    // setUserData's insert only wrote username + refreshFields, so the
+                    // fallback object never had privacyAckRequired, webPreferences,
+                    // grants, etc. A real getUserObject() call now finds the row and
+                    // returns the fully-computed shape used everywhere else.
+                    userObject = await UserService.getUserObject(username)
                 }
             }
 
@@ -152,6 +158,50 @@ const setupUser = async function (req, res, next) {
             }
 
             req.userObject = userObject
+        }
+        next()
+    }
+    catch (e) {
+        next(e)
+    }
+}
+
+// The only endpoints reachable while a user owes a privacy acknowledgement.
+// These are not conveniences — each is structurally required to bootstrap the
+// client or to escape the block. Everything else 403s. Matched against req.path
+// (the sub-path under the /api mount).
+//   - GET  /op/definition          client can't build its API layer without the spec
+//   - GET  /privacy/rules          the modal needs the agreement text to display
+//   - POST /privacy/acknowledgements  the act that clears the block (gating it deadlocks)
+//   - GET  /user                   always the caller's own record (no other-party PII);
+//                                   lets bootstrap seed real grants/prefs/status instead
+//                                   of mounting a stub user and reloading after ack
+const privacyAckAllowlist = [
+    { method: 'GET', path: '/op/definition' },
+    { method: 'GET', path: '/privacy/rules' },
+    { method: 'POST', path: '/privacy/acknowledgements' },
+    { method: 'GET', path: '/user' },
+]
+
+function isPrivacyAckAllowlisted(req) {
+    return privacyAckAllowlist.some(
+        entry => entry.method === req.method && entry.path === req.path
+    )
+}
+
+// express middleware: block protected requests when the caller owes a
+// privacy acknowledgement. Fail-closed — anything not allowlisted is blocked.
+// Expects to run after setupUser().
+const requirePrivacyAck = async function (req, res, next) {
+    try {
+        // No authenticated user (no token) → let auth/security layers handle it.
+        if (!req.userObject?.userId) return next()
+        if (isPrivacyAckAllowlisted(req)) return next()
+
+        // privacyAckRequired is precomputed by setupUser via getUserObject — no
+        // extra query here. The gate is a plain boolean read.
+        if (req.userObject.privacyAckRequired) {
+            throw new SmError.PrivacyAckRequiredError()
         }
         next()
     }
@@ -307,6 +357,7 @@ async function initializeAuth() {
 module.exports = {
     validateToken,
     setupUser,
+    requirePrivacyAck,
     validateOauthSecurity,
     validateWebhookBearer,
     initializeAuth,

@@ -85,6 +85,12 @@ const routes = [
     meta: { requiresAdmin: true },
   },
   {
+    path: '/admin/privacy',
+    name: 'admin-privacy',
+    component: () => import('../features/Admin/components/PrivacyRulesAdmin.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
     path: '/meta',
     name: 'meta',
     component: () => import('../features/MetaVillage/components/MetaVillage.vue'),

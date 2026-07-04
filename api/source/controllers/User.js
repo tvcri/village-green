@@ -90,9 +90,12 @@ module.exports.exportUserGroups = async function exportUserGroups (projections, 
 
 module.exports.getUser = async function getUser (req, res, next) {
   try {
-    const projection = ['villageGrants', 'statistics']
+    // privacyStatus is always included (not opt-in): the privacy-ack gate
+    // allowlists this endpoint specifically so bootstrap can read it while
+    // blocked, and the client has no other way to learn its own ack status.
+    const projection = ['villageGrants', 'statistics', 'privacyStatus']
     if (req.query.projection) {
-      projection.push(req.query.projection)
+      projection.push(...req.query.projection)
     }
 
     let response = await UserService.getUserByUserId(req.userObject.userId, projection)
