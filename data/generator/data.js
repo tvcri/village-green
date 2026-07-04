@@ -1,6 +1,7 @@
 import { makeRng } from './rng.js'
 import { CAPABILITIES, ROLE } from './constants.js'
 import { buildVillagesAndUsers } from './builders/villages.js'
+import { buildPrivacy } from './builders/privacy.js'
 import { buildPersons } from './builders/persons.js'
 import { buildMembership } from './builders/membership.js'
 import { buildRequests } from './builders/requests.js'
@@ -8,6 +9,7 @@ import { buildRequests } from './builders/requests.js'
 export function buildDataset (content, seed) {
   const rng = makeRng(seed)
   const { village, user_data, village_grant, villageIdByName, adminUserId } = buildVillagesAndUsers(content, rng)
+  const privacy = buildPrivacy(user_data, rng)
   // requests builder needs villageId -> name; pass via a private field
   content.__villageById = Object.fromEntries(village.map(v => [v.id, v.name]))
 
@@ -26,6 +28,7 @@ export function buildDataset (content, seed) {
 
   return {
     village, user_data, village_grant,
+    privacy_rules: privacy.privacy_rules, privacy_acknowledgement: privacy.privacy_acknowledgement,
     capability: CAPABILITIES.map(c => ({ id: c.id, name: c.name })),
     disability: membership.disability, vetting_type: membership.vetting_type,
     person: personsPlan.person,

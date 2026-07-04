@@ -195,6 +195,28 @@ test('service requests match the UI-enforced category/transport/location rules',
   for (const t of ['Round Trip', 'One Way', 'None']) assert.ok(tt.has(t), `missing transport ${t}`)
 })
 
+test('privacy: one published rule, acknowledged by every user (incl. the loader account)', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  assert.equal(ds.privacy_rules.length, 1)
+  const rule = ds.privacy_rules[0]
+  const userIds = new Set(ds.user_data.map(u => u.userId))
+  assert.ok(userIds.has(rule.publishedByUserId))
+  assert.ok(rule.content.length > 100 && rule.modifiedAt > rule.publishedAt)
+  // every user has acked the current rule — the API's ack gate 403s anyone who hasn't
+  const ackedUsers = new Set(ds.privacy_acknowledgement.map(a => a.userId))
+  assert.equal(ackedUsers.size, ds.user_data.length)
+  for (const a of ds.privacy_acknowledgement) {
+    assert.equal(a.rulesId, rule.id)
+    assert.ok(userIds.has(a.userId))
+    assert.ok(a.acknowledgedAt >= rule.publishedAt, 'acks cannot precede publication')
+    assert.doesNotThrow(() => JSON.parse(a.tokenClaims))
+  }
+  // the loader's machine account must exist and be acked, or import 403s itself
+  const loader = ds.user_data.find(u => u.username === 'demo-loader@villagegreen.test')
+  assert.ok(loader, 'demo-loader account must be pre-seeded')
+  assert.ok(ackedUsers.has(loader.userId))
+})
+
 test('notifications reference requests; recipients is a JSON string', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   const srIds = new Set(ds.service_request.map(s => s.id))

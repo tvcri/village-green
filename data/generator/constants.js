@@ -43,6 +43,7 @@ export const VILLAGES = [
 // Parent-before-child insert order (FK checks are disabled during load, but stay tidy).
 export const TABLE_ORDER = [
   'village', 'user_data', 'village_grant',
+  'privacy_rules', 'privacy_acknowledgement',
   'capability', 'disability', 'vetting_type',
   'person', 'member', 'volunteer',
   'volunteer_capability', 'volunteer_vetting', 'person_disability',

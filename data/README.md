@@ -25,13 +25,16 @@ That's it. The SQL seeder writes directly to MySQL and does not need the API run
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `npm run seed` | Direct-SQL seed into the DB (primary path; always works) |
-| `npm run emit` | Write `demo-appdata.jsonl` in the app-data format (needs the DB up for column introspection) |
-| `npm run import` | POST the JSONL to `/op/appdata` (needs the API + mock OIDC, see below) |
-| `npm run roundtrip` | seed → emit → import → sanity check |
-| `npm run doctor` | Schema-drift check only (also runs automatically before every command above) |
+| Command | Direction | What it does |
+|---|---|---|
+| `npm run seed` | generator → DB | Direct-SQL seed into the dev DB (primary path; no API needed) |
+| `npm run emit` | generator → file | Write `demo-appdata.jsonl` — built **locally by this tool** from the builders + live column introspection. Deterministic: the meta `date` is pinned so the same seed yields a byte-identical file (don't expect a fresh timestamp) |
+| `npm run import` | file → app | POST the generated JSONL to the app's **import** endpoint (`POST /op/appdata`; needs the API + mock OIDC, see below) |
+| `npm run export` | app → file | Call the app's **export** endpoint (`GET /op/appdata?format=jsonl`) and write `appdata-export.jsonl` — whatever is in the DB *right now*, serialized by the app itself (real timestamped meta, includes every table/column, not just what the generator sets) |
+| `npm run roundtrip` | all of the above | seed → emit → import → sanity check, exercising both load paths end to end |
+| `npm run doctor` | — | Schema-drift check only (also runs automatically before every command above) |
+
+**`emit` vs `export`** — both produce app-data JSONL, but from opposite ends: `emit` is the *generator's* serializer (what the dataset *should* be; reproducible, git-diffable), `export` is the *app's* serializer (what the DB actually *contains*, e.g. after clicking around the UI). Comparing an `export` taken right after an `import` is a good way to catch bugs in the app's own export path.
 
 ### Environment knobs
 
@@ -47,13 +50,13 @@ That's it. The SQL seeder writes directly to MySQL and does not need the API run
 | `VG_DEMO_SEED` | `20260630` | RNG seed (change to get a different but still deterministic dataset) |
 | `VG_DEMO_TOKEN` | _(unset)_ | Pre-minted bearer token (skips token mint from mock OIDC) |
 
-## App-data path (`emit` / `import` / `roundtrip`)
+## App-data path (`emit` / `import` / `export` / `roundtrip`)
 
-The `import` and `roundtrip` commands use the app's `/op/appdata` endpoint. This endpoint:
+The `import`, `export`, and `roundtrip` commands use the app's `/op/appdata` endpoint (POST = import/overwrite, GET = export). This endpoint:
 
 - Is **opt-in** — the API must be started with `VG_EXPERIMENTAL_APPDATA=true`
-- Requires the **mock OIDC** service on `:18080` — the loader mints a bearer token by sending a **GET** to `/api/get-token` with the admin username; the dataset is then **POSTed** to `/op/appdata`
-- The loader token uses the narrow scope `vg:op` (sufficient for `/op/appdata`)
+- Requires the **mock OIDC** service on `:18080` — the loader mints a bearer token by sending a **GET** to `/api/get-token` with the admin username, then POSTs (import) or GETs (export) `/op/appdata`
+- The loader token uses the narrow scope `vg:op`. Scopes are **hierarchical** (prefix-matched), so `vg:op` also satisfies the export endpoint's `vg:op:read` — longer scopes are restrictions of their shorter parents
 
 > **Note:** When logging in via the mock-OIDC browser form to use the app itself, enter the wider scope string into the form:
 > `vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:friends:read`
@@ -109,9 +112,18 @@ vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:
 
 Beyond these bespoke personas, a **coverage fill** pass tops up every village so it has at least one user of **each** grant role (Owner / Manage / Full / Restricted); the two big villages get 2–3 of each. Fill users are themed per village (`herbert.west@miskatonic.test`, `lois.griffin@quahog.test`, `alva.vanderbilt@newport.test`, `zadok.allen@innsmouth.test`, …) — see `FILL_LOGINS` in `generator/builders/villages.js` for the full roster. Any of them works as a mock-OIDC login. Every user carries a `name` claim in `lastClaims`, so creator attribution renders a display name rather than an email.
 
+## Privacy rules and acknowledgements
+
+The dataset publishes **one privacy-rules version** (a playground-flavored agreement, published and typo-fix-patched by `samuel.slater`) and an **acknowledgement for every user**, so no demo login ever hits the ack modal. This matters more than it looks: the API blocks nearly every endpoint (`privacy_ack_required`) for any user who hasn't acknowledged the current rules — only the spec, the rules text, the ack POST, and `/user` are reachable. Two consequences:
+
+- Typing a **new** username into the mock OIDC form gets the ack modal on first login (realistic, and a handy way to demo the feature).
+- Acknowledgements only count if they are **newer than `VG_PRIVACY_ACK_INTERVAL_DAYS`** (default 365). The seeded acks are dated April–May 2026, so around **spring 2027** they age out and every login starts modal-ing — re-seed, or publish a fresh rule in the Admin hub.
+
+The loader's machine account (`demo-loader@villagegreen.test`) is pre-seeded **with** an acknowledgement for the same reason — otherwise the app would create it on the loader's first call and the ack gate would 403 the import/export commands themselves.
+
 ## How the dataset is built
 
-Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows; ~35% of members get a standing `service_notes`) **→ service requests + FCV submissions**.
+Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows; ~35% of members get a standing `service_notes`) **→ service requests + FCV submissions**.
 
 Service requests are built in two passes:
 
@@ -133,6 +145,6 @@ After merging schema changes from main: `npm test && npm run roundtrip` exercise
 
 ## Determinism
 
-The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 296 persons, ~200 service requests (90 of them bespoke gags), households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
+The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 291 persons, ~200 service requests (90 of them bespoke gags), households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
 
 The cameos are real Rhode Island historical figures and Lovecraft-lore characters, with gag service requests written to match their biographies.

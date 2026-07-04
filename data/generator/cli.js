@@ -5,7 +5,7 @@ import { buildDataset, loadContent } from './data.js'
 import { seedSql } from './seed-sql.js'
 import { buildJsonl, columnMapFromDb } from './emit-appdata.js'
 import { columnMetaFromDb, analyzeDrift, loadBaseline } from './doctor.js'
-import { mintToken, importAppData } from './load-appdata.js'
+import { mintToken, importAppData, exportAppData } from './load-appdata.js'
 import { writeFileSync, readFileSync } from 'node:fs'
 
 const args = process.argv.slice(2)
@@ -37,11 +37,15 @@ async function sanity () {
       (SELECT COUNT(*) FROM volunteer) vol,
       (SELECT COUNT(*) FROM volunteer WHERE active = 1) avol,
       (SELECT COUNT(*) FROM service_request) sr,
-      (SELECT COUNT(*) FROM service_request WHERE status IN ('Confirmed','Completed') AND volunteer_person_id IS NULL) bad`)
+      (SELECT COUNT(*) FROM service_request WHERE status IN ('Confirmed','Completed') AND volunteer_person_id IS NULL) bad,
+      (SELECT COUNT(*) FROM user_data) u,
+      (SELECT COUNT(*) FROM privacy_acknowledgement) pa`)
     return c
   })
   if (r.v !== 10) throw new Error(`expected 10 villages, got ${r.v}`)
   if (r.bad !== 0) throw new Error(`${r.bad} Confirmed/Completed requests have no volunteer`)
+  // every user must have acked the privacy rules or the API's ack gate blocks them
+  if (r.pa !== r.u) throw new Error(`${r.u} users but ${r.pa} privacy acknowledgements`)
   if (!(r.am < r.m) || !(r.avol < r.vol)) throw new Error('active views should filter some rows')
   console.log('sanity OK:', r)
 }
@@ -75,6 +79,14 @@ if (has('--import')) {
   const jsonl = (has('--import') && val('--import', null)) ? readFileSync(path, 'utf8') : await emitJsonl(dataset)
   const token = await mintToken()
   console.log(await importAppData(config.api.base, token, jsonl))
+}
+if (has('--export')) {
+  // The app's own GET /op/appdata exporter — what's in the DB right now, as
+  // serialized by the app (vs --emit, which builds JSONL from the generator).
+  const out = val('--export', 'appdata-export.jsonl')
+  const token = await mintToken()
+  writeFileSync(out, await exportAppData(config.api.base, token))
+  console.log('wrote', out)
 }
 if (has('--roundtrip')) {
   console.log('SQL seed:', await seedSql(dataset))

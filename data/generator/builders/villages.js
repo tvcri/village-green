@@ -132,6 +132,14 @@ export function buildVillagesAndUsers (content, rng) {
   // 6) A zero-grants user (valid login, sees nothing).
   addUser('mr.calimari@quahog.test', 'Mr. Calimari')
 
+  // 6b) The import/export loader's machine account (load-appdata.js mints its
+  // token as this username). Pre-seeding it matters: the API creates a row for
+  // any authenticated caller, and the privacy-ack gate blocks /op/appdata for
+  // users who haven't acknowledged the current rules — without this row (and
+  // its acknowledgement, see builders/privacy.js) the loader would 403 itself.
+  addUser('demo-loader@villagegreen.test', 'demo-loader@villagegreen.test',
+    { scope: 'vg:op', realm_access: { roles: ['admin'] } })
+
   // 7) Coverage fill — every village offers at least one user of each grant
   // role (big villages carry 2-3 of each), drawn from the themed pools above.
   // The admin's blanket owner grants don't count: coverage should hold among
