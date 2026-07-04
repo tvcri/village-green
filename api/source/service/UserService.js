@@ -34,7 +34,7 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
   ])
   const groupBy = ['ud.userId']
 
-  const orderBy = ['ud.username']
+  const orderBy = ['displayName']
 
   // PROJECTIONS
   if (inProjection?.includes('villageGrants')) {
@@ -79,6 +79,36 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
 
   if(inProjection?.includes('webPreferences')) {
     columns.push(`ud.webPreferences`)
+  }
+
+  if (inProjection?.includes('privacyStatus')) {
+    // Correlated subqueries — one round-trip, no JS merge. needsAck is true
+    // unless the user's latest ack is of the current rules version AND within
+    // the configured interval. ackIntervalDays is a validated positive integer
+    // from server config (never user input), safe to inline as a literal.
+    const intervalDays = config.privacy.ackIntervalDays
+    columns.push(`(
+      select json_object(
+        'needsAck',
+          case
+            when (select id from privacy_rules order by id desc limit 1) is null then false
+            when exists (
+              select 1 from privacy_acknowledgement pa
+              where pa.userId = ud.userId
+                and pa.rulesId = (select id from privacy_rules order by id desc limit 1)
+                and pa.acknowledgedAt > (UTC_TIMESTAMP() - INTERVAL ${intervalDays} DAY)
+            ) then false
+            else true
+          end,
+        'pendingRulesId', (select id from privacy_rules order by id desc limit 1),
+        'lastAckedRulesId',
+          (select pa.rulesId from privacy_acknowledgement pa
+           where pa.userId = ud.userId order by pa.id desc limit 1),
+        'lastAcknowledgedAt',
+          (select date_format(pa.acknowledgedAt, '%Y-%m-%dT%TZ') from privacy_acknowledgement pa
+           where pa.userId = ud.userId order by pa.id desc limit 1)
+      )
+    ) as privacyStatus`)
   }
 
   // PREDICATES
@@ -546,13 +576,33 @@ exports.getUserObject = async function (username) {
         and cgDirect.userId is null
         and ud3.userId = ud.userId) dt
     where
-      dt.rn = 1) dt2) as grants     
+      dt.rn = 1) dt2) as grants,
+    -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
+    -- published and the user has no acknowledgement of the current version within
+    -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
+    (
+      case
+        when (select id from privacy_rules order by id desc limit 1) is null then 0
+        when exists (
+          select 1
+          from privacy_acknowledgement pa
+          where pa.userId = ud.userId
+            and pa.rulesId = (select id from privacy_rules order by id desc limit 1)
+            and pa.acknowledgedAt > (UTC_TIMESTAMP() - INTERVAL ? DAY)
+        ) then 0
+        else 1
+      end
+    ) as privacyAckRequired
   from
     user_data ud
   where
     ud.username = ?`
-  const [rows] = await dbUtils.pool.query(sql, [username])
-  return rows[0]
+  const [rows] = await dbUtils.pool.query(sql, [config.privacy.ackIntervalDays, username])
+  const row = rows[0]
+  if (row) {
+    row.privacyAckRequired = row.privacyAckRequired === 1
+  }
+  return row
 }
 
 exports.getUserWebPreferences = async function (userId) {

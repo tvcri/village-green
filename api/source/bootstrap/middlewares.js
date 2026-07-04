@@ -78,6 +78,7 @@ function configureServiceCheck(app) {
 function configureAuth(app) {
   app.use('/api', auth.validateToken)
   app.use('/api', auth.setupUser)
+  app.use('/api', auth.requirePrivacyAck)
 }
 
 function configureExpress(app) {
