@@ -57,6 +57,7 @@ const flatPerson = computed(() => {
   <Dialog
     v-model:visible="dialogVisible"
     modal
+    :pt="{ header: { style: { justifyContent: 'flex-end' } } }"
     :style="{ width: '72rem' }"
     :breakpoints="{ '1200px': '95vw' }"
   >
