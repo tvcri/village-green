@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { getPrivacyRules, createPrivacyAcknowledgement } from '../features/Admin/api/privacyApi.js'
@@ -17,9 +17,24 @@ const loading = ref(false)
 const loadError = ref(false)
 const error = ref(null)
 
+const contentEl = ref(null)
+// Sticky once true: only loadRules() resets it, so scrolling back up after
+// reaching the end doesn't re-disable the button.
+const hasScrolledToEnd = ref(false)
+
+function checkScrolledToEnd() {
+  const el = contentEl.value
+  if (!el) return
+  // Tolerance for subpixel rounding; also covers content that doesn't overflow.
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 2) {
+    hasScrolledToEnd.value = true
+  }
+}
+
 // Load (or reload) rules content whenever the modal becomes required.
 // Handles both cold-start and mid-session re-block (new version / interval).
 async function loadRules() {
+  hasScrolledToEnd.value = false
   loading.value = true
   loadError.value = false
   try {
@@ -32,10 +47,14 @@ async function loadRules() {
     // agree. Surface a retry instead of a silent blank modal.
     loadError.value = true
     console.error('[PrivacyAckModal] Failed to load rules:', err)
-  }
-  finally {
     loading.value = false
+    return
   }
+  loading.value = false
+  // Re-check once loading flips false and the content div has rendered:
+  // short text that doesn't overflow the container should not require a scroll.
+  await nextTick()
+  checkScrolledToEnd()
 }
 
 watch(needsAck, (blocked) => {
@@ -80,13 +99,19 @@ async function acknowledge() {
       <p class="privacy-error">Failed to load the privacy agreement.</p>
       <Button label="Retry" severity="secondary" @click="loadRules" />
     </div>
-    <div v-else class="privacy-content" v-html="rulesHtml" />
+    <div
+      v-else
+      ref="contentEl"
+      class="privacy-content"
+      v-html="rulesHtml"
+      @scroll="checkScrolledToEnd"
+    />
     <p v-if="error" class="privacy-error">{{ error }}</p>
     <template #footer>
       <Button
         label="I Agree"
         :loading="acknowledging"
-        :disabled="acknowledging || loading || loadError || !rulesHtml"
+        :disabled="acknowledging || loading || loadError || !rulesHtml || !hasScrolledToEnd"
         @click="acknowledge"
       />
     </template>
@@ -108,7 +133,7 @@ async function acknowledge() {
 }
 
 .privacy-content {
-  max-height: 60vh;
+  max-height: 50vh;
   overflow-y: auto;
   line-height: 1.6;
 }
