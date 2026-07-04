@@ -268,6 +268,34 @@ module.exports.getVillageVolunteers = async function (villageId) {
   return rows
 }
 
+module.exports.getVolunteers = async function ({ villageIdsGranted, elevate }) {
+  const columns = [
+    'p.full_name AS fullName',
+    'CAST(vol.id AS CHAR) AS volunteerId',
+    'CAST(vol.person_id AS CHAR) AS personId',
+  `  COALESCE(CAST(
+      CONCAT('[', GROUP_CONCAT(CONCAT('"',c.name,'"') ORDER BY c.name), ']')
+      AS JSON), JSON_ARRAY()) AS capabilities`
+  ]
+  const joins = new Set([
+    'active_volunteer vol',
+    'JOIN person p ON p.id = vol.person_id',
+    'LEFT JOIN volunteer_capability vc ON vc.volunteer_id = vol.id',
+    'LEFT JOIN capability c ON c.id = vc.capability_id'
+  ])
+  const predicates = { statements: [], binds: [] }
+  if (!elevate) {
+    if (!villageIdsGranted.length) return []
+    predicates.statements.push('p.village_id IN (?)')
+    predicates.binds.push(villageIdsGranted)
+  }
+  const groupBy = ['vol.id']
+  const orderBy = ['p.full_name']
+  const sql = dbUtils.makeQueryString({columns, joins, predicates, groupBy, orderBy, format: true})
+  const [rows] = await dbUtils.pool.query(sql)
+  return rows
+}
+
 module.exports.getVillagePersons = async function (villageId) {
   return await PersonService.getPersonsByVillage(villageId)
 }

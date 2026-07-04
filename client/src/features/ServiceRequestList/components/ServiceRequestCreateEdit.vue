@@ -19,7 +19,7 @@ import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
-import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
+import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
 
@@ -42,8 +42,13 @@ const { state: villageMembers, execute: fetchMembers } = useAsyncState(
   { immediate: false }
 )
 
+const anyVillageVolunteers = ref(false)
+
 const { state: villageVolunteers, execute: fetchVolunteers } = useAsyncState(
-  () => form.value.villageId ? getVillageVolunteers(form.value.villageId) : null,
+  () => {
+    if (anyVillageVolunteers.value) return getVolunteers()
+    return form.value.villageId ? getVillageVolunteers(form.value.villageId) : null
+  },
   { immediate: false }
 )
 
@@ -102,6 +107,10 @@ watch(existingRequest, async (val) => {
       if (!dateStr) return ''
       return new Date(dateStr)
     }
+    // A volunteer from outside the member's village only appears in the
+    // "any village" list, so flip the checkbox before villageId's watcher
+    // triggers fetchVolunteers, or the loaded volunteer won't be findable.
+    anyVillageVolunteers.value = !!(val.volunteerVillageId && val.volunteerVillageId !== val.villageId)
     form.value = {
       villageId: val.villageId || '',
       memberPersonId: val.memberPersonId || '',
@@ -197,6 +206,10 @@ watch(() => form.value.villageId, (villageId, oldVillageId) => {
     fetchMembers()
     fetchVolunteers()
   }
+})
+
+watch(anyVillageVolunteers, () => {
+  if (form.value.villageId) fetchVolunteers()
 })
 
 watch([allMemberOptions, () => form.value.memberPersonId], ([members, memberId]) => {
@@ -763,7 +776,13 @@ const openPersonDialog = (personId) => {
             </div>
 
             <div v-if="form.villageId">
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Volunteer</label>
+              <label class="volunteer-label">
+                <span>Volunteer</span>
+                <span class="any-village-toggle">
+                  <Checkbox v-model="anyVillageVolunteers" binary input-id="any-village-volunteers" />
+                  <label for="any-village-volunteers">From any village</label>
+                </span>
+              </label>
               <div class="person-field-row">
                 <AutoComplete
                   v-model="selectedVolunteer"
@@ -1084,6 +1103,27 @@ const openPersonDialog = (personId) => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.volunteer-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.any-village-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+}
+
+.any-village-toggle label {
+  cursor: pointer;
 }
 
 .card-header-wrapper {

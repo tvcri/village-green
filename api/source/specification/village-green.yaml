@@ -1447,6 +1447,8 @@ paths:
       tags:
       - Volunteer
       operationId: getVolunteers
+      parameters:
+        - $ref: '#/components/parameters/ElevateQuery'
       responses:
         '200':
           description: List of volunteers
@@ -3252,6 +3254,13 @@ components:
         volunteerFullName:
           type: string
           maxLength: 200
+          nullable: true
+        volunteerVillageId:
+          $ref: '#/components/schemas/VillageId'
+          nullable: true
+        volunteerVillageName:
+          type: string
+          maxLength: 100
           nullable: true
         status:
           type: string
