@@ -127,6 +127,13 @@ const config = {
         clientSecret: process.env.VG_GOOGLE_CLIENT_SECRET ?? '',
         redirectUri: process.env.VG_GOOGLE_REDIRECT_URI ?? '',
         mapsKey: process.env.VG_GOOGLE_MAPS_KEY ?? '',
+    },
+    privacy: {
+        ackIntervalDays: (() => {
+            const val = parseInt(process.env.VG_PRIVACY_ACK_INTERVAL_DAYS)
+            if (isNaN(val) || val < 1) return 365
+            return val
+        })(),
     }
 }
 

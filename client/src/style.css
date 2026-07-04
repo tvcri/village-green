@@ -306,3 +306,5 @@ textarea:focus {
 
 .paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
 .paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }
+
+.privacy-modal-mask { backdrop-filter: blur(8px); }

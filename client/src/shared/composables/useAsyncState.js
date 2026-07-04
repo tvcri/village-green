@@ -80,6 +80,13 @@ export function useAsyncState(promiseFactory, options = {}) {
         return null
       }
 
+      // Privacy-ack gate is handled globally by the ack modal; never surface it
+      // through the global error modal or onError. Fall into error state silently.
+      if (e.name === 'PrivacyAckError') {
+        error.value = e
+        return null
+      }
+
       error.value = e
       if (onError) {
         onError(e)

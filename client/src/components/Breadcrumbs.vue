@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
@@ -31,20 +31,37 @@ function getSiblings(routeName, currentParams) {
   }))
 }
 
-const { state: villages } = useAsyncState(
+// Only needed for village-scoped and meta routes (village name/dropdown).
+// Fetched lazily so the root villages route doesn't duplicate VillageList's
+// own (differently-projected) fetch of the same data.
+const { state: villages, execute: fetchVillages } = useAsyncState(
   () => getVillages(),
-  { immediate: true, onError: null }
+  { immediate: false, onError: null }
 )
 
-const { state: adminVillages } = useAsyncState(
+// Elevated-privilege lookups: only needed on the admin create-grant routes,
+// so fetch lazily and on-demand rather than for every user on every page.
+const { state: adminVillages, execute: fetchAdminVillages } = useAsyncState(
   () => getAdminVillages(),
-  { immediate: true, onError: null }
+  { immediate: false, onError: null }
 )
 
-const { state: adminUsers } = useAsyncState(
+const { state: adminUsers, execute: fetchAdminUsers } = useAsyncState(
   () => getAdminUsers(),
-  { immediate: true, onError: null }
+  { immediate: false, onError: null }
 )
+
+watch(() => route.name, (routeName) => {
+  if (!routeName) return
+
+  if (routeName === 'admin-create-grant' && adminVillages.value === null) {
+    fetchAdminVillages()
+  } else if (routeName === 'admin-create-user-grant' && adminUsers.value === null) {
+    fetchAdminUsers()
+  } else if (!routeName.startsWith('admin') && (route.params.villageId || routeName.startsWith('meta')) && villages.value === null) {
+    fetchVillages()
+  }
+}, { immediate: true })
 
 const breadcrumbs = computed(() => {
   const crumbs = [
