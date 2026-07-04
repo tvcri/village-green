@@ -74,6 +74,8 @@ async function acknowledge() {
   catch (err) {
     error.value = 'Failed to record acknowledgement. Please try again.'
     console.error('[PrivacyAckModal] Ack failed:', err)
+  }
+  finally {
     acknowledging.value = false
   }
 }
@@ -133,7 +135,7 @@ async function acknowledge() {
 }
 
 .privacy-content {
-  max-height: 50vh;
+  max-height: 60vh;
   overflow-y: auto;
   line-height: 1.6;
 }
