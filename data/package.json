@@ -6,6 +6,7 @@
   "description": "Deterministic RI-lore demo dataset generator + loaders for Village Green",
   "scripts": {
     "test": "node --test",
+    "doctor": "node generator/cli.js --doctor",
     "seed": "node generator/cli.js --sql",
     "emit": "node generator/cli.js --emit",
     "import": "node generator/cli.js --import",

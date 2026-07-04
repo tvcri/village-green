@@ -4,6 +4,7 @@ import { TABLE_ORDER } from './constants.js'
 import { buildDataset, loadContent } from './data.js'
 import { seedSql } from './seed-sql.js'
 import { buildJsonl, columnMapFromDb } from './emit-appdata.js'
+import { columnMetaFromDb, analyzeDrift, loadBaseline } from './doctor.js'
 import { mintToken, importAppData } from './load-appdata.js'
 import { writeFileSync, readFileSync } from 'node:fs'
 
@@ -45,7 +46,20 @@ async function sanity () {
   console.log('sanity OK:', r)
 }
 
+// Schema-drift check — runs before every command so renamed/dropped columns,
+// new required columns, and new UNACKNOWLEDGED columns all fail here, with
+// names, not mid-load with a SQL error. Known-unset columns live (with
+// reasons) in doctor-baseline.json.
+async function doctor (dataset) {
+  const meta = await withDb((conn) => columnMetaFromDb(conn, TABLE_ORDER))
+  const { errors, notices, acknowledged } = analyzeDrift(meta, dataset, TABLE_ORDER, loadBaseline())
+  for (const n of notices) console.log('doctor notice:', n)
+  if (errors.length) throw new Error('schema drift detected:\n  - ' + errors.join('\n  - '))
+  console.log(`doctor OK: ${TABLE_ORDER.length} tables checked, ${acknowledged} acknowledged-unset column(s)`)
+}
+
 const dataset = buildDataset(loadContent(), config.seed)
+await doctor(dataset)
 
 if (has('--sql') || args.length === 0) {
   console.log('SQL seed:', await seedSql(dataset))

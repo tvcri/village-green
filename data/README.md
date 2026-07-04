@@ -31,6 +31,7 @@ That's it. The SQL seeder writes directly to MySQL and does not need the API run
 | `npm run emit` | Write `demo-appdata.jsonl` in the app-data format (needs the DB up for column introspection) |
 | `npm run import` | POST the JSONL to `/op/appdata` (needs the API + mock OIDC, see below) |
 | `npm run roundtrip` | seed → emit → import → sanity check |
+| `npm run doctor` | Schema-drift check only (also runs automatically before every command above) |
 
 ### Environment knobs
 
@@ -116,6 +117,17 @@ Service requests are built in two passes:
 2. **Volume pass** — each village gets ≈ 0.8 × its active-member count of ordinary requests: a random active member × a weighted-random `catalog` entry (`Ride: Medical Appnt` ×6, other rides ×3 — prod is medical-ride-heavy) × a random destination from a pool matched to the service (medical → Miskatonic Health, shopping → grocery/food landmarks, personal care → the barber, activities → landmarks).
 
 Field rules mirror the client UI (`ServiceRequestCreateEdit.vue`): `service_name` is always one of the ten `serviceNameOptions`; rides are `Round Trip` (~80%) or `One Way`, everything else `None`; Tech Support and Household Chores/Handy Help set no location fields, all others get destination/address/city/state; Round Trips carry `appt_time`/`return_time` in Start → Arrival → Return → Finish slot order. A member's `service_notes` is echoed into `instructions` on every one of that member's requests, matching how prod repeats standing mobility notes.
+
+## Maintaining the generator through schema changes
+
+The schema is expected to change routinely. Two conventions keep those changes cheap:
+
+- **Builders set only the columns they mean.** Both load paths (direct SQL and app-data) omit unset columns so DB defaults apply — the generator never has to chase columns it doesn't care about.
+- **The doctor runs before every command** and compares what the builders emit against the live schema. Everything actionable is a hard **error** with the exact `table.column` named: a renamed/dropped column the builders still set, a new NOT-NULL-without-default column, or a **new unset column not yet acknowledged**. Every consciously-unset column lives in `generator/doctor-baseline.json` with a one-line reason — so when the schema grows a column, someone must either populate it in a builder (usually what we want, even for nullables) or record why not. Stale baseline entries (column since populated or dropped) surface as notices; prune them.
+
+After merging schema changes from main: `npm test && npm run roundtrip` exercises the builders, the UI-rule invariants, the live schema, and the `/op/appdata` endpoint in one shot.
+
+**Adding a new table**: add it to `TABLE_ORDER` in `generator/constants.js` (parent-before-child), build its rows in a builder, wire the builder into `generator/data.js`, and extend the `sanity()` counts in `generator/cli.js` plus a test.
 
 ## Determinism
 
