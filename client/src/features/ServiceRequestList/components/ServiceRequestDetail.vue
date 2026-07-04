@@ -107,86 +107,89 @@ const timeDisplay = computed(() => {
         </div>
       </template>
       <template #content>
-        <!-- Member Section -->
-        <div class="section">
-          <h3 class="section-header">Member</h3>
-          <div v-if="request.memberFullName" class="detail-field">
-            <span class="label">Name:</span>
-            <span class="value">{{ request.memberFullName }}</span>
+        <!-- Member / Volunteer Row -->
+        <div class="section-row">
+          <!-- Member Section -->
+          <div class="section" :class="request.volunteerFullName ? 'section-half' : 'section-full'">
+            <h3 class="section-header">Member</h3>
+            <div v-if="request.memberFullName" class="detail-field">
+              <span class="label">Name:</span>
+              <span class="value">{{ request.memberFullName }}</span>
+            </div>
+            <template v-if="request.memberAddress">
+              <div v-if="request.memberAddress.address" class="detail-field">
+                <span class="label">Address:</span>
+                <span class="value">{{ request.memberAddress.address }}</span>
+              </div>
+              <div v-if="request.memberAddress.city || request.memberAddress.state || request.memberAddress.zip" class="detail-field">
+                <span class="label">City/State/Zip:</span>
+                <span class="value">{{ [request.memberAddress.city, request.memberAddress.state, request.memberAddress.zip].filter(Boolean).join(', ') }}</span>
+              </div>
+              <div v-if="request.memberAddress.phone" class="detail-field">
+                <span class="label">Phone:</span>
+                <div class="phone-numbers">
+                  <a :href="`tel:${request.memberAddress.phone}`" class="phone-item">
+                    <i class="pi pi-phone"></i>
+                    <span class="phone-number">{{ request.memberAddress.phone }}</span>
+                  </a>
+                </div>
+              </div>
+              <div v-if="request.memberAddress.cell" class="detail-field">
+                <span class="label">Cell:</span>
+                <div class="phone-numbers">
+                  <a :href="`tel:${request.memberAddress.cell}`" class="phone-item">
+                    <i class="pi pi-phone"></i>
+                    <span class="phone-number">{{ request.memberAddress.cell }}</span>
+                  </a>
+                </div>
+              </div>
+              <div v-if="request.memberAddress.email" class="detail-field">
+                <span class="label">Email:</span>
+                <span class="value">{{ request.memberAddress.email }}</span>
+              </div>
+            </template>
           </div>
-          <template v-if="request.memberAddress">
-            <div v-if="request.memberAddress.address" class="detail-field">
-              <span class="label">Address:</span>
-              <span class="value">{{ request.memberAddress.address }}</span>
-            </div>
-            <div v-if="request.memberAddress.city || request.memberAddress.state || request.memberAddress.zip" class="detail-field">
-              <span class="label">City/State/Zip:</span>
-              <span class="value">{{ [request.memberAddress.city, request.memberAddress.state, request.memberAddress.zip].filter(Boolean).join(', ') }}</span>
-            </div>
-            <div v-if="request.memberAddress.phone" class="detail-field">
-              <span class="label">Phone:</span>
-              <div class="phone-numbers">
-                <a :href="`tel:${request.memberAddress.phone}`" class="phone-item">
-                  <i class="pi pi-phone"></i>
-                  <span class="phone-number">{{ request.memberAddress.phone }}</span>
-                </a>
-              </div>
-            </div>
-            <div v-if="request.memberAddress.cell" class="detail-field">
-              <span class="label">Cell:</span>
-              <div class="phone-numbers">
-                <a :href="`tel:${request.memberAddress.cell}`" class="phone-item">
-                  <i class="pi pi-phone"></i>
-                  <span class="phone-number">{{ request.memberAddress.cell }}</span>
-                </a>
-              </div>
-            </div>
-            <div v-if="request.memberAddress.email" class="detail-field">
-              <span class="label">Email:</span>
-              <span class="value">{{ request.memberAddress.email }}</span>
-            </div>
-          </template>
-        </div>
 
-        <!-- Volunteer Section -->
-        <div v-if="request.volunteerFullName" class="section">
-          <h3 class="section-header">Volunteer</h3>
-          <div class="detail-field">
-            <span class="label">Name:</span>
-            <span class="value">{{ request.volunteerFullName }}</span>
+          <!-- Volunteer Section -->
+          <div v-if="request.volunteerFullName" class="section section-half">
+            <h3 class="section-header">Volunteer</h3>
+            <div class="detail-field">
+              <span class="label">Name:</span>
+              <span class="value">{{ request.volunteerFullName }}</span>
+            </div>
+            <template v-if="request.volunteerAddress">
+              <div v-if="request.volunteerAddress.address" class="detail-field">
+                <span class="label">Address:</span>
+                <span class="value">{{ request.volunteerAddress.address }}</span>
+              </div>
+              <div v-if="request.volunteerAddress.city || request.volunteerAddress.state || request.volunteerAddress.zip" class="detail-field">
+                <span class="label">City/State/Zip:</span>
+                <span class="value">{{ [request.volunteerAddress.city, request.volunteerAddress.state, request.volunteerAddress.zip].filter(Boolean).join(', ') }}</span>
+              </div>
+              <div v-if="request.volunteerAddress.phone" class="detail-field">
+                <span class="label">Phone:</span>
+                <div class="phone-numbers">
+                  <a :href="`tel:${request.volunteerAddress.phone}`" class="phone-item">
+                    <i class="pi pi-phone"></i>
+                    <span class="phone-number">{{ request.volunteerAddress.phone }}</span>
+                  </a>
+                </div>
+              </div>
+              <div v-if="request.volunteerAddress.cell" class="detail-field">
+                <span class="label">Cell:</span>
+                <div class="phone-numbers">
+                  <a :href="`tel:${request.volunteerAddress.cell}`" class="phone-item">
+                    <i class="pi pi-phone"></i>
+                    <span class="phone-number">{{ request.volunteerAddress.cell }}</span>
+                  </a>
+                </div>
+              </div>
+              <div v-if="request.volunteerAddress.email" class="detail-field">
+                <span class="label">Email:</span>
+                <span class="value">{{ request.volunteerAddress.email }}</span>
+              </div>
+            </template>
           </div>
-          <template v-if="request.volunteerAddress">
-            <div v-if="request.volunteerAddress.address" class="detail-field">
-              <span class="label">Address:</span>
-              <span class="value">{{ request.volunteerAddress.address }}</span>
-            </div>
-            <div v-if="request.volunteerAddress.city || request.volunteerAddress.state || request.volunteerAddress.zip" class="detail-field">
-              <span class="label">City/State/Zip:</span>
-              <span class="value">{{ [request.volunteerAddress.city, request.volunteerAddress.state, request.volunteerAddress.zip].filter(Boolean).join(', ') }}</span>
-            </div>
-            <div v-if="request.volunteerAddress.phone" class="detail-field">
-              <span class="label">Phone:</span>
-              <div class="phone-numbers">
-                <a :href="`tel:${request.volunteerAddress.phone}`" class="phone-item">
-                  <i class="pi pi-phone"></i>
-                  <span class="phone-number">{{ request.volunteerAddress.phone }}</span>
-                </a>
-              </div>
-            </div>
-            <div v-if="request.volunteerAddress.cell" class="detail-field">
-              <span class="label">Cell:</span>
-              <div class="phone-numbers">
-                <a :href="`tel:${request.volunteerAddress.cell}`" class="phone-item">
-                  <i class="pi pi-phone"></i>
-                  <span class="phone-number">{{ request.volunteerAddress.cell }}</span>
-                </a>
-              </div>
-            </div>
-            <div v-if="request.volunteerAddress.email" class="detail-field">
-              <span class="label">Email:</span>
-              <span class="value">{{ request.volunteerAddress.email }}</span>
-            </div>
-          </template>
         </div>
 
         <!-- Description Section -->
@@ -392,6 +395,29 @@ const timeDisplay = computed(() => {
   margin-bottom: 0;
 }
 
+.section-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: 1rem 1.5rem;
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+}
+
+.section-row .section {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.section-half {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.section-full {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, 1fr);
+}
+
 /* The notification list is a single grid child; without this it would sit in
    one of the section's 3 columns and wrap chips at ~1/3 width. Span all columns. */
 .notifications-section > :deep(.notification-history) {
@@ -471,6 +497,10 @@ const timeDisplay = computed(() => {
   .section {
     grid-template-columns: 1fr 1fr;
   }
+
+  .section-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 600px) {
@@ -481,6 +511,10 @@ const timeDisplay = computed(() => {
   .section {
     grid-template-columns: 1fr;
     gap: 1rem;
+  }
+
+  .section-half {
+    grid-template-columns: 1fr;
   }
 }
 </style>
