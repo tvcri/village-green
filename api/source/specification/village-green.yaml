@@ -1531,6 +1531,22 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
 
+  /disabilities:
+    get:
+      summary: List active disabilities
+      tags: [Disability]
+      operationId: getDisabilities
+      responses:
+        '200':
+          description: List of disabilities
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Disability' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
   /capabilities:
     get:
       summary: List all volunteer capabilities
@@ -2377,6 +2393,15 @@ components:
       required: [ communityId, name ]
       properties:
         communityId: { $ref: '#/components/schemas/CommunityId' }
+        name: { type: string, maxLength: 100 }
+    DisabilityId:
+      $ref: '#/components/schemas/StringIntId'
+    Disability:
+      additionalProperties: false
+      type: object
+      required: [ disabilityId, name ]
+      properties:
+        disabilityId: { $ref: '#/components/schemas/DisabilityId' }
         name: { type: string, maxLength: 100 }
     PersonDisability:
       additionalProperties: false
