@@ -21,12 +21,7 @@ export const patchPerson = (personId, body) =>
 
 export const deletePerson = (personId) => apiCall('deletePerson', { personId })
 
-export const getPersonCommunities = (personId) =>
-  apiCall('getPersonCommunities', { personId })
-
-export const putPersonCommunities = (personId, communityIds) =>
-  apiCall('putPersonCommunities', { personId }, { communityIds })
-
 // Lookups (Plan A Task 8.5): full lists for id<->name resolution.
 export const getCommunities  = () => apiCall('getCommunities')
 export const getCapabilities = () => apiCall('getCapabilities')
+export const getDisabilities = () => apiCall('getDisabilities')
