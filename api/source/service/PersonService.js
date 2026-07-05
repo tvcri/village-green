@@ -60,6 +60,7 @@ module.exports.getPerson = async function (personId, projections = []) {
     'p.full_name AS fullName',
     'p.last_name AS lastName',
     'p.first_name AS firstName',
+    'p.middle_initial AS middleInitial',
     'p.nickname',
     'p.address',
     'p.city',

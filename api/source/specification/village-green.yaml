@@ -2777,6 +2777,10 @@ components:
           type: string
           maxLength: 100
           nullable: true
+        middleInitial:
+          type: string
+          maxLength: 10
+          nullable: true
         nickname:
           type: string
           maxLength: 100

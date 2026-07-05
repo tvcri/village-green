@@ -60,6 +60,11 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.firstName }}</span>
         </div>
 
+        <div v-if="person.middleInitial" class="detail-field">
+          <span class="label">Middle Initial:</span>
+          <span class="value">{{ person.middleInitial }}</span>
+        </div>
+
         <div v-if="person.lastName" class="detail-field">
           <span class="label">Last Name:</span>
           <span class="value">{{ person.lastName }}</span>
