@@ -5,7 +5,8 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import UploadStep from './UploadStep.vue'
-// PersonStep / MemberStep / DoneStep imported as they land in Tasks 8-10
+import PersonStep from './PersonStep.vue'
+// MemberStep / DoneStep imported as they land in Tasks 9-10
 
 const router = useRouter()
 
@@ -73,7 +74,11 @@ function exit () {
       </div>
 
       <UploadStep v-if="currentStep.key === 'upload'" @extracted="onExtracted" />
-      <!-- PersonStep / MemberStep / DoneStep render here (Tasks 8-10) -->
+      <PersonStep v-else-if="currentStep.key.startsWith('person-')"
+        :key="currentStep.key"
+        :extraction="extraction" :memberIndex="currentStep.memberIndex"
+        @person-done="onPersonDone" />
+      <!-- MemberStep / DoneStep render here (Tasks 9-10) -->
 
       <div class="wizard-footer">
         <span v-if="extraction?.usage" class="usage">
