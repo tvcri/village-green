@@ -17,7 +17,10 @@ module.exports.extractApplication = async function extractApplication (req, res,
       throw new SmError.ClientError('PDF exceeds the 20MB limit for extraction.')
     }
     const { data, usage } = await ApplicationImportService.extractFromPdf(req.file.buffer)
-    const villages = await VillageService.getVillages()
+    // queryVillages returns [] unless elevate/grants bypass its grant-based
+    // filter; village resolution here needs the full list regardless of the
+    // operator's own village grants.
+    const villages = await VillageService.queryVillages({ elevate: true })
     res.json(ApplicationImportService.assembleResponse(data, villages, usage))
   }
   catch (err) {
