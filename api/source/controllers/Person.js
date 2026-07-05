@@ -31,8 +31,9 @@ module.exports.getPersons = async function getPersons (req, res, next) {
 module.exports.createPerson = async function createPerson (req, res, next) {
   try {
     const body = req.body
-    const response = await PersonService.createPerson(body)
-    res.status(201).json(response[0])
+    const personId = await PersonService.createPerson(body)
+    const response = await PersonService.getPerson(personId)
+    res.status(201).json(response)
   }
   catch (err) {
     next(err)

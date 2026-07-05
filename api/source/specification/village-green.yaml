@@ -3259,6 +3259,12 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageId'
           nullable: true
+        communities:
+          type: array
+          items: { $ref: '#/components/schemas/CommunityId' }
+        disabilities:
+          type: array
+          items: { $ref: '#/components/schemas/PersonDisabilityPatch' }
     PersonRoles:
       type: array
       items:

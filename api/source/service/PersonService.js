@@ -240,14 +240,24 @@ module.exports.getPersonsByVillage = async function (villageId) {
 }
 
 module.exports.createPerson = async function (body) {
+  const { communities, disabilities, ...personFields } = body
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const [personInsertResult] = await connection.query('INSERT INTO person SET ?', body)
-      return personInsertResult.insertId
+      const [personInsertResult] = await connection.query('INSERT INTO person SET ?', personFields)
+      const newPersonId = personInsertResult.insertId
+      if (communities?.length) {
+        const values = communities.map(communityId => [newPersonId, communityId])
+        await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
+      }
+      if (disabilities?.length) {
+        const values = disabilities.map(d => [newPersonId, d.disabilityId, d.note ?? null])
+        await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
+      }
+      return newPersonId
     },
     statusObj: undefined
   })
-  return await queryPersons({personId: insertId})
+  return insertId
 }
 
 module.exports.patchPerson = async function (personId, body) {
