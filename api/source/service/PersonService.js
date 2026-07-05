@@ -6,9 +6,10 @@ const _this = this
 async function queryPersons (inPredicates = {}) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
-    'p.full_name AS fullName',
-    'p.last_name AS lastName',
-    'p.first_name AS firstName',
+    'p.fullName',
+    'p.lastName',
+    'p.firstName',
+    'p.middleInitial',
     'p.nickname',
     'p.address',
     'p.city',
@@ -17,11 +18,11 @@ async function queryPersons (inPredicates = {}) {
     'p.email',
     'p.phone',
     'p.cell',
-    'p.emergency_contact_name AS emergencyContactName',
-    'p.emergency_contact_relationship AS emergencyContactRelationship',
-    'p.emergency_contact_phone AS emergencyContactPhone',
-    'p.emergency_contact_email AS emergencyContactEmail',
-    "DATE_FORMAT(p.birth_date, '%Y-%m-%d') AS birthDate",
+    'p.emergencyContactName',
+    'p.emergencyContactRelationship',
+    'p.emergencyContactPhone',
+    'p.emergencyContactEmail',
+    "DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate",
     `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
     `CASE
       WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
@@ -32,11 +33,11 @@ async function queryPersons (inPredicates = {}) {
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.village_id',
-    'LEFT JOIN active_member m ON m.person_id = p.id',
-    'LEFT JOIN active_volunteer vol ON vol.person_id = p.id'
+    'JOIN village v ON v.id = p.villageId',
+    'LEFT JOIN active_member m ON m.personId = p.id',
+    'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
   ])
-  const orderBy = ['p.full_name']
+  const orderBy = ['p.fullName']
   const predicates = { statements: [], binds: [] }
 
   if (inPredicates?.personId) {
@@ -45,7 +46,7 @@ async function queryPersons (inPredicates = {}) {
   }
 
   if (inPredicates?.villageId) {
-    predicates.statements.push('p.village_id = ?')
+    predicates.statements.push('p.villageId = ?')
     predicates.binds.push(inPredicates.villageId)
   }
 
@@ -57,9 +58,10 @@ async function queryPersons (inPredicates = {}) {
 module.exports.getPerson = async function (personId, projections = []) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
-    'p.full_name AS fullName',
-    'p.last_name AS lastName',
-    'p.first_name AS firstName',
+    'p.fullName',
+    'p.lastName',
+    'p.firstName',
+    'p.middleInitial',
     'p.nickname',
     'p.address',
     'p.city',
@@ -68,11 +70,11 @@ module.exports.getPerson = async function (personId, projections = []) {
     'p.email',
     'p.phone',
     'p.cell',
-    'p.emergency_contact_name AS emergencyContactName',
-    'p.emergency_contact_relationship AS emergencyContactRelationship',
-    'p.emergency_contact_phone AS emergencyContactPhone',
-    'p.emergency_contact_email AS emergencyContactEmail',
-    "DATE_FORMAT(p.birth_date, '%Y-%m-%d') AS birthDate",
+    'p.emergencyContactName',
+    'p.emergencyContactRelationship',
+    'p.emergencyContactPhone',
+    'p.emergencyContactEmail',
+    "DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate",
     `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
     `CASE
       WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
@@ -83,20 +85,20 @@ module.exports.getPerson = async function (personId, projections = []) {
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.village_id',
-    'LEFT JOIN active_member m ON m.person_id = p.id',
-    'LEFT JOIN active_volunteer vol ON vol.person_id = p.id'
+    'JOIN village v ON v.id = p.villageId',
+    'LEFT JOIN active_member m ON m.personId = p.id',
+    'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
   ])
   const predicates = { statements: ['p.id = ?'], binds: [personId] }
 
   if (projections.includes('memberInfo')) {
     columns.push(`(SELECT JSON_OBJECT(
       'memberId', CAST(id AS CHAR),
-      'memberNumber', member_number,
-      'memberLevel', member_level,
-      'serviceNotes', service_notes,
-      'joinDate', DATE_FORMAT(join_date, '%Y-%m-%d')
-    ) FROM active_member WHERE person_id = p.id) AS memberInfo`)
+      'memberNumber', memberNumber,
+      'memberLevel', memberLevel,
+      'serviceNotes', serviceNotes,
+      'joinDate', DATE_FORMAT(joinDate, '%Y-%m-%d')
+    ) FROM active_member WHERE personId = p.id) AS memberInfo`)
   }
 
   if (projections.includes('volunteerInfo')) {
@@ -108,10 +110,10 @@ module.exports.getPerson = async function (personId, projections = []) {
           JSON_ARRAY()
         )
         FROM volunteer_capability vc
-        JOIN capability c ON c.id = vc.capability_id
-        WHERE vc.volunteer_id = vol2.id
+        JOIN capability c ON c.id = vc.capabilityId
+        WHERE vc.volunteerId = vol2.id
       )
-    ) FROM active_volunteer vol2 WHERE vol2.person_id = p.id) AS volunteerInfo`)
+    ) FROM active_volunteer vol2 WHERE vol2.personId = p.id) AS volunteerInfo`)
   }
 
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
@@ -126,27 +128,8 @@ module.exports.getPersonsByVillage = async function (villageId) {
 module.exports.createPerson = async function (body) {
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const { villageId, ...personFields } = body
-      const mappedFields = {}
-      if (personFields.fullName !== undefined) mappedFields.full_name = personFields.fullName
-      if (personFields.lastName !== undefined) mappedFields.last_name = personFields.lastName
-      if (personFields.firstName !== undefined) mappedFields.first_name = personFields.firstName
-      if (personFields.nickname !== undefined) mappedFields.nickname = personFields.nickname
-      if (personFields.address !== undefined) mappedFields.address = personFields.address
-      if (personFields.city !== undefined) mappedFields.city = personFields.city
-      if (personFields.state !== undefined) mappedFields.state = personFields.state
-      if (personFields.zip !== undefined) mappedFields.zip = personFields.zip
-      if (personFields.email !== undefined) mappedFields.email = personFields.email
-      if (personFields.phone !== undefined) mappedFields.phone = personFields.phone
-      if (personFields.cell !== undefined) mappedFields.cell = personFields.cell
-      if (personFields.birthDate !== undefined) mappedFields.birth_date = personFields.birthDate
-      if (personFields.joinDate !== undefined) mappedFields.join_date = personFields.joinDate
-      if (villageId !== undefined) mappedFields.village_id = villageId
-
-      const [personInsertResult] = await connection.query('INSERT INTO person SET ?', mappedFields)
-      const insertId = personInsertResult.insertId
-
-      return insertId
+      const [personInsertResult] = await connection.query('INSERT INTO person SET ?', body)
+      return personInsertResult.insertId
     },
     statusObj: undefined
   })
@@ -156,26 +139,8 @@ module.exports.createPerson = async function (body) {
 module.exports.patchPerson = async function (personId, body) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const { villageId, ...personFields } = body
-
-      const mappedFields = {}
-      if (personFields.fullName !== undefined) mappedFields.full_name = personFields.fullName
-      if (personFields.lastName !== undefined) mappedFields.last_name = personFields.lastName
-      if (personFields.firstName !== undefined) mappedFields.first_name = personFields.firstName
-      if (personFields.nickname !== undefined) mappedFields.nickname = personFields.nickname
-      if (personFields.address !== undefined) mappedFields.address = personFields.address
-      if (personFields.city !== undefined) mappedFields.city = personFields.city
-      if (personFields.state !== undefined) mappedFields.state = personFields.state
-      if (personFields.zip !== undefined) mappedFields.zip = personFields.zip
-      if (personFields.email !== undefined) mappedFields.email = personFields.email
-      if (personFields.phone !== undefined) mappedFields.phone = personFields.phone
-      if (personFields.cell !== undefined) mappedFields.cell = personFields.cell
-      if (personFields.birthDate !== undefined) mappedFields.birth_date = personFields.birthDate
-      if (personFields.joinDate !== undefined) mappedFields.join_date = personFields.joinDate
-      if (villageId !== undefined) mappedFields.village_id = villageId
-
-      if (Object.keys(mappedFields).length > 0) {
-        await connection.query('UPDATE person SET ? WHERE id = ?', [mappedFields, personId])
+      if (Object.keys(body).length > 0) {
+        await connection.query('UPDATE person SET ? WHERE id = ?', [body, personId])
       }
     },
     statusObj: undefined
@@ -190,7 +155,7 @@ module.exports.deletePerson = async function (personId) {
 module.exports.getPersons = async function ({ villageIdsGranted, elevate, villageId, firstName, lastName, phone, email }) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
-    'p.full_name AS fullName',
+    'p.fullName',
     `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
     `CASE
       WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
@@ -203,27 +168,27 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.village_id',
-    'LEFT JOIN active_member m ON m.person_id = p.id',
-    'LEFT JOIN active_volunteer vol ON vol.person_id = p.id'
+    'JOIN village v ON v.id = p.villageId',
+    'LEFT JOIN active_member m ON m.personId = p.id',
+    'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
   ])
   const predicates = { statements: [], binds: [] }
 
   if (!elevate) {
     if (!villageIdsGranted.length) return []
-    predicates.statements.push('p.village_id IN (?)')
+    predicates.statements.push('p.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)
   }
   if (villageId && villageId.length > 0) {
-    predicates.statements.push('p.village_id IN (?)')
+    predicates.statements.push('p.villageId IN (?)')
     predicates.binds.push(villageId)
   }
   if (firstName) {
-    predicates.statements.push('p.first_name LIKE ?')
+    predicates.statements.push('p.firstName LIKE ?')
     predicates.binds.push(`%${firstName}%`)
   }
   if (lastName) {
-    predicates.statements.push('p.last_name LIKE ?')
+    predicates.statements.push('p.lastName LIKE ?')
     predicates.binds.push(`%${lastName}%`)
   }
   if (phone) {
@@ -235,7 +200,7 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
     predicates.binds.push(`%${email}%`)
   }
 
-  const orderBy = ['p.full_name']
+  const orderBy = ['p.fullName']
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows

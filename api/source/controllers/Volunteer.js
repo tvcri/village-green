@@ -1,11 +1,17 @@
 'use strict';
 
 const SmError = require('../utils/error')
+const VillageService = require('../service/VillageService')
 
 module.exports.getVolunteers = async function getVolunteers (req, res, next) {
   try {
-    // TODO: Implement getVolunteers
-    res.json({})
+    const elevate = req.query.elevate
+    if (elevate && !req.userObject.privileges?.admin) {
+      throw new SmError.PrivilegeError()
+    }
+    const villageIdsGranted = Object.keys(req.userObject.grants)
+    const response = await VillageService.getVolunteers({ villageIdsGranted, elevate })
+    res.json(response)
   }
   catch (err) {
     next(err)

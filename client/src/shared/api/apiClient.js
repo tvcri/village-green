@@ -1,4 +1,5 @@
 import { OpenApiOps } from './openApiOps.js'
+import { reloadIfExpired } from '../../auth/tokenExpiry.js'
 import { usePrivacyAck } from '../composables/usePrivacyAck.js'
 /*
  * See docs/architecture/fetching-asyncDataOperations-ErrorHandling.md
@@ -134,6 +135,10 @@ function getBaseUrl() {
  * api.post('/stigs', { name: 'test' })
  */
 export async function apiFetch(path, opts = {}) {
+  if (reloadIfExpired()) {
+    return new Promise(() => {}) // reload in flight; page is unloading, never resolve
+  }
+
   let url
   // to be edited
   if (path.startsWith('http')) {

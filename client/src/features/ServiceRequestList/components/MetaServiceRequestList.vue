@@ -5,6 +5,8 @@ import { useScrollRestore } from '../../../shared/composables/useScrollRestore.j
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
@@ -296,7 +298,10 @@ const clearFilters = () => {
             </div>
             <div class="search-box">
               <label>Request ID / #:</label>
-              <InputText v-model="idSearch" placeholder="Search by ID or number" />
+              <IconField>
+                <InputText v-model="idSearch" placeholder="Search by ID or number" />
+                <InputIcon v-if="idSearch" class="pi pi-times" style="cursor: pointer" @click="idSearch = ''" />
+              </IconField>
             </div>
           </div>
 
