@@ -6,7 +6,8 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import UploadStep from './UploadStep.vue'
 import PersonStep from './PersonStep.vue'
-// MemberStep / DoneStep imported as they land in Tasks 9-10
+import MemberStep from './MemberStep.vue'
+// DoneStep imported as it lands in Task 10
 
 const router = useRouter()
 
@@ -78,7 +79,14 @@ function exit () {
         :key="currentStep.key"
         :extraction="extraction" :memberIndex="currentStep.memberIndex"
         @person-done="onPersonDone" />
-      <!-- MemberStep / DoneStep render here (Tasks 9-10) -->
+      <MemberStep v-else-if="currentStep.key.startsWith('member-')"
+        :key="currentStep.key"
+        :extraction="extraction" :memberIndex="currentStep.memberIndex"
+        :personId="created[currentStep.memberIndex].personId"
+        :primaryPersonId="currentStep.memberIndex > 0 ? created[0].personId : null"
+        :primaryPersonName="currentStep.memberIndex > 0 ? created[0].fullName : ''"
+        @member-done="onMemberDone" />
+      <!-- DoneStep renders here (Task 10) -->
 
       <div class="wizard-footer">
         <span v-if="extraction?.usage" class="usage">
