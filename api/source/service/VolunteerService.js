@@ -48,23 +48,32 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { capabilityIds = [], associateVillageIds = [] } = {}) {
+module.exports.putVolunteer = async function (personId, { providerType = null, active = null, capabilityIds = [], associateVillageIds = [] } = {}) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const volunteerId = await ensureVolunteer(connection, personId)
+      await connection.query(
+        'UPDATE volunteer SET providerType = ?, active = ? WHERE id = ?', [providerType, active, volunteerId]
+      )
       await replaceCapabilities(connection, volunteerId, capabilityIds)
       await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
     },
     statusObj: undefined
   })
-  return await PersonService.getPerson(personId, ['volunteerInfo'])
+  return await PersonService.getPerson(personId, ['volunteerDetail'])
 }
 
-// Partial update: replace only the arrays that are present.
+// Partial update: replace only the fields/arrays that are present.
 module.exports.patchVolunteer = async function (personId, body = {}) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const volunteerId = await ensureVolunteer(connection, personId)
+      const fields = {}
+      if (body.providerType !== undefined) fields.providerType = body.providerType
+      if (body.active !== undefined) fields.active = body.active
+      if (Object.keys(fields).length) {
+        await connection.query('UPDATE volunteer SET ? WHERE id = ?', [fields, volunteerId])
+      }
       if (body.capabilityIds !== undefined) {
         await replaceCapabilities(connection, volunteerId, body.capabilityIds)
       }
@@ -74,7 +83,7 @@ module.exports.patchVolunteer = async function (personId, body = {}) {
     },
     statusObj: undefined
   })
-  return await PersonService.getPerson(personId, ['volunteerInfo'])
+  return await PersonService.getPerson(personId, ['volunteerDetail'])
 }
 
 module.exports.deleteVolunteer = async function (personId) {

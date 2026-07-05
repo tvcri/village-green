@@ -17,6 +17,11 @@ const props = defineProps({
   columnCount: {
     type: Number,
     default: 4
+  },
+  detailLevel: {
+    type: String,
+    enum: ['info', 'full'],
+    default: 'info'
   }
 })
 
@@ -38,6 +43,7 @@ const mapAddress = computed(() => {
 
 const isMember = computed(() => props.personType === 'member' || props.personType === 'member, volunteer')
 const isVolunteer = computed(() => props.personType === 'volunteer' || props.personType === 'member, volunteer')
+const isFullDetail = computed(() => props.detailLevel === 'full')
 
 const serviceNotesSpan = computed(() => Math.min(props.columnCount, 2))
 
@@ -148,6 +154,72 @@ const copyEmail = async (email) => {
           <span class="label">Join Date:</span>
           <span class="value">{{ person.joinDate }}</span>
         </div>
+
+        <template v-if="isFullDetail">
+          <div v-if="person.memberType" class="detail-field">
+            <span class="label">Member Type:</span>
+            <span class="value">{{ person.memberType }}</span>
+          </div>
+
+          <div v-if="person.primaryPerson?.fullName" class="detail-field">
+            <span class="label">Primary Person:</span>
+            <span class="value">{{ person.primaryPerson.fullName }}</span>
+          </div>
+
+          <div v-if="person.secondaryType" class="detail-field">
+            <span class="label">Secondary Type:</span>
+            <span class="value">{{ person.secondaryType }}</span>
+          </div>
+
+          <div v-if="person.status" class="detail-field">
+            <span class="label">Status:</span>
+            <span class="value">{{ person.status }}</span>
+          </div>
+
+          <div v-if="person.dropReason" class="detail-field">
+            <span class="label">Drop Reason:</span>
+            <span class="value">{{ person.dropReason }}</span>
+          </div>
+
+          <div v-if="person.householdSize != null" class="detail-field">
+            <span class="label">Household Size:</span>
+            <span class="value">{{ person.householdSize }}</span>
+          </div>
+
+          <div v-if="person.householdDues != null" class="detail-field">
+            <span class="label">Household Dues:</span>
+            <span class="value">{{ Number(person.householdDues).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) }}</span>
+          </div>
+
+          <div v-if="person.quickbooksKey" class="detail-field">
+            <span class="label">Quickbooks Key:</span>
+            <span class="value">{{ person.quickbooksKey }}</span>
+          </div>
+
+          <div v-if="person.printedNewsletter != null" class="detail-field">
+            <span class="label">Printed Newsletter:</span>
+            <span class="value">{{ person.printedNewsletter ? 'Yes' : 'No' }}</span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Member Notes Section (full detail only) -->
+      <div v-if="isFullDetail && (person.confidentialNotes || person.statusChangeNotes || person.miscNotes)" class="section">
+        <h3 class="section-header">Member Notes</h3>
+        <div v-if="person.confidentialNotes" class="detail-field notes-field">
+          <span class="label">Confidential Notes:</span>
+          <span class="value">{{ person.confidentialNotes }}</span>
+        </div>
+
+        <div v-if="person.statusChangeNotes" class="detail-field notes-field">
+          <span class="label">Status Change Notes:</span>
+          <span class="value">{{ person.statusChangeNotes }}</span>
+        </div>
+
+        <div v-if="person.miscNotes" class="detail-field notes-field">
+          <span class="label">Misc Notes:</span>
+          <span class="value">{{ person.miscNotes }}</span>
+        </div>
       </div>
 
       <!-- Service Notes Section -->
@@ -171,6 +243,29 @@ const copyEmail = async (email) => {
               class="capability-badge"
             />
           </div>
+        </div>
+
+        <template v-if="isFullDetail">
+          <div v-if="person.providerType" class="detail-field">
+            <span class="label">Provider Type:</span>
+            <span class="value">{{ person.providerType }}</span>
+          </div>
+
+          <div v-if="person.active != null" class="detail-field">
+            <span class="label">Active:</span>
+            <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Vetting Section (full detail only) -->
+      <div v-if="isFullDetail && isVolunteer && person.vettings?.length" class="section">
+        <h3 class="section-header">Vetting</h3>
+        <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
+          <span class="label">{{ vetting.name }}:</span>
+          <span class="value">
+            {{ vetting.dateEntered || 'Unknown' }}<template v-if="vetting.dateExpired"> – {{ vetting.dateExpired }}</template>
+          </span>
         </div>
       </div>
 
@@ -375,6 +470,10 @@ const copyEmail = async (email) => {
 
 .service-notes-field {
   grid-column: span v-bind(serviceNotesSpan);
+}
+
+.notes-field {
+  grid-column: 1 / -1;
 }
 
 .map-section {

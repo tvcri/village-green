@@ -14,7 +14,7 @@ const toast = useToast()
 const personId = computed(() => route.params.personId)
 
 const { state: person } = useAsyncState(
-  () => apiCall('getPerson', { personId: personId.value, projection: ['memberInfo', 'volunteerInfo'] }),
+  () => apiCall('getPerson', { personId: personId.value, projection: ['memberDetail', 'volunteerDetail'] }),
   { immediate: true }
 )
 
@@ -29,8 +29,8 @@ const personType = computed(() => {
 
 const flatPerson = computed(() => {
   if (!person.value) return null
-  const { memberInfo, volunteerInfo, ...rest } = person.value
-  return { ...rest, ...memberInfo, ...volunteerInfo }
+  const { memberDetail, volunteerDetail, ...rest } = person.value
+  return { ...rest, ...memberDetail, ...volunteerDetail }
 })
 
 function goEdit () { router.push({ name: 'meta-person-edit', params: { personId: personId.value } }) }
@@ -58,7 +58,7 @@ async function removePerson () {
       <Button label="Volunteer" icon="pi pi-users" severity="secondary" @click="goVolunteer" />
       <Button label="Delete" icon="pi pi-trash" severity="danger" @click="removePerson" />
     </div>
-    <PersonDetailCard v-if="flatPerson" :person="flatPerson" :person-type="personType" />
+    <PersonDetailCard v-if="flatPerson" :person="flatPerson" :person-type="personType" detail-level="full" />
   </div>
 </template>
 

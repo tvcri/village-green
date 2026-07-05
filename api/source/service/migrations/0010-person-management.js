@@ -64,9 +64,46 @@ const upMigration = [
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
 
   `INSERT INTO community (name) VALUES ('Pride'), ('Veteran')`,
+
+  // Follow STIGMAN convention: boolean-intent columns are BIT(1), not
+  // tinyint(1). mysql2 reads/writes BIT(1) as a JS boolean via the pool's
+  // existing typeCast; JSON_OBJECT() embedding still requires an explicit
+  // `!= 0` cast regardless of column type (see PersonService.js memberDetail).
+  `ALTER TABLE person MODIFY COLUMN computerUse BIT(1) DEFAULT NULL`,
+  `ALTER TABLE person MODIFY COLUMN smartphone BIT(1) DEFAULT NULL`,
+  `ALTER TABLE member MODIFY COLUMN printedNewsletter BIT(1) DEFAULT NULL`,
+  `ALTER TABLE volunteer MODIFY COLUMN active BIT(1) DEFAULT NULL`,
+
+  // Views must be re-created to pick up the new column types (SELECT * is
+  // resolved at view-creation time, not at query time).
+  `CREATE OR REPLACE VIEW active_member AS
+     SELECT id, personId, memberNumber, memberLevel, memberType,
+       primaryPersonId, secondaryType, serviceNotes, joinDate, createdDate,
+       status, dropReason, householdSize, householdDues, quickbooksKey,
+       printedNewsletter, confidentialNotes, statusChangeNotes, miscNotes
+     FROM member WHERE status = 'Active'`,
+  `CREATE OR REPLACE VIEW active_volunteer AS
+     SELECT id, personId, providerType, active
+     FROM volunteer WHERE active = 1`,
 ]
 
 const downMigration = [
+  // Revert views and columns back to tinyint(1) before the rest of the
+  // down-migration runs (reverse of the up-migration's append order).
+  `CREATE OR REPLACE VIEW active_volunteer AS
+     SELECT id, personId, providerType, active
+     FROM volunteer WHERE active = 1`,
+  `CREATE OR REPLACE VIEW active_member AS
+     SELECT id, personId, memberNumber, memberLevel, memberType,
+       primaryPersonId, secondaryType, serviceNotes, joinDate, createdDate,
+       status, dropReason, householdSize, householdDues, quickbooksKey,
+       printedNewsletter, confidentialNotes, statusChangeNotes, miscNotes
+     FROM member WHERE status = 'Active'`,
+  `ALTER TABLE volunteer MODIFY COLUMN active tinyint(1) DEFAULT NULL`,
+  `ALTER TABLE member MODIFY COLUMN printedNewsletter tinyint(1) DEFAULT NULL`,
+  `ALTER TABLE person MODIFY COLUMN smartphone tinyint(1) DEFAULT NULL`,
+  `ALTER TABLE person MODIFY COLUMN computerUse tinyint(1) DEFAULT NULL`,
+
   // Revert fullName to a plain, writable column (preserving current values).
   `ALTER TABLE person
      MODIFY COLUMN fullName VARCHAR(200) NOT NULL`,

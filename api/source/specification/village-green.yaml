@@ -2769,20 +2769,151 @@ components:
           type: string
           maxLength: 100
           nullable: true
+        memberType:
+          type: string
+          maxLength: 50
+          nullable: true
+        primaryPersonId:
+          $ref: '#/components/schemas/PersonId'
+          nullable: true
+        secondaryType:
+          type: string
+          maxLength: 50
+          nullable: true
         serviceNotes:
           type: string
           nullable: true
         joinDate:
           type: string
           format: date
+        status:
+          type: string
+          maxLength: 50
+          nullable: true
+        dropReason:
+          type: string
+          maxLength: 100
+          nullable: true
+        householdSize:
+          type: integer
+          nullable: true
+        householdDues:
+          type: number
+          nullable: true
+        quickbooksKey:
+          type: string
+          maxLength: 50
+          nullable: true
+        printedNewsletter:
+          type: boolean
+          nullable: true
+        confidentialNotes:
+          type: string
+          nullable: true
+        statusChangeNotes:
+          type: string
+          nullable: true
+        miscNotes:
+          type: string
+          nullable: true
     MemberPut:
       additionalProperties: false
       type: object
       properties:
         memberNumber: { type: string, maxLength: 50 }
         memberLevel:  { type: string, maxLength: 100 }
-        serviceNotes: { type: string }
-        joinDate:     { type: string, format: date }
+        memberType:   { type: string, maxLength: 50 }
+        primaryPersonId:
+          $ref: '#/components/schemas/PersonId'
+        secondaryType:   { type: string, maxLength: 50 }
+        serviceNotes:    { type: string }
+        joinDate:        { type: string, format: date }
+        status:          { type: string, maxLength: 50 }
+        dropReason:      { type: string, maxLength: 100 }
+        householdSize:   { type: integer }
+        householdDues:   { type: number }
+        quickbooksKey:   { type: string, maxLength: 50 }
+        printedNewsletter: { type: boolean }
+        confidentialNotes: { type: string }
+        statusChangeNotes: { type: string }
+        miscNotes:         { type: string }
+    MemberDetail:
+      additionalProperties: false
+      type: object
+      required:
+      - memberId
+      - personId
+      properties:
+        memberId:
+          $ref: '#/components/schemas/MemberId'
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        memberNumber:
+          type: string
+          maxLength: 50
+          nullable: true
+        memberLevel:
+          type: string
+          maxLength: 100
+          nullable: true
+        memberType:
+          type: string
+          maxLength: 50
+          nullable: true
+        primaryPerson:
+          type: object
+          nullable: true
+          properties:
+            personId:
+              $ref: '#/components/schemas/PersonId'
+            fullName:
+              type: string
+              maxLength: 200
+        secondaryType:
+          type: string
+          maxLength: 50
+          nullable: true
+        serviceNotes:
+          type: string
+          nullable: true
+        joinDate:
+          type: string
+          format: date
+          nullable: true
+        createdDate:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          maxLength: 50
+          nullable: true
+        dropReason:
+          type: string
+          maxLength: 100
+          nullable: true
+        householdSize:
+          type: integer
+          nullable: true
+        householdDues:
+          type: number
+          nullable: true
+        quickbooksKey:
+          type: string
+          maxLength: 50
+          nullable: true
+        printedNewsletter:
+          type: boolean
+          nullable: true
+        confidentialNotes:
+          type: string
+          nullable: true
+        statusChangeNotes:
+          type: string
+          nullable: true
+        miscNotes:
+          type: string
+          nullable: true
     Person:
       additionalProperties: false
       type: object
@@ -2874,8 +3005,14 @@ components:
         memberInfo:
           $ref: '#/components/schemas/Member'
           nullable: true
+        memberDetail:
+          $ref: '#/components/schemas/MemberDetail'
+          nullable: true
         volunteerInfo:
           $ref: '#/components/schemas/Volunteer'
+          nullable: true
+        volunteerDetail:
+          $ref: '#/components/schemas/VolunteerDetail'
           nullable: true
         communityInfo:
           type: array
@@ -3932,12 +4069,68 @@ components:
             properties:
               villageId: { $ref: '#/components/schemas/VillageId' }
               name: { type: string }
+    VettingTypeId:
+      $ref: '#/components/schemas/StringIntId'
+    VolunteerDetail:
+      additionalProperties: false
+      type: object
+      required:
+      - volunteerId
+      - personId
+      properties:
+        volunteerId:
+          $ref: '#/components/schemas/VolunteerId'
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        providerType:
+          type: string
+          maxLength: 50
+          nullable: true
+        active:
+          type: boolean
+          nullable: true
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityName'
+        associateVillages:
+          type: array
+          items:
+            type: object
+            properties:
+              villageId: { $ref: '#/components/schemas/VillageId' }
+              name: { type: string }
+        vettings:
+          type: array
+          items:
+            type: object
+            properties:
+              vettingTypeId:
+                $ref: '#/components/schemas/VettingTypeId'
+              name:
+                type: string
+                maxLength: 100
+              dateEntered:
+                type: string
+                format: date
+                nullable: true
+              dateExpired:
+                type: string
+                format: date
+                nullable: true
     VolunteerId:
       $ref: '#/components/schemas/StringIntId'
     VolunteerPut:
       additionalProperties: false
       type: object
       properties:
+        providerType:
+          type: string
+          maxLength: 50
+          nullable: true
+        active:
+          type: boolean
+          nullable: true
         capabilityIds:
           type: array
           items: { $ref: '#/components/schemas/CapabilityId' }
@@ -3949,6 +4142,13 @@ components:
       type: object
       minProperties: 1
       properties:
+        providerType:
+          type: string
+          maxLength: 50
+          nullable: true
+        active:
+          type: boolean
+          nullable: true
         capabilityIds:
           type: array
           items: { $ref: '#/components/schemas/CapabilityId' }
@@ -4165,7 +4365,9 @@ components:
           type: string
           enum:
           - memberInfo
+          - memberDetail
           - volunteerInfo
+          - volunteerDetail
           - communityInfo
     PrivilegeQuery:
       name: privilege

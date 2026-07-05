@@ -105,6 +105,33 @@ module.exports.getPerson = async function (personId, projections = []) {
     ) FROM active_member WHERE personId = p.id) AS memberInfo`)
   }
 
+  if (projections.includes('memberDetail')) {
+    columns.push(`(SELECT JSON_OBJECT(
+      'memberId', CAST(m2.id AS CHAR),
+      'personId', CAST(m2.personId AS CHAR),
+      'memberNumber', m2.memberNumber,
+      'memberLevel', m2.memberLevel,
+      'memberType', m2.memberType,
+      'primaryPerson', (
+        SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
+        FROM person pp WHERE pp.id = m2.primaryPersonId
+      ),
+      'secondaryType', m2.secondaryType,
+      'serviceNotes', m2.serviceNotes,
+      'joinDate', DATE_FORMAT(m2.joinDate, '%Y-%m-%d'),
+      'createdDate', DATE_FORMAT(m2.createdDate, '%Y-%m-%d'),
+      'status', m2.status,
+      'dropReason', m2.dropReason,
+      'householdSize', m2.householdSize,
+      'householdDues', m2.householdDues,
+      'quickbooksKey', m2.quickbooksKey,
+      'printedNewsletter', m2.printedNewsletter != 0,
+      'confidentialNotes', m2.confidentialNotes,
+      'statusChangeNotes', m2.statusChangeNotes,
+      'miscNotes', m2.miscNotes
+    ) FROM member m2 WHERE m2.personId = p.id) AS memberDetail`)
+  }
+
   if (projections.includes('volunteerInfo')) {
     columns.push(`(SELECT JSON_OBJECT(
       'volunteerId', CAST(vol2.id AS CHAR),
@@ -129,6 +156,51 @@ module.exports.getPerson = async function (personId, projections = []) {
         WHERE vva.volunteerId = vol2.id
       )
     ) FROM active_volunteer vol2 WHERE vol2.personId = p.id) AS volunteerInfo`)
+  }
+
+  if (projections.includes('volunteerDetail')) {
+    columns.push(`(SELECT JSON_OBJECT(
+      'volunteerId', CAST(vol3.id AS CHAR),
+      'personId', CAST(vol3.personId AS CHAR),
+      'providerType', vol3.providerType,
+      'active', vol3.active != 0,
+      'capabilities', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(CONCAT('"', c.name, '"') ORDER BY c.name), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_capability vc
+        JOIN capability c ON c.id = vc.capabilityId
+        WHERE vc.volunteerId = vol3.id
+      ),
+      'associateVillages', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT('villageId', CAST(vva.villageId AS CHAR), 'name', av.name) ORDER BY av.name
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_village_associate vva
+        JOIN village av ON av.id = vva.villageId
+        WHERE vva.volunteerId = vol3.id
+      ),
+      'vettings', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT(
+              'vettingTypeId', CAST(vv.vettingTypeId AS CHAR),
+              'name', vt.name,
+              'dateEntered', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d'),
+              'dateExpired', DATE_FORMAT(vv.dateExpired, '%Y-%m-%d')
+            ) ORDER BY vt.name, vv.dateEntered
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_vetting vv
+        JOIN vetting_type vt ON vt.id = vv.vettingTypeId
+        WHERE vv.volunteerId = vol3.id
+      )
+    ) FROM volunteer vol3 WHERE vol3.personId = p.id) AS volunteerDetail`)
   }
 
   if (projections.includes('communityInfo')) {

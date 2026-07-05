@@ -34,7 +34,7 @@ module.exports.putMember = async function (personId, body) {
     },
     statusObj: undefined
   })
-  return await PersonService.getPerson(personId, ['memberInfo'])
+  return await PersonService.getPerson(personId, ['memberDetail'])
 }
 
 // Partially update an existing member role.
@@ -47,7 +47,7 @@ module.exports.patchMember = async function (personId, body) {
     },
     statusObj: undefined
   })
-  return await PersonService.getPerson(personId, ['memberInfo'])
+  return await PersonService.getPerson(personId, ['memberDetail'])
 }
 
 module.exports.deleteMember = async function (personId) {
