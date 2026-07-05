@@ -1,5 +1,8 @@
 'use strict'
 
+const Anthropic = require('@anthropic-ai/sdk')
+const config = require('../utils/config')
+
 // --- structured-outputs schema helpers -------------------------------------
 const str = { type: ['string', 'null'] }
 const num = { type: ['number', 'null'] }
@@ -160,10 +163,55 @@ function computeCost ({ input_tokens, output_tokens }) {
   }
 }
 
+async function extractFromPdf (pdfBuffer) {
+  const client = new Anthropic({ apiKey: config.anthropic.apiKey })
+  let message
+  try {
+    message = await client.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 4096,
+      output_config: { format: { type: 'json_schema', schema: EXTRACTION_SCHEMA } },
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: 'application/pdf',
+              data: pdfBuffer.toString('base64'),
+            },
+          },
+          { type: 'text', text: EXTRACTION_PROMPT },
+        ],
+      }],
+    })
+  }
+  catch (sdkErr) {
+    const err = new Error(`Anthropic API error: ${sdkErr.message}`)
+    err.status = 502
+    throw err
+  }
+  if (message.stop_reason === 'refusal') {
+    const err = new Error('The extraction request was declined by the model. Verify the document is an application form.')
+    err.status = 400
+    throw err
+  }
+  const text = message.content?.find(b => b.type === 'text')?.text
+  if (!text) {
+    const err = new Error('Claude returned an empty response.')
+    err.status = 502
+    throw err
+  }
+  // Structured outputs guarantee this parses and validates against EXTRACTION_SCHEMA
+  return { data: JSON.parse(text), usage: computeCost(message.usage) }
+}
+
 module.exports = {
   EXTRACTION_PROMPT,
   EXTRACTION_SCHEMA,
   resolveVillage,
   assembleResponse,
   computeCost,
+  extractFromPdf,
 }
