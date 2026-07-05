@@ -1827,6 +1827,58 @@ paths:
       security:
       - oauth:
         - vg:village
+  /villages/{villageId}/members:
+    get:
+      summary: List members in a village
+      tags:
+      - Village
+      operationId: getVillageMembers
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      responses:
+        '200':
+          description: Member list for village
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
+  /villages/{villageId}/volunteers:
+    get:
+      summary: List volunteers in a village
+      tags:
+      - Village
+      operationId: getVillageVolunteers
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      responses:
+        '200':
+          description: Volunteer list for village
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Volunteer'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
   /villages/{villageId}/persons:
     get:
       summary: List persons in a village

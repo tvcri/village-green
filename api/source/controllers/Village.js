@@ -96,6 +96,48 @@ module.exports.deleteVillage = async function deleteVillage (req, res, next) {
   }
 }
 
+module.exports.getVillageMembers = async function getVillageMembers (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      grants: req.userObject.grants,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await VillageService.getVillageMembers(villageId)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.getVillageVolunteers = async function getVillageVolunteers (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+
+    const existing = await VillageService.queryVillages({
+      filter: {villageId},
+      grants: req.userObject.grants,
+      userId: req.userObject.userId
+    })
+    if (!existing[0]) {
+      throw new SmError.NotFoundError()
+    }
+
+    const response = await VillageService.getVillageVolunteers(villageId)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
 module.exports.getVillagePersons = async function getVillagePersons (req, res, next) {
   try {
     const villageId = req.params.villageId
