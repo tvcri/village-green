@@ -64,8 +64,9 @@ module.exports.patchPerson = async function patchPerson (req, res, next) {
       throw new SmError.NotFoundError()
     }
 
-    const response = await PersonService.patchPerson(personId, body)
-    res.json(response[0])
+    await PersonService.patchPerson(personId, body)
+    const response = await PersonService.getPerson(personId)
+    res.json(response)
   }
   catch (err) {
     next(err)

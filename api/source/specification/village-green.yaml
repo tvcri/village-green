@@ -2411,6 +2411,13 @@ components:
         disabilityId: { $ref: '#/components/schemas/DisabilityId' }
         name: { type: string, maxLength: 100 }
         note: { type: string, maxLength: 255, nullable: true }
+    PersonDisabilityPatch:
+      additionalProperties: false
+      type: object
+      required: [ disabilityId ]
+      properties:
+        disabilityId: { $ref: '#/components/schemas/DisabilityId' }
+        note: { type: string, maxLength: 255, nullable: true }
     CommitBranch:
       type: string
     CommitDescribe:
@@ -3227,6 +3234,12 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageId'
           nullable: true
+        communities:
+          type: array
+          items: { $ref: '#/components/schemas/CommunityId' }
+        disabilities:
+          type: array
+          items: { $ref: '#/components/schemas/PersonDisabilityPatch' }
     PersonPost:
       additionalProperties: false
       type: object

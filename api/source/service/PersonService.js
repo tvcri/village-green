@@ -251,15 +251,30 @@ module.exports.createPerson = async function (body) {
 }
 
 module.exports.patchPerson = async function (personId, body) {
+  const { communities, disabilities, ...personFields } = body
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      if (Object.keys(body).length > 0) {
-        await connection.query('UPDATE person SET ? WHERE id = ?', [body, personId])
+      if (Object.keys(personFields).length > 0) {
+        await connection.query('UPDATE person SET ? WHERE id = ?', [personFields, personId])
+      }
+      if (communities !== undefined) {
+        await connection.query('DELETE FROM person_community WHERE personId = ?', [personId])
+        if (communities.length) {
+          const values = communities.map(communityId => [personId, communityId])
+          await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
+        }
+      }
+      if (disabilities !== undefined) {
+        await connection.query('DELETE FROM person_disability WHERE personId = ?', [personId])
+        if (disabilities.length) {
+          const values = disabilities.map(d => [personId, d.disabilityId, d.note ?? null])
+          await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
+        }
       }
     },
     statusObj: undefined
   })
-  return await queryPersons({personId})
+  return personId
 }
 
 module.exports.deletePerson = async function (personId) {
