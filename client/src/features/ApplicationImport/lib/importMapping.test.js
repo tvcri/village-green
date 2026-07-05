@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  mapPersonForm, personCommunityNames, mapMemberForm, composeNotes,
+  mapPersonForm, personCommunityNames, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
 } from './importMapping.js'
 
@@ -79,6 +79,24 @@ describe('personCommunityNames', () => {
   })
 })
 
+describe('personDisabilities', () => {
+  it('maps Yes/Sometimes accessibility answers to disability names, skips No', () => {
+    const result = personDisabilities(extraction(), 0)
+    expect(result).toEqual(new Map([['Hearing', null]]))
+  })
+  it('returns an empty map when accessibility is null', () => {
+    expect(personDisabilities(extraction(), 1)).toEqual(new Map())
+  })
+  it('maps all five fields to their disability names when all are Yes', () => {
+    const e = extraction()
+    e.members[0].extras.accessibility = {
+      difficultyHearing: 'Yes', visionLimited: 'Yes', usesWalker: 'Yes', usesCane: 'Yes', usesWheelchair: 'Yes',
+    }
+    const result = personDisabilities(e, 0)
+    expect([...result.keys()].sort()).toEqual(['Cane', 'Hearing', 'Vision', 'Walker', 'Wheelchair'])
+  })
+})
+
 describe('mapMemberForm', () => {
   it('maps defaults and household size for Dual', () => {
     const f = mapMemberForm(extraction(), 0, null)
@@ -101,17 +119,16 @@ describe('composeNotes', () => {
     expect(notes).toContain('Imported from application PDF')
     expect(notes).toContain('Ambassador: Pat Smith')
     expect(notes).toContain('Gender: F')
-    expect(notes).toContain('Difficulty hearing: Sometimes')
     expect(notes).toContain('Circle of Pride preferred: Yes')
     expect(notes).toContain('Payment method: Personal Check')
     expect(notes).toContain('Dues (yearly): 120')
     expect(notes).toContain('Emergency contact home phone: 401-555-9999')
     expect(notes).toContain('Accessibility notes: Hearing: uses hearing aids sometimes.')
     expect(notes).not.toContain('Veteran')        // mapped to community
+    expect(notes).not.toContain('Difficulty hearing')  // mapped to structured disabilities
     expect(notes).not.toContain('null')
   })
-  it('omits accessibility lines when accessibility is null', () => {
-    expect(composeNotes(extraction(), 1)).not.toContain('hearing')
+  it('omits accessibility notes line when accessibilityNotes is null', () => {
     expect(composeNotes(extraction(), 1)).not.toContain('Accessibility notes')
   })
 })

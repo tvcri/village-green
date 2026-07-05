@@ -29,6 +29,25 @@ export function personCommunityNames (extraction, memberIndex) {
   return names
 }
 
+const DISABILITY_NAMES_BY_FIELD = {
+  difficultyHearing: 'Hearing',
+  visionLimited: 'Vision',
+  usesWalker: 'Walker',
+  usesCane: 'Cane',
+  usesWheelchair: 'Wheelchair',
+}
+
+export function personDisabilities (extraction, memberIndex) {
+  const result = new Map()
+  const accessibility = extraction.members[memberIndex].extras.accessibility
+  if (!accessibility) return result
+  for (const [field, name] of Object.entries(DISABILITY_NAMES_BY_FIELD)) {
+    const answer = accessibility[field]
+    if (answer === 'Yes' || answer === 'Sometimes') result.set(name, null)
+  }
+  return result
+}
+
 export function mapMemberForm (extraction, memberIndex, primaryPersonId) {
   const d = extraction.memberDefaults
   return {
@@ -42,11 +61,6 @@ export function mapMemberForm (extraction, memberIndex, primaryPersonId) {
   }
 }
 
-const ACCESSIBILITY_LABELS = {
-  difficultyHearing: 'Difficulty hearing', visionLimited: 'Vision limited',
-  usesWalker: 'Uses walker', usesCane: 'Uses cane', usesWheelchair: 'Uses wheelchair',
-}
-
 export function composeNotes (extraction, memberIndex) {
   const { extras } = extraction.members[memberIndex]
   const { preferences: prefs, memberDefaults: d, application: app } = extraction
@@ -56,9 +70,6 @@ export function composeNotes (extraction, memberIndex) {
   push('Ambassador', app.ambassador)
   push('Pronouns', extras.pronouns)
   push('Gender', extras.gender)
-  for (const [key, label] of Object.entries(ACCESSIBILITY_LABELS)) {
-    push(label, extras.accessibility?.[key])
-  }
   push('Accessibility notes', extras.accessibilityNotes)
   // Cell was preferred for the emergencyContactPhone form field; keep the home
   // number on record when both were extracted.
