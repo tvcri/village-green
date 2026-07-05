@@ -1471,50 +1471,6 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer ] } ]
 
-  /persons/{personId}/communities:
-    get:
-      summary: List a person's communities
-      tags: [Community]
-      operationId: getPersonCommunities
-      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
-      responses:
-        '200':
-          description: List of communities
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/Community' }
-        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-      security: [ { oauth: [ vg:person:read ] } ]
-    put:
-      summary: Replace a person's community memberships
-      tags: [Community]
-      operationId: putPersonCommunities
-      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [ communityIds ]
-              properties:
-                communityIds:
-                  type: array
-                  items: { $ref: '#/components/schemas/CommunityId' }
-      responses:
-        '200':
-          description: Updated communities
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/Community' }
-        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-      security: [ { oauth: [ vg:community ] } ]
-
   /communities:
     get:
       summary: List all communities
