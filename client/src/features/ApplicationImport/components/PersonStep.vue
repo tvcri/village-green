@@ -6,9 +6,9 @@ import Message from 'primevue/message'
 import PersonFormFields from '../../PersonList/components/PersonFormFields.vue'
 import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js'
 import {
-  mapPersonForm, personCommunityNames, uncertainMapForPerson, buildPersonCreatePayload,
+  mapPersonForm, personCommunityNames, personDisabilities, uncertainMapForPerson, buildPersonCreatePayload,
 } from '../lib/importMapping.js'
-import { getPersons, createPerson, putPersonCommunities, getCommunities } from '../../PersonList/api/personApi.js'
+import { getPersons, createPerson, getCommunities, getDisabilities } from '../../PersonList/api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 
 const props = defineProps({
@@ -22,18 +22,23 @@ const form = reactive(mapPersonForm(props.extraction, props.memberIndex))
 const errors = reactive({})
 const uncertain = reactive(uncertainMapForPerson(props.extraction, props.memberIndex))
 const communityNames = ref(personCommunityNames(props.extraction, props.memberIndex))
+const disabilities = ref(personDisabilities(props.extraction, props.memberIndex))
 const villages = ref([])
 const allCommunities = ref([])
+const allDisabilities = ref([])
 const duplicates = ref([])
 const saving = ref(false)
 
 const communityNameToId = computed(() =>
   new Map(allCommunities.value.map(c => [c.name, c.communityId])))
+const disabilityNameToId = computed(() =>
+  new Map(allDisabilities.value.map(d => [d.name, d.disabilityId])))
 
 onMounted(async () => {
   try {
     villages.value = await getVillages(true)
     allCommunities.value = await getCommunities()
+    allDisabilities.value = await getDisabilities()
     await findDuplicates()
   }
   catch (err) {
@@ -62,6 +67,20 @@ function toggleCommunity (name, checked) {
   communityNames.value = next
 }
 
+function toggleDisability (name, checked) {
+  const next = new Map(disabilities.value)
+  if (checked) next.set(name, next.get(name) ?? '')
+  else next.delete(name)
+  disabilities.value = next
+}
+
+function editDisabilityNote (name, note) {
+  if (!disabilities.value.has(name)) return
+  const next = new Map(disabilities.value)
+  next.set(name, note)
+  disabilities.value = next
+}
+
 function useExisting (person) {
   emit('person-done', { personId: person.personId, fullName: person.fullName, existing: true })
 }
@@ -73,21 +92,15 @@ async function submit () {
   }
   saving.value = true
   try {
-    const created = await createPerson(buildPersonCreatePayload(form))
-    if (communityNames.value.size) {
-      const ids = [...communityNames.value].map(n => communityNameToId.value.get(n)).filter(Boolean)
-      if (ids.length === 0) {
-        toast.add({ severity: 'warn', summary: 'Warning', detail: "Person created, but community names could not be resolved — set them on the person's edit page", life: 5000 })
-      }
-      else {
-        try {
-          await putPersonCommunities(created.personId, ids)
-        }
-        catch (err) {
-          toast.add({ severity: 'warn', summary: 'Warning', detail: "Person created, but communities could not be saved — set them on the person's edit page", life: 5000 })
-        }
-      }
-    }
+    const payload = buildPersonCreatePayload(form)
+    payload.communities = [...communityNames.value]
+      .map(n => communityNameToId.value.get(n))
+      .filter(Boolean)
+    payload.disabilities = [...disabilities.value.entries()].map(([n, note]) => ({
+      disabilityId: disabilityNameToId.value.get(n),
+      note: note || null,
+    })).filter(d => d.disabilityId)
+    const created = await createPerson(payload)
     emit('person-done', {
       personId: created.personId,
       fullName: [form.firstName, form.lastName].filter(Boolean).join(' '),
@@ -118,8 +131,9 @@ async function submit () {
     <form @submit.prevent="submit">
       <PersonFormFields
         :form="form" :errors="errors" :uncertain="uncertain"
-        :villages="villages" :communityNames="communityNames"
+        :villages="villages" :communityNames="communityNames" :disabilities="disabilities"
         @edited="onEdited" @toggle-community="toggleCommunity"
+        @toggle-disability="toggleDisability" @edit-disability-note="editDisabilityNote"
       />
       <div class="step-footer">
         <Button type="submit" :label="`Create Person & Continue`" :loading="saving" />
