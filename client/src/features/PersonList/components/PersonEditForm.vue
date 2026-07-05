@@ -8,7 +8,7 @@ import PersonFormFields from './PersonFormFields.vue'
 import { validatePersonForm } from '../lib/personFormValidation.js'
 import {
   getPerson, createPerson, patchPerson,
-  getPersonCommunities, putPersonCommunities, getCommunities,
+  getCommunities, getDisabilities,
 } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 
@@ -32,10 +32,13 @@ const errors = reactive({})
 
 const villages = ref([])          // [{ villageId, name }]
 const allCommunities = ref([])    // [{ communityId, name }] from getCommunities()
+const allDisabilities = ref([])   // [{ disabilityId, name }] from getDisabilities()
 const communityNameToId = computed(() =>
   new Map(allCommunities.value.map(c => [c.name, c.communityId])))
-const communityNames = ref(new Set())   // Set<'Pride'|'Veteran'>
-let originalCommunityNames = new Set()
+const disabilityNameToId = computed(() =>
+  new Map(allDisabilities.value.map(d => [d.name, d.disabilityId])))
+const communityNames = ref(new Set())     // Set<'Pride'|'Veteran'>
+const disabilities = ref(new Map())       // Map<'Vision'|'Walker'|'Hearing'|'Wheelchair'|'Cane', note>
 
 async function loadVillages () {
   villages.value = await getVillages(true)
@@ -43,14 +46,14 @@ async function loadVillages () {
 
 onMounted(async () => {
   await loadVillages()
-  allCommunities.value = await getCommunities()   // [{ communityId, name }]
+  allCommunities.value = await getCommunities()     // [{ communityId, name }]
+  allDisabilities.value = await getDisabilities()   // [{ disabilityId, name }]
   if (isEdit.value) {
     const p = await getPerson(personId.value, [])
     Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
     form.villageId = p.village?.villageId ?? null
-    const comms = await getPersonCommunities(personId.value)
-    originalCommunityNames = new Set(comms.map(c => c.name))
-    communityNames.value = new Set(originalCommunityNames)
+    communityNames.value = new Set(p.communities.map(c => c.name))
+    disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
   }
 })
 
@@ -66,6 +69,13 @@ function buildPayload () {
     else if (v !== null) payload[k] = v
   })
   payload.villageId = form.villageId ?? null   // explicit null clears home village
+  payload.communities = [...communityNames.value]
+    .map(n => communityNameToId.value.get(n))
+    .filter(Boolean)
+  payload.disabilities = [...disabilities.value.entries()].map(([n, note]) => ({
+    disabilityId: disabilityNameToId.value.get(n),
+    note: note || null,
+  }))
   return payload
 }
 
@@ -83,10 +93,6 @@ async function handleSubmit () {
       const created = await createPerson(buildPayload())
       id = created.personId
     }
-    // Community: only call if changed. Translate selected names → ids.
-    if (communitiesChanged()) {
-      await putPersonCommunities(id, communityNamesToIds(communityNames.value))
-    }
     toast.add({ severity: 'success', summary: 'Saved', detail: isEdit.value ? 'Person updated' : 'Person created', life: 2000 })
     router.push({ name: 'meta-person-detail', params: { personId: id } })
   }
@@ -95,20 +101,24 @@ async function handleSubmit () {
   }
 }
 
-function communitiesChanged () {
-  if (communityNames.value.size !== originalCommunityNames.size) return true
-  for (const n of communityNames.value) if (!originalCommunityNames.has(n)) return true
-  return false
-}
-
-function communityNamesToIds (names) {
-  return [...names].map(n => communityNameToId.value.get(n)).filter(Boolean)
-}
-
 function toggleCommunity (name, checked) {
   if (checked) communityNames.value.add(name)
   else communityNames.value.delete(name)
   communityNames.value = new Set(communityNames.value)
+}
+
+function toggleDisability (name, checked) {
+  const next = new Map(disabilities.value)
+  if (checked) next.set(name, next.get(name) ?? '')
+  else next.delete(name)
+  disabilities.value = next
+}
+
+function editDisabilityNote (name, note) {
+  if (!disabilities.value.has(name)) return
+  const next = new Map(disabilities.value)
+  next.set(name, note)
+  disabilities.value = next
 }
 
 function cancel () {
@@ -129,7 +139,10 @@ function cancel () {
           :errors="errors"
           :villages="villages"
           :communityNames="communityNames"
+          :disabilities="disabilities"
           @toggle-community="toggleCommunity"
+          @toggle-disability="toggleDisability"
+          @edit-disability-note="editDisabilityNote"
         />
 
         <!-- Footer: Save / Cancel buttons -->
