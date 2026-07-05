@@ -157,6 +157,7 @@ module.exports.createPerson = async function (body) {
       // full_name is a STORED generated column (last/first) — never written here.
       if (personFields.lastName !== undefined) mappedFields.last_name = personFields.lastName
       if (personFields.firstName !== undefined) mappedFields.first_name = personFields.firstName
+      if (personFields.middleInitial !== undefined) mappedFields.middle_initial = personFields.middleInitial
       if (personFields.nickname !== undefined) mappedFields.nickname = personFields.nickname
       if (personFields.address !== undefined) mappedFields.address = personFields.address
       if (personFields.city !== undefined) mappedFields.city = personFields.city
@@ -166,6 +167,10 @@ module.exports.createPerson = async function (body) {
       if (personFields.phone !== undefined) mappedFields.phone = personFields.phone
       if (personFields.cell !== undefined) mappedFields.cell = personFields.cell
       if (personFields.birthDate !== undefined) mappedFields.birth_date = personFields.birthDate
+      if (personFields.emergencyContactName !== undefined) mappedFields.emergency_contact_name = personFields.emergencyContactName
+      if (personFields.emergencyContactRelationship !== undefined) mappedFields.emergency_contact_relationship = personFields.emergencyContactRelationship
+      if (personFields.emergencyContactPhone !== undefined) mappedFields.emergency_contact_phone = personFields.emergencyContactPhone
+      if (personFields.emergencyContactEmail !== undefined) mappedFields.emergency_contact_email = personFields.emergencyContactEmail
       if (villageId !== undefined) mappedFields.village_id = villageId
 
       const [personInsertResult] = await connection.query('INSERT INTO person SET ?', mappedFields)
@@ -187,6 +192,7 @@ module.exports.patchPerson = async function (personId, body) {
       // full_name is a STORED generated column (last/first) — never written here.
       if (personFields.lastName !== undefined) mappedFields.last_name = personFields.lastName
       if (personFields.firstName !== undefined) mappedFields.first_name = personFields.firstName
+      if (personFields.middleInitial !== undefined) mappedFields.middle_initial = personFields.middleInitial
       if (personFields.nickname !== undefined) mappedFields.nickname = personFields.nickname
       if (personFields.address !== undefined) mappedFields.address = personFields.address
       if (personFields.city !== undefined) mappedFields.city = personFields.city
@@ -196,6 +202,10 @@ module.exports.patchPerson = async function (personId, body) {
       if (personFields.phone !== undefined) mappedFields.phone = personFields.phone
       if (personFields.cell !== undefined) mappedFields.cell = personFields.cell
       if (personFields.birthDate !== undefined) mappedFields.birth_date = personFields.birthDate
+      if (personFields.emergencyContactName !== undefined) mappedFields.emergency_contact_name = personFields.emergencyContactName
+      if (personFields.emergencyContactRelationship !== undefined) mappedFields.emergency_contact_relationship = personFields.emergencyContactRelationship
+      if (personFields.emergencyContactPhone !== undefined) mappedFields.emergency_contact_phone = personFields.emergencyContactPhone
+      if (personFields.emergencyContactEmail !== undefined) mappedFields.emergency_contact_email = personFields.emergencyContactEmail
       if (villageId !== undefined) mappedFields.village_id = villageId
 
       if (Object.keys(mappedFields).length > 0) {

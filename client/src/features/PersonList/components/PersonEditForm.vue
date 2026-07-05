@@ -21,7 +21,7 @@ const isEdit = computed(() => !!route.params.personId)
 const personId = computed(() => route.params.personId)
 
 const form = reactive({
-  firstName: '', lastName: '', nickname: '',
+  firstName: '', middleInitial: '', lastName: '', nickname: '',
   address: '', city: '', state: '', zip: '',
   email: '', phone: '', cell: '', birthDate: '',
   emergencyContactName: '', emergencyContactRelationship: '',
@@ -171,6 +171,18 @@ function cancel () {
               @input="clearError('firstName')"
             />
             <small class="field-error" v-if="errors.firstName">{{ errors.firstName }}</small>
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="middleInitial">Middle Initial</label>
+            <InputText
+              id="middleInitial"
+              v-model="form.middleInitial"
+              class="w-full"
+              :class="{ 'p-invalid': errors.middleInitial }"
+              @input="clearError('middleInitial')"
+            />
+            <small class="field-error" v-if="errors.middleInitial">{{ errors.middleInitial }}</small>
           </div>
 
           <div class="form-field">
@@ -378,7 +390,7 @@ function cancel () {
 
 .section {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;

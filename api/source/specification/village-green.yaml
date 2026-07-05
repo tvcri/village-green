@@ -2896,6 +2896,10 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+        middleInitial:
+          type: string
+          maxLength: 10
+          nullable: true
         nickname:
           type: string
           maxLength: 100
@@ -2966,6 +2970,9 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+        middleInitial:
+          type: string
+          maxLength: 10
         nickname:
           type: string
           maxLength: 100
