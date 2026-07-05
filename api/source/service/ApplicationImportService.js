@@ -164,6 +164,11 @@ function computeCost ({ input_tokens, output_tokens }) {
 }
 
 async function extractFromPdf (pdfBuffer) {
+  if (!config.anthropic.apiKey) {
+    const err = new Error('PDF extraction is not configured: VG_ANTHROPIC_API_KEY is not set.')
+    err.status = 500
+    throw err
+  }
   const client = new Anthropic({ apiKey: config.anthropic.apiKey })
   let message
   try {

@@ -75,12 +75,17 @@ async function submit () {
   try {
     const created = await createPerson(buildPersonCreatePayload(form))
     if (communityNames.value.size) {
-      try {
-        const ids = [...communityNames.value].map(n => communityNameToId.value.get(n)).filter(Boolean)
-        await putPersonCommunities(created.personId, ids)
+      const ids = [...communityNames.value].map(n => communityNameToId.value.get(n)).filter(Boolean)
+      if (ids.length === 0) {
+        toast.add({ severity: 'warn', summary: 'Warning', detail: "Person created, but community names could not be resolved — set them on the person's edit page", life: 5000 })
       }
-      catch (err) {
-        toast.add({ severity: 'warn', summary: 'Warning', detail: "Person created, but communities could not be saved — set them on the person's edit page", life: 5000 })
+      else {
+        try {
+          await putPersonCommunities(created.personId, ids)
+        }
+        catch (err) {
+          toast.add({ severity: 'warn', summary: 'Warning', detail: "Person created, but communities could not be saved — set them on the person's edit page", life: 5000 })
+        }
       }
     }
     emit('person-done', {

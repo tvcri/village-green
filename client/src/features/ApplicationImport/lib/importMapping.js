@@ -78,6 +78,8 @@ function personFieldForPath (path, memberIndex) {
     if (Number(memberMatch[1]) !== memberIndex) return null
     const field = memberMatch[2]
     // extras (pronouns/gender/veteran/accessibility.*) have no form field
+    // Keep in sync with the keys returned by mapPersonForm / the PersonFormFields
+    // form shape — a person field missing here silently loses its uncertainty flag.
     const personFields = ['firstName', 'middleInitial', 'lastName', 'nickname', 'street', 'unit',
       'city', 'state', 'zip', 'email', 'phone', 'cell', 'birthDate']
     return personFields.includes(field) ? field : null
@@ -96,6 +98,8 @@ function personFieldForPath (path, memberIndex) {
 }
 
 function memberFieldForPath (path) {
+  // Only these extraction paths map onto member-form fields today; other
+  // member-form fields can never carry an uncertainty flag.
   const map = {
     'application.applicationDate': 'joinDate',
     'preferences.newsletterPrint': 'printedNewsletter',

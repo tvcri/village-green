@@ -13,7 +13,7 @@ const router = useRouter()
 
 const extraction = ref(null)
 const stepIndex = ref(0)
-const created = ref([])            // [{ personId, fullName, memberGranted }]
+const created = ref([])            // [{ personId, fullName, existing, memberGranted }]
 const cancelVisible = ref(false)
 
 const isDual = computed(() =>
