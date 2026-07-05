@@ -20,34 +20,36 @@ test('resolveVillage handles null name', () => {
   assert.deepEqual(svc.resolveVillage(null, villages), { villageId: null, villageName: null })
 })
 
+// Fixture is in the schema's null-free shape: blanks are "" and dues are
+// digit strings; assembleResponse normalizes back to the null-based contract.
 function sampleExtraction () {
   return {
     applicationType: 'member',
     application: { applicationDate: '2026-06-12', villageName: 'Westside', ambassador: 'Pat Smith', householdType: 'Dual' },
     members: [
       {
-        firstName: 'Marge', middleInitial: 'A', lastName: 'Innovera', nickname: null,
+        firstName: 'Marge', middleInitial: 'A', lastName: 'Innovera', nickname: '',
         pronouns: 'she/her', birthDate: '1948-03-02', gender: 'F', veteran: 'Yes',
-        street: '12 Elm St', unit: null, city: 'Providence', state: 'RI', zip: '02901',
-        email: 'marge@example.com', phone: '401-555-1111', cell: null,
+        street: '12 Elm St', unit: '', city: 'Providence', state: 'RI', zip: '02901',
+        email: 'marge@example.com', phone: '401-555-1111', cell: '',
         accessibility: { difficultyHearing: 'Sometimes', visionLimited: 'No', usesWalker: 'No', usesCane: 'No', usesWheelchair: 'No' },
       },
       {
-        firstName: 'Al', middleInitial: null, lastName: 'Innovera', nickname: null,
-        pronouns: null, birthDate: '1946-07-19', gender: 'M', veteran: 'No',
-        street: null, unit: null, city: null, state: null, zip: null,
-        email: null, phone: null, cell: '401-555-2222',
-        accessibility: null,
+        firstName: 'Al', middleInitial: '', lastName: 'Innovera', nickname: '',
+        pronouns: '', birthDate: '1946-07-19', gender: 'M', veteran: 'No',
+        street: '', unit: '', city: '', state: '', zip: '',
+        email: '', phone: '', cell: '401-555-2222',
+        accessibility: { difficultyHearing: '', visionLimited: '', usesWalker: '', usesCane: '', usesWheelchair: '' },
       },
     ],
     emergencyContact: {
-      firstName: 'Rob', middleInitial: null, lastName: 'Innovera',
-      phoneHome: null, phoneCell: '401-555-3333', email: 'rob@example.com', relationship: 'Son',
+      firstName: 'Rob', middleInitial: '', lastName: 'Innovera',
+      phoneHome: '', phoneCell: '401-555-3333', email: 'rob@example.com', relationship: 'Son',
     },
     preferences: {
       newsletterPrint: 'Yes', wantsVolunteerInfo: 'No',
       circleOfPrideJoin: 'No', circleOfPridePreferred: 'Yes',
-      duesMonthly: null, duesYearly: 120, paymentMethod: 'Personal Check', invoiceMailed: 'Yes',
+      duesMonthly: '', duesYearly: '120', paymentMethod: 'Personal Check', invoiceMailed: 'Yes',
     },
     uncertainFields: [{ path: 'members[0].zip', reason: 'last digit ambiguous', alternative: '02907' }],
   }
@@ -69,9 +71,41 @@ test('assembleResponse maps memberDefaults and resolves village', () => {
   assert.equal(r.memberDefaults.joinDate, '2026-06-12')
   assert.equal(r.memberDefaults.printedNewsletter, true)
   assert.equal(r.memberDefaults.duesYearly, 120)
+  assert.equal(r.memberDefaults.duesMonthly, null)
   assert.equal(r.memberDefaults.paymentMethod, 'Personal Check')
   assert.deepEqual(r.preferences, { wantsVolunteerInfo: 'No', circleOfPrideJoin: 'No', circleOfPridePreferred: 'Yes' })
   assert.deepEqual(r.usage, usage)
+})
+
+test('assembleResponse normalizes blanks to nulls and collapses all-empty objects', () => {
+  const r = svc.assembleResponse(sampleExtraction(), villages, usage)
+  assert.equal(r.members[0].nickname, null)
+  assert.equal(r.members[1].street, null)
+  assert.equal(r.members[1].extras.pronouns, null)
+  assert.equal(r.members[1].extras.accessibility, null)      // all answers blank
+  assert.equal(r.emergencyContact.phoneHome, null)            // partially filled stays an object
+  assert.equal(r.emergencyContact.firstName, 'Rob')
+})
+
+test('assembleResponse nulls an all-empty emergencyContact', () => {
+  const data = sampleExtraction()
+  data.emergencyContact = {
+    firstName: '', middleInitial: '', lastName: '',
+    phoneHome: '', phoneCell: '', email: '', relationship: '',
+  }
+  const r = svc.assembleResponse(data, villages, usage)
+  assert.equal(r.emergencyContact, null)
+})
+
+test('EXTRACTION_SCHEMA stays under the 16-union structured-outputs cap', () => {
+  let unions = 0
+  function walk (node) {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node.type) || Array.isArray(node.anyOf)) unions++
+    for (const v of Object.values(node)) walk(v)
+  }
+  walk(svc.EXTRACTION_SCHEMA)
+  assert.ok(unions <= 16, `schema has ${unions} union-typed parameters (limit 16)`)
 })
 
 test('assembleResponse caps members at two entries', () => {

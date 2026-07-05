@@ -4,13 +4,15 @@ const Anthropic = require('@anthropic-ai/sdk')
 const config = require('../utils/config')
 
 // --- structured-outputs schema helpers -------------------------------------
-const str = { type: ['string', 'null'] }
-const num = { type: ['number', 'null'] }
-// The API's structured-outputs validator rejects enum combined with a type
-// array — nullable enums must be an anyOf of a string-enum branch and null.
-const nullableEnum = values => ({ anyOf: [{ type: 'string', enum: values }, { type: 'null' }] })
-const yn = nullableEnum(['Yes', 'No'])
-const ynSometimes = nullableEnum(['Yes', 'No', 'Sometimes'])
+// The API's structured-outputs validator caps union-typed parameters (type
+// arrays or anyOf) at 16 per schema, so the extraction schema avoids
+// nullability entirely: blank fields are empty strings ("") and dues amounts
+// are digit strings. normalizeBlanks() restores the null-based wire contract
+// after parsing, so nothing downstream changes.
+const str = { type: 'string' }
+const num = { type: 'string', description: 'Numeric amount as digits, or "" if blank' }
+const yn = { type: 'string', enum: ['Yes', 'No', ''] }
+const ynSometimes = { type: 'string', enum: ['Yes', 'No', 'Sometimes', ''] }
 
 const memberEntry = {
   type: 'object',
@@ -24,7 +26,7 @@ const memberEntry = {
     street: str, unit: str, city: str, state: str, zip: str,
     email: str, phone: { ...str, description: 'home phone' }, cell: str,
     accessibility: {
-      type: ['object', 'null'],
+      type: 'object',
       additionalProperties: false,
       required: ['difficultyHearing', 'visionLimited', 'usesWalker', 'usesCane', 'usesWheelchair'],
       properties: {
@@ -51,12 +53,12 @@ const EXTRACTION_SCHEMA = {
             applicationDate: { ...str, description: 'YYYY-MM-DD' },
             villageName: str,
             ambassador: str,
-            householdType: nullableEnum(['Single', 'Dual']),
+            householdType: { type: 'string', enum: ['Single', 'Dual', ''] },
           },
         },
         members: { type: 'array', items: memberEntry },
         emergencyContact: {
-          type: ['object', 'null'],
+          type: 'object',
           additionalProperties: false,
           required: ['firstName', 'middleInitial', 'lastName', 'phoneHome', 'phoneCell', 'email', 'relationship'],
           properties: {
@@ -73,7 +75,7 @@ const EXTRACTION_SCHEMA = {
             newsletterPrint: yn, wantsVolunteerInfo: yn,
             circleOfPrideJoin: yn, circleOfPridePreferred: yn,
             duesMonthly: num, duesYearly: num,
-            paymentMethod: nullableEnum(['Online', 'Bank Payment', 'Bank Withdrawal', 'Personal Check']),
+            paymentMethod: { type: 'string', enum: ['Online', 'Bank Payment', 'Bank Withdrawal', 'Personal Check', ''] },
             invoiceMailed: yn,
           },
         },
@@ -83,7 +85,7 @@ const EXTRACTION_SCHEMA = {
             type: 'object',
             additionalProperties: false,
             required: ['path', 'reason', 'alternative'],
-            properties: { path: { type: 'string' }, reason: { type: 'string' }, alternative: str },
+            properties: { path: { type: 'string' }, reason: { type: 'string' }, alternative: { type: 'string', description: '"" when no alternative reading' } },
           },
         },
       },
@@ -112,13 +114,37 @@ First, identify the document type:
 
 For a membership application:
 - The form may be filled in block-print style where all letters appear uppercase. Use letter size to infer true case: larger letters represent intended uppercase (start of a word or proper noun) and smaller letters represent intended lowercase. Apply standard title case to names, streets, and cities accordingly. Never return all-caps values for text fields.
-- "members" holds one entry for a Single household. For a Dual household, extract the second household member's own fields as a second entry (never more than two entries). If the second person's field is blank on the form, use null — do not copy the first person's value.
-- For any field that is blank or not filled in, use null.
-- If "No Emergency Contact" is checked, return null for emergencyContact.
+- "members" holds one entry for a Single household. For a Dual household, extract the second household member's own fields as a second entry (never more than two entries). If the second person's field is blank on the form, use an empty string — do not copy the first person's value.
+- For any field that is blank or not filled in, use an empty string "".
+- duesMonthly and duesYearly are digit strings (e.g. "120"), or "" if blank.
+- If "No Emergency Contact" is checked or no emergency contact is given, return emergencyContact with every field set to "".
 - Dates are YYYY-MM-DD.
-- "uncertainFields": list ONLY fields whose values are genuinely ambiguous from the handwriting or scan quality — a digit that could be read two ways, a partially cut-off word, an ambiguous checkbox. For each, give the JSON path (e.g. "members[0].zip"), a short reason, and your best alternative reading (or null if none). Do not list fields you read confidently; an empty array means everything was clear.`
+- "uncertainFields": list ONLY fields whose values are genuinely ambiguous from the handwriting or scan quality — a digit that could be read two ways, a partially cut-off word, an ambiguous checkbox. For each, give the JSON path (e.g. "members[0].zip"), a short reason, and your best alternative reading ("" if none). Do not list fields you read confidently; an empty array means everything was clear.`
 
 // --- assembly ---------------------------------------------------------------
+
+// The schema is null-free (see helpers above); restore the null-based wire
+// contract: "" → null recursively, dues digit strings → numbers, and all-empty
+// accessibility/emergencyContact objects → null.
+function normalizeBlanks (value) {
+  if (value === '') return null
+  if (Array.isArray(value)) return value.map(normalizeBlanks)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, normalizeBlanks(v)]))
+  }
+  return value
+}
+
+function toAmount (v) {
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function nullIfAllNull (obj) {
+  if (!obj) return null
+  return Object.values(obj).every(v => v === null) ? null : obj
+}
 
 function resolveVillage (villageName, villages) {
   if (!villageName) return { villageId: null, villageName: null }
@@ -128,12 +154,13 @@ function resolveVillage (villageName, villages) {
 }
 
 function assembleResponse (data, villages, usage) {
+  data = normalizeBlanks(data)
   if (data.applicationType !== 'member') {
     return { ...data, usage }
   }
   const members = data.members.slice(0, 2).map(m => {
     const { pronouns, gender, veteran, accessibility, ...person } = m
-    return { ...person, extras: { pronouns, gender, veteran, accessibility } }
+    return { ...person, extras: { pronouns, gender, veteran, accessibility: nullIfAllNull(accessibility) } }
   })
   const { newsletterPrint, duesMonthly, duesYearly, paymentMethod, invoiceMailed, ...preferences } = data.preferences
   return {
@@ -145,12 +172,14 @@ function assembleResponse (data, villages, usage) {
       householdType: data.application.householdType,
     },
     members,
-    emergencyContact: data.emergencyContact,
+    emergencyContact: nullIfAllNull(data.emergencyContact),
     preferences,
     memberDefaults: {
       joinDate: data.application.applicationDate,
       printedNewsletter: newsletterPrint === 'Yes',
-      duesMonthly, duesYearly, paymentMethod, invoiceMailed,
+      duesMonthly: toAmount(duesMonthly),
+      duesYearly: toAmount(duesYearly),
+      paymentMethod, invoiceMailed,
     },
     uncertainFields: data.uncertainFields,
     usage,
