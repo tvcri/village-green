@@ -14,7 +14,7 @@ export function buildDataset (content, seed) {
   content.__villageById = Object.fromEntries(village.map(v => [v.id, v.name]))
 
   // Service requests are entered by village staff — any manager or owner of
-  // the village is a plausible creator (created_user_id attribution). The dev
+  // the village is a plausible creator (createdUserId attribution). The dev
   // admin owns every village but shouldn't dominate the byline, so skip it.
   const creatorsByVillage = {}
   for (const g of village_grant) {

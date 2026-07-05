@@ -2594,6 +2594,126 @@
         "destination": "the transatlantic dock",
         "description": "Relocating permanently to France; democracy has become inconvenient and the bar has closed. Steamer trunks only."
       }
+    },
+    {
+      "name": "Prudence Slater-Whipple",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented great-great-granddaughter of Samuel Slater; keeps a spindle from the old Pawtucket mill on her mantel.",
+      "tag": "background"
+    },
+    {
+      "name": "Obadiah Slater",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented Slater-mill descendant; still calls Sunday dinner \"the second shift.\"",
+      "tag": "background"
+    },
+    {
+      "name": "Mercy Williams-Tefft",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of Roger Williams; hosts a soul-liberty book club that argues about everything.",
+      "tag": "background"
+    },
+    {
+      "name": "Josiah Williams",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented Williams-line descendant; paddles the Seekonk every June to honor the banishment route.",
+      "tag": "background"
+    },
+    {
+      "name": "Faith Hutchinson-Cole",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of Anne Hutchinson; famously wins every zoning-board argument.",
+      "tag": "background"
+    },
+    {
+      "name": "Ezra Hopkins",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of Stephen Hopkins; signs every birthday card with a deliberately shaky hand.",
+      "tag": "background"
+    },
+    {
+      "name": "Abigail Hopkins-Brown",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented Hopkins descendant; runs the church rummage sale like a merchant fleet.",
+      "tag": "background"
+    },
+    {
+      "name": "Silas Greene",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of Nathanael Greene; re-enacts quartermaster logistics with casserole deliveries.",
+      "tag": "background"
+    },
+    {
+      "name": "Hannah Greene-Almy",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented Greene descendant; grows the biggest rhubarb in Kent County, allegedly.",
+      "tag": "background"
+    },
+    {
+      "name": "Caleb Perry",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of Oliver Hazard Perry; has not given up the ship, or the 1987 Buick.",
+      "tag": "background"
+    },
+    {
+      "name": "Louisa Perry-Chace",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented Perry descendant; narrates harbor tours whether or not anyone asked.",
+      "tag": "background"
+    },
+    {
+      "name": "Bertram Burnside",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of Ambrose Burnside; the sideburns are, tragically, hereditary.",
+      "tag": "background"
+    },
+    {
+      "name": "Cornelia Dorr-Angell",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of Thomas Wilson Dorr; still collects signatures for something every spring.",
+      "tag": "background"
+    },
+    {
+      "name": "Theodora Dyer",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented Dyer-family descendant; keeps the governors’ portraits dusted at the historical society.",
+      "tag": "background"
+    },
+    {
+      "name": "Winifred Lewis",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of lighthouse keeper Ida Lewis; rows to Rose Island for exercise, weather be damned.",
+      "tag": "background"
+    },
+    {
+      "name": "Augustus Stuart",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of Gilbert Stuart; paints dollar-bill George on request at village fundraisers.",
+      "tag": "background"
+    },
+    {
+      "name": "Rosalind Jones-Carter",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of soprano Sissieretta Jones; leads the senior chorus with terrifying precision.",
+      "tag": "background"
+    },
+    {
+      "name": "Percival Whipple",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented Whipple-family descendant; claims the family tavern once out-poured all of Providence.",
+      "tag": "background"
+    },
+    {
+      "name": "Delia Sprague",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of the Sprague mill dynasty; knits like the A&W looms are still running.",
+      "tag": "background"
+    },
+    {
+      "name": "Horace Arnold",
+      "bucket": "invented-descendants",
+      "realBlurb": "Invented descendant of colonial governor Benedict Arnold (the grandfather, he insists, not the traitor).",
+      "tag": "background"
     }
   ],
   "loginPersonas": [

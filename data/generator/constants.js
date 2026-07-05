@@ -10,7 +10,7 @@ export const CAPABILITIES = [
 
 export const ROLE = { restricted: 1, full: 2, manage: 3, owner: 4 }
 
-// service_request.service_name values are UI-enforced (serviceNameOptions in
+// service_request.serviceName values are UI-enforced (serviceNameOptions in
 // ServiceRequestCreateEdit.vue) — keep this list in sync with the client.
 export const SERVICE_CATEGORIES = [
   'Ride: Medical Appnt', 'Ride: Shopping', 'Ride: Activity/Event', 'Ride: Personal Care',

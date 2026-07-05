@@ -33,11 +33,11 @@ test('persons: no address key, unique (village,name), themed big villages', () =
   const { person, byVillage } = buildPersons(fullContent, villageIdByName, makeRng(1))
   for (const p of person) {
     assert.ok(!('address' in p), 'person rows must not set the generated address column')
-    assert.equal(typeof p.full_name, 'string')
-    assert.ok(p.village_id >= 1 && p.village_id <= 10)
+    assert.equal(typeof p.fullName, 'string')
+    assert.ok(p.villageId >= 1 && p.villageId <= 10)
   }
-  // unique (village_id, full_name)
-  const keys = person.map(p => `${p.village_id}::${p.full_name.toLowerCase()}`)
+  // unique (villageId, fullName)
+  const keys = person.map(p => `${p.villageId}::${p.fullName.toLowerCase()}`)
   assert.equal(keys.length, new Set(keys).size)
   // big villages (Arkham=1, Quahog=2) each have >=50 members and >=50 volunteers
   for (const vid of [villageIdByName['Arkham'], villageIdByName['Quahog']]) {
@@ -53,31 +53,45 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   const personIds = new Set(person.map(p => p.id))
 
   for (const row of m.member) {
-    assert.ok(personIds.has(row.person_id))
+    assert.ok(personIds.has(row.personId))
     assert.equal(typeof row.status, 'string')
-    if (row.status !== 'Active') assert.ok(row.drop_reason, 'inactive members need a drop_reason')
+    if (row.status !== 'Active') assert.ok(row.dropReason, 'inactive members need a dropReason')
   }
   assert.ok(m.member.some(r => r.status === 'Active'))
   assert.ok(m.member.some(r => r.status !== 'Active'))
 
   for (const row of m.volunteer) {
-    assert.ok(personIds.has(row.person_id))
+    assert.ok(personIds.has(row.personId))
     assert.ok(row.active === 0 || row.active === 1)
   }
   assert.ok(m.volunteer.some(r => r.active === 1) && m.volunteer.some(r => r.active === 0))
 
   // overlap: persons who are BOTH member and volunteer <= 10% of volunteers
   // (members receive services; volunteers provide them — mostly distinct populations)
-  const memberPersons = new Set(m.member.map(r => r.person_id))
-  const both = m.volunteer.filter(r => memberPersons.has(r.person_id)).length
+  const memberPersons = new Set(m.member.map(r => r.personId))
+  const both = m.volunteer.filter(r => memberPersons.has(r.personId)).length
   assert.ok(both <= Math.ceil(m.volunteer.length * 0.10), `overlap ${both}/${m.volunteer.length}`)
+
+  // ~5% inactivity on both sides, drawn from the invented filler persons first
+  const inactiveMembers = m.member.filter(r => r.status !== 'Active')
+  const inactiveShare = inactiveMembers.length / m.member.length
+  assert.ok(inactiveShare > 0.02 && inactiveShare < 0.08, `inactive member share ${inactiveShare.toFixed(2)} not ~0.05`)
+  const inactiveVolShare = m.volunteer.filter(r => r.active === 0).length / m.volunteer.length
+  assert.ok(inactiveVolShare > 0.02 && inactiveVolShare < 0.08, `inactive volunteer share ${inactiveVolShare.toFixed(2)} not ~0.05`)
+
+  // dataset-wide mix targets ~60/40 members:volunteers
+  const memberShare = m.member.length / (m.member.length + m.volunteer.length)
+  assert.ok(memberShare > 0.55 && memberShare < 0.65, `member share ${memberShare.toFixed(2)} not ~0.60`)
+  // ~66% of members carry a standing service note (echoed into request instructions)
+  const noteShare = m.member.filter(r => r.serviceNotes).length / m.member.length
+  assert.ok(noteShare > 0.55 && noteShare < 0.78, `serviceNotes share ${noteShare.toFixed(2)} not ~0.66`)
 
   // junctions reference valid parents
   const volIds = new Set(m.volunteer.map(v => v.id))
-  for (const vc of m.volunteer_capability) assert.ok(volIds.has(vc.volunteer_id))
-  for (const vv of m.volunteer_vetting) assert.ok(volIds.has(vv.volunteer_id))
+  for (const vc of m.volunteer_capability) assert.ok(volIds.has(vc.volunteerId))
+  for (const vv of m.volunteer_vetting) assert.ok(volIds.has(vv.volunteerId))
   const disIds = new Set(m.disability.map(d => d.id))
-  for (const pd of m.person_disability) assert.ok(disIds.has(pd.disability_id) && personIds.has(pd.person_id))
+  for (const pd of m.person_disability) assert.ok(disIds.has(pd.disabilityId) && personIds.has(pd.personId))
 })
 
 test('users/grants: admin, multi-village coordinator, and zero-grants user exist', () => {
@@ -123,9 +137,9 @@ test('grants cover every role in every village; requests are attributed to a man
     .filter(g => !adminIds.has(g.userId) && (g.roleId === ROLE.manage || g.roleId === ROLE.owner))
     .map(g => `${g.villageId}:${g.userId}`))
   for (const sr of ds.service_request) {
-    assert.ok(sr.created_user_id, `request ${sr.id} has no creating user`)
-    assert.ok(creatorOk.has(`${sr.village_id}:${sr.created_user_id}`),
-      `request ${sr.id} creator ${sr.created_user_id} is not a manager/owner of village ${sr.village_id}`)
+    assert.ok(sr.createdUserId, `request ${sr.id} has no creating user`)
+    assert.ok(creatorOk.has(`${sr.villageId}:${sr.createdUserId}`),
+      `request ${sr.id} creator ${sr.createdUserId} is not a manager/owner of village ${sr.villageId}`)
   }
   // every user carries a display-name claim for creator attribution
   for (const u of ds.user_data) {
@@ -140,12 +154,12 @@ test('service requests honor deriveStatus and reference valid people', () => {
   const villageIds = new Set(ds.village.map(v => v.id))
   const statuses = new Set(['Draft', 'Open', 'Confirmed', 'Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled'])
   for (const sr of ds.service_request) {
-    assert.ok(villageIds.has(sr.village_id))
+    assert.ok(villageIds.has(sr.villageId))
     assert.ok(statuses.has(sr.status), `bad status ${sr.status}`)
-    if (sr.status === 'Confirmed' || sr.status === 'Completed') assert.ok(sr.volunteer_person_id, `${sr.status} needs a volunteer`)
-    if (sr.status === 'Open') assert.equal(sr.volunteer_person_id, null)
-    if (sr.member_person_id) assert.ok(personIds.has(sr.member_person_id))
-    if (sr.volunteer_person_id) assert.ok(personIds.has(sr.volunteer_person_id))
+    if (sr.status === 'Confirmed' || sr.status === 'Completed') assert.ok(sr.volunteerPersonId, `${sr.status} needs a volunteer`)
+    if (sr.status === 'Open') assert.equal(sr.volunteerPersonId, null)
+    if (sr.memberPersonId) assert.ok(personIds.has(sr.memberPersonId))
+    if (sr.volunteerPersonId) assert.ok(personIds.has(sr.volunteerPersonId))
   }
   // a spread of statuses is present
   const seen = new Set(ds.service_request.map(s => s.status))
@@ -154,19 +168,19 @@ test('service requests honor deriveStatus and reference valid people', () => {
 
 test('service requests match the UI-enforced category/transport/location rules', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
-  const noteByPerson = Object.fromEntries(ds.member.filter(m => m.service_notes).map(m => [m.person_id, m.service_notes]))
+  const noteByPerson = Object.fromEntries(ds.member.filter(m => m.serviceNotes).map(m => [m.personId, m.serviceNotes]))
   for (const sr of ds.service_request) {
-    assert.ok(SERVICE_CATEGORIES.includes(sr.service_name), `bad category ${sr.service_name}`)
-    const isRide = sr.service_name.startsWith('Ride:')
+    assert.ok(SERVICE_CATEGORIES.includes(sr.serviceName), `bad category ${sr.serviceName}`)
+    const isRide = sr.serviceName.startsWith('Ride:')
     if (isRide) {
-      assert.ok(['Round Trip', 'One Way'].includes(sr.transportation_type), `ride needs RT/OW, got ${sr.transportation_type}`)
+      assert.ok(['Round Trip', 'One Way'].includes(sr.transportationType), `ride needs RT/OW, got ${sr.transportationType}`)
       assert.ok(sr.destination, 'rides require a destination')
     } else {
-      assert.equal(sr.transportation_type, 'None')
+      assert.equal(sr.transportationType, 'None')
     }
-    if (NO_LOCATION_SERVICES.includes(sr.service_name)) {
+    if (NO_LOCATION_SERVICES.includes(sr.serviceName)) {
       for (const f of ['destination', 'address', 'city', 'state', 'zip', 'phone']) {
-        assert.equal(sr[f], null, `${sr.service_name} must not set ${f}`)
+        assert.equal(sr[f], null, `${sr.serviceName} must not set ${f}`)
       }
     } else {
       // grid shows Destination + City columns — both must render
@@ -175,24 +189,78 @@ test('service requests match the UI-enforced category/transport/location rules',
       assert.ok(sr.address, 'location services need an address')
     }
     // UI time flow: RT = Start -> Arrival -> Return -> Finish; otherwise no appt/return
-    assert.ok(sr.start_at <= sr.finish_at)
-    if (sr.transportation_type === 'Round Trip') {
-      assert.ok(sr.appt_time && sr.return_time, 'round trips seed arrival + return')
-      assert.ok(sr.start_at < sr.appt_time && sr.appt_time < sr.return_time && sr.return_time < sr.finish_at,
-        `RT time order: ${sr.start_at} ${sr.appt_time} ${sr.return_time} ${sr.finish_at}`)
+    assert.ok(sr.startAt <= sr.finishAt)
+    if (sr.transportationType === 'Round Trip') {
+      assert.ok(sr.apptTime && sr.returnTime, 'round trips seed arrival + return')
+      assert.ok(sr.startAt < sr.apptTime && sr.apptTime < sr.returnTime && sr.returnTime < sr.finishAt,
+        `RT time order: ${sr.startAt} ${sr.apptTime} ${sr.returnTime} ${sr.finishAt}`)
     } else {
-      assert.equal(sr.appt_time, null)
-      assert.equal(sr.return_time, null)
+      assert.equal(sr.apptTime, null)
+      assert.equal(sr.returnTime, null)
     }
     // instructions echo the member's standing service note (or are absent)
-    if (sr.instructions) assert.equal(sr.instructions, noteByPerson[sr.member_person_id])
+    if (sr.instructions) assert.equal(sr.instructions, noteByPerson[sr.memberPersonId])
   }
   // flavor made it through: some members carry service notes, echoed on requests
-  assert.ok(ds.member.some(m => m.service_notes), 'some members should have service_notes')
+  assert.ok(ds.member.some(m => m.serviceNotes), 'some members should have serviceNotes')
   assert.ok(ds.service_request.some(s => s.instructions), 'some requests should echo member notes')
   // both trip types and a few date-only non-rides appear
-  const tt = new Set(ds.service_request.map(s => s.transportation_type))
+  const tt = new Set(ds.service_request.map(s => s.transportationType))
   for (const t of ['Round Trip', 'One Way', 'None']) assert.ok(tt.has(t), `missing transport ${t}`)
+})
+
+test('inactive members come from the invented filler pool first', () => {
+  const content = fullContentWithDest()
+  const ds = buildDataset(content, 20260630)
+  const fillerNames = new Set(content.people.figures
+    .filter(f => f.bucket === 'invented-descendants').map(f => f.name.toLowerCase()))
+  const fillerPersonIds = new Set(ds.person
+    .filter(p => fillerNames.has(p.fullName.toLowerCase())).map(p => p.id))
+  const inactive = ds.member.filter(m => m.status !== 'Active')
+  assert.ok(inactive.length >= 1)
+  const fillerMemberCount = ds.member.filter(m => fillerPersonIds.has(m.personId)).length
+  const nonFillerInactive = inactive.filter(m => !fillerPersonIds.has(m.personId)).length
+  // named notables only go inactive once the filler pool is exhausted
+  assert.ok(nonFillerInactive === 0 || fillerMemberCount <= inactive.length,
+    `${nonFillerInactive} named members inactive with ${fillerMemberCount} fillers available`)
+})
+
+test('standing requests: series re-book the same trip and share one booking identity', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  // a series = same member + service + destination + time-of-day slot
+  const key = (s) => [s.memberPersonId, s.serviceName, s.destination, s.startAt.slice(11)].join('|')
+  const groups = {}
+  for (const s of ds.service_request) (groups[key(s)] ??= []).push(s)
+  const series = Object.values(groups).filter(g => g.length > 1)
+  // booked once: same staff creator and entry timestamp on every occurrence
+  // (an unrelated re-draw of the same trip can collide on the key, so count
+  // the well-formed series rather than asserting on every group)
+  const wellFormed = series.filter(g =>
+    new Set(g.map(s => s.createdUserId)).size === 1 && new Set(g.map(s => s.createdAt)).size === 1)
+  assert.ok(wellFormed.length >= 20, `only ${wellFormed.length} standing series`)
+  for (const g of wellFormed) {
+    for (const s of g) assert.ok(s.createdAt <= s.startAt, 'booking predates every occurrence')
+  }
+})
+
+test('members can hold several requests, but never two overlapping in time', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const ms = (x) => Date.parse(x.replace(' ', 'T') + 'Z')
+  // date-only requests (start == finish) block their nominal 15-minute slot
+  const span = (sr) => [ms(sr.startAt), Math.max(ms(sr.finishAt), ms(sr.startAt) + 15 * 60000)]
+  const byMember = {}
+  for (const sr of ds.service_request) (byMember[sr.memberPersonId] ??= []).push(sr)
+  const multi = Object.values(byMember).filter(list => list.length > 1)
+  assert.ok(multi.length >= 10, `only ${multi.length} members have >1 request`)
+  for (const list of Object.values(byMember)) {
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const [aS, aE] = span(list[i]); const [bS, bE] = span(list[j])
+        assert.ok(!(aS < bE && bS < aE),
+          `member ${list[i].memberPersonId} double-booked: [${list[i].startAt}..${list[i].finishAt}] vs [${list[j].startAt}..${list[j].finishAt}]`)
+      }
+    }
+  }
 })
 
 test('privacy: one published rule, acknowledged by every user (incl. the loader account)', () => {
@@ -221,7 +289,7 @@ test('notifications reference requests; recipients is a JSON string', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   const srIds = new Set(ds.service_request.map(s => s.id))
   for (const n of ds.notification_event) {
-    assert.ok(srIds.has(n.service_request_id))
+    assert.ok(srIds.has(n.serviceRequestId))
     assert.equal(typeof n.recipients, 'string')
     assert.doesNotThrow(() => JSON.parse(n.recipients))
   }
@@ -232,23 +300,23 @@ test('buildDataset is deterministic and complete', () => {
   const b = buildDataset(fullContentWithDest(), 20260630)
   assert.deepEqual(a, b)
   assert.equal(a.capability.length, 13)
-  assert.ok(a.person.length >= 220, `person count ${a.person.length}`)
-  assert.ok(a.service_request.length >= 150, `service_request count ${a.service_request.length}`)
+  assert.ok(a.person.length >= 290, `person count ${a.person.length}`)
+  assert.ok(a.service_request.length >= 180, `service_request count ${a.service_request.length}`)
   assert.ok(a.fcv_submission.length >= 30, `fcv_submission count ${a.fcv_submission.length}`)
 })
 
 test('all 10 villages have >=1 member and >=1 volunteer; big villages have >=50 of each', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
-  // build village-id -> {members, volunteers} count map via person.village_id join
+  // build village-id -> {members, volunteers} count map via person.villageId join
   const byVillage = {}
   for (const v of ds.village) byVillage[v.id] = { name: v.name, m: 0, v: 0 }
-  const personVillage = Object.fromEntries(ds.person.map(p => [p.id, p.village_id]))
+  const personVillage = Object.fromEntries(ds.person.map(p => [p.id, p.villageId]))
   for (const row of ds.member) {
-    const vid = personVillage[row.person_id]
+    const vid = personVillage[row.personId]
     if (vid != null) byVillage[vid].m++
   }
   for (const row of ds.volunteer) {
-    const vid = personVillage[row.person_id]
+    const vid = personVillage[row.personId]
     if (vid != null) byVillage[vid].v++
   }
   // every village must have at least 1 member and 1 volunteer

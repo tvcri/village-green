@@ -2,10 +2,12 @@ import { VILLAGES, RI_STREETS } from '../constants.js'
 
 // Target member/volunteer counts per village size. Members and volunteers are
 // mostly DISTINCT people (members receive services; volunteers provide them).
+// Dataset-wide the mix lands near 60/40 members:volunteers, while the big
+// villages still honor the >=50 members AND >=50 volunteers requirement.
 const SIZE = {
-  big: { members: 55, volunteers: 52 },
-  medium: { members: 11, volunteers: 7 },
-  small: { members: 5, volunteers: 4 },
+  big: { members: 63, volunteers: 50 },
+  medium: { members: 13, volunteers: 7 },
+  small: { members: 6, volunteers: 3 },
   tiny: { members: 3, volunteers: 2 },
 }
 
@@ -55,6 +57,7 @@ export function buildPersons (content, villageIdByName, rng) {
   const used = new Set()
   const person = []
   const byVillage = {}
+  const fillerIds = new Set() // invented-descendant filler persons — least-examined rows
   let pid = 0
 
   const splitName = (name) => {
@@ -67,16 +70,17 @@ export function buildPersons (content, villageIdByName, rng) {
     pid += 1
     const { first, last } = splitName(fig.name)
     used.add(fig.name)
+    if (fig.bucket === 'invented-descendants') fillerIds.add(pid)
     person.push({
-      id: pid, village_id: villageId, full_name: fig.name,
-      first_name: first, last_name: last, nickname: null,
+      id: pid, villageId: villageId, fullName: fig.name,
+      firstName: first, lastName: last, nickname: null,
       street: `${rng.int(1, 400)} ${rng.pick(RI_STREETS)}`, unit: rng.bool(0.15) ? `Apt ${rng.int(1, 30)}` : null,
       city: RI_TOWNS[vName] || vName, state: 'RI', zip: String(rng.int(2801, 2920)).padStart(5, '0'),
       email: emailFor(fig.name), phone: `401-555-${String(rng.int(100, 999))}`, cell: `401-555-${String(rng.int(100, 999))}`,
-      computer_use: rng.bool(0.6) ? 1 : 0, smartphone: rng.bool(0.7) ? 1 : 0,
-      birth_date: `19${rng.int(30, 60)}-${String(rng.int(1, 12)).padStart(2, '0')}-${String(rng.int(1, 28)).padStart(2, '0')}`,
-      emergency_contact_name: null, emergency_contact_relationship: null,
-      emergency_contact_phone: null, emergency_contact_email: null,
+      computerUse: rng.bool(0.6) ? 1 : 0, smartphone: rng.bool(0.7) ? 1 : 0,
+      birthDate: `19${rng.int(30, 60)}-${String(rng.int(1, 12)).padStart(2, '0')}-${String(rng.int(1, 28)).padStart(2, '0')}`,
+      emergencyContactName: null, emergencyContactRelationship: null,
+      emergencyContactPhone: null, emergencyContactEmail: null,
       comments: fig.realBlurb || null,
     })
     return pid
@@ -103,5 +107,5 @@ export function buildPersons (content, villageIdByName, rng) {
     if (!volunteers.length && members.length) volunteers.push(rng.pick(members))
     byVillage[villageId] = { members, volunteers }
   }
-  return { person, byVillage }
+  return { person, byVillage, fillerIds }
 }

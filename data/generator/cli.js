@@ -37,7 +37,7 @@ async function sanity () {
       (SELECT COUNT(*) FROM volunteer) vol,
       (SELECT COUNT(*) FROM volunteer WHERE active = 1) avol,
       (SELECT COUNT(*) FROM service_request) sr,
-      (SELECT COUNT(*) FROM service_request WHERE status IN ('Confirmed','Completed') AND volunteer_person_id IS NULL) bad,
+      (SELECT COUNT(*) FROM service_request WHERE status IN ('Confirmed','Completed') AND volunteerPersonId IS NULL) bad,
       (SELECT COUNT(*) FROM user_data) u,
       (SELECT COUNT(*) FROM privacy_acknowledgement) pa`)
     return c

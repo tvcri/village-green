@@ -1,6 +1,6 @@
 # Village Green — demo dataset generator
 
-Deterministic demo data for Village Green: a roster of 296 RI-history/lore figures (116 of them gag cameos with bespoke service requests), spread across 10 villages. The dataset is fixed-seed so the same records load every time.
+Deterministic demo data for Village Green: a roster of 316 RI-history/lore figures (116 of them gag cameos with bespoke service requests, plus a handful of invented descendants of real notables to fill out the rolls), spread across 10 villages. The dataset is fixed-seed so the same records load every time.
 
 ## Prerequisites
 
@@ -126,14 +126,16 @@ The loader's machine account (`demo-loader@villagegreen.test`) is pre-seeded **w
 
 ## How the dataset is built
 
-Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows; ~35% of members get a standing `service_notes`) **→ service requests + FCV submissions**.
+Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows in a ~60/40 mix; ~66% of members get a standing `serviceNotes`; ~5% of each side is inactive, drawn from the invented-descendant filler persons first) **→ service requests + FCV submissions**.
 
 Service requests are built in two passes:
 
 1. **Gag pass** — each gag-tagged figure who landed as a member gets one bespoke request from their `gag` block in `people.json`. The free-text gag title is keyword-mapped onto a real UI service name, title + blurb become the `description`, and the gag's destination is used as-is.
-2. **Volume pass** — each village gets ≈ 0.8 × its active-member count of ordinary requests: a random active member × a weighted-random `catalog` entry (`Ride: Medical Appnt` ×6, other rides ×3 — prod is medical-ride-heavy) × a random destination from a pool matched to the service (medical → Miskatonic Health, shopping → grocery/food landmarks, personal care → the barber, activities → landmarks).
+2. **Volume pass** — each village gets ≈ 0.5 × its active-member count of ordinary bookings: a random active member × a weighted-random `catalog` entry (`Ride: Medical Appnt` ×6, other rides ×3 — prod is medical-ride-heavy) × a random destination from a pool matched to the service (medical → Miskatonic Health, shopping → grocery/food landmarks, personal care → the barber, activities → landmarks).
 
-Field rules mirror the client UI (`ServiceRequestCreateEdit.vue`): `service_name` is always one of the ten `serviceNameOptions`; rides are `Round Trip` (~80%) or `One Way`, everything else `None`; Tech Support and Household Chores/Handy Help set no location fields, all others get destination/address/city/state; Round Trips carry `appt_time`/`return_time` in Start → Arrival → Return → Finish slot order. A member's `service_notes` is echoed into `instructions` on every one of that member's requests, matching how prod repeats standing mobility notes. Every request's `created_user_id` points at a **manager or owner of its own village** (staff enter requests on behalf of members), so the app's creator attribution shows a plausible themed name.
+Any booking (gag or ordinary) can become a **standing request**: the same trip re-booked every 1/2/4 weeks for a handful of occurrences spanning past and future — past ones mostly Completed, upcoming ones Confirmed/Open, usually with the same regular volunteer, all sharing one entry timestamp and staff creator. Medical rides recur most (think dialysis runs); we're deliberately loose about what "recurs" — it's demo data, so Roger Williams may well draw a second banishment ride a month later.
+
+Field rules mirror the client UI (`ServiceRequestCreateEdit.vue`): `serviceName` is always one of the ten `serviceNameOptions`; rides are `Round Trip` (~80%) or `One Way`, everything else `None`; Tech Support and Household Chores/Handy Help set no location fields, all others get destination/address/city/state; Round Trips carry `apptTime`/`returnTime` in Start → Arrival → Return → Finish slot order. A member's `serviceNotes` is echoed into `instructions` on every one of that member's requests, matching how prod repeats standing mobility notes. Members can hold several requests, but never two that overlap in time — the builder re-rolls the day/slot until it clears the member's other bookings. Every request's `createdUserId` points at a **manager or owner of its own village** (staff enter requests on behalf of members), so the app's creator attribution shows a plausible themed name.
 
 ## Maintaining the generator through schema changes
 
@@ -148,6 +150,6 @@ After merging schema changes from main: `npm test && npm run roundtrip` exercise
 
 ## Determinism
 
-The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 291 persons, ~200 service requests (90 of them bespoke gags), households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
+The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 311 persons (~60/40 members:volunteers) and ~460 service requests — 101 bespoke gag bookings plus ordinary volume, with roughly 80 standing series among them — households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
 
 The cameos are real Rhode Island historical figures and Lovecraft-lore characters, with gag service requests written to match their biographies.

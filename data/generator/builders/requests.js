@@ -59,11 +59,11 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
     .flatMap(s => Array(s.serviceName === 'Ride: Medical Appnt' ? 6 : s.serviceName.startsWith('Ride:') ? 3 : 1).fill(s))
   const gagFigures = content.people.figures.filter(f => f.tag === 'gag')
   // map a gag figure to a member person row by name
-  const personByName = Object.fromEntries(plan.person.map(p => [p.full_name.toLowerCase(), p]))
-  const memberPersonIds = new Set(membership.member.map(m => m.person_id))
-  // standing member notes (member.service_notes) echo into request instructions, like prod
+  const personByName = Object.fromEntries(plan.person.map(p => [p.fullName.toLowerCase(), p]))
+  const memberPersonIds = new Set(membership.member.map(m => m.personId))
+  // standing member notes (member.serviceNotes) echo into request instructions, like prod
   const noteByPerson = Object.fromEntries(
-    membership.member.filter(m => m.service_notes).map(m => [m.person_id, m.service_notes]))
+    membership.member.filter(m => m.serviceNotes).map(m => [m.personId, m.serviceNotes]))
 
   const service_request = []
   const notification_event = []
@@ -71,7 +71,7 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
   let srId = 0; let neId = 0; let fcvId = 0; let reqNo = 27100
 
   const pushNotifications = (sr) => {
-    const recips = JSON.stringify([sr.member_person_id, sr.volunteer_person_id].filter(Boolean))
+    const recips = JSON.stringify([sr.memberPersonId, sr.volunteerPersonId].filter(Boolean))
     const events = []
     if (sr.status === 'Open' || sr.status === 'Confirmed' || sr.status === 'Completed' || CANCELLED.has(sr.status)) events.push('open')
     if (sr.status === 'Confirmed' || sr.status === 'Completed') events.push('confirmed')
@@ -80,13 +80,16 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
       neId += 1
       const createdAt = addDays(BASE_DATE, -rng.int(1, 60))
       const sentAt = addDays(createdAt, rng.int(0, 1))
-      notification_event.push({ id: neId, event_type: et, service_request_id: sr.id,
-        created_at: dt(createdAt), sent_at: dt(sentAt), recipients: recips })
+      notification_event.push({ id: neId, eventType: et, serviceRequestId: sr.id,
+        createdAt: dt(createdAt), sentAt: dt(sentAt), recipients: recips })
     }
   }
 
+  // memberPersonId -> [startMs, endMs][] — members can hold several requests,
+  // but never two that overlap in time
+  const busyByMember = {}
+
   const makeRequest = (villageId, memberPersonId, opts = {}) => {
-    srId += 1
     const vols = byVillage[villageId].volunteers
     const creators = creatorsByVillage[villageId] || []
     let status = opts.status || rng.weighted(STATUS_W)
@@ -96,7 +99,6 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
     // always null for Open; otherwise pick volunteer only if wantsVol
     const volunteerPersonId = status === 'Open' ? null : (wantsVol && vols.length ? rng.pick(vols) : null)
     const past = status === 'Completed' || CANCELLED.has(status)
-    const day = addDays(BASE_DATE, past ? -rng.int(1, 120) : rng.int(1, 45))
 
     const svc = opts.gag ? null : rng.pick(services)
     const category = opts.gag ? gagCategory(opts.gag.serviceName) : svc.serviceName
@@ -106,9 +108,22 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
 
     // UI time flow — Round Trip: Start -> Arrival -> Return -> Finish; One Way: Start -> Finish.
     // Some non-ride requests are date-only ("time to be arranged"), like prod.
+    // Re-roll the day/slot until it clears the member's other requests; a
+    // date-only request blocks its nominal slot, so two "to be arranged"
+    // requests can't share a date either.
     const dateOnly = !isRide && rng.bool(0.5)
-    const startMin = dateOnly ? 4 * 60 : rng.int(32, 68) * 15 // 8:00 AM .. 5:00 PM slots
-    const durMin = dateOnly ? 0 : (isRide ? (roundTrip ? rng.int(5, 10) * 15 : rng.int(2, 4) * 15) : rng.int(4, 8) * 15)
+    const busy = (busyByMember[memberPersonId] ??= [])
+    let day, startMin, durMin, slot = null
+    for (let attempt = 0; attempt < 10 && !slot; attempt++) {
+      day = addDays(BASE_DATE, past ? -rng.int(1, 120) : rng.int(1, 45))
+      startMin = dateOnly ? 4 * 60 : rng.int(32, 68) * 15 // 8:00 AM .. 5:00 PM slots
+      durMin = dateOnly ? 0 : (isRide ? (roundTrip ? rng.int(5, 10) * 15 : rng.int(2, 4) * 15) : rng.int(4, 8) * 15)
+      const s = atMinutes(day, startMin).getTime()
+      const e = atMinutes(day, startMin + Math.max(durMin, 15)).getTime()
+      if (!busy.some(([bs, be]) => s < be && bs < e)) slot = [s, e]
+    }
+    if (!slot) return // calendar is packed — skip rather than double-book
+    busy.push(slot)
     const legMin = rng.int(1, 2) * 15 // travel leg used to seed arrival/return
 
     // The grid's Destination/City columns come from these fields, so real
@@ -134,42 +149,89 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
       ? `${opts.gag.serviceName} — ${opts.gag.description}`
       : (svc.flavor ? `${svc.description}. ${svc.flavor}` : `${svc.description}.`)
 
-    service_request.push({
-      id: srId,
-      // prod mix: CE-era requests carry a number, VG-native ones are null
-      request_number: rng.bool(0.35) ? null : (reqNo += 1),
-      village_id: villageId,
-      member_person_id: memberPersonId, volunteer_person_id: volunteerPersonId, status,
-      service_name: category,
-      transportation_type: transportationType,
-      destination, address, city, state, zip, phone,
-      // staff attribution — entered by a manager or owner of the village
-      created_user_id: creators.length ? rng.pick(creators) : null,
-      created_at: dt(addDays(day, -rng.int(1, 14))),
-      start_at: dt(atMinutes(day, startMin)),
-      finish_at: dt(atMinutes(day, startMin + durMin)),
-      appt_time: roundTrip ? dt(atMinutes(day, startMin + legMin)) : null,
-      return_time: roundTrip ? dt(atMinutes(day, startMin + durMin - legMin)) : null,
-      instructions: noteByPerson[memberPersonId] || null,
-      description,
-    })
-    pushNotifications(service_request[service_request.length - 1])
+    // Standing requests — regulars re-book the same trip on a cadence (dialysis
+    // runs, weekly shopping, Poe's cemetery visit). We're deliberately loose
+    // about what counts as "recurring": it's demo data — if Roger Williams
+    // draws a second banishment ride a month later, so be it. Decided up front
+    // so the booking timestamp predates the series' earliest occurrence.
+    // gag cameos are the showpieces — let their bespoke requests recur a bit
+    // more often so a browse-through hits one quickly
+    const recurP = (category === 'Ride: Medical Appnt' ? 0.6 : isRide ? 0.4 : 0.25) + (opts.gag ? 0.15 : 0)
+    let recur = null
+    if (rng.bool(recurP)) {
+      // the series spans both directions — a standing booking has history
+      const extra = rng.int(2, 5)
+      recur = { stepDays: rng.pick([7, 14, 28]), extra, back: rng.int(0, extra) }
+    }
+
+    // The whole series (base + any recurrences) shares one booking: same staff
+    // creator, same entry timestamp, same slot and trip shape — only the date,
+    // status, and volunteer vary per occurrence.
+    const creatorId = creators.length ? rng.pick(creators) : null
+    const earliestDay = recur ? addDays(day, -recur.stepDays * recur.back) : day
+    const createdAtStr = dt(addDays(earliestDay, -rng.int(1, 14)))
+    const emit = (d, occStatus, occVolunteer) => {
+      srId += 1
+      service_request.push({
+        id: srId,
+        // prod mix: CE-era requests carry a number, VG-native ones are null
+        requestNumber: rng.bool(0.35) ? null : (reqNo += 1),
+        villageId: villageId,
+        memberPersonId: memberPersonId, volunteerPersonId: occVolunteer, status: occStatus,
+        serviceName: category,
+        transportationType: transportationType,
+        destination, address, city, state, zip, phone,
+        // staff attribution — entered by a manager or owner of the village
+        createdUserId: creatorId,
+        createdAt: createdAtStr,
+        startAt: dt(atMinutes(d, startMin)),
+        finishAt: dt(atMinutes(d, startMin + durMin)),
+        apptTime: roundTrip ? dt(atMinutes(d, startMin + legMin)) : null,
+        returnTime: roundTrip ? dt(atMinutes(d, startMin + durMin - legMin)) : null,
+        instructions: noteByPerson[memberPersonId] || null,
+        description,
+      })
+      pushNotifications(service_request[service_request.length - 1])
+    }
+    emit(day, status, volunteerPersonId)
+
+    if (recur) {
+      // regulars usually get the same driver for every occurrence
+      const regular = volunteerPersonId || (vols.length ? rng.pick(vols) : null)
+      for (let k = -recur.back; k <= recur.extra - recur.back; k++) {
+        if (k === 0) continue // the base occurrence, already emitted
+        const d = addDays(day, recur.stepDays * k)
+        const s = atMinutes(d, startMin).getTime()
+        const e = atMinutes(d, startMin + Math.max(durMin, 15)).getTime()
+        if (busy.some(([bs, be]) => s < be && bs < e)) continue // that day's taken
+        const occStatus = d < BASE_DATE
+          ? rng.weighted([['Completed', 8], ['Member cancelled', 1], ['Volunteer cancelled', 1]])
+          : rng.weighted([['Confirmed', 1], ['Open', 1]])
+        const occVolunteer = occStatus === 'Open' ? null
+          : (occStatus === 'Completed' || occStatus === 'Confirmed') ? regular
+            : (rng.bool(0.5) ? regular : null)
+        if ((occStatus === 'Completed' || occStatus === 'Confirmed') && !occVolunteer) continue
+        busy.push([s, e])
+        emit(d, occStatus, occVolunteer)
+      }
+    }
   }
 
   // 1) Bespoke gag requests for gag cameos who landed as members.
   for (const fig of gagFigures) {
     const p = personByName[fig.name.toLowerCase()]
     if (!p || !memberPersonIds.has(p.id)) continue
-    makeRequest(p.village_id, p.id, {
+    makeRequest(p.villageId, p.id, {
       status: rng.weighted([['Open', 3], ['Confirmed', 3], ['Completed', 2], ['Draft', 1]]),
       gag: fig.gag,
     })
   }
 
   // 2) Ordinary requests, concentrated in big villages, to reach a healthy volume.
+  // (Draw rate is per BOOKING — standing bookings fan out into several rows.)
   for (const vid of Object.keys(byVillage).map(Number)) {
-    const memberPersons = membership.member.filter(m => byVillage[vid].members.includes(m.person_id) && m.status === 'Active').map(m => m.person_id)
-    const n = Math.max(2, Math.round(memberPersons.length * 0.8))
+    const memberPersons = membership.member.filter(m => byVillage[vid].members.includes(m.personId) && m.status === 'Active').map(m => m.personId)
+    const n = Math.max(2, Math.round(memberPersons.length * 0.5))
     for (let k = 0; k < n && memberPersons.length; k++) makeRequest(vid, rng.pick(memberPersons))
   }
 
@@ -184,8 +246,8 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
       const volP = personById[rng.pick(vols)]; const memP = personById[rng.pick(mems)]
       fcv_submission.push({
         id: fcvId, villageId: vid, villageName: village,
-        volunteerPersonId: volP.id, rawVolunteerName: volP.full_name,
-        memberPersonId: memP.id, rawMemberName: memP.full_name,
+        volunteerPersonId: volP.id, rawVolunteerName: volP.fullName,
+        memberPersonId: memP.id, rawMemberName: memP.fullName,
         visitDate: addDays(BASE_DATE, -rng.int(1, 200)).toISOString().slice(0, 10),
         timeSpentMinutes: rng.int(15, 120), contactType: rng.pick(contactTypes),
         activityTypes: JSON.stringify(rng.shuffle(activityTypes).slice(0, rng.int(1, 3))),

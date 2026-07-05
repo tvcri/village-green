@@ -11,7 +11,7 @@ test('people.json is a large, de-duped, tagged roster', () => {
   assert.ok(Array.isArray(people.figures), 'figures is an array')
   assert.ok(people.figures.length >= 240, `figures=${people.figures.length} (want >= 240)`)
 
-  // globally unique names (the schema enforces unique (village_id, full_name);
+  // globally unique names (the schema enforces unique (villageId, fullName);
   // we keep names globally unique so a figure never appears in two villages)
   const names = people.figures.map(f => f.name.toLowerCase())
   assert.equal(names.length, new Set(names).size, 'figure names must be globally unique')
