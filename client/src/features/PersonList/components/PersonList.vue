@@ -27,8 +27,8 @@ const phone = ref('')
 const email = ref('')
 const selectedVillage = ref('All villages')
 
-const showMembers = ref(true)
-const showVolunteers = ref(true)
+const showMembers = ref(false)
+const showVolunteers = ref(false)
 
 // Village options for the filter; 'All villages' is the sentinel meaning no
 // village restriction (server returns persons across all granted villages).
@@ -61,6 +61,7 @@ const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
 
 const filteredPersons = computed(() => {
   if (!persons.value) return null
+  if (!showMembers.value && !showVolunteers.value) return persons.value
   return persons.value.filter(p => {
     const roles = parseJson(p.roles)
     if (showMembers.value && roles.includes('member')) return true
