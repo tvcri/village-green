@@ -6,8 +6,11 @@ const config = require('../utils/config')
 // --- structured-outputs schema helpers -------------------------------------
 const str = { type: ['string', 'null'] }
 const num = { type: ['number', 'null'] }
-const yn = { type: ['string', 'null'], enum: ['Yes', 'No', null] }
-const ynSometimes = { type: ['string', 'null'], enum: ['Yes', 'No', 'Sometimes', null] }
+// The API's structured-outputs validator rejects enum combined with a type
+// array — nullable enums must be an anyOf of a string-enum branch and null.
+const nullableEnum = values => ({ anyOf: [{ type: 'string', enum: values }, { type: 'null' }] })
+const yn = nullableEnum(['Yes', 'No'])
+const ynSometimes = nullableEnum(['Yes', 'No', 'Sometimes'])
 
 const memberEntry = {
   type: 'object',
@@ -48,7 +51,7 @@ const EXTRACTION_SCHEMA = {
             applicationDate: { ...str, description: 'YYYY-MM-DD' },
             villageName: str,
             ambassador: str,
-            householdType: { type: ['string', 'null'], enum: ['Single', 'Dual', null] },
+            householdType: nullableEnum(['Single', 'Dual']),
           },
         },
         members: { type: 'array', items: memberEntry },
@@ -70,7 +73,7 @@ const EXTRACTION_SCHEMA = {
             newsletterPrint: yn, wantsVolunteerInfo: yn,
             circleOfPrideJoin: yn, circleOfPridePreferred: yn,
             duesMonthly: num, duesYearly: num,
-            paymentMethod: { type: ['string', 'null'], enum: ['Online', 'Bank Payment', 'Bank Withdrawal', 'Personal Check', null] },
+            paymentMethod: nullableEnum(['Online', 'Bank Payment', 'Bank Withdrawal', 'Personal Check']),
             invoiceMailed: yn,
           },
         },
