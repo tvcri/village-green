@@ -7,7 +7,7 @@ import Dialog from 'primevue/dialog'
 import UploadStep from './UploadStep.vue'
 import PersonStep from './PersonStep.vue'
 import MemberStep from './MemberStep.vue'
-// DoneStep imported as it lands in Task 10
+import DoneStep from './DoneStep.vue'
 
 const router = useRouter()
 
@@ -61,6 +61,12 @@ function requestCancel () {
 function exit () {
   router.push({ name: 'meta-persons' })
 }
+
+function restart () {
+  extraction.value = null
+  created.value = []
+  stepIndex.value = 0
+}
 </script>
 
 <template>
@@ -86,7 +92,7 @@ function exit () {
         :primaryPersonId="currentStep.memberIndex > 0 ? created[0].personId : null"
         :primaryPersonName="currentStep.memberIndex > 0 ? created[0].fullName : ''"
         @member-done="onMemberDone" />
-      <!-- DoneStep renders here (Task 10) -->
+      <DoneStep v-else-if="currentStep.key === 'done'" :created="created" @restart="restart" />
 
       <div class="wizard-footer">
         <span v-if="extraction?.usage" class="usage">
