@@ -50,6 +50,7 @@ function sampleExtraction () {
         street: '12 Elm St', unit: '', city: 'Providence', state: 'RI', zip: '02901',
         email: 'marge@example.com', phone: '401-555-1111', cell: '',
         accessibility: { difficultyHearing: 'Sometimes', visionLimited: 'No', usesWalker: 'No', usesCane: 'No', usesWheelchair: 'No' },
+        accessibilityNotes: '',
       },
       {
         firstName: 'Al', middleInitial: '', lastName: 'Innovera', nickname: '',
@@ -57,6 +58,7 @@ function sampleExtraction () {
         street: '', unit: '', city: '', state: '', zip: '',
         email: '', phone: '', cell: '401-555-2222',
         accessibility: { difficultyHearing: '', visionLimited: '', usesWalker: '', usesCane: '', usesWheelchair: '' },
+        accessibilityNotes: 'Vision limited: needs glasses. Uses walker: rollator for travel.',
       },
     ],
     emergencyContact: {
@@ -80,6 +82,8 @@ test('assembleResponse splits person fields from extras', () => {
   assert.equal(r.members[0].pronouns, undefined)
   assert.deepEqual(r.members[0].extras.accessibility.difficultyHearing, 'Sometimes')
   assert.equal(r.members[0].extras.veteran, 'Yes')
+  assert.equal(r.members[0].extras.accessibilityNotes, null)
+  assert.equal(r.members[1].extras.accessibilityNotes, 'Vision limited: needs glasses. Uses walker: rollator for travel.')
 })
 
 test('assembleResponse maps memberDefaults and resolves village', () => {

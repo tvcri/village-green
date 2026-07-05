@@ -58,6 +58,7 @@ export function composeNotes (extraction, memberIndex) {
   for (const [key, label] of Object.entries(ACCESSIBILITY_LABELS)) {
     push(label, extras.accessibility?.[key])
   }
+  push('Accessibility notes', extras.accessibilityNotes)
   // Cell was preferred for the emergencyContactPhone form field; keep the home
   // number on record when both were extracted.
   const ec = extraction.emergencyContact

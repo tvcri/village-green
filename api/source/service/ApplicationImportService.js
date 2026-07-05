@@ -19,7 +19,7 @@ const memberEntry = {
   additionalProperties: false,
   required: ['firstName', 'middleInitial', 'lastName', 'nickname', 'pronouns', 'birthDate',
     'gender', 'veteran', 'street', 'unit', 'city', 'state', 'zip', 'email', 'phone', 'cell',
-    'accessibility'],
+    'accessibility', 'accessibilityNotes'],
   properties: {
     firstName: str, middleInitial: str, lastName: str, nickname: str, pronouns: str,
     birthDate: { ...str, description: 'YYYY-MM-DD' }, gender: str, veteran: yn,
@@ -34,6 +34,7 @@ const memberEntry = {
         usesWalker: ynSometimes, usesCane: ynSometimes, usesWheelchair: ynSometimes,
       },
     },
+    accessibilityNotes: { ...str, description: 'Any handwritten explain/detail text for the accessibility questions, verbatim' },
   },
 }
 
@@ -117,6 +118,7 @@ For a membership application:
 - "members" holds one entry for a Single household. For a Dual household, extract the second household member's own fields as a second entry (never more than two entries). If the second person's field is blank on the form, use an empty string — do not copy the first person's value.
 - For any field that is blank or not filled in, use an empty string "".
 - duesMonthly and duesYearly are digit strings (e.g. "120"), or "" if blank.
+- Accessibility questions (difficultyHearing, visionLimited, usesWalker, usesCane, usesWheelchair) are Yes/No/Sometimes checkboxes with an adjacent "explain" line. Some applicants check "Yes" but write their explanation on the "Sometimes" line, or check both. When this happens, use the checked Yes/No value as the field's answer — do NOT report it as an uncertain field, this is not ambiguous, the applicant's intent is clear from the checkbox. Instead, put the full explain text verbatim in accessibilityNotes (e.g. "Vision limited: needs glasses. Uses walker: rollator for travel."), one line per field that has explain text. accessibilityNotes is "" if no field had any handwritten explanation.
 - If "No Emergency Contact" is checked or no emergency contact is given, return emergencyContact with every field set to "".
 - Dates are YYYY-MM-DD.
 - "uncertainFields": list ONLY fields whose values are genuinely ambiguous from the handwriting or scan quality — a digit that could be read two ways, a partially cut-off word, an ambiguous checkbox. For each, give the JSON path (e.g. "members[0].zip"), a short reason, and your best alternative reading ("" if none). Do not list fields you read confidently; an empty array means everything was clear.`
@@ -177,8 +179,8 @@ function assembleResponse (data, villages, usage) {
     return { ...data, usage }
   }
   const members = data.members.slice(0, 2).map(m => {
-    const { pronouns, gender, veteran, accessibility, ...person } = m
-    return { ...person, extras: { pronouns, gender, veteran, accessibility: nullIfAllNull(accessibility) } }
+    const { pronouns, gender, veteran, accessibility, accessibilityNotes, ...person } = m
+    return { ...person, extras: { pronouns, gender, veteran, accessibility: nullIfAllNull(accessibility), accessibilityNotes } }
   })
   const { newsletterPrint, duesMonthly, duesYearly, paymentMethod, invoiceMailed, ...preferences } = data.preferences
   return {

@@ -21,13 +21,14 @@ function extraction () {
         extras: {
           pronouns: 'she/her', gender: 'F', veteran: 'Yes',
           accessibility: { difficultyHearing: 'Sometimes', visionLimited: 'No', usesWalker: 'No', usesCane: 'No', usesWheelchair: 'No' },
+          accessibilityNotes: 'Hearing: uses hearing aids sometimes.',
         },
       },
       {
         firstName: 'Al', middleInitial: null, lastName: 'Innovera', nickname: null,
         birthDate: '1946-07-19', street: null, unit: null, city: null, state: null, zip: null,
         email: null, phone: null, cell: '401-555-2222',
-        extras: { pronouns: null, gender: 'M', veteran: 'No', accessibility: null },
+        extras: { pronouns: null, gender: 'M', veteran: 'No', accessibility: null, accessibilityNotes: null },
       },
     ],
     emergencyContact: {
@@ -105,11 +106,13 @@ describe('composeNotes', () => {
     expect(notes).toContain('Payment method: Personal Check')
     expect(notes).toContain('Dues (yearly): 120')
     expect(notes).toContain('Emergency contact home phone: 401-555-9999')
+    expect(notes).toContain('Accessibility notes: Hearing: uses hearing aids sometimes.')
     expect(notes).not.toContain('Veteran')        // mapped to community
     expect(notes).not.toContain('null')
   })
   it('omits accessibility lines when accessibility is null', () => {
     expect(composeNotes(extraction(), 1)).not.toContain('hearing')
+    expect(composeNotes(extraction(), 1)).not.toContain('Accessibility notes')
   })
 })
 
