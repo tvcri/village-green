@@ -41,11 +41,15 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.requestNumber',
     'CAST(sr.villageId AS CHAR) AS villageId',
+    'v.name AS villageName',
     'CAST(sr.memberPersonId AS CHAR) AS memberPersonId',
     'CAST(m.id AS CHAR) AS memberId',
     'mp.fullName AS memberFullName',
+    'm.serviceNotes AS memberServiceNotes',
     'CAST(sr.volunteerPersonId AS CHAR) AS volunteerPersonId',
     'CAST(vol.id AS CHAR) AS volunteerId',
+    'CAST(vv.id AS CHAR) AS volunteerVillageId',
+    'vv.name AS volunteerVillageName',
     'vp.fullName AS volunteerFullName',
     'sr.status AS status',
     'sr.serviceName',
@@ -69,10 +73,12 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   ]
   const joins = new Set([
     'service_request sr',
+    'LEFT JOIN village v ON sr.villageId = v.id',
     'LEFT JOIN member m ON sr.memberPersonId = m.personId',
     'LEFT JOIN person mp ON sr.memberPersonId = mp.id',
     'LEFT JOIN volunteer vol ON sr.volunteerPersonId = vol.personId',
     'LEFT JOIN person vp ON sr.volunteerPersonId = vp.id',
+    'LEFT JOIN village vv ON vp.villageId = vv.id',
     'LEFT JOIN user_data ud ON sr.createdUserId = ud.userId'
   ])
   const predicates = { statements: ['sr.id = ?'], binds: [serviceRequestId] }

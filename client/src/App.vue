@@ -21,7 +21,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="isDev" class="dev-instance" aria-hidden="true">TEST DEPLOYMENT</div>
+  <div v-if="isDev" class="dev-instance" aria-hidden="true">FOR DEMONSTRATION ONLY -- DOES NOT MANAGE PRODUCTION DATA</div>
   <div class="app-container">
     <Toast />
     <GlobalErrorModal />
@@ -77,7 +77,7 @@ onMounted(() => {
   margin: 0 auto;
   max-width: 1200px;
   height: 20px;
-  background-color: #783d1022;
+  background-color: #ff6f00c9;
   pointer-events: none;
   z-index: 9999;
   display: flex;

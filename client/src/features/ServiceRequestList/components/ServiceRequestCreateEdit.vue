@@ -19,8 +19,9 @@ import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
-import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
+import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
+import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
 
@@ -41,8 +42,13 @@ const { state: villageMembers, execute: fetchMembers } = useAsyncState(
   { immediate: false }
 )
 
+const anyVillageVolunteers = ref(false)
+
 const { state: villageVolunteers, execute: fetchVolunteers } = useAsyncState(
-  () => form.value.villageId ? getVillageVolunteers(form.value.villageId) : null,
+  () => {
+    if (anyVillageVolunteers.value) return getVolunteers()
+    return form.value.villageId ? getVillageVolunteers(form.value.villageId) : null
+  },
   { immediate: false }
 )
 
@@ -101,6 +107,10 @@ watch(existingRequest, async (val) => {
       if (!dateStr) return ''
       return new Date(dateStr)
     }
+    // A volunteer from outside the member's village only appears in the
+    // "any village" list, so flip the checkbox before villageId's watcher
+    // triggers fetchVolunteers, or the loaded volunteer won't be findable.
+    anyVillageVolunteers.value = !!(val.volunteerVillageId && val.volunteerVillageId !== val.villageId)
     form.value = {
       villageId: val.villageId || '',
       memberPersonId: val.memberPersonId || '',
@@ -136,6 +146,12 @@ const allMemberOptions = computed(() => {
     label: m.personFullName || m.fullName,
     value: String(m.personId || m.id)
   }))
+})
+
+const selectedMemberServiceNotes = computed(() => {
+  if (!Array.isArray(villageMembers.value) || !form.value.memberPersonId) return ''
+  const member = villageMembers.value.find(m => String(m.personId || m.id) === String(form.value.memberPersonId))
+  return member?.serviceNotes || ''
 })
 
 const allVolunteerOptions = computed(() => {
@@ -196,6 +212,10 @@ watch(() => form.value.villageId, (villageId, oldVillageId) => {
     fetchMembers()
     fetchVolunteers()
   }
+})
+
+watch(anyVillageVolunteers, () => {
+  if (form.value.villageId) fetchVolunteers()
 })
 
 watch([allMemberOptions, () => form.value.memberPersonId], ([members, memberId]) => {
@@ -667,6 +687,14 @@ const handleCancelRequest = async (reason) => {
   }
 }
 
+const personDialogVisible = ref(false)
+const personDialogPersonId = ref(null)
+
+const openPersonDialog = (personId) => {
+  personDialogPersonId.value = personId
+  personDialogVisible.value = true
+}
+
 </script>
 
 <template>
@@ -729,28 +757,60 @@ const handleCancelRequest = async (reason) => {
 
             <div v-if="form.villageId">
               <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Member<span class="req">*</span></label>
-              <AutoComplete
-                v-model="selectedMember"
-                :suggestions="memberFilteredOptions"
-                option-label="label"
-                placeholder="Search member"
-                :force-selection="true"
-                showClear
-                @complete="filterMembers"
-              />
+              <div class="person-field-row">
+                <AutoComplete
+                  v-model="selectedMember"
+                  :suggestions="memberFilteredOptions"
+                  option-label="label"
+                  placeholder="Search member"
+                  :force-selection="true"
+                  showClear
+                  @complete="filterMembers"
+                />
+                <Button
+                  v-if="form.memberPersonId"
+                  type="button"
+                  icon="pi pi-id-card"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="View member details"
+                  v-tooltip.top="'View member details'"
+                  @click="openPersonDialog(form.memberPersonId)"
+                />
+              </div>
             </div>
 
             <div v-if="form.villageId">
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Volunteer</label>
-              <AutoComplete
-                v-model="selectedVolunteer"
-                :suggestions="volunteerFilteredOptions"
-                option-label="label"
-                placeholder="Search volunteer"
-                :force-selection="true"
-                showClear
-                @complete="filterVolunteers"
-              />
+              <label class="volunteer-label">
+                <span>Volunteer</span>
+                <span class="any-village-toggle">
+                  <Checkbox v-model="anyVillageVolunteers" binary input-id="any-village-volunteers" />
+                  <label for="any-village-volunteers">From any village</label>
+                </span>
+              </label>
+              <div class="person-field-row">
+                <AutoComplete
+                  v-model="selectedVolunteer"
+                  :suggestions="volunteerFilteredOptions"
+                  option-label="label"
+                  placeholder="Search volunteer"
+                  :force-selection="true"
+                  showClear
+                  @complete="filterVolunteers"
+                />
+                <Button
+                  v-if="form.volunteerPersonId"
+                  type="button"
+                  icon="pi pi-id-card"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="View volunteer details"
+                  v-tooltip.top="'View volunteer details'"
+                  @click="openPersonDialog(form.volunteerPersonId)"
+                />
+              </div>
             </div>
           </div>
 
@@ -759,8 +819,20 @@ const handleCancelRequest = async (reason) => {
             Select a village to continue…
           </div>
 
-          <!-- Remaining sections, revealed once a village is chosen -->
-          <template v-if="form.villageId">
+          <!-- Hint shown once village is selected but before a member is chosen -->
+          <div v-if="form.villageId && !form.memberPersonId" class="village-hint">
+            Select a member to continue…
+          </div>
+
+          <!-- Remaining sections, revealed once a member is chosen -->
+          <template v-if="form.villageId && form.memberPersonId">
+
+          <!-- Service Notes: display-only, sourced from the selected member's record -->
+          <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Service Notes</h3>
+          </div>
+          <div v-if="selectedMemberServiceNotes" style="white-space: pre-wrap;">{{ selectedMemberServiceNotes }}</div>
+          <div v-else class="service-notes-empty">There are no service notes for this member</div>
 
           <!-- Service Section -->
           <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
@@ -1016,6 +1088,10 @@ const handleCancelRequest = async (reason) => {
         </form>
       </template>
     </Card>
+    <PersonDetailDialog
+      v-model:visible="personDialogVisible"
+      :person-id="personDialogPersonId"
+    />
   </div>
 </template>
 
@@ -1036,9 +1112,41 @@ const handleCancelRequest = async (reason) => {
   font-size: 0.9rem;
 }
 
+.service-notes-empty {
+  color: var(--color-text-dim);
+  font-style: italic;
+}
+
 .req {
   color: var(--color-error);
   margin-left: 0.15rem;
+}
+
+.person-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.volunteer-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.any-village-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+}
+
+.any-village-toggle label {
+  cursor: pointer;
 }
 
 .card-header-wrapper {
