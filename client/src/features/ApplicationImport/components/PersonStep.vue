@@ -31,9 +31,14 @@ const communityNameToId = computed(() =>
   new Map(allCommunities.value.map(c => [c.name, c.communityId])))
 
 onMounted(async () => {
-  villages.value = await getVillages(true)
-  allCommunities.value = await getCommunities()
-  await findDuplicates()
+  try {
+    villages.value = await getVillages(true)
+    allCommunities.value = await getCommunities()
+    await findDuplicates()
+  }
+  catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load form data — go back and retry', life: 3000 })
+  }
 })
 
 async function findDuplicates () {
@@ -70,8 +75,13 @@ async function submit () {
   try {
     const created = await createPerson(buildPersonCreatePayload(form))
     if (communityNames.value.size) {
-      const ids = [...communityNames.value].map(n => communityNameToId.value.get(n)).filter(Boolean)
-      await putPersonCommunities(created.personId, ids)
+      try {
+        const ids = [...communityNames.value].map(n => communityNameToId.value.get(n)).filter(Boolean)
+        await putPersonCommunities(created.personId, ids)
+      }
+      catch (err) {
+        toast.add({ severity: 'warn', summary: 'Warning', detail: "Person created, but communities could not be saved — set them on the person's edit page", life: 5000 })
+      }
     }
     emit('person-done', {
       personId: created.personId,
