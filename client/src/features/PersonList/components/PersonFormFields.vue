@@ -9,8 +9,9 @@ const props = defineProps({
   uncertain: { type: Object, default: () => ({}) },
   villages: { type: Array, required: true },
   communityNames: { type: Object, required: true },  // Set
+  disabilities: { type: Object, required: true },     // Map<name, note>
 })
-const emit = defineEmits(['edited', 'toggle-community'])
+const emit = defineEmits(['edited', 'toggle-community', 'toggle-disability', 'edit-disability-note'])
 
 function edited (field) {
   delete props.errors[field]
@@ -223,6 +224,31 @@ function uncertainText (field) {
     </div>
   </div>
 
+  <!-- Disabilities Section -->
+  <div class="section">
+    <h3 class="section-header">Disabilities</h3>
+
+    <div class="form-field disabilities-list">
+      <div v-for="name in ['Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane']" :key="name" class="disability-row">
+        <label class="checkbox-item">
+          <Checkbox
+            :modelValue="disabilities.has(name)"
+            binary
+            @update:modelValue="v => $emit('toggle-disability', name, v)"
+          />
+          <span class="checkbox-label">{{ name }}</span>
+        </label>
+        <InputText
+          v-if="disabilities.has(name)"
+          :modelValue="disabilities.get(name) ?? ''"
+          placeholder="Optional note"
+          class="disability-note"
+          @update:modelValue="v => $emit('edit-disability-note', name, v)"
+        />
+      </div>
+    </div>
+  </div>
+
   <!-- Emergency Contact Section -->
   <div class="section">
     <h3 class="section-header">Emergency Contact</h3>
@@ -346,6 +372,24 @@ function uncertainText (field) {
 .checkbox-label {
   font-size: 1rem;
   color: var(--color-text-primary);
+}
+
+.disabilities-list {
+  grid-column: 1 / -1;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.25rem;
+}
+
+.disability-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.disability-note {
+  flex: 1;
+  max-width: 20rem;
 }
 
 .uncertain-icon {
