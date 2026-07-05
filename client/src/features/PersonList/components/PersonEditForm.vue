@@ -22,7 +22,7 @@ const personId = computed(() => route.params.personId)
 
 const form = reactive({
   firstName: '', middleInitial: '', lastName: '', nickname: '',
-  address: '', city: '', state: '', zip: '',
+  street: '', unit: '', city: '', state: '', zip: '',
   email: '', phone: '', cell: '', birthDate: '',
   emergencyContactName: '', emergencyContactRelationship: '',
   emergencyContactPhone: '', emergencyContactEmail: '',
@@ -96,7 +96,12 @@ function buildPayload () {
   const payload = {}
   Object.entries(form).forEach(([k, v]) => {
     if (k === 'villageId') return
-    if (v !== '' && v !== null) payload[k] = v
+    if (v === '') {
+      // On edit, send null so a cleared field is actually cleared server-side
+      // instead of being omitted (and thus left at its prior value).
+      if (isEdit.value) payload[k] = null
+    }
+    else if (v !== null) payload[k] = v
   })
   payload.villageId = form.villageId ?? null   // explicit null clears home village
   return payload
@@ -239,8 +244,13 @@ function cancel () {
           </div>
 
           <div class="form-field">
-            <label class="label" for="address">Address</label>
-            <InputText id="address" v-model="form.address" class="w-full" />
+            <label class="label" for="street">Street</label>
+            <InputText id="street" v-model="form.street" class="w-full" />
+          </div>
+
+          <div class="form-field">
+            <label class="label" for="unit">Unit</label>
+            <InputText id="unit" v-model="form.unit" class="w-full" />
           </div>
 
           <div class="form-field">

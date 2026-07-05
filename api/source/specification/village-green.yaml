@@ -2811,6 +2811,14 @@ components:
           type: string
           maxLength: 100
           nullable: true
+        street:
+          type: string
+          maxLength: 200
+          nullable: true
+        unit:
+          type: string
+          maxLength: 100
+          nullable: true
         address:
           type: string
           maxLength: 300
@@ -2930,9 +2938,13 @@ components:
           type: string
           maxLength: 100
           nullable: true
-        address:
+        street:
           type: string
-          maxLength: 300
+          maxLength: 200
+          nullable: true
+        unit:
+          type: string
+          maxLength: 100
           nullable: true
         city:
           type: string
@@ -3002,9 +3014,12 @@ components:
         nickname:
           type: string
           maxLength: 100
-        address:
+        street:
           type: string
-          maxLength: 300
+          maxLength: 200
+        unit:
+          type: string
+          maxLength: 100
         city:
           type: string
           maxLength: 100
