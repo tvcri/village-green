@@ -95,6 +95,33 @@ module.exports.getPerson = async function (personId, projections = []) {
   ])
   const predicates = { statements: ['p.id = ?'], binds: [personId] }
 
+  columns.push(`(
+    SELECT COALESCE(
+      ${dbUtils.jsonArrayAgg({
+        value: `JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name)`,
+        orderBy: 'c.name'
+      })},
+      JSON_ARRAY()
+    )
+    FROM person_community pc
+    JOIN community c ON c.id = pc.communityId
+    WHERE pc.personId = p.id
+  ) AS communities`)
+
+  columns.push(`(
+    SELECT COALESCE(
+      ${dbUtils.jsonArrayAgg({
+        value: `JSON_OBJECT('disabilityId', CAST(d.id AS CHAR), 'name', d.name, 'note', pd.note)`,
+        orderBy: 'd.name'
+      })},
+      JSON_ARRAY()
+    )
+    FROM person_disability pd
+    JOIN disability d ON d.id = pd.disabilityId
+    WHERE pd.personId = p.id
+      AND d.name IN ('Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane')
+  ) AS disabilities`)
+
   if (projections.includes('memberInfo')) {
     columns.push(`(SELECT JSON_OBJECT(
       'memberId', CAST(id AS CHAR),
@@ -201,20 +228,6 @@ module.exports.getPerson = async function (personId, projections = []) {
         WHERE vv.volunteerId = vol3.id
       )
     ) FROM volunteer vol3 WHERE vol3.personId = p.id) AS volunteerDetail`)
-  }
-
-  if (projections.includes('communityInfo')) {
-    columns.push(`(
-      SELECT COALESCE(
-        CAST(CONCAT('[', GROUP_CONCAT(
-          JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name) ORDER BY c.name
-        ), ']') AS JSON),
-        JSON_ARRAY()
-      )
-      FROM person_community pc
-      JOIN community c ON c.id = pc.communityId
-      WHERE pc.personId = p.id
-    ) AS communityInfo`)
   }
 
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })

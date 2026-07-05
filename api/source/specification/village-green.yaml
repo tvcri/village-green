@@ -2378,6 +2378,14 @@ components:
       properties:
         communityId: { $ref: '#/components/schemas/CommunityId' }
         name: { type: string, maxLength: 100 }
+    PersonDisability:
+      additionalProperties: false
+      type: object
+      required: [ disabilityId, name ]
+      properties:
+        disabilityId: { $ref: '#/components/schemas/DisabilityId' }
+        name: { type: string, maxLength: 100 }
+        note: { type: string, maxLength: 255, nullable: true }
     CommitBranch:
       type: string
     CommitDescribe:
@@ -2979,6 +2987,8 @@ components:
       required:
       - personId
       - fullName
+      - communities
+      - disabilities
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
@@ -3073,9 +3083,12 @@ components:
         volunteerDetail:
           $ref: '#/components/schemas/VolunteerDetail'
           nullable: true
-        communityInfo:
+        communities:
           type: array
           items: { $ref: '#/components/schemas/Community' }
+        disabilities:
+          type: array
+          items: { $ref: '#/components/schemas/PersonDisability' }
     PersonSummary:
       additionalProperties: false
       type: object
@@ -4427,7 +4440,6 @@ components:
           - memberDetail
           - volunteerInfo
           - volunteerDetail
-          - communityInfo
     PrivilegeQuery:
       name: privilege
       in: query
