@@ -1155,6 +1155,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       security: []
+  /applications/extract:
+    post:
+      summary: Extract application data from a scanned PDF
+      tags:
+      - Application
+      operationId: extractApplication
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                importFile:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Extraction result, discriminated by applicationType
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationExtractResponse'
+        '400':
+          description: Missing or invalid file, or extraction was declined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Anthropic API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person
   /persons:
     get:
       summary: List persons
@@ -2247,6 +2291,21 @@ components:
       - type: array
     ApiVersion:
       $ref: '#/components/schemas/Version'
+    ApplicationExtractResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - applicationType
+      properties:
+        applicationType:
+          type: string
+          enum: [member, volunteer, unknown]
+        usage:
+          type: object
+          properties:
+            inputTokens: { type: integer }
+            outputTokens: { type: integer }
+            cost: { type: number }
     AppDataFormat:
       type: string
       default: gzip
