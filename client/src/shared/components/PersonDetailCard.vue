@@ -13,6 +13,10 @@ const props = defineProps({
     type: String,
     enum: ['member', 'volunteer', 'member, volunteer'],
     required: true
+  },
+  columnCount: {
+    type: Number,
+    default: 4
   }
 })
 
@@ -35,6 +39,8 @@ const mapAddress = computed(() => {
 const isMember = computed(() => props.personType === 'member' || props.personType === 'member, volunteer')
 const isVolunteer = computed(() => props.personType === 'volunteer' || props.personType === 'member, volunteer')
 
+const serviceNotesSpan = computed(() => Math.min(props.columnCount, 2))
+
 const copyEmail = async (email) => {
   try {
     await navigator.clipboard.writeText(email)
@@ -50,7 +56,12 @@ const copyEmail = async (email) => {
 
 <template>
   <Card v-if="person" class="detail-card">
-    <template #title>{{ person.fullName }}</template>
+    <template #title>
+      <div class="title-row">
+        <span>{{ person.fullName }}</span>
+        <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
+      </div>
+    </template>
     <template #content>
       <!-- Personal Information Section -->
       <div class="section">
@@ -137,9 +148,12 @@ const copyEmail = async (email) => {
           <span class="label">Join Date:</span>
           <span class="value">{{ person.joinDate }}</span>
         </div>
+      </div>
 
-        <div v-if="person.serviceNotes" class="detail-field">
-          <span class="label">Service Notes:</span>
+      <!-- Service Notes Section -->
+      <div v-if="person.serviceNotes" class="section">
+        <h3 class="section-header">Service Notes</h3>
+        <div class="detail-field service-notes-field">
           <span class="value">{{ person.serviceNotes }}</span>
         </div>
       </div>
@@ -216,6 +230,18 @@ const copyEmail = async (email) => {
   font-size: 2rem;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.village-tag {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
 :deep(.p-card-content) {
   display: block;
 }
@@ -247,7 +273,7 @@ const copyEmail = async (email) => {
 
 .section {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(v-bind(columnCount), 1fr);
   gap: 1rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;
@@ -316,11 +342,15 @@ const copyEmail = async (email) => {
   align-items: center;
   font-weight: 600
 }
+.phone_number {
+  white-space: nowrap;
+}
 
 
 .phone-item i {
   color: var(--color-text-dim);
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .capabilities-list {
@@ -341,6 +371,10 @@ const copyEmail = async (email) => {
 
 .capabilities-field {
   grid-column: 1 / -1;
+}
+
+.service-notes-field {
+  grid-column: span v-bind(serviceNotesSpan);
 }
 
 .map-section {

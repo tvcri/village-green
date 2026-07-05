@@ -5,8 +5,8 @@ module.exports.getCommunities = async function (personId) {
   const [rows] = await dbUtils.pool.query(
     `SELECT CAST(c.id AS CHAR) AS communityId, c.name
        FROM person_community pc
-       JOIN community c ON c.id = pc.community_id
-      WHERE pc.person_id = ?
+       JOIN community c ON c.id = pc.communityId
+      WHERE pc.personId = ?
       ORDER BY c.name`,
     [personId]
   )
@@ -17,11 +17,11 @@ module.exports.getCommunities = async function (personId) {
 module.exports.putCommunities = async function (personId, { communityIds = [] } = {}) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      await connection.query('DELETE FROM person_community WHERE person_id = ?', [personId])
+      await connection.query('DELETE FROM person_community WHERE personId = ?', [personId])
       if (communityIds.length) {
         const values = communityIds.map(id => [personId, id])
         await connection.query(
-          'INSERT INTO person_community (person_id, community_id) VALUES ?', [values]
+          'INSERT INTO person_community (personId, communityId) VALUES ?', [values]
         )
       }
     },

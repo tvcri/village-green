@@ -3,6 +3,20 @@ const VolunteerService = require('../service/VolunteerService')
 const MemberService = require('../service/MemberService')
 const PersonService = require('../service/PersonService')
 const SmError = require('../utils/error')
+const VillageService = require('../service/VillageService')
+
+module.exports.getVolunteers = async function getVolunteers (req, res, next) {
+  try {
+    const elevate = req.query.elevate
+    if (elevate && !req.userObject.privileges?.admin) {
+      throw new SmError.PrivilegeError()
+    }
+    const villageIdsGranted = Object.keys(req.userObject.grants)
+    const response = await VillageService.getVolunteers({ villageIdsGranted, elevate })
+    res.json(response)
+  }
+  catch (err) { next(err) }
+}
 
 module.exports.putPersonVolunteer = async function putPersonVolunteer (req, res, next) {
   try {

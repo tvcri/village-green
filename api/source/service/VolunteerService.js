@@ -5,11 +5,11 @@ const PersonService = require('./PersonService')
 // Ensure a volunteer row exists for the person; return its id.
 async function ensureVolunteer (connection, personId) {
   const [existing] = await connection.query(
-    'SELECT id FROM volunteer WHERE person_id = ?', [personId]
+    'SELECT id FROM volunteer WHERE personId = ?', [personId]
   )
   if (existing.length) return existing[0].id
   const [res] = await connection.query(
-    'INSERT INTO volunteer SET ?', { person_id: personId }
+    'INSERT INTO volunteer SET ?', { personId }
   )
   return res.insertId
 }
@@ -17,12 +17,12 @@ async function ensureVolunteer (connection, personId) {
 // Full-array replace of capabilities for a volunteer.
 async function replaceCapabilities (connection, volunteerId, capabilityIds) {
   await connection.query(
-    'DELETE FROM volunteer_capability WHERE volunteer_id = ?', [volunteerId]
+    'DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId]
   )
   if (capabilityIds?.length) {
     const values = capabilityIds.map(id => [volunteerId, id])
     await connection.query(
-      'INSERT INTO volunteer_capability (volunteer_id, capability_id) VALUES ?', [values]
+      'INSERT INTO volunteer_capability (volunteerId, capabilityId) VALUES ?', [values]
     )
   }
 }
@@ -30,19 +30,19 @@ async function replaceCapabilities (connection, volunteerId, capabilityIds) {
 // Full-array replace of associate villages for a volunteer.
 async function replaceAssociateVillages (connection, volunteerId, villageIds) {
   await connection.query(
-    'DELETE FROM volunteer_village_associate WHERE volunteer_id = ?', [volunteerId]
+    'DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId]
   )
   if (villageIds?.length) {
     const values = villageIds.map(id => [volunteerId, id])
     await connection.query(
-      'INSERT INTO volunteer_village_associate (volunteer_id, village_id) VALUES ?', [values]
+      'INSERT INTO volunteer_village_associate (volunteerId, villageId) VALUES ?', [values]
     )
   }
 }
 
 module.exports.volunteerExists = async function (personId) {
   const [rows] = await dbUtils.pool.query(
-    'SELECT id FROM volunteer WHERE person_id = ?', [personId]
+    'SELECT id FROM volunteer WHERE personId = ?', [personId]
   )
   return rows.length > 0
 }
@@ -83,12 +83,12 @@ module.exports.deleteVolunteer = async function (personId) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [rows] = await connection.query(
-        'SELECT id FROM volunteer WHERE person_id = ?', [personId]
+        'SELECT id FROM volunteer WHERE personId = ?', [personId]
       )
       if (!rows.length) return
       const volunteerId = rows[0].id
-      await connection.query('DELETE FROM volunteer_capability WHERE volunteer_id = ?', [volunteerId])
-      await connection.query('DELETE FROM volunteer_village_associate WHERE volunteer_id = ?', [volunteerId])
+      await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
+      await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
       await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
     },
     statusObj: undefined

@@ -1323,6 +1323,32 @@ paths:
       security:
       - oauth:
         - vg:person
+  /volunteers:
+    get:
+      summary: List volunteers
+      tags:
+      - Volunteer
+      operationId: getVolunteers
+      parameters:
+        - $ref: '#/components/parameters/ElevateQuery'
+      responses:
+        '200':
+          description: List of volunteers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Volunteer'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:volunteer:read
   /persons/{personId}/member:
     put:
       summary: Grant or replace the member role
@@ -3138,6 +3164,9 @@ components:
           type: string
           maxLength: 200
           nullable: true
+        memberServiceNotes:
+          type: string
+          nullable: true
         volunteerPersonId:
           $ref: '#/components/schemas/PersonId'
           nullable: true
@@ -3147,6 +3176,13 @@ components:
         volunteerFullName:
           type: string
           maxLength: 200
+          nullable: true
+        volunteerVillageId:
+          $ref: '#/components/schemas/VillageId'
+          nullable: true
+        volunteerVillageName:
+          type: string
+          maxLength: 100
           nullable: true
         status:
           type: string
