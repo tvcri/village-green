@@ -121,6 +121,11 @@ const routes = [
     component: () => import('../features/PersonList/components/PersonEditForm.vue'),
   },
   {
+    path: '/meta/persons/import',
+    name: 'meta-person-import',
+    component: () => import('../features/ApplicationImport/components/ApplicationImportWizard.vue'),
+  },
+  {
     path: '/meta/persons/:personId/edit',
     name: 'meta-person-edit',
     component: () => import('../features/PersonList/components/PersonEditForm.vue'),

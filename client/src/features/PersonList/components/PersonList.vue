@@ -118,6 +118,8 @@ function onSearch() {
           {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
         </span>
         <Button label="New Person" icon="pi pi-plus" @click="$router.push({ name: 'meta-person-create' })" />
+        <Button label="Import Application" icon="pi pi-file-import" severity="secondary"
+          @click="$router.push({ name: 'meta-person-import' })" />
       </div>
     </div>
 
