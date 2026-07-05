@@ -32,7 +32,8 @@ export function personCommunityNames (extraction, memberIndex) {
 export function mapMemberForm (extraction, memberIndex, primaryPersonId) {
   const d = extraction.memberDefaults
   return {
-    joinDate: s(d.joinDate),
+    // joinDate is when the member record is created, not the application
+    // date — leave it for the operator to set, same as a non-import grant.
     printedNewsletter: !!d.printedNewsletter,
     householdSize: extraction.application.householdType === 'Dual' ? 2 : 1,
     householdDues: d.duesYearly ?? d.duesMonthly ?? null,
@@ -102,7 +103,6 @@ function memberFieldForPath (path) {
   // Only these extraction paths map onto member-form fields today; other
   // member-form fields can never carry an uncertainty flag.
   const map = {
-    'application.applicationDate': 'joinDate',
     'preferences.newsletterPrint': 'printedNewsletter',
     'preferences.duesMonthly': 'householdDues',
     'preferences.duesYearly': 'householdDues',

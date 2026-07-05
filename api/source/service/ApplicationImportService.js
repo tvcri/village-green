@@ -195,7 +195,6 @@ function assembleResponse (data, villages, usage) {
     emergencyContact: nullIfAllNull(data.emergencyContact),
     preferences,
     memberDefaults: {
-      joinDate: data.application.applicationDate,
       printedNewsletter: newsletterPrint === 'Yes',
       duesMonthly: toAmount(duesMonthly),
       duesYearly: toAmount(duesYearly),

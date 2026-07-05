@@ -89,7 +89,8 @@ test('assembleResponse splits person fields from extras', () => {
 test('assembleResponse maps memberDefaults and resolves village', () => {
   const r = svc.assembleResponse(sampleExtraction(), villages, usage)
   assert.deepEqual(r.application.village, { villageId: 1, villageName: 'Westside' })
-  assert.equal(r.memberDefaults.joinDate, '2026-06-12')
+  assert.equal(r.application.applicationDate, '2026-06-12')
+  assert.equal(r.memberDefaults.joinDate, undefined)   // join date is set when the member record is created, not from the application
   assert.equal(r.memberDefaults.printedNewsletter, true)
   assert.equal(r.memberDefaults.duesYearly, 120)
   assert.equal(r.memberDefaults.duesMonthly, null)

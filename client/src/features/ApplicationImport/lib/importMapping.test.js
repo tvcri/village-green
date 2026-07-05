@@ -37,7 +37,7 @@ function extraction () {
     },
     preferences: { wantsVolunteerInfo: 'No', circleOfPrideJoin: 'Yes', circleOfPridePreferred: 'Yes' },
     memberDefaults: {
-      joinDate: '2026-06-12', printedNewsletter: true,
+      printedNewsletter: true,
       duesMonthly: null, duesYearly: 120, paymentMethod: 'Personal Check', invoiceMailed: 'Yes',
     },
     uncertainFields: [
@@ -82,7 +82,7 @@ describe('personCommunityNames', () => {
 describe('mapMemberForm', () => {
   it('maps defaults and household size for Dual', () => {
     const f = mapMemberForm(extraction(), 0, null)
-    expect(f.joinDate).toBe('2026-06-12')
+    expect(f.joinDate).toBeUndefined()   // join date is set when the member record is created, not from the application
     expect(f.printedNewsletter).toBe(true)
     expect(f.householdSize).toBe(2)
     expect(f.householdDues).toBe(120)
