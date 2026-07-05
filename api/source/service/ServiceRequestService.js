@@ -31,7 +31,7 @@ async function writeNotificationEvent(connection, serviceRequestId, resolvedStat
     eventType = 'open'
   }
   await connection.query(
-    `INSERT INTO notification_event (event_type, service_request_id) VALUES (?, ?)`,
+    `INSERT INTO notification_event (eventType, serviceRequestId) VALUES (?, ?)`,
     [eventType, serviceRequestId]
   )
 }
@@ -39,26 +39,26 @@ async function writeNotificationEvent(connection, serviceRequestId, resolvedStat
 module.exports.getServiceRequest = async function (serviceRequestId, projections = []) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
-    'sr.request_number AS requestNumber',
-    'CAST(sr.village_id AS CHAR) AS villageId',
+    'sr.requestNumber',
+    'CAST(sr.villageId AS CHAR) AS villageId',
     'v.name AS villageName',
-    'CAST(sr.member_person_id AS CHAR) AS memberPersonId',
+    'CAST(sr.memberPersonId AS CHAR) AS memberPersonId',
     'CAST(m.id AS CHAR) AS memberId',
-    'mp.full_name AS memberFullName',
-    'm.service_notes AS memberServiceNotes',
-    'CAST(sr.volunteer_person_id AS CHAR) AS volunteerPersonId',
+    'mp.fullName AS memberFullName',
+    'm.serviceNotes AS memberServiceNotes',
+    'CAST(sr.volunteerPersonId AS CHAR) AS volunteerPersonId',
     'CAST(vol.id AS CHAR) AS volunteerId',
     'CAST(vv.id AS CHAR) AS volunteerVillageId',
     'vv.name AS volunteerVillageName',
-    'vp.full_name AS volunteerFullName',
+    'vp.fullName AS volunteerFullName',
     'sr.status AS status',
-    'sr.service_name AS serviceName',
-    'sr.transportation_type AS transportationType',
-    "DATE_FORMAT(sr.created_at, '%Y-%m-%dT%TZ') AS createdAt",
-    "DATE_FORMAT(sr.start_at, '%Y-%m-%dT%TZ') AS startAt",
-    "DATE_FORMAT(sr.finish_at, '%Y-%m-%dT%TZ') AS finishAt",
-    "DATE_FORMAT(sr.appt_time, '%Y-%m-%dT%TZ') AS apptTime",
-    "DATE_FORMAT(sr.return_time, '%Y-%m-%dT%TZ') AS returnTime",
+    'sr.serviceName',
+    'sr.transportationType',
+    "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
+    "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
+    "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
+    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
+    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
@@ -67,19 +67,19 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.city AS city',
     'sr.zip AS zip',
     'sr.phone AS phone',
-    'CAST(sr.created_user_id AS CHAR) AS createdUserId',
+    'CAST(sr.createdUserId AS CHAR) AS createdUserId',
     'ud.username AS createdByUsername',
     `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`
   ]
   const joins = new Set([
     'service_request sr',
-    'LEFT JOIN village v ON sr.village_id = v.id',
-    'LEFT JOIN member m ON sr.member_person_id = m.person_id',
-    'LEFT JOIN person mp ON sr.member_person_id = mp.id',
-    'LEFT JOIN volunteer vol ON sr.volunteer_person_id = vol.person_id',
-    'LEFT JOIN person vp ON sr.volunteer_person_id = vp.id',
-    'LEFT JOIN village vv ON vp.village_id = vv.id',
-    'LEFT JOIN user_data ud ON sr.created_user_id = ud.userId'
+    'LEFT JOIN village v ON sr.villageId = v.id',
+    'LEFT JOIN member m ON sr.memberPersonId = m.personId',
+    'LEFT JOIN person mp ON sr.memberPersonId = mp.id',
+    'LEFT JOIN volunteer vol ON sr.volunteerPersonId = vol.personId',
+    'LEFT JOIN person vp ON sr.volunteerPersonId = vp.id',
+    'LEFT JOIN village vv ON vp.villageId = vv.id',
+    'LEFT JOIN user_data ud ON sr.createdUserId = ud.userId'
   ])
   const predicates = { statements: ['sr.id = ?'], binds: [serviceRequestId] }
 
@@ -96,7 +96,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   }
 
   if (projections.includes('volunteerAddress')) {
-    columns.push(`IF(sr.volunteer_person_id IS NOT NULL, JSON_OBJECT(
+    columns.push(`IF(sr.volunteerPersonId IS NOT NULL, JSON_OBJECT(
       'address', vp.address,
       'city', vp.city,
       'state', vp.state,
@@ -114,19 +114,19 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
       SELECT JSON_ARRAYAGG(
         JSON_OBJECT(
           'id', ne.id,
-          'eventType', ne.event_type,
-          'createdAt', DATE_FORMAT(ne.created_at, '%Y-%m-%dT%TZ'),
-          'sentAt', DATE_FORMAT(ne.sent_at, '%Y-%m-%dT%TZ'),
-          'failedAt', DATE_FORMAT(ne.failed_at, '%Y-%m-%dT%TZ'),
+          'eventType', ne.eventType,
+          'createdAt', DATE_FORMAT(ne.createdAt, '%Y-%m-%dT%TZ'),
+          'sentAt', DATE_FORMAT(ne.sentAt, '%Y-%m-%dT%TZ'),
+          'failedAt', DATE_FORMAT(ne.failedAt, '%Y-%m-%dT%TZ'),
           'recipients', COALESCE((
-            SELECT JSON_ARRAYAGG(JSON_OBJECT('id', p.id, 'fullName', p.full_name))
+            SELECT JSON_ARRAYAGG(JSON_OBJECT('id', p.id, 'fullName', p.fullName))
             FROM JSON_TABLE(ne.recipients, '$[*]' COLUMNS(personId INT PATH '$')) AS jt
             JOIN person p ON p.id = jt.personId
           ), JSON_ARRAY())
         )
       )
       FROM notification_event ne
-      WHERE ne.service_request_id = sr.id
+      WHERE ne.serviceRequestId = sr.id
     ) AS notificationHistory`)
   }
 
@@ -138,23 +138,23 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
 module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate, status, villageId, hasNotifications }) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
-    'sr.request_number AS requestNumber',
-    'CAST(sr.village_id AS CHAR) AS villageId',
+    'sr.requestNumber',
+    'CAST(sr.villageId AS CHAR) AS villageId',
     'v.name AS villageName',
-    'CAST(sr.member_person_id AS CHAR) AS memberPersonId',
+    'CAST(sr.memberPersonId AS CHAR) AS memberPersonId',
     'CAST(m.id AS CHAR) AS memberId',
-    'mp.full_name AS memberFullName',
-    'CAST(sr.volunteer_person_id AS CHAR) AS volunteerPersonId',
+    'mp.fullName AS memberFullName',
+    'CAST(sr.volunteerPersonId AS CHAR) AS volunteerPersonId',
     'CAST(vol.id AS CHAR) AS volunteerId',
-    'vp.full_name AS volunteerFullName',
+    'vp.fullName AS volunteerFullName',
     'sr.status AS status',
-    'sr.service_name AS serviceName',
-    'sr.transportation_type AS transportationType',
-    "DATE_FORMAT(sr.created_at, '%Y-%m-%dT%TZ') AS createdAt",
-    "DATE_FORMAT(sr.start_at, '%Y-%m-%dT%TZ') AS startAt",
-    "DATE_FORMAT(sr.finish_at, '%Y-%m-%dT%TZ') AS finishAt",
-    "DATE_FORMAT(sr.appt_time, '%Y-%m-%dT%TZ') AS apptTime",
-    "DATE_FORMAT(sr.return_time, '%Y-%m-%dT%TZ') AS returnTime",
+    'sr.serviceName',
+    'sr.transportationType',
+    "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
+    "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
+    "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
+    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
+    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
@@ -163,34 +163,34 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     'sr.city AS city',
     'sr.zip AS zip',
     'sr.phone AS phone',
-    'CAST(sr.created_user_id AS CHAR) AS createdUserId',
+    'CAST(sr.createdUserId AS CHAR) AS createdUserId',
     'ud.username AS createdByUsername',
     `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`,
     `COALESCE(
-      (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.event_type)')}
+      (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.eventType)')}
        FROM notification_event ne
-       WHERE ne.service_request_id = sr.id),
+       WHERE ne.serviceRequestId = sr.id),
       JSON_ARRAY()
     ) AS notifications`
   ]
   const joins = new Set([
     'service_request sr',
-    'JOIN village v ON sr.village_id = v.id',
-    'LEFT JOIN member m ON sr.member_person_id = m.person_id',
-    'LEFT JOIN person mp ON sr.member_person_id = mp.id',
-    'LEFT JOIN volunteer vol ON sr.volunteer_person_id = vol.person_id',
-    'LEFT JOIN person vp ON sr.volunteer_person_id = vp.id',
-    'LEFT JOIN user_data ud ON sr.created_user_id = ud.userId'
+    'JOIN village v ON sr.villageId = v.id',
+    'LEFT JOIN member m ON sr.memberPersonId = m.personId',
+    'LEFT JOIN person mp ON sr.memberPersonId = mp.id',
+    'LEFT JOIN volunteer vol ON sr.volunteerPersonId = vol.personId',
+    'LEFT JOIN person vp ON sr.volunteerPersonId = vp.id',
+    'LEFT JOIN user_data ud ON sr.createdUserId = ud.userId'
   ])
   const predicates = { statements: [], binds: [] }
 
   if (!elevate) {
     if (!villageIdsGranted.length) return []
-    predicates.statements.push('sr.village_id IN (?)')
+    predicates.statements.push('sr.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)
   }
   if (villageId && villageId.length > 0) {
-    predicates.statements.push('sr.village_id IN (?)')
+    predicates.statements.push('sr.villageId IN (?)')
     predicates.binds.push([villageId])
   }
   if (status && status.length > 0) {
@@ -212,11 +212,11 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
   }
   if (hasNotifications === false) {
     predicates.statements.push(
-      'NOT EXISTS (SELECT 1 FROM notification_event ne WHERE ne.service_request_id = sr.id) AND sr.request_number IS NULL'
+      'NOT EXISTS (SELECT 1 FROM notification_event ne WHERE ne.serviceRequestId = sr.id) AND sr.requestNumber IS NULL'
     )
   }
 
-  const orderBy = ['sr.finish_at DESC']
+  const orderBy = ['sr.finishAt DESC']
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows
@@ -233,54 +233,33 @@ module.exports.createServiceRequest = async function (payload, userId) {
     transactionFn: async (connection) => {
       const resolvedStatus = deriveStatus(payload.status, payload.volunteerPersonId)
 
-      const sql = `
-        INSERT INTO service_request (
-          village_id,
-          member_person_id,
-          volunteer_person_id,
-          request_number,
-          status,
-          service_name,
-          transportation_type,
-          created_at,
-          start_at,
-          finish_at,
-          appt_time,
-          return_time,
-          state,
-          instructions,
-          description,
-          destination,
-          address,
-          city,
-          zip,
-          phone,
-          created_user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      const values = [
-        payload.villageId,
-        payload.memberPersonId || null,
-        payload.volunteerPersonId || null,
-        payload.requestNumber || null,
-        resolvedStatus,
-        payload.serviceName || null,
-        payload.transportationType || null,
-        convertToMySQLDateTime(payload.startAt),
-        convertToMySQLDateTime(payload.finishAt),
-        convertToMySQLDateTime(payload.apptTime),
-        convertToMySQLDateTime(payload.returnTime),
-        payload.state || null,
-        payload.instructions || null,
-        payload.description || null,
-        payload.destination || null,
-        payload.address || null,
-        payload.city || null,
-        payload.zip || null,
-        payload.phone || null,
-        userId
-      ]
-      const [result] = await connection.query(sql, values)
+      const insertFields = {
+        villageId: payload.villageId,
+        memberPersonId: payload.memberPersonId || null,
+        volunteerPersonId: payload.volunteerPersonId || null,
+        requestNumber: payload.requestNumber || null,
+        status: resolvedStatus,
+        serviceName: payload.serviceName || null,
+        transportationType: payload.transportationType || null,
+        startAt: convertToMySQLDateTime(payload.startAt),
+        finishAt: convertToMySQLDateTime(payload.finishAt),
+        apptTime: convertToMySQLDateTime(payload.apptTime),
+        returnTime: convertToMySQLDateTime(payload.returnTime),
+        state: payload.state || null,
+        instructions: payload.instructions || null,
+        description: payload.description || null,
+        destination: payload.destination || null,
+        address: payload.address || null,
+        city: payload.city || null,
+        zip: payload.zip || null,
+        phone: payload.phone || null,
+        createdUserId: userId
+      }
+
+      const [result] = await connection.query(
+        'INSERT INTO service_request SET ?, createdAt = NOW()',
+        insertFields
+      )
       const serviceRequestId = result.insertId
 
       if (payload.notify) {
@@ -305,91 +284,37 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [currentRows] = await connection.query(
-        'SELECT volunteer_person_id, status FROM service_request WHERE id = ?',
+        'SELECT volunteerPersonId, status FROM service_request WHERE id = ?',
         [serviceRequestId]
       )
       const current = currentRows[0]
       if (!current) return null
 
-      const updates = []
-      const values = []
-
-      if (payload.memberPersonId !== undefined) {
-        updates.push('member_person_id = ?')
-        values.push(payload.memberPersonId || null)
-      }
-      if (payload.volunteerPersonId !== undefined) {
-        updates.push('volunteer_person_id = ?')
-        values.push(payload.volunteerPersonId || null)
-      }
-      if (payload.serviceName !== undefined) {
-        updates.push('service_name = ?')
-        values.push(payload.serviceName || null)
-      }
-      if (payload.transportationType !== undefined) {
-        updates.push('transportation_type = ?')
-        values.push(payload.transportationType || null)
-      }
-      if (payload.startAt !== undefined) {
-        updates.push('start_at = ?')
-        values.push(convertToMySQLDateTime(payload.startAt))
-      }
-      if (payload.finishAt !== undefined) {
-        updates.push('finish_at = ?')
-        values.push(convertToMySQLDateTime(payload.finishAt))
-      }
-      if (payload.apptTime !== undefined) {
-        updates.push('appt_time = ?')
-        values.push(convertToMySQLDateTime(payload.apptTime))
-      }
-      if (payload.returnTime !== undefined) {
-        updates.push('return_time = ?')
-        values.push(convertToMySQLDateTime(payload.returnTime))
-      }
-      if (payload.state !== undefined) {
-        updates.push('state = ?')
-        values.push(payload.state || null)
-      }
-      if (payload.city !== undefined) {
-        updates.push('city = ?')
-        values.push(payload.city || null)
-      }
-      if (payload.zip !== undefined) {
-        updates.push('zip = ?')
-        values.push(payload.zip || null)
-      }
-      if (payload.address !== undefined) {
-        updates.push('address = ?')
-        values.push(payload.address || null)
-      }
-      if (payload.phone !== undefined) {
-        updates.push('phone = ?')
-        values.push(payload.phone || null)
-      }
-      if (payload.instructions !== undefined) {
-        updates.push('instructions = ?')
-        values.push(payload.instructions || null)
-      }
-      if (payload.description !== undefined) {
-        updates.push('description = ?')
-        values.push(payload.description || null)
-      }
-      if (payload.destination !== undefined) {
-        updates.push('destination = ?')
-        values.push(payload.destination || null)
-      }
+      const updateFields = {}
+      if (payload.memberPersonId !== undefined) updateFields.memberPersonId = payload.memberPersonId || null
+      if (payload.volunteerPersonId !== undefined) updateFields.volunteerPersonId = payload.volunteerPersonId || null
+      if (payload.serviceName !== undefined) updateFields.serviceName = payload.serviceName || null
+      if (payload.transportationType !== undefined) updateFields.transportationType = payload.transportationType || null
+      if (payload.startAt !== undefined) updateFields.startAt = convertToMySQLDateTime(payload.startAt)
+      if (payload.finishAt !== undefined) updateFields.finishAt = convertToMySQLDateTime(payload.finishAt)
+      if (payload.apptTime !== undefined) updateFields.apptTime = convertToMySQLDateTime(payload.apptTime)
+      if (payload.returnTime !== undefined) updateFields.returnTime = convertToMySQLDateTime(payload.returnTime)
+      if (payload.state !== undefined) updateFields.state = payload.state || null
+      if (payload.city !== undefined) updateFields.city = payload.city || null
+      if (payload.zip !== undefined) updateFields.zip = payload.zip || null
+      if (payload.address !== undefined) updateFields.address = payload.address || null
+      if (payload.phone !== undefined) updateFields.phone = payload.phone || null
+      if (payload.instructions !== undefined) updateFields.instructions = payload.instructions || null
+      if (payload.description !== undefined) updateFields.description = payload.description || null
+      if (payload.destination !== undefined) updateFields.destination = payload.destination || null
 
       const newVolunteerPersonId = payload.volunteerPersonId !== undefined
         ? (payload.volunteerPersonId || null)
-        : current.volunteer_person_id
+        : current.volunteerPersonId
       const resolvedStatus = deriveStatus(payload.status, newVolunteerPersonId)
+      updateFields.status = resolvedStatus
 
-      updates.push('status = ?')
-      values.push(resolvedStatus)
-
-      values.push(serviceRequestId)
-      const sql = `UPDATE service_request SET ${updates.join(', ')} WHERE id = ?`
-      await connection.query(sql, values)
+      await connection.query('UPDATE service_request SET ? WHERE id = ?', [updateFields, serviceRequestId])
 
       if (payload.notify) {
         await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
