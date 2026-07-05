@@ -121,7 +121,18 @@ function buildUncertainMap (extraction, resolver) {
 }
 
 export function uncertainMapForPerson (extraction, memberIndex) {
-  return buildUncertainMap(extraction, path => personFieldForPath(path, memberIndex))
+  const map = buildUncertainMap(extraction, path => personFieldForPath(path, memberIndex))
+  // The server returns villageId null when the extracted village name didn't
+  // resolve — surface that as an uncertainty even when the model read the
+  // name confidently, since the member step requires a home village.
+  const village = extraction.application.village
+  if (!map.villageId && village.villageName && village.villageId === null) {
+    map.villageId = {
+      reason: `"${village.villageName}" did not match any village — select one`,
+      alternative: null,
+    }
+  }
+  return map
 }
 
 export function uncertainMapForMember (extraction, memberIndex) {

@@ -128,6 +128,18 @@ describe('uncertain maps', () => {
     const m = uncertainMapForMember(extraction(), 0)
     expect(m.householdDues).toEqual({ reason: 'overwritten amount', alternative: '150' })
   })
+  it('synthesizes a villageId uncertainty when the village did not resolve', () => {
+    const e = extraction()
+    e.uncertainFields = []                       // model read the name confidently
+    e.application.village = { villageId: null, villageName: 'Warwick Village' }
+    const m = uncertainMapForPerson(e, 0)
+    expect(m.villageId.reason).toContain('Warwick Village')
+    // resolved village or no name at all -> no synthetic flag
+    e.application.village = { villageId: 3, villageName: 'Warwick' }
+    expect(uncertainMapForPerson(e, 0).villageId).toBeUndefined()
+    e.application.village = { villageId: null, villageName: null }
+    expect(uncertainMapForPerson(e, 0).villageId).toBeUndefined()
+  })
 })
 
 describe('buildPersonCreatePayload', () => {

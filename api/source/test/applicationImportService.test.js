@@ -6,6 +6,7 @@ const svc = require('../service/ApplicationImportService')
 const villages = [
   { villageId: 1, name: 'Westside' },
   { villageId: 2, name: 'Harbor Point' },
+  { villageId: 3, name: 'Warwick' },
 ]
 
 test('resolveVillage matches case-insensitively with trim', () => {
@@ -18,6 +19,22 @@ test('resolveVillage returns null id for unknown name, preserving raw name', () 
 
 test('resolveVillage handles null name', () => {
   assert.deepEqual(svc.resolveVillage(null, villages), { villageId: null, villageName: null })
+})
+
+test('resolveVillage ignores the word "village" and punctuation', () => {
+  assert.deepEqual(svc.resolveVillage('Warwick Village', villages), { villageId: 3, villageName: 'Warwick' })
+  assert.deepEqual(svc.resolveVillage('Village of Harbor-Point', villages), { villageId: 2, villageName: 'Harbor Point' })
+})
+
+test('resolveVillage falls back to a unique substring match', () => {
+  assert.deepEqual(svc.resolveVillage('Harbor', villages), { villageId: 2, villageName: 'Harbor Point' })
+  assert.deepEqual(svc.resolveVillage('The Westside Community', villages), { villageId: 1, villageName: 'Westside' })
+  assert.deepEqual(svc.resolveVillage('Nowhere', villages), { villageId: null, villageName: 'Nowhere' })
+})
+
+test('resolveVillage returns no match when substring is ambiguous', () => {
+  const ambiguous = [...villages, { villageId: 4, name: 'Harbor East' }]
+  assert.deepEqual(svc.resolveVillage('Harbor', ambiguous), { villageId: null, villageName: 'Harbor' })
 })
 
 // Fixture is in the schema's null-free shape: blanks are "" and dues are

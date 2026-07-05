@@ -146,10 +146,28 @@ function nullIfAllNull (obj) {
   return Object.values(obj).every(v => v === null) ? null : obj
 }
 
+// Applicants write informal village names ("Warwick Village" for "Warwick");
+// compare with the word "village" and punctuation stripped, then fall back to
+// a substring match only when it is unambiguous.
+function normalizeVillageName (name) {
+  return name
+    .toLowerCase()
+    .replace(/\bvillage\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
 function resolveVillage (villageName, villages) {
   if (!villageName) return { villageId: null, villageName: null }
-  const needle = villageName.trim().toLowerCase()
-  const match = villages.find(v => v.name.trim().toLowerCase() === needle)
+  const needle = normalizeVillageName(villageName)
+  let match = needle ? villages.find(v => normalizeVillageName(v.name) === needle) : null
+  if (!match && needle) {
+    const candidates = villages.filter(v => {
+      const n = normalizeVillageName(v.name)
+      return n && (n.includes(needle) || needle.includes(n))
+    })
+    if (candidates.length === 1) match = candidates[0]
+  }
   return { villageId: match?.villageId ?? null, villageName: match?.name ?? villageName.trim() }
 }
 
