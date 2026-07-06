@@ -38,6 +38,22 @@ const memberEntry = {
   },
 }
 
+const volunteerPerson = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['firstName', 'middleInitial', 'lastName', 'nickname', 'pronouns', 'birthDate',
+    'gender', 'veteran', 'language', 'street', 'unit', 'city', 'state', 'zip', 'email', 'phone', 'cell'],
+  properties: {
+    firstName: str, middleInitial: str, lastName: str, nickname: str, pronouns: str,
+    birthDate: { ...str, description: 'YYYY-MM-DD' }, gender: str, veteran: yn,
+    language: { ...str, description: 'Language(s) spoken other than English' },
+    street: str, unit: str, city: str, state: str, zip: str,
+    email: str, phone: { ...str, description: 'home phone' }, cell: str,
+  },
+}
+
+const CAPABILITY_NAME_ENUM = ['Rides', 'Errands', 'Home Help', 'Steering Committee', 'Tech Support', 'Friends']
+
 const EXTRACTION_SCHEMA = {
   anyOf: [
     {
@@ -94,8 +110,43 @@ const EXTRACTION_SCHEMA = {
     {
       type: 'object',
       additionalProperties: false,
-      required: ['applicationType'],
-      properties: { applicationType: { const: 'volunteer' } },
+      required: ['applicationType', 'application', 'person', 'emergencyContact', 'capabilityNames',
+        'circleOfPrideJoin', 'notes', 'uncertainFields'],
+      properties: {
+        applicationType: { const: 'volunteer' },
+        application: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['applicationDate', 'villageName', 'ambassador'],
+          properties: {
+            applicationDate: { ...str, description: 'YYYY-MM-DD' },
+            villageName: str,
+            ambassador: str,
+          },
+        },
+        person: volunteerPerson,
+        emergencyContact: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['firstName', 'middleInitial', 'lastName', 'phoneHome', 'phoneCell', 'email', 'relationship'],
+          properties: {
+            firstName: str, middleInitial: str, lastName: str,
+            phoneHome: str, phoneCell: str, email: str, relationship: str,
+          },
+        },
+        capabilityNames: { type: 'array', items: { type: 'string', enum: CAPABILITY_NAME_ENUM } },
+        circleOfPrideJoin: yn,
+        notes: { ...str, description: 'Substantive free-text only — see prompt' },
+        uncertainFields: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['path', 'reason', 'alternative'],
+            properties: { path: { type: 'string' }, reason: { type: 'string' }, alternative: { type: 'string', description: '"" when no alternative reading' } },
+          },
+        },
+      },
     },
     {
       type: 'object',
@@ -110,7 +161,7 @@ const EXTRACTION_PROMPT = `You are processing a scanned application form for the
 
 First, identify the document type:
 - A MEMBERSHIP application: return the "member" variant of the schema with all extracted fields.
-- A VOLUNTEER application: return only {"applicationType": "volunteer"} for now.
+- A VOLUNTEER application: return the "volunteer" variant of the schema with all extracted fields.
 - Anything else (blank form, wrong document, unreadable scan): return {"applicationType": "unknown", "reason": "<short explanation>"}.
 
 For a membership application:
@@ -121,7 +172,14 @@ For a membership application:
 - Accessibility questions (difficultyHearing, visionLimited, usesWalker, usesCane, usesWheelchair) are Yes/No/Sometimes checkboxes with an adjacent "explain" line. Some applicants check "Yes" but write their explanation on the "Sometimes" line, or check both. When this happens, use the checked Yes/No value as the field's answer — do NOT report it as an uncertain field, this is not ambiguous, the applicant's intent is clear from the checkbox. Instead, put the full explain text verbatim in accessibilityNotes (e.g. "Vision limited: needs glasses. Uses walker: rollator for travel."), one line per field that has explain text. accessibilityNotes is "" if no field had any handwritten explanation.
 - If "No Emergency Contact" is checked or no emergency contact is given, return emergencyContact with every field set to "".
 - Dates are YYYY-MM-DD.
-- "uncertainFields": list ONLY fields whose values are genuinely ambiguous from the handwriting or scan quality — a digit that could be read two ways, a partially cut-off word, an ambiguous checkbox. For each, give the JSON path (e.g. "members[0].zip"), a short reason, and your best alternative reading ("" if none). Do not list fields you read confidently; an empty array means everything was clear.`
+- "uncertainFields": list ONLY fields whose values are genuinely ambiguous from the handwriting or scan quality — a digit that could be read two ways, a partially cut-off word, an ambiguous checkbox. For each, give the JSON path (e.g. "members[0].zip"), a short reason, and your best alternative reading ("" if none). Do not list fields you read confidently; an empty array means everything was clear.
+- For a volunteer application:
+  - The same block-print case-inference and blank-field rules above apply.
+  - "capabilityNames" lists every checked volunteer-opportunity option, using these exact names: "Rides", "Errands", "Home Help" (for "Light Household Maintenance"), "Steering Committee" (for "Steering Committee Member"), "Tech Support" (for "Technology Support"), "Friends" (for "Village Friends"). The form shows "Driver" as a parent checkbox with "Rides" and "Errands" as its own indented sub-checkboxes — read the Rides and Errands checkboxes directly; include each only if its own box is checked, regardless of whether the parent "Driver" box is checked or blank.
+  - "circleOfPrideJoin" is the form's "Would you like to support the Circle of Pride as a volunteer?" Yes/No answer.
+  - Do NOT extract anything from the "Supplemental Section for Drivers" page (license restrictions, vehicle table, insurance company, signature, document checklist) — skip that entire page.
+  - Do NOT extract the checkbox/dropdown answers from the "Supplemental Section for Village Friends Volunteers" page (service type, employment status, occupation, activity preferences). However, if that page's free-text boxes ("What activities..." or "Please supply any other relevant information") contain substantive, non-routine content — a real note about the volunteer's situation, needs, or support arrangements — extract that text verbatim into "notes". If those boxes are blank or contain only routine/no content, "notes" is "".
+  - Confidentiality/Liability waiver text, its signature, and its date are never extracted.`
 
 // --- assembly ---------------------------------------------------------------
 
@@ -175,6 +233,23 @@ function resolveVillage (villageName, villages) {
 
 function assembleResponse (data, villages, usage) {
   data = normalizeBlanks(data)
+  if (data.applicationType === 'volunteer') {
+    return {
+      applicationType: 'volunteer',
+      application: {
+        applicationDate: data.application.applicationDate,
+        village: resolveVillage(data.application.villageName, villages),
+        ambassador: data.application.ambassador,
+      },
+      person: data.person,
+      emergencyContact: data.emergencyContact,
+      capabilityNames: data.capabilityNames,
+      circleOfPrideJoin: data.circleOfPrideJoin,
+      notes: data.notes,
+      uncertainFields: data.uncertainFields,
+      usage,
+    }
+  }
   if (data.applicationType !== 'member') {
     return { ...data, usage }
   }

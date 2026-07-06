@@ -137,9 +137,7 @@ test('assembleResponse caps members at two entries', () => {
   assert.equal(r.members.length, 2)
 })
 
-test('assembleResponse passes volunteer/unknown variants through with usage', () => {
-  const r = svc.assembleResponse({ applicationType: 'volunteer' }, villages, usage)
-  assert.deepEqual(r, { applicationType: 'volunteer', usage })
+test('assembleResponse passes unknown variant through with usage', () => {
   const u = svc.assembleResponse({ applicationType: 'unknown', reason: 'blank form' }, villages, usage)
   assert.deepEqual(u, { applicationType: 'unknown', reason: 'blank form', usage })
 })
@@ -160,4 +158,73 @@ test('EXTRACTION_SCHEMA objects all forbid additional properties', () => {
   }
   walk(svc.EXTRACTION_SCHEMA, '$')
   assert.deepEqual(failures, [])
+})
+
+function sampleVolunteerExtraction () {
+  return {
+    applicationType: 'volunteer',
+    application: { applicationDate: '2026-05-30', villageName: 'Barrington Village', ambassador: '' },
+    person: {
+      firstName: 'Nicole', middleInitial: 'K', lastName: 'Brown', nickname: '',
+      pronouns: 'she/her', birthDate: '1999-07-10', gender: 'Female', veteran: 'No',
+      language: '', street: '5 Sherbrooke Rd', unit: '', city: 'Barrington', state: 'RI', zip: '02806',
+      email: 'labrown8025@gmail.com', phone: '', cell: '401-497-0470',
+    },
+    emergencyContact: {
+      firstName: 'Laurie', middleInitial: '', lastName: 'Brown',
+      phoneHome: '', phoneCell: '401-497-0470', email: 'labrown8025@gmail.com', relationship: 'Parent/Guardian',
+    },
+    capabilityNames: ['Errands'],
+    circleOfPrideJoin: 'No',
+    notes: 'Nicole is a special needs adult who would like to volunteer and help with errands. Her direct support worker, Katelyn Hall, will be supporting Nicole and driving her to and from each location and supporting her during shopping trips and deliveries.',
+    uncertainFields: [],
+  }
+}
+
+const volunteerUsage = { inputTokens: 6000, outputTokens: 500, cost: 0.0425 }
+
+test('assembleResponse resolves village and passes through volunteer fields', () => {
+  const r = svc.assembleResponse(sampleVolunteerExtraction(), villages, volunteerUsage)
+  assert.equal(r.applicationType, 'volunteer')
+  assert.deepEqual(r.application.village, { villageId: null, villageName: 'Barrington Village' })
+  assert.equal(r.person.firstName, 'Nicole')
+  assert.equal(r.person.cell, '401-497-0470')
+  assert.equal(r.emergencyContact.relationship, 'Parent/Guardian')
+  assert.deepEqual(r.capabilityNames, ['Errands'])
+  assert.equal(r.circleOfPrideJoin, 'No')
+  assert.ok(r.notes.includes('Katelyn Hall'))
+  assert.deepEqual(r.usage, volunteerUsage)
+})
+
+test('assembleResponse normalizes volunteer blanks to null', () => {
+  const data = sampleVolunteerExtraction()
+  const r = svc.assembleResponse(data, villages, volunteerUsage)
+  assert.equal(r.application.ambassador, null)
+  assert.equal(r.person.nickname, null)
+  assert.equal(r.person.phone, null)
+  assert.equal(r.emergencyContact.phoneHome, null)
+})
+
+test('EXTRACTION_SCHEMA volunteer variant forbids additional properties and stays under the union cap', () => {
+  // Re-run the same structural invariants already enforced for the member
+  // variant, now that a second non-trivial variant exists in the anyOf.
+  const failures = []
+  function walk (node, where) {
+    if (!node || typeof node !== 'object') return
+    if (node.type === 'object' || (Array.isArray(node.type) && node.type.includes('object'))) {
+      if (node.additionalProperties !== false) failures.push(where)
+    }
+    for (const [k, v] of Object.entries(node)) walk(v, `${where}.${k}`)
+  }
+  walk(svc.EXTRACTION_SCHEMA, '$')
+  assert.deepEqual(failures, [])
+
+  let unions = 0
+  function walkUnions (node) {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node.type) || Array.isArray(node.anyOf)) unions++
+    for (const v of Object.values(node)) walkUnions(v)
+  }
+  walkUnions(svc.EXTRACTION_SCHEMA)
+  assert.ok(unions <= 16, `schema has ${unions} union-typed parameters (limit 16)`)
 })
