@@ -40,7 +40,7 @@ const mapOrigin = computed(() => {
 const mapDestination = computed(() => {
   const r = request.value
   if (!r || (!r.address && !r.city)) return ''
-  return [r.address, r.city, 'RI'].filter(Boolean).join(', ')
+  return [r.address, r.city, r.state].filter(Boolean).join(', ')
 })
 
 const mapWaypoint = computed(() => {
@@ -239,9 +239,9 @@ const timeDisplay = computed(() => {
             <span class="value">{{ request.address }}</span>
           </div>
 
-          <div v-if="request.city" class="detail-field">
-            <span class="label">City:</span>
-            <span class="value">{{ request.city }}</span>
+          <div v-if="request.city || request.state" class="detail-field">
+            <span class="label">City/State:</span>
+            <span class="value">{{ [request.city, request.state].filter(Boolean).join(', ') }}</span>
           </div>
 
           <div v-if="request.phone" class="detail-field">
