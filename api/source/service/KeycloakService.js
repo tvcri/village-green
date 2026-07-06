@@ -168,11 +168,37 @@ async function updateUsername({ oldUsername, newUsername }) {
   }
 }
 
+async function deleteUser({ username }) {
+  const existing = await findUserByUsername(username)
+  if (!existing) {
+    // Nothing to delete — treat as already-deleted, not an error.
+    return
+  }
+
+  const token = await ensureFreshToken()
+  const { baseUrl, realm } = parseAuthority(config.oauth.authority)
+  const url = `${baseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(existing.id)}`
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  })
+
+  if (!res.ok) {
+    const text = await safeReadBody(res)
+    const error = new Error(`Keycloak delete-user failed (${res.status}): ${text}`)
+    error.status = res.status
+    error.body = text
+    throw error
+  }
+}
+
 module.exports = {
   parseAuthority,
   buildCreateUserPayload,
   ensureFreshToken,
   createUser,
   findUserByUsername,
-  updateUsername
+  updateUsername,
+  deleteUser
 }

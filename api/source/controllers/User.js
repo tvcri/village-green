@@ -81,11 +81,14 @@ module.exports.deleteUser = async function deleteUser (req, res, next) {
         // User has accessed the system, so we need to reject the request
         throw new SmError.UnprocessableError('User has accessed the system. Use PATCH to remove village grants or configure Authentication provider to reject user entirely.')
       }
+      if (userData) {
+        await KeycloakService.deleteUser({ username: userData.username })
+      }
       let response = await UserService.deleteUser(userId, projection, elevate, req.userObject)
       res.json(response)
     }
     else {
-      throw new SmError.PrivilegeError()    
+      throw new SmError.PrivilegeError()
     }
   }
   catch(err) {
