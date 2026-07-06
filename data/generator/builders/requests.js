@@ -59,7 +59,7 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
     .flatMap(s => Array(s.serviceName === 'Ride: Medical Appnt' ? 6 : s.serviceName.startsWith('Ride:') ? 3 : 1).fill(s))
   const gagFigures = content.people.figures.filter(f => f.tag === 'gag')
   // map a gag figure to a member person row by name
-  const personByName = Object.fromEntries(plan.person.map(p => [p.fullName.toLowerCase(), p]))
+  const personByName = Object.fromEntries(plan.person.map(p => [plan.nameById[p.id].toLowerCase(), p]))
   const memberPersonIds = new Set(membership.member.map(m => m.personId))
   // standing member notes (member.serviceNotes) echo into request instructions, like prod
   const noteByPerson = Object.fromEntries(
@@ -246,8 +246,8 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
       const volP = personById[rng.pick(vols)]; const memP = personById[rng.pick(mems)]
       fcv_submission.push({
         id: fcvId, villageId: vid, villageName: village,
-        volunteerPersonId: volP.id, rawVolunteerName: volP.fullName,
-        memberPersonId: memP.id, rawMemberName: memP.fullName,
+        volunteerPersonId: volP.id, rawVolunteerName: plan.nameById[volP.id],
+        memberPersonId: memP.id, rawMemberName: plan.nameById[memP.id],
         visitDate: addDays(BASE_DATE, -rng.int(1, 200)).toISOString().slice(0, 10),
         timeSpentMinutes: rng.int(15, 120), contactType: rng.pick(contactTypes),
         activityTypes: JSON.stringify(rng.shuffle(activityTypes).slice(0, rng.int(1, 3))),

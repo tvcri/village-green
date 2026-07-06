@@ -58,22 +58,35 @@ export function buildPersons (content, villageIdByName, rng) {
   const person = []
   const byVillage = {}
   const fillerIds = new Set() // invented-descendant filler persons — least-examined rows
+  const nameById = {} // pid -> original figure name (fullName is DB-generated now)
   let pid = 0
 
-  const splitName = (name) => {
-    const parts = name.replace(/[^A-Za-z .'-]/g, '').split(/\s+/).filter(Boolean)
-    return { first: parts[0] || name, last: parts.length > 1 ? parts[parts.length - 1] : '' }
+  // Naive first-token/last-token split. Names this gets wrong (suffixes like
+  // "Astor IV", the disambiguated second William Dyer) carry explicit
+  // firstName/lastName overrides in people.json instead of heuristics here.
+  const splitName = (fig) => {
+    if (fig.lastName) return { first: fig.firstName, last: fig.lastName }
+    const parts = fig.name.replace(/[^A-Za-z .'-]/g, '').split(/\s+/).filter(Boolean)
+    const first = parts[0] || fig.name
+    // mononyms (the sachems, Consuela) fill both fields — the schema CHECKs
+    // both non-empty; the original full name is preserved in nickname
+    return { first, last: parts.length > 1 ? parts[parts.length - 1] : first }
   }
   const emailFor = (name) => name.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '') + '@residents.test'
 
   const makePerson = (fig, villageId, vName) => {
     pid += 1
-    const { first, last } = splitName(fig.name)
+    const { first, last } = splitName(fig)
     used.add(fig.name)
     if (fig.bucket === 'invented-descendants') fillerIds.add(pid)
+    nameById[pid] = fig.name
     person.push({
-      id: pid, villageId: villageId, fullName: fig.name,
-      firstName: first, lastName: last, nickname: null,
+      // fullName and address are DB-generated (fullName = "last, first") —
+      // never set them. Quirky figure names that don't survive the first/last
+      // split ("Del's Lemonade cart") are preserved in nickname.
+      id: pid, villageId: villageId,
+      firstName: first, lastName: last,
+      nickname: fig.name === `${first} ${last}`.trim() ? null : fig.name,
       middleInitial: rng.bool(0.5) ? rng.pick('ABCDEFGHJLMPRSTW'.split('')) : null,
       salutation: rng.bool(0.1) ? rng.pick(['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Rev.', 'Capt.']) : null,
       street: `${rng.int(1, 400)} ${rng.pick(RI_STREETS)}`, unit: rng.bool(0.15) ? `Apt ${rng.int(1, 30)}` : null,
@@ -112,5 +125,5 @@ export function buildPersons (content, villageIdByName, rng) {
     if (!volunteers.length && members.length) volunteers.push(rng.pick(members))
     byVillage[villageId] = { members, volunteers }
   }
-  return { person, byVillage, fillerIds }
+  return { person, byVillage, fillerIds, nameById }
 }

@@ -62,6 +62,7 @@ export function analyzeDrift (columnMeta, dataset, tables = TABLE_ORDER, baselin
     for (const r of rows) for (const k of Object.keys(r)) populated.add(k)
     for (const k of populated) {
       if (!byName.has(k)) errors.push(`\`${table}.${k}\` is set by a builder but missing from the schema (renamed or dropped?)`)
+      else if (byName.get(k).generated) errors.push(`\`${table}.${k}\` is a GENERATED column — the DB computes it; remove it from the builder`)
     }
     for (const c of cols) {
       if (populated.has(c.name) || c.generated || c.autoIncrement) continue

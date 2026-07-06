@@ -111,9 +111,9 @@
       "tag": "gag"
     },
     {
-      "name": "Metacomet (King Philip)",
+      "name": "Metacomet",
       "bucket": "Historical",
-      "realBlurb": "Wampanoag sachem who led the devastating 1675–76 war against the New England colonies; he was killed near Mount Hope in Bristol.",
+      "realBlurb": "Wampanoag sachem, known to the English as King Philip, who led the devastating 1675–76 war against the New England colonies; he was killed near Mount Hope in Bristol.",
       "gag": {
         "serviceName": "Ride to Mount Hope",
         "destination": "Mount Hope, Bristol",
@@ -144,9 +144,9 @@
       "tag": "gag"
     },
     {
-      "name": "William Blackstone (Blaxton)",
+      "name": "William Blackstone",
       "bucket": "Historical",
-      "realBlurb": "Eccentric early settler who planted New England's first apple orchard and reportedly rode a trained bull around the Cumberland/Lonsdale area.",
+      "realBlurb": "Eccentric early settler (name also spelled 'Blaxton') who planted New England's first apple orchard and reportedly rode a trained bull around the Cumberland/Lonsdale area.",
       "gag": {
         "serviceName": "Ride needed (my bull is tired)",
         "destination": "Study Hill orchard, Cumberland",
@@ -287,7 +287,7 @@
       "tag": "gag"
     },
     {
-      "name": "Nelson Eddy / RISD muralists",
+      "name": "The RISD Muralists",
       "bucket": "Writers/Artists/Performers",
       "realBlurb": "RISD students have a long tradition of guerrilla art, murals, and 'unsanctioned' public installations across Providence's old industrial spaces.",
       "gag": {
@@ -342,7 +342,7 @@
       "tag": "gag"
     },
     {
-      "name": "Vincent 'Buddy' the Statehouse pigeon (civic mascot)",
+      "name": "Vincent 'Buddy' the Statehouse pigeon",
       "bucket": "Politicians/Characters",
       "realBlurb": "Rhode Island's gilded Independent Man statue tops the State House dome — struck by lightning many times and once removed for repairs after taking a bolt.",
       "gag": {
@@ -371,28 +371,6 @@
         "serviceName": "Late-night ride to the Exeter cemetery (bring a shovel)",
         "destination": "Chestnut Hill Baptist Church cemetery, Exeter",
         "description": "Needs a discreet midnight lift to her own graveside. Bring a shovel, a lantern, and an open mind. The town's worried about consumption again."
-      },
-      "tag": "gag"
-    },
-    {
-      "name": "Little Bett (the Learned Elephant)",
-      "bucket": "Oddballs/Legends",
-      "realBlurb": "A traveling circus elephant shot dead on a Chepachet bridge in May 1826 by men hiding in a grist mill; the town commemorates her with a plaque each May 25.",
-      "gag": {
-        "serviceName": "XL ride (very large passenger)",
-        "destination": "Chepachet bridge, Glocester — avoid the grist mill",
-        "description": "Needs a calm, sturdy ride across town for tonight's show. Please route AROUND the Hawkins grist mill; the locals have been twitchy and armed. Peanuts provided."
-      },
-      "tag": "gag"
-    },
-    {
-      "name": "Nibbles Woodaway (the Big Blue Bug)",
-      "bucket": "Oddballs/Legends",
-      "realBlurb": "The 58-foot, 4,000-pound fiberglass termite mascot looming over I-95 in Providence since 1980, dressed up for every holiday; named by Geraldine Perry in a 1990 contest.",
-      "gag": {
-        "serviceName": "Errand: seasonal costume delivery",
-        "destination": "I-95 overpass, Providence",
-        "description": "Needs a Santa hat, reindeer antlers, and a blinking red nose hauled up to the gantry before the holiday traffic. 928 times life-size, so size up the ladder."
       },
       "tag": "gag"
     },
@@ -441,7 +419,7 @@
       "tag": "gag"
     },
     {
-      "name": "The Awful Awful (Newport Creamery)",
+      "name": "The Awful Awful",
       "bucket": "Oddballs/Legends",
       "realBlurb": "Rhode Island's beloved frozen drink — 'Awful Big, Awful Good' — sold at Newport Creamery, a fixture of local diner culture and 'cabinet' (milkshake) lore.",
       "gag": {
@@ -463,7 +441,7 @@
       "tag": "gag"
     },
     {
-      "name": "Coffee Milk (state drink)",
+      "name": "Coffee Milk",
       "bucket": "Oddballs/Legends",
       "realBlurb": "Coffee milk — milk with coffee syrup — was named Rhode Island's official state beverage in 1993 after a fierce legislative showdown with Del's Lemonade fans.",
       "gag": {
@@ -485,7 +463,7 @@
       "tag": "gag"
     },
     {
-      "name": "Quahog (the clam)",
+      "name": "Quahog",
       "bucket": "Oddballs/Legends",
       "realBlurb": "The hard-shell clam ('quahog,' from Narragansett 'poquauhock') is RI's state shell and the heart of stuffies, chowder, and clam-cake culture.",
       "gag": {
@@ -496,7 +474,7 @@
       "tag": "gag"
     },
     {
-      "name": "The Gaspee (burning reenactors)",
+      "name": "The Gaspee",
       "bucket": "Oddballs/Legends",
       "realBlurb": "Each June, Pawtuxet Village holds Gaspee Days, culminating in the ceremonial burning of a mock British schooner to mark the 1772 raid.",
       "gag": {
@@ -529,7 +507,7 @@
       "tag": "gag"
     },
     {
-      "name": "Emily Dickinson (sparingly nearby)",
+      "name": "Emily Dickinson",
       "bucket": "Nearby Notables",
       "realBlurb": "Amherst, Massachusetts poet of reclusive habit who rarely left her home and conducted much of her social life through letters and a famously private upstairs room.",
       "gag": {
@@ -540,7 +518,7 @@
       "tag": "gag"
     },
     {
-      "name": "Frederick Law Olmsted (Roger Williams Park ties)",
+      "name": "Frederick Law Olmsted",
       "bucket": "Nearby Notables",
       "realBlurb": "Landscape architect whose firm shaped Roger Williams Park in Providence and the broader 'Emerald' parks movement across New England.",
       "gag": {
@@ -573,7 +551,7 @@
       "tag": "gag"
     },
     {
-      "name": "Sarah Doyle / Pembroke pioneers",
+      "name": "Sarah Doyle",
       "bucket": "Historical",
       "realBlurb": "Providence educator and women's-rights advocate who helped found the women's college (later Pembroke) at Brown in the 1890s.",
       "gag": {
@@ -581,10 +559,11 @@
         "destination": "Brown University gates, Providence",
         "description": "Needs a lift to argue, again, that women should be allowed to study here. Bring petitions and patience. The future Pembroke College thanks you."
       },
-      "tag": "gag"
+      "tag": "gag",
+      "villageHint": "New York System"
     },
     {
-      "name": "Rocky Point Park (the Shore Dinner Hall)",
+      "name": "Rocky Point Park",
       "bucket": "Oddballs/Legends",
       "realBlurb": "Beloved Warwick amusement park (closed 1995) famous for its enormous Shore Dinner Hall serving clam cakes and chowder to thousands at once.",
       "gag": {
@@ -595,7 +574,7 @@
       "tag": "gag"
     },
     {
-      "name": "George 'Cap' Wirth / Crescent Park Carousel",
+      "name": "George 'Cap' Wirth",
       "bucket": "Oddballs/Legends",
       "realBlurb": "The 1895 Charles I. D. Looff carousel at Crescent Park in East Providence is a National Historic Landmark — a masterwork of hand-carved horses.",
       "gag": {
@@ -705,7 +684,9 @@
       "bucket": "colonial-historical",
       "realBlurb": "Merchant whose gift renamed the college 'Brown' in 1804.",
       "tag": "background",
-      "villageHint": "New York System"
+      "villageHint": "New York System",
+      "firstName": "Nicholas",
+      "lastName": "Brown Jr."
     },
     {
       "name": "Canonicus",
@@ -966,14 +947,18 @@
       "bucket": "colonial-historical",
       "realBlurb": "Naval namesake descendant active in Newport maritime circles.",
       "tag": "background",
-      "villageHint": "Oldport"
+      "villageHint": "Oldport",
+      "firstName": "Oliver",
+      "lastName": "Perry Jr."
     },
     {
       "name": "Stephen Decatur Sr.",
       "bucket": "colonial-historical",
       "realBlurb": "Revolutionary privateer whose son became a naval legend.",
       "tag": "background",
-      "villageHint": "Oldport"
+      "villageHint": "Oldport",
+      "firstName": "Stephen",
+      "lastName": "Decatur Sr."
     },
     {
       "name": "Welcome Arnold",
@@ -1081,7 +1066,9 @@
       "bucket": "gilded-age-newport",
       "realBlurb": "Built The Breakers, the grandest of the Newport cottages.",
       "tag": "background",
-      "villageHint": "Oldport"
+      "villageHint": "Oldport",
+      "firstName": "Cornelius",
+      "lastName": "Vanderbilt II"
     },
     {
       "name": "Alice Claypoole Vanderbilt",
@@ -1131,7 +1118,9 @@
       "bucket": "gilded-age-newport",
       "realBlurb": "Inventor, sci-fi novelist, and the richest man to die on the Titanic.",
       "tag": "background",
-      "villageHint": "Oldport"
+      "villageHint": "Oldport",
+      "firstName": "John",
+      "lastName": "Astor IV"
     },
     {
       "name": "Ward McAllister",
@@ -1504,7 +1493,9 @@
       "bucket": "politics-crime",
       "realBlurb": "Scion of the Green political line, active in Providence civic life.",
       "tag": "background",
-      "villageHint": "New York System"
+      "villageHint": "New York System",
+      "firstName": "Theodore",
+      "lastName": "Green Jr."
     },
     {
       "name": "Rowland Hazard",
@@ -1512,13 +1503,6 @@
       "realBlurb": "South County woolen magnate whose family seeded Peace Dale.",
       "tag": "background",
       "villageHint": "Cabinet"
-    },
-    {
-      "name": "Sarah Doyle",
-      "bucket": "arts-music-lit",
-      "realBlurb": "Pioneer of women's education at Brown; the Women's Center bears her name.",
-      "tag": "background",
-      "villageHint": "New York System"
     },
     {
       "name": "Christiana Carteaux Bannister",
@@ -1574,7 +1558,9 @@
       "bucket": "politics-crime",
       "realBlurb": "Heir to the Sundlun civic name in Rhode Island politics.",
       "tag": "background",
-      "villageHint": "Oldport"
+      "villageHint": "Oldport",
+      "firstName": "Bruce",
+      "lastName": "Sundlun Jr."
     },
     {
       "name": "Vincent 'Buddy' Vallone",
@@ -2074,7 +2060,7 @@
       }
     },
     {
-      "name": "Thomas Paine (the pirate)",
+      "name": "Thomas Paine",
       "bucket": "oddballs-legends",
       "realBlurb": "Buccaneer-turned-Newport-pillar who helped build Trinity Church.",
       "tag": "background",
@@ -2104,7 +2090,9 @@
       "bucket": "arts-music-lit",
       "realBlurb": "Heir to the Providence showman's name and grin.",
       "tag": "background",
-      "villageHint": "New York System"
+      "villageHint": "New York System",
+      "firstName": "George",
+      "lastName": "Cohan Jr."
     },
     {
       "name": "Christopher Lloyd",
@@ -2212,7 +2200,9 @@
       "bucket": "fictional-ri",
       "realBlurb": "Miskatonic geologist-narrator of 'At the Mountains of Madness.'",
       "tag": "background",
-      "villageHint": "Arkham"
+      "villageHint": "Arkham",
+      "firstName": "William",
+      "lastName": "Dyer"
     },
     {
       "name": "Edith Wharton",
@@ -2714,6 +2704,24 @@
       "bucket": "invented-descendants",
       "realBlurb": "Invented descendant of colonial governor Benedict Arnold (the grandfather, he insists, not the traitor).",
       "tag": "background"
+    },
+    {
+      "name": "Ezekiel Whipple",
+      "bucket": "invented-descendants",
+      "tag": "background",
+      "realBlurb": "Invented Whipple-family descendant; insists the tavern ledger balances if you squint."
+    },
+    {
+      "name": "Clara Burnside",
+      "bucket": "invented-descendants",
+      "tag": "background",
+      "realBlurb": "Invented Burnside descendant; mercifully spared the sideburns, keeps the portrait dusted."
+    },
+    {
+      "name": "Marion Sprague-Tefft",
+      "bucket": "invented-descendants",
+      "tag": "background",
+      "realBlurb": "Invented descendant of the Sprague mill dynasty; hums at loom speed when concentrating."
     }
   ],
   "loginPersonas": [

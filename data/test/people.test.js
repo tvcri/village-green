@@ -11,10 +11,19 @@ test('people.json is a large, de-duped, tagged roster', () => {
   assert.ok(Array.isArray(people.figures), 'figures is an array')
   assert.ok(people.figures.length >= 240, `figures=${people.figures.length} (want >= 240)`)
 
-  // globally unique names (the schema enforces unique (villageId, fullName);
-  // we keep names globally unique so a figure never appears in two villages)
+  // globally unique names — fullName is now DB-generated from (lastName, firstName),
+  // but we keep original figure names globally unique so a figure never appears twice
   const names = people.figures.map(f => f.name.toLowerCase())
   assert.equal(names.length, new Set(names).size, 'figure names must be globally unique')
+
+  for (const f of people.figures) {
+    // names are just names — qualifiers live in realBlurb. A disambiguating
+    // parenthetical is allowed only alongside an explicit firstName/lastName split.
+    assert.ok(!f.name.includes('/'), `slash mashup in name: ${f.name}`)
+    if (f.name.includes('(')) assert.ok(f.firstName && f.lastName, `parenthetical without split override: ${f.name}`)
+    // overrides come as a pair
+    assert.ok(!f.firstName === !f.lastName, `firstName/lastName must both be set: ${f.name}`)
+  }
 })
 
 test('every figure is tagged; gag cameos carry a gag object', () => {

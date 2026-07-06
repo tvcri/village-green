@@ -63,6 +63,14 @@ test('doctor: generated and auto_increment columns are ignored', () => {
   assert.equal(notices.length, 0)
 })
 
+test('doctor: builder setting a GENERATED column is an error (inserts would fail)', () => {
+  const meta = { widget: [col('id'), col('addr', { generated: true }), col('name')] }
+  const ds = { widget: [{ id: 1, addr: '1 Main St', name: 'a' }] }
+  const { errors } = analyzeDrift(meta, ds, ['widget'])
+  assert.equal(errors.length, 1)
+  assert.match(errors[0], /widget\.addr.*GENERATED/)
+})
+
 test('doctor: empty dataset tables are skipped; missing table with rows is an error', () => {
   const meta = {}
   const ds = { empty_table: [], gone_table: [{ id: 1 }] }

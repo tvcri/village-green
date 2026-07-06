@@ -15,6 +15,9 @@ export function buildMembership (plan, content, rng) {
   const dropReasons = content.services.memberDropReasons
   const serviceNotes = content.services.memberServiceNotes || []
   const confidentialNotes = content.services.memberConfidentialNotes || []
+  const volunteerNotes = content.services.volunteerNotes || []
+  // deliberately disability-agnostic phrasing — a random note pairs with any condition
+  const disabilityNotes = content.services.disabilityNotes || []
 
   const member = []
   const volunteer = []
@@ -58,7 +61,10 @@ export function buildMembership (plan, content, rng) {
     for (const personId of [...new Set(volunteers)]) {
       vId += 1
       // ~5% flip to inactive in the post-pass below
-      volunteer.push({ id: vId, personId: personId, providerType: rng.pick(['Individual', 'Couple', 'Agency']), active: 1 })
+      volunteer.push({
+        id: vId, personId: personId, providerType: rng.pick(['Individual', 'Couple', 'Agency']), active: 1,
+        notes: volunteerNotes.length && rng.bool(0.5) ? rng.pick(volunteerNotes) : null,
+      })
       // 1-3 capabilities
       const caps = rng.shuffle(CAPABILITIES).slice(0, rng.int(1, 3))
       for (const c of caps) { vcId += 1; volunteer_capability.push({ id: vcId, volunteerId: vId, capabilityId: c.id }) }
@@ -86,7 +92,11 @@ export function buildMembership (plan, content, rng) {
   // ~handful of disabilities across members
   const memberPersonIds = [...new Set(member.map(m => m.personId))]
   for (const personId of rng.shuffle(memberPersonIds).slice(0, Math.min(12, memberPersonIds.length))) {
-    pdId += 1; person_disability.push({ id: pdId, personId: personId, disabilityId: rng.pick(disability).id })
+    pdId += 1
+    person_disability.push({
+      id: pdId, personId: personId, disabilityId: rng.pick(disability).id,
+      note: disabilityNotes.length && rng.bool(0.5) ? rng.pick(disabilityNotes) : null,
+    })
   }
 
   return { member, volunteer, disability, vetting_type, volunteer_capability, volunteer_vetting, person_disability }

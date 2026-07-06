@@ -28,16 +28,21 @@ test('villages: 10 villages with 1-based ids', () => {
   assert.equal(villageIdByName[VILLAGES[0].name], 1)
 })
 
-test('persons: no address key, unique (village,name), themed big villages', () => {
+test('persons: no generated-column keys, unique (village,name), themed big villages', () => {
   const { village, villageIdByName } = buildVillagesAndUsers(fullContent, makeRng(1))
-  const { person, byVillage } = buildPersons(fullContent, villageIdByName, makeRng(1))
+  const { person, byVillage, nameById } = buildPersons(fullContent, villageIdByName, makeRng(1))
   for (const p of person) {
+    // address and fullName are DB-generated — builders must never set them
     assert.ok(!('address' in p), 'person rows must not set the generated address column')
-    assert.equal(typeof p.fullName, 'string')
+    assert.ok(!('fullName' in p), 'person rows must not set the generated fullName column')
+    assert.equal(typeof nameById[p.id], 'string')
+    assert.ok(p.firstName, 'firstName feeds the generated fullName')
     assert.ok(p.villageId >= 1 && p.villageId <= 10)
+    // quirky figure names that don't survive the first/last split live in nickname
+    if (nameById[p.id] !== `${p.firstName} ${p.lastName}`.trim()) assert.equal(p.nickname, nameById[p.id])
   }
-  // unique (villageId, fullName)
-  const keys = person.map(p => `${p.villageId}::${p.fullName.toLowerCase()}`)
+  // a figure never appears in two villages: unique (villageId, original name)
+  const keys = person.map(p => `${p.villageId}::${nameById[p.id].toLowerCase()}`)
   assert.equal(keys.length, new Set(keys).size)
   // demographic sprinkle: ~half carry a middle initial, ~10% a salutation
   const miShare = person.filter(p => p.middleInitial).length / person.length
@@ -97,6 +102,10 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   assert.ok(m.member.every(r => typeof r.householdDues === 'number' && r.householdDues >= 0 && r.householdDues <= 60))
   const at40 = m.member.filter(r => r.householdDues === 40).length / m.member.length
   assert.ok(at40 > 0.4, `only ${(at40 * 100).toFixed(0)}% of members at the $40 tier`)
+  // ~half of volunteers carry a staff note; disability links too (few rows, so just both-kinds)
+  const volNoteShare = m.volunteer.filter(r => r.notes).length / m.volunteer.length
+  assert.ok(volNoteShare > 0.35 && volNoteShare < 0.65, `volunteer notes share ${volNoteShare.toFixed(2)} not ~0.5`)
+  assert.ok(m.person_disability.some(r => r.note) && m.person_disability.some(r => !r.note))
 
   // junctions reference valid parents
   const volIds = new Set(m.volunteer.map(v => v.id))
@@ -224,10 +233,13 @@ test('service requests match the UI-enforced category/transport/location rules',
 test('inactive members come from the invented filler pool first', () => {
   const content = fullContentWithDest()
   const ds = buildDataset(content, 20260630)
-  const fillerNames = new Set(content.people.figures
-    .filter(f => f.bucket === 'invented-descendants').map(f => f.name.toLowerCase()))
+  // person rows no longer carry fullName (DB-generated) — match fillers by
+  // their name-derived email, which mirrors the builder's emailFor()
+  const emailFor = (name) => name.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '') + '@residents.test'
+  const fillerEmails = new Set(content.people.figures
+    .filter(f => f.bucket === 'invented-descendants').map(f => emailFor(f.name)))
   const fillerPersonIds = new Set(ds.person
-    .filter(p => fillerNames.has(p.fullName.toLowerCase())).map(p => p.id))
+    .filter(p => fillerEmails.has(p.email)).map(p => p.id))
   const inactive = ds.member.filter(m => m.status !== 'Active')
   assert.ok(inactive.length >= 1)
   const fillerMemberCount = ds.member.filter(m => fillerPersonIds.has(m.personId)).length
