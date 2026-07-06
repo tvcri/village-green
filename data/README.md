@@ -4,16 +4,16 @@ Deterministic demo data for Village Green: a roster of 316 RI-history/lore figur
 
 ## Prerequisites
 
-- **Docker** — for the dev MySQL instance
+- **A running dev MySQL with the schema applied** — the generator doesn't start anything itself; it just connects to whatever the `VG_DB_*` env vars point at (defaults below). The easiest way to get the schema is to start the API once (it applies migrations at startup). See KNOWN ISSUE below about two missing views.
 - **Node.js 18+**
 - **npm install** — run once inside this directory (`data/`)
-
-The dev database schema must be present. The easiest way to get it is to start the API once (`docker compose -f ../docker-compose.dev.yml up -d` + whatever `npm run dev` script the API uses to apply migrations). See KNOWN ISSUE below about two missing views.
 
 ## Quick start
 
 ```bash
-# From the repo root — bring up the dev MySQL container
+# Optional — a docker-compose for the dev MySQL container (not in the repo yet).
+# Skip it if you already have the dev DB up; the generator just reads the
+# VG_DB_* / VG_DEMO_* env vars and talks to whatever is already running.
 docker compose -f docker-compose.dev.yml up -d
 
 # From data/
@@ -21,7 +21,7 @@ npm install
 npm run seed
 ```
 
-That's it. The SQL seeder writes directly to MySQL and does not need the API running.
+That's it. The SQL seeder writes directly to MySQL and does not need the API running. The **app-data commands** (`seed:api` / `import` / `export` / `roundtrip`) are the exception: they go through the app's `/op/appdata` endpoint, so they need the API up (started with `VG_EXPERIMENTAL_APPDATA=true`) — and the mock OIDC server too, to mint the loader's token (unless you supply one via `VG_DEMO_TOKEN`). Details in the App-data path section below.
 
 ## Commands
 
