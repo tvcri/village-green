@@ -190,6 +190,7 @@ module.exports.getPerson = async function (personId, projections = []) {
       'volunteerId', CAST(vol3.id AS CHAR),
       'personId', CAST(vol3.personId AS CHAR),
       'providerType', vol3.providerType,
+      'notes', vol3.notes,
       'active', vol3.active != 0,
       'capabilities', (
         SELECT COALESCE(

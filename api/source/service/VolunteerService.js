@@ -48,12 +48,12 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, active = null, capabilityIds = [], associateVillageIds = [] } = {}) {
+module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [] } = {}) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const volunteerId = await ensureVolunteer(connection, personId)
       await connection.query(
-        'UPDATE volunteer SET providerType = ?, active = ? WHERE id = ?', [providerType, active, volunteerId]
+        'UPDATE volunteer SET providerType = ?, active = ?, notes = ? WHERE id = ?', [providerType, active, notes, volunteerId]
       )
       await replaceCapabilities(connection, volunteerId, capabilityIds)
       await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
@@ -71,6 +71,7 @@ module.exports.patchVolunteer = async function (personId, body = {}) {
       const fields = {}
       if (body.providerType !== undefined) fields.providerType = body.providerType
       if (body.active !== undefined) fields.active = body.active
+      if (body.notes !== undefined) fields.notes = body.notes
       if (Object.keys(fields).length) {
         await connection.query('UPDATE volunteer SET ? WHERE id = ?', [fields, volunteerId])
       }
