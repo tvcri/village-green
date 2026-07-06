@@ -207,3 +207,58 @@ export function buildPersonCreatePayload (form) {
   })
   return payload
 }
+
+export function mapVolunteerPersonForm (extraction) {
+  const p = extraction.person
+  const ec = extraction.emergencyContact
+  return {
+    firstName: s(p.firstName), middleInitial: s(p.middleInitial),
+    lastName: s(p.lastName), nickname: s(p.nickname),
+    street: s(p.street), unit: s(p.unit),
+    city: s(p.city), state: s(p.state), zip: s(p.zip),
+    email: s(p.email),
+    phone: s(p.phone), cell: s(p.cell),
+    birthDate: s(p.birthDate),
+    emergencyContactName: ec ? [ec.firstName, ec.middleInitial, ec.lastName].filter(Boolean).join(' ') : '',
+    emergencyContactRelationship: s(ec?.relationship),
+    emergencyContactPhone: s(ec?.phoneCell ?? ec?.phoneHome),
+    emergencyContactEmail: s(ec?.email),
+    villageId: extraction.application.village.villageId,
+  }
+}
+
+export function volunteerPersonCommunityNames (extraction) {
+  const names = new Set()
+  if (extraction.circleOfPrideJoin === 'Yes') names.add('Pride')
+  return names
+}
+
+export function volunteerCapabilityNames (extraction) {
+  return new Set(extraction.capabilityNames)
+}
+
+// extraction path -> volunteer-person-form field (no members[] index — a
+// volunteer application describes exactly one person)
+function volunteerPersonFieldForPath (path) {
+  const personMatch = path.match(/^person\.(\w+)$/)
+  if (personMatch) {
+    const personFields = ['firstName', 'middleInitial', 'lastName', 'nickname', 'street', 'unit',
+      'city', 'state', 'zip', 'email', 'phone', 'cell', 'birthDate']
+    return personFields.includes(personMatch[1]) ? personMatch[1] : null
+  }
+  if (path === 'application.villageName') return 'villageId'
+  const ecMatch = path.match(/^emergencyContact\.(\w+)$/)
+  if (ecMatch) {
+    const map = {
+      firstName: 'emergencyContactName', middleInitial: 'emergencyContactName', lastName: 'emergencyContactName',
+      phoneHome: 'emergencyContactPhone', phoneCell: 'emergencyContactPhone',
+      email: 'emergencyContactEmail', relationship: 'emergencyContactRelationship',
+    }
+    return map[ecMatch[1]] ?? null
+  }
+  return null
+}
+
+export function uncertainMapForVolunteerPerson (extraction) {
+  return buildUncertainMap(extraction, volunteerPersonFieldForPath)
+}

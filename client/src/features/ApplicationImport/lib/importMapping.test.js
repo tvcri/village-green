@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   mapPersonForm, personCommunityNames, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
+  mapVolunteerPersonForm, volunteerPersonCommunityNames, volunteerCapabilityNames, uncertainMapForVolunteerPerson,
 } from './importMapping.js'
 
 function extraction () {
@@ -255,5 +256,72 @@ describe('buildPersonCreatePayload', () => {
   it('drops empty values and keeps villageId', () => {
     const p = buildPersonCreatePayload({ firstName: 'Al', lastName: 'Innovera', nickname: '', email: null, villageId: 1 })
     expect(p).toEqual({ firstName: 'Al', lastName: 'Innovera', villageId: 1 })
+  })
+})
+
+function volunteerExtraction () {
+  return {
+    applicationType: 'volunteer',
+    application: {
+      applicationDate: '2026-05-30',
+      village: { villageId: 7, villageName: 'Barrington Village' },
+      ambassador: null,
+    },
+    person: {
+      firstName: 'Nicole', middleInitial: 'K', lastName: 'Brown', nickname: null,
+      pronouns: 'she/her', birthDate: '1999-07-10', gender: 'Female', veteran: 'No',
+      language: null, street: '5 Sherbrooke Rd', unit: null, city: 'Barrington', state: 'RI', zip: '02806',
+      email: 'labrown8025@gmail.com', phone: null, cell: '401-497-0470',
+    },
+    emergencyContact: {
+      firstName: 'Laurie', middleInitial: null, lastName: 'Brown',
+      phoneHome: null, phoneCell: '401-497-0470', email: 'labrown8025@gmail.com', relationship: 'Parent/Guardian',
+    },
+    capabilityNames: ['Errands'],
+    circleOfPrideJoin: 'No',
+    notes: 'Nicole is a special needs adult...',
+    uncertainFields: [
+      { path: 'person.zip', reason: 'digit unclear', alternative: '02807' },
+      { path: 'application.villageName', reason: 'abbreviated with "Village" suffix', alternative: null },
+      { path: 'emergencyContact.phoneCell', reason: 'smudged', alternative: null },
+    ],
+  }
+}
+
+describe('mapVolunteerPersonForm', () => {
+  it('maps the single person and emergency contact, no household fallback needed', () => {
+    const f = mapVolunteerPersonForm(volunteerExtraction())
+    expect(f.firstName).toBe('Nicole')
+    expect(f.zip).toBe('02806')
+    expect(f.villageId).toBe(7)
+    expect(f.emergencyContactName).toBe('Laurie Brown')
+    expect(f.emergencyContactPhone).toBe('401-497-0470')
+    expect(f.emergencyContactRelationship).toBe('Parent/Guardian')
+  })
+})
+
+describe('volunteerPersonCommunityNames', () => {
+  it('adds Pride when circleOfPrideJoin is Yes', () => {
+    const e = volunteerExtraction()
+    e.circleOfPrideJoin = 'Yes'
+    expect(volunteerPersonCommunityNames(e)).toEqual(new Set(['Pride']))
+  })
+  it('is empty when circleOfPrideJoin is No', () => {
+    expect(volunteerPersonCommunityNames(volunteerExtraction())).toEqual(new Set())
+  })
+})
+
+describe('volunteerCapabilityNames', () => {
+  it('wraps capabilityNames in a Set', () => {
+    expect(volunteerCapabilityNames(volunteerExtraction())).toEqual(new Set(['Errands']))
+  })
+})
+
+describe('uncertainMapForVolunteerPerson', () => {
+  it('maps person/emergencyContact/village paths without a members[] index', () => {
+    const m = uncertainMapForVolunteerPerson(volunteerExtraction())
+    expect(m.zip).toEqual({ reason: 'digit unclear', alternative: '02807' })
+    expect(m.villageId).toBeDefined()
+    expect(m.emergencyContactPhone).toBeDefined()
   })
 })
