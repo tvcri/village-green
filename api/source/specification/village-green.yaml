@@ -812,6 +812,13 @@ paths:
       - User
       summary: Create a User
       operationId: createUser
+      parameters:
+      - name: keycloak
+        in: query
+        description: Also create the corresponding Keycloak account. Defaults to true.
+        schema:
+          type: boolean
+          default: true
       requestBody:
         required: true
         content:
@@ -3898,6 +3905,10 @@ components:
           uniqueItems: true
         username:
           $ref: '#/components/schemas/Username'
+        firstName:
+          type: string
+        lastName:
+          type: string
       required:
       - username
       - villageGrants
