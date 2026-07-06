@@ -104,6 +104,18 @@ CREATE TABLE `ce_dump` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `community`
+--
+
+DROP TABLE IF EXISTS `community`;
+CREATE TABLE `community` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `disability`
 --
 
@@ -204,10 +216,10 @@ CREATE TABLE `notification_event` (
 DROP TABLE IF EXISTS `person`;
 CREATE TABLE `person` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `villageId` int NOT NULL,
-  `fullName` varchar(200) NOT NULL,
-  `lastName` varchar(100) DEFAULT NULL,
-  `firstName` varchar(100) DEFAULT NULL,
+  `villageId` int DEFAULT NULL,
+  `fullName` varchar(200) GENERATED ALWAYS AS (concat_ws(_utf8mb4', ',`lastName`,`firstName`)) STORED,
+  `lastName` varchar(100) NOT NULL,
+  `firstName` varchar(100) NOT NULL,
   `middleInitial` varchar(10) DEFAULT NULL,
   `salutation` varchar(20) DEFAULT NULL,
   `nickname` varchar(100) DEFAULT NULL,
@@ -230,8 +242,25 @@ CREATE TABLE `person` (
   `emergencyContactEmail` varchar(200) DEFAULT NULL,
   `comments` text,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `village_id` (`villageId`,`fullName`),
-  CONSTRAINT `person_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`)
+  KEY `person_ibfk_1` (`villageId`),
+  CONSTRAINT `person_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
+  CONSTRAINT `person_names_non_empty` CHECK (((`lastName` <> _utf8mb4'') and (`firstName` <> _utf8mb4'')))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `person_community`
+--
+
+DROP TABLE IF EXISTS `person_community`;
+CREATE TABLE `person_community` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `personId` int NOT NULL,
+  `communityId` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `person_community` (`personId`,`communityId`),
+  KEY `pc_community_fk` (`communityId`),
+  CONSTRAINT `pc_community_fk` FOREIGN KEY (`communityId`) REFERENCES `community` (`id`),
+  CONSTRAINT `pc_person_fk` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -479,6 +508,22 @@ CREATE TABLE `volunteer_vetting` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `volunteer_village_associate`
+--
+
+DROP TABLE IF EXISTS `volunteer_village_associate`;
+CREATE TABLE `volunteer_village_associate` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `volunteerId` int NOT NULL,
+  `villageId` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `volunteer_village` (`volunteerId`,`villageId`),
+  KEY `vva_village_fk` (`villageId`),
+  CONSTRAINT `vva_village_fk` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
+  CONSTRAINT `vva_volunteer_fk` FOREIGN KEY (`volunteerId`) REFERENCES `volunteer` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Dumping events for database 'vg'
 --
 
@@ -515,4 +560,4 @@ CREATE TABLE `volunteer_vetting` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-05 14:56:28
+-- Dump completed on 2026-07-05 15:48:59
