@@ -13,7 +13,7 @@ import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
-import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { toCsv, downloadCsv, withLocalDateTimeColumns } from '../../../shared/lib/csvUtils.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 defineOptions({ name: 'VillageServiceRequestList' })
@@ -188,24 +188,26 @@ const activeFilterCount = computed(() => {
 
 const columnsForCsv = [
   { header: 'Request #', key: 'displayNumber' },
-  { header: 'Status', key: 'status' },
   { header: 'Service', key: 'serviceName' },
   { header: 'Member', key: 'memberFullName' },
   { header: 'Volunteer', key: 'volunteerFullName' },
+  { header: 'Description', key: 'description' },
   { header: 'Start At', key: 'startAt' },
+  { header: 'Arrive At', key: 'apptTime' },
+  { header: 'Return At', key: 'returnTime' },
   { header: 'Finish At', key: 'finishAt' },
-  { header: 'Transportation Type', key: 'transportationType' },
   { header: 'Destination', key: 'destination' },
   { header: 'Address', key: 'address' },
   { header: 'City', key: 'city' },
-  { header: 'Phone', key: 'phone' },
-  { header: 'Description', key: 'description' },
+  { header: 'State', key: 'state' },
   { header: 'Created At', key: 'createdAt' }
 ]
+  
+const DATE_TIME_CSV_KEYS = ['startAt', 'apptTime', 'returnTime', 'finishAt', 'createdAt']
 
 const handleDownloadCsv = async () => {
   if (!village.value && villageId.value) await fetchVillage()
-  const csv = toCsv(requests.value || [], columnsForCsv)
+  const csv = toCsv(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv)
   const villageName = village.value?.name || 'village'
   downloadCsv(csv, `${villageName}-service-requests.csv`)
 }
@@ -215,7 +217,7 @@ async function handleCreateSheet() {
     isCreatingSheet.value = true
     if (!village.value && villageId.value) await fetchVillage()
     const villageName = village.value?.name || 'Village Green'
-    const result = await createSheet(requests.value || [], columnsForCsv, `${villageName} Service Requests`)
+    const result = await createSheet(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv, `${villageName} Service Requests`)
     const sheetUrl = result.url || result
     if (result.popupBlocked) {
       if (toast) {
