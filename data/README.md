@@ -4,7 +4,7 @@ Deterministic demo data for Village Green: a roster of 316 RI-history/lore figur
 
 ## Prerequisites
 
-- **A running dev MySQL with the schema applied** — the generator doesn't start anything itself; it just connects to whatever the `VG_DB_*` env vars point at (defaults below). The easiest way to get the schema is to start the API once (it applies migrations at startup). See KNOWN ISSUE below about two missing views.
+- **A running dev MySQL with the schema applied** — the generator doesn't start anything itself; it just connects to whatever the `VG_DB_*` env vars point at (defaults below). The easiest way to get the schema is to start the API once.
 - **Node.js 18+**
 - **npm install** — run once inside this directory (`data/`)
 
@@ -32,7 +32,7 @@ The commands split into two families: **seed** commands *generate* the dataset a
 | `npm run seed:db` (alias: `seed`) | generate → DB | Generate the dataset and load it with direct SQL INSERTs (primary path; no API needed) |
 | `npm run seed:api` | generate → app | Generate the same dataset and load it through the app's **import** endpoint (`POST /op/appdata`; needs the API + mock OIDC, see below) |
 | `npm run emit` | generate → file | Generate the dataset and write it to `demo-appdata.jsonl` **without loading it anywhere**. Deterministic: the meta `date` is pinned so the same seed yields a byte-identical file (don't expect a fresh timestamp) |
-| `npm run import` | file → app | POST an **existing** app-data file as-is (deflsault `demo-appdata.jsonl`; pick another with `npm run import -- --import=<file>`). Works with emitted files *and* app exports — no generation, and no doctor gate, so it can restore a backup even while the builders are mid-drift |
+| `npm run import` | file → app | POST an **existing** app-data file as-is (default `demo-appdata.jsonl`; pick another with `npm run import -- --import=<file>`). Works with emitted files *and* app exports — no generation, and no doctor gate, so it can restore a backup even while the builders are mid-drift |
 | `npm run export` | app → file | Call the app's **export** endpoint (`GET /op/appdata?format=jsonl`) and write `appdata-export.jsonl` — whatever is in the DB *right now*, serialized by the app itself (real timestamped meta, includes every table/column, not just what the generator sets) |
 | `npm run roundtrip` | all of the above | seed:db → emit → seed:api → sanity check, exercising both load paths end to end |
 | `npm run doctor` | — | Schema-drift check only (also runs automatically before every *generating* command above — not before `import`/`export`, which don't use the builders) |
@@ -64,26 +64,7 @@ The `seed:api`, `import`, `export`, and `roundtrip` commands use the app's `/op/
 > **Note:** When logging in via the mock-OIDC browser form to use the app itself, enter the wider scope string into the form:
 > `vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:friends:read`
 
-This path exercises the otherwise-untested `/op/appdata` endpoint and **may surface endpoint bugs**. The SQL `seed:db` command is the always-works fallback and is recommended for most development use.
-
-## KNOWN ISSUE — two SQL views are missing from this branch
-
-The app exposes members and volunteers through two SQL views (`active_member` and `active_volunteer`). Those views are **not in this branch's fresh-install schema** (the fix lives in `30-vg-views.sql` on a separate branch). Without them the app's `/persons` endpoint will **500** even though the demo data is correctly loaded in the DB.
-
-Fix — run the following against the dev DB once (substitute your connection details):
-
-```sql
-CREATE OR REPLACE VIEW active_member AS SELECT * FROM member WHERE status = 'Active';
-CREATE OR REPLACE VIEW active_volunteer AS SELECT * FROM volunteer WHERE active = 1;
-```
-
-Example one-liner using the dev defaults:
-
-```bash
-mysql -h 127.0.0.1 -P 3308 -u vg -pvg vg -e \
-  "CREATE OR REPLACE VIEW active_member AS SELECT * FROM member WHERE status = 'Active'; \
-   CREATE OR REPLACE VIEW active_volunteer AS SELECT * FROM volunteer WHERE active = 1;"
-```
+This path exercises the `/op/appdata` endpoint itself and **may surface endpoint bugs**. The SQL `seed:db` command is the always-works fallback and is recommended for most development use.
 
 ## Demo personas and mock-OIDC logins
 
