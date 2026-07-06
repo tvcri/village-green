@@ -37,6 +37,26 @@ const DISABILITY_NAMES_BY_FIELD = {
   usesWheelchair: 'Wheelchair',
 }
 
+// Labels the extraction prompt uses for each field's accessibilityNotes
+// sentence (see ApplicationImportService.js's example: "Vision limited:
+// needs glasses. Uses walker: rollator for travel.").
+const ACCESSIBILITY_NOTE_LABELS_BY_FIELD = {
+  difficultyHearing: 'Difficulty hearing',
+  visionLimited: 'Vision limited',
+  usesWalker: 'Uses walker',
+  usesCane: 'Uses cane',
+  usesWheelchair: 'Uses wheelchair',
+}
+
+// accessibilityNotes is a verbatim block of "<Label>: <text>." sentences,
+// one per field that had handwritten explain text. Pull out the sentence
+// for a given field's label, if present.
+function noteFromAccessibilityNotes (accessibilityNotes, label) {
+  if (!accessibilityNotes) return null
+  const match = accessibilityNotes.match(new RegExp(`${label}:\\s*([^.]+)\\.`))
+  return match ? match[1].trim() : null
+}
+
 // The prompt tells the model to fold a Yes/Sometimes-checkbox-conflict's
 // explain text into accessibilityNotes and never flag it as uncertain — but
 // in practice the model sometimes reports it as an uncertainFields entry on
@@ -57,11 +77,15 @@ export function personDisabilities (extraction, memberIndex) {
       .map(u => [u.path, u])
       .filter(([path]) => path.startsWith(`members[${memberIndex}].accessibility.`)),
   )
+  const accessibilityNotes = extraction.members[memberIndex].extras.accessibilityNotes
   for (const [field, name] of Object.entries(DISABILITY_NAMES_BY_FIELD)) {
     const conflict = uncertainByField.get(`members[${memberIndex}].accessibility.${field}`)
     const answer = conflict?.alternative ?? accessibility[field]
     if (answer !== 'Yes' && answer !== 'Sometimes') continue
-    result.set(name, conflict ? noteFromReason(conflict.reason) : null)
+    const note = conflict
+      ? noteFromReason(conflict.reason)
+      : noteFromAccessibilityNotes(accessibilityNotes, ACCESSIBILITY_NOTE_LABELS_BY_FIELD[field])
+    result.set(name, note)
   }
   return result
 }

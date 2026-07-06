@@ -133,6 +133,39 @@ describe('personDisabilities', () => {
     const result = personDisabilities(e, 0)
     expect(result.get('Hearing')).toBeNull()
   })
+  it('recovers per-field notes from accessibilityNotes when the model follows the prompt correctly', () => {
+    // This is the expected/common model behavior per the prompt: no
+    // uncertainFields conflict is reported, and the explain text instead
+    // arrives verbatim in accessibilityNotes as "<Label>: <text>." sentences.
+    const e = extraction()
+    e.members[0].extras.accessibility = {
+      difficultyHearing: 'Yes', visionLimited: 'Yes', usesWalker: 'Yes', usesCane: 'No', usesWheelchair: 'No',
+    }
+    e.members[0].extras.accessibilityNotes = 'Difficulty hearing: hearing aids. Vision limited: glasses. Uses walker: rollator (travel).'
+    e.uncertainFields = []
+    const result = personDisabilities(e, 0)
+    expect(result.get('Hearing')).toBe('hearing aids')
+    expect(result.get('Vision')).toBe('glasses')
+    expect(result.get('Walker')).toBe('rollator (travel)')
+  })
+  it('prefers the uncertainFields conflict note over accessibilityNotes when both are present', () => {
+    const e = extraction()
+    e.members[0].extras.accessibility = { difficultyHearing: 'Yes', visionLimited: 'No', usesWalker: 'No', usesCane: 'No', usesWheelchair: 'No' }
+    e.members[0].extras.accessibilityNotes = 'Difficulty hearing: hearing aids.'
+    e.uncertainFields = [
+      { path: 'members[0].accessibility.difficultyHearing', reason: "Checkmark ambiguous, 'hearing aids and lip reading' noted", alternative: 'Yes' },
+    ]
+    const result = personDisabilities(e, 0)
+    expect(result.get('Hearing')).toBe('hearing aids and lip reading')
+  })
+  it('leaves a Yes/Sometimes disability with no note when accessibilityNotes has no sentence for it', () => {
+    const e = extraction()
+    e.members[0].extras.accessibility = { difficultyHearing: 'Yes', visionLimited: 'No', usesWalker: 'No', usesCane: 'No', usesWheelchair: 'No' }
+    e.members[0].extras.accessibilityNotes = ''
+    e.uncertainFields = []
+    const result = personDisabilities(e, 0)
+    expect(result.get('Hearing')).toBeNull()
+  })
 })
 
 describe('mapMemberForm', () => {

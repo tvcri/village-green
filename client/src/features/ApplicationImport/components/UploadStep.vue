@@ -20,6 +20,7 @@ async function submit () {
   errorMessage.value = ''
   try {
     const result = await extractApplication(selectedFile.value)
+    console.log(result)
     if (result.applicationType === 'volunteer') {
       status.value = 'unsupported'
       errorMessage.value = 'This looks like a volunteer application. Volunteer imports aren\'t supported yet.'

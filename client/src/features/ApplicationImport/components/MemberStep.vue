@@ -24,7 +24,7 @@ const toast = useToast()
 const form = reactive({
   memberNumber: '', memberLevel: '', memberType: '', primaryPersonId: '',
   secondaryType: '', serviceNotes: '', joinDate: '',
-  status: '', dropReason: '', householdSize: null, householdDues: null,
+  status: 'Active', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   confidentialNotes: '', statusChangeNotes: '', miscNotes: '',
   ...mapMemberForm(props.extraction, props.memberIndex, props.primaryPersonId),

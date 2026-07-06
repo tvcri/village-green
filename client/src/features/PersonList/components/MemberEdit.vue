@@ -19,7 +19,7 @@ const hasHomeVillage = computed(() => !!person.value?.village?.villageId)
 const form = reactive({
   memberNumber: '', memberLevel: '', memberType: '', primaryPersonId: '',
   secondaryType: '', serviceNotes: '', joinDate: '',
-  status: '', dropReason: '', householdSize: null, householdDues: null,
+  status: 'Active', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   confidentialNotes: '', statusChangeNotes: '', miscNotes: '',
 })

@@ -3,6 +3,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
+import Select from 'primevue/select'
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -12,6 +13,8 @@ const props = defineProps({
   showCreatedDate: { type: Boolean, default: false },
 })
 const emit = defineEmits(['edited'])
+
+const statusOptions = ['Active', 'Dropped'].map(s => ({ label: s, value: s }))
 
 function edited (field) { emit('edited', field) }
 
@@ -25,7 +28,7 @@ function uncertainText (field) {
   <div class="section">
     <h3 class="section-header">Membership</h3>
 
-    <div class="form-field">
+    <div v-if="showCreatedDate" class="form-field">
       <label class="label" for="memberNumber">Member #
         <i v-if="uncertain.memberNumber" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('memberNumber')" />
       </label>
@@ -74,7 +77,8 @@ function uncertainText (field) {
       <label class="label" for="status">Status
         <i v-if="uncertain.status" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('status')" />
       </label>
-      <InputText id="status" v-model="form.status" class="w-full" @input="edited('status')" />
+      <Select id="status" v-model="form.status" :options="statusOptions"
+              optionLabel="label" optionValue="value" placeholder="Select status" class="w-full" @update:modelValue="edited('status')" />
     </div>
 
     <div class="form-field">

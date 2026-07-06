@@ -29,7 +29,10 @@ module.exports.putMember = async function (personId, body) {
         }
       }
       else {
-        await connection.query('INSERT INTO member SET ?', { personId, ...body })
+        const [[{ nextNumber }]] = await connection.query(
+          'SELECT COALESCE(MAX(CAST(memberNumber AS SIGNED)), 0) + 1 AS nextNumber FROM member FOR UPDATE'
+        )
+        await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...body })
       }
     },
     statusObj: undefined

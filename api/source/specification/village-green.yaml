@@ -2875,7 +2875,6 @@ components:
       additionalProperties: false
       type: object
       properties:
-        memberNumber: { type: string, maxLength: 50 }
         memberLevel:  { type: string, maxLength: 100 }
         memberType:   { type: string, maxLength: 50 }
         primaryPersonId:
