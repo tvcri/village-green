@@ -1,6 +1,7 @@
 'use strict'
 
 const Anthropic = require('@anthropic-ai/sdk')
+const { PDFDocument } = require('pdf-lib')
 const config = require('../utils/config')
 
 // --- structured-outputs schema helpers -------------------------------------
@@ -157,6 +158,46 @@ const EXTRACTION_SCHEMA = {
   ],
 }
 
+// The combined member+volunteer schema above is too large for a single
+// structured-outputs call once both variants are fully fleshed out (Anthropic
+// rejects the request with "compiled grammar is too large"). Extraction is
+// therefore two-phase: a tiny CLASSIFY_SCHEMA call against page 1 only picks
+// the document type, then a second call sends the full document against only
+// that one matching variant (plus the "unknown" fallback, in case phase 2
+// itself can't extract cleanly). variantSchemaFor looks up each variant by
+// its applicationType const so there is one source of truth for each shape.
+const CLASSIFY_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['applicationType', 'reason'],
+  properties: {
+    applicationType: { type: 'string', enum: ['member', 'volunteer', 'unknown'] },
+    reason: { type: 'string', description: '"" unless applicationType is "unknown"' },
+  },
+}
+
+const CLASSIFY_PROMPT = `You are looking at page 1 of a scanned application form for the Village Common of Rhode Island. Identify the document type from this page alone:
+- A MEMBERSHIP application: applicationType "member".
+- A VOLUNTEER application: applicationType "volunteer".
+- Anything else (blank form, wrong document, unreadable scan): applicationType "unknown", with a short "reason".
+Return "reason" as "" unless applicationType is "unknown".`
+
+const unknownVariant = EXTRACTION_SCHEMA.anyOf.find(v => v.properties.applicationType.const === 'unknown')
+
+function variantSchemaFor (applicationType) {
+  const matched = EXTRACTION_SCHEMA.anyOf.find(v => v.properties.applicationType.const === applicationType)
+  if (!matched) return unknownVariant
+  return { anyOf: [matched, unknownVariant] }
+}
+
+async function extractPage1 (pdfBuffer) {
+  const srcDoc = await PDFDocument.load(pdfBuffer)
+  const outDoc = await PDFDocument.create()
+  const [page] = await outDoc.copyPages(srcDoc, [0])
+  outDoc.addPage(page)
+  return Buffer.from(await outDoc.save())
+}
+
 const EXTRACTION_PROMPT = `You are processing a scanned application form for the Village Common of Rhode Island.
 
 First, identify the document type:
@@ -289,19 +330,13 @@ function computeCost ({ input_tokens, output_tokens }) {
   }
 }
 
-async function extractFromPdf (pdfBuffer) {
-  if (!config.anthropic.apiKey) {
-    const err = new Error('PDF extraction is not configured: VG_ANTHROPIC_API_KEY is not set.')
-    err.status = 500
-    throw err
-  }
-  const client = new Anthropic({ apiKey: config.anthropic.apiKey })
+async function callClaude (client, pdfBuffer, schema, prompt) {
   let message
   try {
     message = await client.messages.create({
       model: 'claude-opus-4-8',
       max_tokens: 4096,
-      output_config: { format: { type: 'json_schema', schema: EXTRACTION_SCHEMA } },
+      output_config: { format: { type: 'json_schema', schema } },
       messages: [{
         role: 'user',
         content: [
@@ -313,7 +348,7 @@ async function extractFromPdf (pdfBuffer) {
               data: pdfBuffer.toString('base64'),
             },
           },
-          { type: 'text', text: EXTRACTION_PROMPT },
+          { type: 'text', text: prompt },
         ],
       }],
     })
@@ -334,13 +369,46 @@ async function extractFromPdf (pdfBuffer) {
     err.status = 502
     throw err
   }
-  // Structured outputs guarantee this parses and validates against EXTRACTION_SCHEMA
-  return { data: JSON.parse(text), usage: computeCost(message.usage) }
+  // Structured outputs guarantee this parses and validates against the schema passed in
+  return { data: JSON.parse(text), usage: message.usage }
+}
+
+function combineCost (usages) {
+  const totals = usages.reduce((acc, u) => ({
+    input_tokens: acc.input_tokens + u.input_tokens,
+    output_tokens: acc.output_tokens + u.output_tokens,
+  }), { input_tokens: 0, output_tokens: 0 })
+  return computeCost(totals)
+}
+
+async function extractFromPdf (pdfBuffer) {
+  if (!config.anthropic.apiKey) {
+    const err = new Error('PDF extraction is not configured: VG_ANTHROPIC_API_KEY is not set.')
+    err.status = 500
+    throw err
+  }
+  const client = new Anthropic({ apiKey: config.anthropic.apiKey })
+
+  const page1 = await extractPage1(pdfBuffer)
+  const classified = await callClaude(client, page1, CLASSIFY_SCHEMA, CLASSIFY_PROMPT)
+  if (classified.data.applicationType === 'unknown') {
+    return {
+      data: { applicationType: 'unknown', reason: classified.data.reason },
+      usage: combineCost([classified.usage]),
+    }
+  }
+
+  const extracted = await callClaude(client, pdfBuffer, variantSchemaFor(classified.data.applicationType), EXTRACTION_PROMPT)
+  return { data: extracted.data, usage: combineCost([classified.usage, extracted.usage]) }
 }
 
 module.exports = {
   EXTRACTION_PROMPT,
   EXTRACTION_SCHEMA,
+  CLASSIFY_SCHEMA,
+  CLASSIFY_PROMPT,
+  variantSchemaFor,
+  extractPage1,
   resolveVillage,
   assembleResponse,
   computeCost,

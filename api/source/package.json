@@ -36,6 +36,7 @@
     "net-keepalive": "^4.0.17",
     "on-finished": "^2.4.1",
     "on-headers": "^1.1.0",
+    "pdf-lib": "^1.17.1",
     "semver": "^7.6.3",
     "swagger-ui-express": "^4.1.6",
     "umzug": "^2.3.0",

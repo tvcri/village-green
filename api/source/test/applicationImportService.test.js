@@ -1,6 +1,7 @@
 'use strict'
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
+const { PDFDocument } = require('pdf-lib')
 const svc = require('../service/ApplicationImportService')
 
 const villages = [
@@ -227,4 +228,53 @@ test('EXTRACTION_SCHEMA volunteer variant forbids additional properties and stay
   }
   walkUnions(svc.EXTRACTION_SCHEMA)
   assert.ok(unions <= 16, `schema has ${unions} union-typed parameters (limit 16)`)
+})
+
+async function makeMultiPagePdf (pageCount) {
+  const doc = await PDFDocument.create()
+  for (let i = 0; i < pageCount; i++) doc.addPage([200, 200])
+  return Buffer.from(await doc.save())
+}
+
+test('extractPage1 returns a single-page PDF from a multi-page source', async () => {
+  const src = await makeMultiPagePdf(5)
+  const page1Buffer = await svc.extractPage1(src)
+  const parsed = await PDFDocument.load(page1Buffer)
+  assert.equal(parsed.getPageCount(), 1)
+})
+
+test('extractPage1 handles an already-single-page PDF', async () => {
+  const src = await makeMultiPagePdf(1)
+  const page1Buffer = await svc.extractPage1(src)
+  const parsed = await PDFDocument.load(page1Buffer)
+  assert.equal(parsed.getPageCount(), 1)
+})
+
+test('variantSchemaFor returns the member variant plus the unknown fallback', () => {
+  const schema = svc.variantSchemaFor('member')
+  assert.equal(schema.anyOf.length, 2)
+  assert.equal(schema.anyOf[0].properties.applicationType.const, 'member')
+  assert.equal(schema.anyOf[1].properties.applicationType.const, 'unknown')
+})
+
+test('variantSchemaFor returns the volunteer variant plus the unknown fallback', () => {
+  const schema = svc.variantSchemaFor('volunteer')
+  assert.equal(schema.anyOf.length, 2)
+  assert.equal(schema.anyOf[0].properties.applicationType.const, 'volunteer')
+  assert.equal(schema.anyOf[1].properties.applicationType.const, 'unknown')
+})
+
+test('variantSchemaFor falls back to the unknown variant alone for an unrecognized type', () => {
+  const schema = svc.variantSchemaFor('bogus')
+  assert.equal(schema.properties.applicationType.const, 'unknown')
+})
+
+test('each two-phase schema is far smaller than the combined EXTRACTION_SCHEMA', () => {
+  const combinedSize = JSON.stringify(svc.EXTRACTION_SCHEMA).length
+  const classifySize = JSON.stringify(svc.CLASSIFY_SCHEMA).length
+  const memberPhaseSize = JSON.stringify(svc.variantSchemaFor('member')).length
+  const volunteerPhaseSize = JSON.stringify(svc.variantSchemaFor('volunteer')).length
+  assert.ok(classifySize < combinedSize / 4, 'classify schema should be much smaller than the combined schema')
+  assert.ok(memberPhaseSize < combinedSize, 'member-only phase schema should be smaller than the combined schema')
+  assert.ok(volunteerPhaseSize < combinedSize, 'volunteer-only phase schema should be smaller than the combined schema')
 })
