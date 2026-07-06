@@ -924,7 +924,9 @@ paths:
     delete:
       tags:
       - User
-      summary: Delete a User that has never accessed the system.
+      summary: Delete a User. Users who have never accessed the system are removed
+        entirely; users who have are soft-deleted (status set to unavailable,
+        grants and group memberships cleared) to preserve foreign key references.
       operationId: deleteUser
       responses:
         '200':
