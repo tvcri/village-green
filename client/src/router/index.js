@@ -116,6 +116,31 @@ const routes = [
     component: () => import('../features/PersonList/components/PersonList.vue'),
   },
   {
+    path: '/meta/persons/create',
+    name: 'meta-person-create',
+    component: () => import('../features/PersonList/components/PersonEditForm.vue'),
+  },
+  {
+    path: '/meta/persons/import',
+    name: 'meta-person-import',
+    component: () => import('../features/ApplicationImport/components/ApplicationImportWizard.vue'),
+  },
+  {
+    path: '/meta/persons/:personId/edit',
+    name: 'meta-person-edit',
+    component: () => import('../features/PersonList/components/PersonEditForm.vue'),
+  },
+  {
+    path: '/meta/persons/:personId/member',
+    name: 'meta-person-member',
+    component: () => import('../features/PersonList/components/MemberEdit.vue'),
+  },
+  {
+    path: '/meta/persons/:personId/volunteer',
+    name: 'meta-person-volunteer',
+    component: () => import('../features/PersonList/components/VolunteerEdit.vue'),
+  },
+  {
     path: '/meta/persons/:personId/:personName?',
     name: 'meta-person-detail',
     component: () => import('../features/PersonList/components/PersonDetail.vue'),

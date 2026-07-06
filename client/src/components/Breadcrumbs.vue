@@ -198,8 +198,33 @@ const breadcrumbs = computed(() => {
       break
     case 'meta-person-detail':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: [
+        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
+        { label: 'Friends', route: { name: 'meta-friends' } }
+      ]})
       crumbs.push({ label: route.params.personName || 'Person' })
+      break
+    case 'meta-person-create':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'New Person' })
+      break
+    case 'meta-person-edit':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Edit Person' })
+      break
+    case 'meta-person-member':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Person', route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
+      crumbs.push({ label: 'Member' })
+      break
+    case 'meta-person-volunteer':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Person', route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
+      crumbs.push({ label: 'Volunteer' })
       break
     case 'members':
       crumbs.push({ label: 'Members', siblings: getSiblings('members', { villageId: vId }) })

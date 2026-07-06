@@ -11,6 +11,8 @@ async function queryPersons (inPredicates = {}) {
     'p.firstName',
     'p.middleInitial',
     'p.nickname',
+    'p.street',
+    'p.unit',
     'p.address',
     'p.city',
     'p.state',
@@ -33,7 +35,7 @@ async function queryPersons (inPredicates = {}) {
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.villageId',
+    'LEFT JOIN village v ON v.id = p.villageId',
     'LEFT JOIN active_member m ON m.personId = p.id',
     'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
   ])
@@ -63,6 +65,8 @@ module.exports.getPerson = async function (personId, projections = []) {
     'p.firstName',
     'p.middleInitial',
     'p.nickname',
+    'p.street',
+    'p.unit',
     'p.address',
     'p.city',
     'p.state',
@@ -85,11 +89,38 @@ module.exports.getPerson = async function (personId, projections = []) {
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.villageId',
+    'LEFT JOIN village v ON v.id = p.villageId',
     'LEFT JOIN active_member m ON m.personId = p.id',
     'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
   ])
   const predicates = { statements: ['p.id = ?'], binds: [personId] }
+
+  columns.push(`(
+    SELECT COALESCE(
+      ${dbUtils.jsonArrayAgg({
+        value: `JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name)`,
+        orderBy: 'c.name'
+      })},
+      JSON_ARRAY()
+    )
+    FROM person_community pc
+    JOIN community c ON c.id = pc.communityId
+    WHERE pc.personId = p.id
+  ) AS communities`)
+
+  columns.push(`(
+    SELECT COALESCE(
+      ${dbUtils.jsonArrayAgg({
+        value: `JSON_OBJECT('disabilityId', CAST(d.id AS CHAR), 'name', d.name, 'note', pd.note)`,
+        orderBy: 'd.name'
+      })},
+      JSON_ARRAY()
+    )
+    FROM person_disability pd
+    JOIN disability d ON d.id = pd.disabilityId
+    WHERE pd.personId = p.id
+      AND d.name IN ('Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane')
+  ) AS disabilities`)
 
   if (projections.includes('memberInfo')) {
     columns.push(`(SELECT JSON_OBJECT(
@@ -99,6 +130,33 @@ module.exports.getPerson = async function (personId, projections = []) {
       'serviceNotes', serviceNotes,
       'joinDate', DATE_FORMAT(joinDate, '%Y-%m-%d')
     ) FROM active_member WHERE personId = p.id) AS memberInfo`)
+  }
+
+  if (projections.includes('memberDetail')) {
+    columns.push(`(SELECT JSON_OBJECT(
+      'memberId', CAST(m2.id AS CHAR),
+      'personId', CAST(m2.personId AS CHAR),
+      'memberNumber', m2.memberNumber,
+      'memberLevel', m2.memberLevel,
+      'memberType', m2.memberType,
+      'primaryPerson', (
+        SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
+        FROM person pp WHERE pp.id = m2.primaryPersonId
+      ),
+      'secondaryType', m2.secondaryType,
+      'serviceNotes', m2.serviceNotes,
+      'joinDate', DATE_FORMAT(m2.joinDate, '%Y-%m-%d'),
+      'createdDate', DATE_FORMAT(m2.createdDate, '%Y-%m-%d'),
+      'status', m2.status,
+      'dropReason', m2.dropReason,
+      'householdSize', m2.householdSize,
+      'householdDues', m2.householdDues,
+      'quickbooksKey', m2.quickbooksKey,
+      'printedNewsletter', m2.printedNewsletter != 0,
+      'confidentialNotes', m2.confidentialNotes,
+      'statusChangeNotes', m2.statusChangeNotes,
+      'miscNotes', m2.miscNotes
+    ) FROM member m2 WHERE m2.personId = p.id) AS memberDetail`)
   }
 
   if (projections.includes('volunteerInfo')) {
@@ -112,8 +170,65 @@ module.exports.getPerson = async function (personId, projections = []) {
         FROM volunteer_capability vc
         JOIN capability c ON c.id = vc.capabilityId
         WHERE vc.volunteerId = vol2.id
+      ),
+      'associateVillages', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT('villageId', CAST(vva.villageId AS CHAR), 'name', av.name) ORDER BY av.name
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_village_associate vva
+        JOIN village av ON av.id = vva.villageId
+        WHERE vva.volunteerId = vol2.id
       )
     ) FROM active_volunteer vol2 WHERE vol2.personId = p.id) AS volunteerInfo`)
+  }
+
+  if (projections.includes('volunteerDetail')) {
+    columns.push(`(SELECT JSON_OBJECT(
+      'volunteerId', CAST(vol3.id AS CHAR),
+      'personId', CAST(vol3.personId AS CHAR),
+      'providerType', vol3.providerType,
+      'notes', vol3.notes,
+      'active', vol3.active != 0,
+      'capabilities', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(CONCAT('"', c.name, '"') ORDER BY c.name), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_capability vc
+        JOIN capability c ON c.id = vc.capabilityId
+        WHERE vc.volunteerId = vol3.id
+      ),
+      'associateVillages', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT('villageId', CAST(vva.villageId AS CHAR), 'name', av.name) ORDER BY av.name
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_village_associate vva
+        JOIN village av ON av.id = vva.villageId
+        WHERE vva.volunteerId = vol3.id
+      ),
+      'vettings', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT(
+              'vettingTypeId', CAST(vv.vettingTypeId AS CHAR),
+              'name', vt.name,
+              'dateEntered', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d'),
+              'dateExpired', DATE_FORMAT(vv.dateExpired, '%Y-%m-%d')
+            ) ORDER BY vt.name, vv.dateEntered
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_vetting vv
+        JOIN vetting_type vt ON vt.id = vv.vettingTypeId
+        WHERE vv.volunteerId = vol3.id
+      )
+    ) FROM volunteer vol3 WHERE vol3.personId = p.id) AS volunteerDetail`)
   }
 
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
@@ -126,33 +241,58 @@ module.exports.getPersonsByVillage = async function (villageId) {
 }
 
 module.exports.createPerson = async function (body) {
+  const { communities, disabilities, ...personFields } = body
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const [personInsertResult] = await connection.query('INSERT INTO person SET ?', body)
-      return personInsertResult.insertId
+      const [personInsertResult] = await connection.query('INSERT INTO person SET ?', personFields)
+      const newPersonId = personInsertResult.insertId
+      if (communities?.length) {
+        const values = communities.map(communityId => [newPersonId, communityId])
+        await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
+      }
+      if (disabilities?.length) {
+        const values = disabilities.map(d => [newPersonId, d.disabilityId, d.note ?? null])
+        await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
+      }
+      return newPersonId
     },
     statusObj: undefined
   })
-  return await queryPersons({personId: insertId})
+  return insertId
 }
 
 module.exports.patchPerson = async function (personId, body) {
+  const { communities, disabilities, ...personFields } = body
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      if (Object.keys(body).length > 0) {
-        await connection.query('UPDATE person SET ? WHERE id = ?', [body, personId])
+      if (Object.keys(personFields).length > 0) {
+        await connection.query('UPDATE person SET ? WHERE id = ?', [personFields, personId])
+      }
+      if (communities !== undefined) {
+        await connection.query('DELETE FROM person_community WHERE personId = ?', [personId])
+        if (communities.length) {
+          const values = communities.map(communityId => [personId, communityId])
+          await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
+        }
+      }
+      if (disabilities !== undefined) {
+        await connection.query('DELETE FROM person_disability WHERE personId = ?', [personId])
+        if (disabilities.length) {
+          const values = disabilities.map(d => [personId, d.disabilityId, d.note ?? null])
+          await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
+        }
       }
     },
     statusObj: undefined
   })
-  return await queryPersons({personId})
+  return personId
 }
 
 module.exports.deletePerson = async function (personId) {
   await dbUtils.pool.query('DELETE FROM person WHERE id = ?', [personId])
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, elevate, villageId, firstName, lastName, phone, email }) {
+module.exports.getPersons = async function ({ villageIdsGranted, elevate, villageId, firstName, lastName, phone, email, role }) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
     'p.fullName',
@@ -168,7 +308,7 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   ]
   const joins = new Set([
     'person p',
-    'JOIN village v ON v.id = p.villageId',
+    'LEFT JOIN village v ON v.id = p.villageId',
     'LEFT JOIN active_member m ON m.personId = p.id',
     'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
   ])
@@ -198,6 +338,19 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   if (email) {
     predicates.statements.push('p.email LIKE ?')
     predicates.binds.push(`%${email}%`)
+  }
+
+  if (role === 'member') {
+    predicates.statements.push('m.id IS NOT NULL')
+  }
+  else if (role === 'volunteer') {
+    predicates.statements.push('vol.id IS NOT NULL')
+  }
+  else if (role === 'community') {
+    // EXISTS rather than a JOIN: a person with N community memberships would
+    // otherwise produce N duplicate rows (community is M:N, unlike the 1:1
+    // member/volunteer roles).
+    predicates.statements.push('EXISTS (SELECT 1 FROM person_community pc WHERE pc.personId = p.id)')
   }
 
   const orderBy = ['p.fullName']

@@ -128,6 +128,10 @@ const config = {
         redirectUri: process.env.VG_GOOGLE_REDIRECT_URI ?? '',
         mapsKey: process.env.VG_GOOGLE_MAPS_KEY ?? '',
     },
+    anthropic: {
+        // Server-side only. Never expose via getClientEnv().
+        apiKey: process.env.VG_ANTHROPIC_API_KEY
+    },
     privacy: {
         ackIntervalDays: (() => {
             const val = parseInt(process.env.VG_PRIVACY_ACK_INTERVAL_DAYS)
