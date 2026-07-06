@@ -37,24 +37,30 @@ const DISABILITY_NAMES_BY_FIELD = {
   usesWheelchair: 'Wheelchair',
 }
 
-// Labels the extraction prompt uses for each field's accessibilityNotes
-// sentence (see ApplicationImportService.js's example: "Vision limited:
-// needs glasses. Uses walker: rollator for travel.").
-const ACCESSIBILITY_NOTE_LABELS_BY_FIELD = {
-  difficultyHearing: 'Difficulty hearing',
-  visionLimited: 'Vision limited',
-  usesWalker: 'Uses walker',
-  usesCane: 'Uses cane',
-  usesWheelchair: 'Uses wheelchair',
+// accessibilityNotes is a block of one-sentence-per-field explanations, but
+// the model paraphrases the label freely ("Vision limited:", "Vision is
+// limited:", "Limited vision:") rather than reproducing the prompt's example
+// phrasing verbatim — matching on an exact label string is too brittle.
+// Match each field by a keyword that's stable across phrasing instead.
+const ACCESSIBILITY_KEYWORDS_BY_FIELD = {
+  difficultyHearing: /hearing/i,
+  visionLimited: /vision/i,
+  usesWalker: /walker|rollator/i,
+  usesCane: /\bcane\b/i,
+  usesWheelchair: /wheelchair/i,
 }
 
-// accessibilityNotes is a verbatim block of "<Label>: <text>." sentences,
-// one per field that had handwritten explain text. Pull out the sentence
-// for a given field's label, if present.
-function noteFromAccessibilityNotes (accessibilityNotes, label) {
+// Split accessibilityNotes into sentences and find the one mentioning this
+// field's keyword, then return the text after its colon (or the whole
+// sentence if there's no colon), trimmed of the trailing period.
+function noteFromAccessibilityNotes (accessibilityNotes, keyword) {
   if (!accessibilityNotes) return null
-  const match = accessibilityNotes.match(new RegExp(`${label}:\\s*([^.]+)\\.`))
-  return match ? match[1].trim() : null
+  const sentences = accessibilityNotes.split(/(?<=\.)\s+/).filter(Boolean)
+  const sentence = sentences.find(s => keyword.test(s))
+  if (!sentence) return null
+  const trimmed = sentence.replace(/\.\s*$/, '').trim()
+  const colonIndex = trimmed.indexOf(':')
+  return (colonIndex === -1 ? trimmed : trimmed.slice(colonIndex + 1).trim()) || null
 }
 
 // The prompt tells the model to fold a Yes/Sometimes-checkbox-conflict's
@@ -84,7 +90,7 @@ export function personDisabilities (extraction, memberIndex) {
     if (answer !== 'Yes' && answer !== 'Sometimes') continue
     const note = conflict
       ? noteFromReason(conflict.reason)
-      : noteFromAccessibilityNotes(accessibilityNotes, ACCESSIBILITY_NOTE_LABELS_BY_FIELD[field])
+      : noteFromAccessibilityNotes(accessibilityNotes, ACCESSIBILITY_KEYWORDS_BY_FIELD[field])
     result.set(name, note)
   }
   return result

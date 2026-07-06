@@ -82,7 +82,9 @@ describe('personCommunityNames', () => {
 describe('personDisabilities', () => {
   it('maps Yes/Sometimes accessibility answers to disability names, skips No', () => {
     const result = personDisabilities(extraction(), 0)
-    expect(result).toEqual(new Map([['Hearing', null]]))
+    // extraction()'s accessibilityNotes ("Hearing: uses hearing aids
+    // sometimes.") is matched by keyword and its text attached as the note.
+    expect(result).toEqual(new Map([['Hearing', 'uses hearing aids sometimes']]))
   })
   it('returns an empty map when accessibility is null', () => {
     expect(personDisabilities(extraction(), 1)).toEqual(new Map())
@@ -127,6 +129,7 @@ describe('personDisabilities', () => {
   it('does not apply a conflict from a different member index', () => {
     const e = extraction()
     e.members[0].extras.accessibility = { difficultyHearing: 'Sometimes', visionLimited: 'No', usesWalker: 'No', usesCane: 'No', usesWheelchair: 'No' }
+    e.members[0].extras.accessibilityNotes = null   // isolate member-index behavior from the notes fallback
     e.uncertainFields = [
       { path: 'members[1].accessibility.difficultyHearing', reason: "'note for the other member'", alternative: 'Yes' },
     ]
@@ -147,6 +150,21 @@ describe('personDisabilities', () => {
     expect(result.get('Hearing')).toBe('hearing aids')
     expect(result.get('Vision')).toBe('glasses')
     expect(result.get('Walker')).toBe('rollator (travel)')
+  })
+  it('matches by keyword when the model paraphrases the label instead of using it verbatim', () => {
+    // Real observed model output: "Vision is limited: Glasses. Uses a
+    // walker: Rollator." — different phrasing than the prompt's example
+    // ("Vision limited: ...", "Uses walker: ..."), which an exact-label
+    // match would miss entirely.
+    const e = extraction()
+    e.members[0].extras.accessibility = {
+      difficultyHearing: 'No', visionLimited: 'Yes', usesWalker: 'Yes', usesCane: 'No', usesWheelchair: 'No',
+    }
+    e.members[0].extras.accessibilityNotes = 'Vision is limited: Glasses. Uses a walker: Rollator.'
+    e.uncertainFields = []
+    const result = personDisabilities(e, 0)
+    expect(result.get('Vision')).toBe('Glasses')
+    expect(result.get('Walker')).toBe('Rollator')
   })
   it('prefers the uncertainFields conflict note over accessibilityNotes when both are present', () => {
     const e = extraction()
