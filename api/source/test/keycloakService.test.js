@@ -59,3 +59,8 @@ test('buildCreateUserPayload omits firstName when only lastName is provided', ()
   assert.equal('firstName' in payload, false)
   assert.equal(payload.lastName, 'Doe')
 })
+
+test('KeycloakService exports findUserByUsername and updateUsername', () => {
+  assert.equal(typeof svc.findUserByUsername, 'function')
+  assert.equal(typeof svc.updateUsername, 'function')
+})

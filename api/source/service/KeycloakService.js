@@ -116,9 +116,63 @@ async function createUser({ username, email, firstName, lastName }) {
   return keycloakUserId
 }
 
+async function findUserByUsername(username) {
+  const token = await ensureFreshToken()
+  const { baseUrl, realm } = parseAuthority(config.oauth.authority)
+  const url = `${baseUrl}/admin/realms/${encodeURIComponent(realm)}/users?username=${encodeURIComponent(username)}&exact=true`
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  })
+
+  if (!res.ok) {
+    const text = await safeReadBody(res)
+    const error = new Error(`Keycloak user lookup failed (${res.status}): ${text}`)
+    error.status = res.status
+    error.body = text
+    throw error
+  }
+
+  const users = await res.json()
+  return users.length > 0 ? users[0] : null
+}
+
+async function updateUsername({ oldUsername, newUsername }) {
+  const existing = await findUserByUsername(oldUsername)
+  if (!existing) {
+    const error = new Error(`No Keycloak user found with username: ${oldUsername}`)
+    error.status = 404
+    throw error
+  }
+
+  const token = await ensureFreshToken()
+  const { baseUrl, realm } = parseAuthority(config.oauth.authority)
+  const url = `${baseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(existing.id)}`
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ username: newUsername, email: newUsername })
+  })
+
+  if (!res.ok) {
+    const text = await safeReadBody(res)
+    const error = new Error(`Keycloak update-username failed (${res.status}): ${text}`)
+    error.status = res.status
+    error.body = text
+    throw error
+  }
+}
+
 module.exports = {
   parseAuthority,
   buildCreateUserPayload,
   ensureFreshToken,
-  createUser
+  createUser,
+  findUserByUsername,
+  updateUsername
 }
