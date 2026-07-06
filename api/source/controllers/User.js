@@ -77,14 +77,25 @@ module.exports.deleteUser = async function deleteUser (req, res, next) {
       let userId = req.params.userId
       let projection = req.query.projection
       let userData = await UserService.getUserByUserId(userId, [], elevate, req.userObject)
-      if (userData?.lastAccess) {
-        // User has accessed the system, so we need to reject the request
-        throw new SmError.UnprocessableError('User has accessed the system. Use PATCH to remove village grants or configure Authentication provider to reject user entirely.')
-      }
       if (userData) {
         await KeycloakService.deleteUser({ username: userData.username })
       }
-      let response = await UserService.deleteUser(userId, projection, elevate, req.userObject)
+      let response
+      if (userData?.lastAccess) {
+        // User has accessed the system: preserve the user_data row (foreign
+        // key references elsewhere depend on it) and soft-delete by setting
+        // status to unavailable instead of removing the row.
+        response = await UserService.replaceUser(userId, {
+          status: 'unavailable',
+          statusUser: req.userObject.userId,
+          statusDate: new Date(),
+          villageGrants: [],
+          userGroups: []
+        }, projection, elevate, req.userObject, res.svcStatus)
+      }
+      else {
+        response = await UserService.deleteUser(userId, projection, elevate, req.userObject)
+      }
       res.json(response)
     }
     else {
