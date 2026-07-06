@@ -6,7 +6,7 @@ import Textarea from 'primevue/textarea'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 
-defineProps({
+const props = defineProps({
   providerType: { type: String, default: '' },
   active: { type: Boolean, default: true },
   notes: { type: String, default: '' },
@@ -29,7 +29,7 @@ const providerTypeOptions = [
 ].map(t => ({ label: t, value: t }))
 
 function uncertainText (field) {
-  const u = uncertain[field]
+  const u = props.uncertain[field]
   return u?.alternative ? `${u.reason} — alternative: ${u.alternative}` : u?.reason
 }
 </script>
