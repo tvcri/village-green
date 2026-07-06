@@ -46,6 +46,12 @@ const steps = computed(() => {
 
 const currentStep = computed(() => steps.value[stepIndex.value])
 
+const title = computed(() => {
+  if (extraction.value?.applicationType === 'member') return 'Import Member Application'
+  if (extraction.value?.applicationType === 'volunteer') return 'Import Volunteer Application'
+  return 'Import Application'
+})
+
 function onExtracted (result) {
   extraction.value = result
   stepIndex.value = 1
@@ -84,7 +90,7 @@ function restart () {
 
 <template>
   <Card class="detail-card">
-    <template #title>Import Member Application</template>
+    <template #title>{{ title }}</template>
     <template #content>
       <div class="step-indicator">
         <span v-for="(s, i) in steps" :key="s.key"
