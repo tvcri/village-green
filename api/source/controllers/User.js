@@ -5,6 +5,7 @@ const UserService = require(`../service/UserService`)
 const VillageService = require(`../service/VillageService`)
 const SmError = require('../utils/error')
 const dbUtils = require('../service/utils')
+const KeycloakService = require('../service/KeycloakService')
 
 async function validateVillageGrants(villageGrants, {elevate}) {
   if (villageGrants?.length) {
@@ -25,10 +26,29 @@ module.exports.createUser = async function createUser (req, res, next) {
     if (!elevate) throw new SmError.PrivilegeError()
     let body = req.body
     let projection = req.query.projection
+    const createInKeycloak = req.query.keycloak !== false
 
-    body.status = 'available'
+    if (createInKeycloak) {
+      try {
+        await KeycloakService.createUser({
+          username: body.username,
+          email: body.username,
+          firstName: body.firstName,
+          lastName: body.lastName
+        })
+      }
+      catch (err) {
+        if (err.status === 409) {
+          throw new SmError.UnprocessableError('User already exists in Keycloak.')
+        }
+        throw err
+      }
+    }
+
+    const { firstName, lastName, ...userDataBody } = body
+    userDataBody.status = 'available'
     try {
-      let response = await UserService.createUser(body, projection, elevate, req.userObject, res.svcStatus)
+      let response = await UserService.createUser(userDataBody, projection, elevate, req.userObject, res.svcStatus)
       res.status(201).json(response)
     }
     catch (err) {
