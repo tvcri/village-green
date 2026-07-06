@@ -4157,6 +4157,9 @@ components:
           type: string
           maxLength: 50
           nullable: true
+        notes:
+          type: string
+          nullable: true
         active:
           type: boolean
           nullable: true
@@ -4199,6 +4202,9 @@ components:
           type: string
           maxLength: 50
           nullable: true
+        notes:
+          type: string
+          nullable: true
         active:
           type: boolean
           nullable: true
@@ -4216,6 +4222,9 @@ components:
         providerType:
           type: string
           maxLength: 50
+          nullable: true
+        notes:
+          type: string
           nullable: true
         active:
           type: boolean
