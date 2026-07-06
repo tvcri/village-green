@@ -320,6 +320,8 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
     'sr.transportationType',
     "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
     "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
+    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
+    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
     "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
     'sr.instructions AS instructions',
     'sr.description AS description',
