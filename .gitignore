@@ -1,0 +1,28 @@
+.gitignore
+
+# NodeJS #
+.nyc_output/
+coverage/
+node_modules/
+npm-debug.log
+test/*.log
+log.json
+# VS Code #
+.vscode
+scratch/
+client/dist/
+.claude/
+.vite/
+.env.development
+.superpowers/
+docs/superpowers/specs/*
+.worktrees/
+
+# docker-compose #
+.env
+
+# ZIP archives #
+# *.zip
+
+# macOS file
+.DS_Store
