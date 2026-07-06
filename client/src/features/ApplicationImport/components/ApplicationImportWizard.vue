@@ -7,6 +7,7 @@ import Dialog from 'primevue/dialog'
 import UploadStep from './UploadStep.vue'
 import PersonStep from './PersonStep.vue'
 import MemberStep from './MemberStep.vue'
+import VolunteerStep from './VolunteerStep.vue'
 import DoneStep from './DoneStep.vue'
 
 const router = useRouter()
@@ -21,6 +22,13 @@ const isDual = computed(() =>
 
 const steps = computed(() => {
   if (!extraction.value) return [{ key: 'upload', label: 'Upload' }]
+  if (extraction.value.applicationType === 'volunteer') {
+    return [
+      { key: 'upload', label: 'Upload' },
+      { key: 'volunteer', label: 'Volunteer' },
+      { key: 'done', label: 'Done' },
+    ]
+  }
   const s = [
     { key: 'upload', label: 'Upload' },
     { key: 'person-0', label: 'Person 1', memberIndex: 0 },
@@ -50,6 +58,11 @@ function onPersonDone ({ personId, fullName, existing }) {
 
 function onMemberDone () {
   created.value[created.value.length - 1].memberGranted = true
+  stepIndex.value++
+}
+
+function onVolunteerDone ({ personId, fullName }) {
+  created.value.push({ personId, fullName, existing: false, memberGranted: true })
   stepIndex.value++
 }
 
@@ -92,6 +105,9 @@ function restart () {
         :primaryPersonId="currentStep.memberIndex > 0 ? created[0].personId : null"
         :primaryPersonName="currentStep.memberIndex > 0 ? created[0].fullName : ''"
         @member-done="onMemberDone" />
+      <VolunteerStep v-else-if="currentStep.key === 'volunteer'"
+        :extraction="extraction"
+        @volunteer-done="onVolunteerDone" />
       <DoneStep v-else-if="currentStep.key === 'done'" :created="created" @restart="restart" />
 
       <div class="wizard-footer">

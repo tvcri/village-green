@@ -21,11 +21,6 @@ async function submit () {
   try {
     const result = await extractApplication(selectedFile.value)
     console.log(result)
-    if (result.applicationType === 'volunteer') {
-      status.value = 'unsupported'
-      errorMessage.value = 'This looks like a volunteer application. Volunteer imports aren\'t supported yet.'
-      return
-    }
     if (result.applicationType === 'unknown') {
       status.value = 'unsupported'
       errorMessage.value = `This doesn't appear to be a member application: ${result.reason}`

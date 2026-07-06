@@ -95,7 +95,10 @@ async function grantVolunteerRole (personId) {
   }
   try {
     await putVolunteer(personId, body)
-    emit('volunteer-done')
+    emit('volunteer-done', {
+      personId: createdPersonId,
+      fullName: [form.firstName, form.lastName].filter(Boolean).join(' '),
+    })
   }
   catch (err) {
     if (err?.status === 422) {
