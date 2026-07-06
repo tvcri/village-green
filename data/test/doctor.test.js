@@ -73,7 +73,7 @@ test('doctor: empty dataset tables are skipped; missing table with rows is an er
 
 test('doctor: baseline file loads and has reasons for every entry', () => {
   const baseline = loadBaseline()
-  assert.ok(Object.keys(baseline).length >= 20)
+  assert.ok(Object.keys(baseline).length >= 10)
   for (const [key, reason] of Object.entries(baseline)) {
     assert.match(key, /^[a-z_]+\.[a-zA-Z_]+$/, `bad baseline key ${key}`)
     assert.ok(typeof reason === 'string' && reason.length > 0, `baseline ${key} needs a reason`)

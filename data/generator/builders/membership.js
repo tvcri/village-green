@@ -14,6 +14,7 @@ export function buildMembership (plan, content, rng) {
   const vetting_type = content.services.vettingTypes.map((v, i) => ({ id: i + 1, name: v.type || v }))
   const dropReasons = content.services.memberDropReasons
   const serviceNotes = content.services.memberServiceNotes || []
+  const confidentialNotes = content.services.memberConfidentialNotes || []
 
   const member = []
   const volunteer = []
@@ -36,8 +37,12 @@ export function buildMembership (plan, content, rng) {
         status: 'Active', // ~5% flip to Inactive/Dropped in the post-pass below
         dropReason: null,
         householdSize: rng.int(1, 2),
+        // annual dues: $40 for most, some discounted/waived, a few higher tiers
+        householdDues: rng.weighted([[40, 12], [0, 1], [20, 2], [25, 1], [30, 2], [50, 2], [60, 2]]),
         // standing mobility/quirk notes; requests echo these as instructions
         serviceNotes: serviceNotes.length && rng.bool(0.66) ? rng.pick(serviceNotes) : null,
+        // staff-only notes — the app restricts who can see these
+        confidentialNotes: confidentialNotes.length && rng.bool(0.4) ? rng.pick(confidentialNotes) : null,
       })
     }
     // ~1 household per village: link a second member to a primary as 'Spouse'

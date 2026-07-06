@@ -126,7 +126,7 @@ The loader's machine account (`demo-loader@villagegreen.test`) is pre-seeded **w
 
 ## How the dataset is built
 
-Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows in a ~60/40 mix; ~66% of members get a standing `serviceNotes`; ~5% of each side is inactive, drawn from the invented-descendant filler persons first) **→ service requests + FCV submissions**.
+Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows in a ~60/40 mix; ~66% of members get a standing `serviceNotes`, ~40% a staff-only `confidentialNotes`, and every member carries `householdDues` ($0–60, usually $40); ~5% of each side is inactive, drawn from the invented-descendant filler persons first) **→ service requests + FCV submissions**.
 
 Service requests are built in two passes:
 

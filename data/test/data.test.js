@@ -39,6 +39,11 @@ test('persons: no address key, unique (village,name), themed big villages', () =
   // unique (villageId, fullName)
   const keys = person.map(p => `${p.villageId}::${p.fullName.toLowerCase()}`)
   assert.equal(keys.length, new Set(keys).size)
+  // demographic sprinkle: ~half carry a middle initial, ~10% a salutation
+  const miShare = person.filter(p => p.middleInitial).length / person.length
+  assert.ok(miShare > 0.4 && miShare < 0.6, `middleInitial share ${miShare.toFixed(2)} not ~0.5`)
+  const salShare = person.filter(p => p.salutation).length / person.length
+  assert.ok(salShare > 0.04 && salShare < 0.18, `salutation share ${salShare.toFixed(2)} not ~0.1`)
   // big villages (Arkham=1, Quahog=2) each have >=50 members and >=50 volunteers
   for (const vid of [villageIdByName['Arkham'], villageIdByName['Quahog']]) {
     assert.ok(byVillage[vid].members.length >= 50, `members in ${vid}`)
@@ -85,6 +90,13 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   // ~66% of members carry a standing service note (echoed into request instructions)
   const noteShare = m.member.filter(r => r.serviceNotes).length / m.member.length
   assert.ok(noteShare > 0.55 && noteShare < 0.78, `serviceNotes share ${noteShare.toFixed(2)} not ~0.66`)
+  // ~40% carry a staff-only confidential note
+  const confShare = m.member.filter(r => r.confidentialNotes).length / m.member.length
+  assert.ok(confShare > 0.28 && confShare < 0.52, `confidentialNotes share ${confShare.toFixed(2)} not ~0.4`)
+  // every member has dues, $0–60 with $40 the common tier
+  assert.ok(m.member.every(r => typeof r.householdDues === 'number' && r.householdDues >= 0 && r.householdDues <= 60))
+  const at40 = m.member.filter(r => r.householdDues === 40).length / m.member.length
+  assert.ok(at40 > 0.4, `only ${(at40 * 100).toFixed(0)}% of members at the $40 tier`)
 
   // junctions reference valid parents
   const volIds = new Set(m.volunteer.map(v => v.id))

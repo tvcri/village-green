@@ -25,6 +25,7 @@ test('services.json has the expected shape and valid capabilities', () => {
   // enough request-eligible entries to drive a varied pool
   assert.ok(s.catalog.filter(e => e.serviceName).length >= 40)
   assert.ok(Array.isArray(s.memberServiceNotes) && s.memberServiceNotes.length >= 8)
+  assert.ok(Array.isArray(s.memberConfidentialNotes) && s.memberConfidentialNotes.length >= 8)
   assert.ok(Array.isArray(s.memberDropReasons) && s.memberDropReasons.length >= 5)
   assert.ok(Array.isArray(s.vettingTypes) && s.vettingTypes.length >= 3)
   assert.ok(Array.isArray(s.disabilities) && s.disabilities.length >= 5)
