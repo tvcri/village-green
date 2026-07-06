@@ -28,6 +28,10 @@ module.exports.createUser = async function createUser (req, res, next) {
     let projection = req.query.projection
     const createInKeycloak = req.query.keycloak !== false
 
+    if (body.villageGrants?.length) {
+      await validateVillageGrants(body.villageGrants, {elevate})
+    }
+
     if (createInKeycloak) {
       try {
         await KeycloakService.createUser({

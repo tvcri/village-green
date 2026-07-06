@@ -3909,9 +3909,12 @@ components:
           type: string
         lastName:
           type: string
+        villageGrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserVillageGrantWrite'
       required:
       - username
-      - villageGrants
     UserPrivileges:
       type: object
       additionalProperties: false
