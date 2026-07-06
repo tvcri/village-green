@@ -95,6 +95,44 @@ describe('personDisabilities', () => {
     const result = personDisabilities(e, 0)
     expect([...result.keys()].sort()).toEqual(['Cane', 'Hearing', 'Vision', 'Walker', 'Wheelchair'])
   })
+  it('recovers the note and answer from an uncertainFields conflict when the model misreports it there', () => {
+    // Real observed model behavior: despite the prompt saying not to, a
+    // Yes-checked-but-Sometimes-explained field comes back as an uncertain
+    // field instead of via accessibilityNotes.
+    const e = extraction()
+    e.members[0].extras.accessibility = {
+      difficultyHearing: 'Sometimes', visionLimited: 'Sometimes', usesWalker: 'Sometimes',
+      usesCane: 'No', usesWheelchair: 'No',
+    }
+    e.members[0].extras.accessibilityNotes = null
+    e.uncertainFields = [
+      { path: 'members[0].accessibility.difficultyHearing', reason: "Checkmark appears in Yes column but 'hearing aids' noted in Sometimes/explain", alternative: 'Yes' },
+      { path: 'members[0].accessibility.visionLimited', reason: "Checkmark in Yes column but 'glasses' noted in explain", alternative: 'Yes' },
+      { path: 'members[0].accessibility.usesWalker', reason: "Marks in both Yes and No columns with 'rollator (travel)' noted", alternative: 'Yes' },
+    ]
+    const result = personDisabilities(e, 0)
+    expect(result.get('Hearing')).toBe('hearing aids')
+    expect(result.get('Vision')).toBe('glasses')
+    expect(result.get('Walker')).toBe('rollator (travel)')
+  })
+  it('falls back to the full reason text when it has no quoted note', () => {
+    const e = extraction()
+    e.members[0].extras.accessibility = { difficultyHearing: 'Sometimes', visionLimited: 'No', usesWalker: 'No', usesCane: 'No', usesWheelchair: 'No' }
+    e.uncertainFields = [
+      { path: 'members[0].accessibility.difficultyHearing', reason: 'Ambiguous checkbox with no legible explain text', alternative: null },
+    ]
+    const result = personDisabilities(e, 0)
+    expect(result.get('Hearing')).toBe('Ambiguous checkbox with no legible explain text')
+  })
+  it('does not apply a conflict from a different member index', () => {
+    const e = extraction()
+    e.members[0].extras.accessibility = { difficultyHearing: 'Sometimes', visionLimited: 'No', usesWalker: 'No', usesCane: 'No', usesWheelchair: 'No' }
+    e.uncertainFields = [
+      { path: 'members[1].accessibility.difficultyHearing', reason: "'note for the other member'", alternative: 'Yes' },
+    ]
+    const result = personDisabilities(e, 0)
+    expect(result.get('Hearing')).toBeNull()
+  })
 })
 
 describe('mapMemberForm', () => {

@@ -37,13 +37,31 @@ const DISABILITY_NAMES_BY_FIELD = {
   usesWheelchair: 'Wheelchair',
 }
 
+// The prompt tells the model to fold a Yes/Sometimes-checkbox-conflict's
+// explain text into accessibilityNotes and never flag it as uncertain — but
+// in practice the model sometimes reports it as an uncertainFields entry on
+// the accessibility.<field> path instead, with the explain text embedded in
+// `reason` (quoted) and the checkbox's real value in `alternative`. Recover
+// the note from that path so it isn't silently dropped.
+function noteFromReason (reason) {
+  const quoted = reason.match(/'([^']+)'/)
+  return quoted ? quoted[1] : reason
+}
+
 export function personDisabilities (extraction, memberIndex) {
   const result = new Map()
   const accessibility = extraction.members[memberIndex].extras.accessibility
   if (!accessibility) return result
+  const uncertainByField = new Map(
+    (extraction.uncertainFields ?? [])
+      .map(u => [u.path, u])
+      .filter(([path]) => path.startsWith(`members[${memberIndex}].accessibility.`)),
+  )
   for (const [field, name] of Object.entries(DISABILITY_NAMES_BY_FIELD)) {
-    const answer = accessibility[field]
-    if (answer === 'Yes' || answer === 'Sometimes') result.set(name, null)
+    const conflict = uncertainByField.get(`members[${memberIndex}].accessibility.${field}`)
+    const answer = conflict?.alternative ?? accessibility[field]
+    if (answer !== 'Yes' && answer !== 'Sometimes') continue
+    result.set(name, conflict ? noteFromReason(conflict.reason) : null)
   }
   return result
 }
