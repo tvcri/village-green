@@ -159,6 +159,7 @@ const activeFilterCount = computed(() => {
 const columnsForCsv = [
   { header: 'Request #', key: 'displayNumber' },
   { header: 'Village', key: 'villageName' },
+  { header: 'Status', key: 'status' },
   { header: 'Service', key: 'serviceName' },
   { header: 'Member', key: 'memberFullName' },
   { header: 'Volunteer', key: 'volunteerFullName' },
