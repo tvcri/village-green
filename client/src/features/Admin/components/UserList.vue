@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
+import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -19,6 +20,7 @@ const toast = useToast()
 
 const searchText = ref('')
 const cellError = ref({ userId: null, message: '' })
+const pageRows = ref(10)
 
 const { state: users, isLoading } = useAsyncState(
   () => getUsersWithGrantCount(),
@@ -125,8 +127,19 @@ async function onDeleteUser(user) {
       @cell-edit-complete="onCellEditComplete"
       sort-field="username"
       :sort-order="1"
+      paginator
+      :rows="pageRows"
       class="users-table-responsive"
     >
+      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
+        <div class="paginator-container">
+          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
+          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
+          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
+          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+        </div>
+      </template>
+
       <Column field="username" header="Username" sortable>
         <template #editor="{ data, field }">
           <InputText v-model="data[field]" autofocus fluid />
