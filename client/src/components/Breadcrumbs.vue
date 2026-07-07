@@ -82,7 +82,7 @@ const breadcrumbs = computed(() => {
       case 'admin-user-grants': {
         const userId = route.params.userId
         const user = adminUsers.value?.find(u => u.userId === userId)
-        const userName = user?.displayName || user?.username || `User ${userId}`
+        const userName = route.params.displayName || user?.displayName || user?.username || `User ${userId}`
         crumbs.push({
           label: 'Users',
           route: { name: 'admin-user-access' }

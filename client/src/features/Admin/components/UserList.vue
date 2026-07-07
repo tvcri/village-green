@@ -51,12 +51,12 @@ function goToCreate() {
   router.push({ name: 'admin-user-create' })
 }
 
-function goToGrants(userId) {
-  router.push({ name: 'admin-user-grants', params: { userId } })
+function goToGrants(userId, displayName) {
+  router.push({ name: 'admin-user-grants', params: { userId, displayName } })
 }
 
 function onRowClick(event) {
-  goToGrants(event.data.userId)
+  goToGrants(event.data.userId, event.data.displayName)
 }
 
 async function onDeleteUser(user) {
@@ -131,7 +131,7 @@ async function onDeleteUser(user) {
           <Button
             :label="String(data.statistics?.villageGrantCount ?? 0)"
             link
-            @click.stop="goToGrants(data.userId)"
+            @click.stop="goToGrants(data.userId, data.displayName)"
           />
         </template>
       </Column>

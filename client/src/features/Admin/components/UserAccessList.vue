@@ -164,20 +164,20 @@ const PENDING_ROW_KEY = '__pending__'
 
 const tableRows = computed(() => {
   if (!pendingGrant.value) return displayGrants.value
-  return [...displayGrants.value, { grantId: PENDING_ROW_KEY }]
+  return [{ grantId: PENDING_ROW_KEY }, ...displayGrants.value]
 })
 
 const isPendingRow = (data) => data.grantId === PENDING_ROW_KEY
 
 const sortVillageName = (a, b) => {
-  if (isPendingRow(a)) return 1
-  if (isPendingRow(b)) return -1
+  if (isPendingRow(a)) return -1
+  if (isPendingRow(b)) return 1
   return sortDirection.value === 'asc' ? a.villageName.localeCompare(b.villageName) : b.villageName.localeCompare(a.villageName)
 }
 
 const sortRoleId = (a, b) => {
-  if (isPendingRow(a)) return 1
-  if (isPendingRow(b)) return -1
+  if (isPendingRow(a)) return -1
+  if (isPendingRow(b)) return 1
   return sortDirection.value === 'asc' ? a.roleId - b.roleId : b.roleId - a.roleId
 }
 </script>
