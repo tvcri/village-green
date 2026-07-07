@@ -321,6 +321,11 @@ h1 {
   color: var(--color-text-dim);
 }
 
+.grants-table-responsive {
+  box-shadow: var(--box-shadow-card);
+  border: 1px solid var(--color-border-default);
+}
+
 .grants-section {
   display: flex;
   flex-direction: column;
