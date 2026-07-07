@@ -121,18 +121,14 @@ async function onDeleteUser(user) {
       <Column field="displayName" header="Display Name" sortable>
         <template #body="{ data }">{{ data.displayName === data.username ? '—' : data.displayName }}</template>
       </Column>
-      <Column field="status" header="Status" sortable>
+      <Column field="status" header="Status" sortable alignHeader="center" style="text-align: center;">
         <template #body="{ data }">
           <Tag :value="data.status" :severity="data.status === 'available' ? 'success' : 'danger'" />
         </template>
       </Column>
-      <Column header="Grants" sortable :sort-field="row => row.statistics?.villageGrantCount ?? 0">
+      <Column header="Grants" sortable :sort-field="row => row.statistics?.villageGrantCount ?? 0" alignHeader="center" style="text-align: center;">
         <template #body="{ data }">
-          <Button
-            :label="String(data.statistics?.villageGrantCount ?? 0)"
-            link
-            @click.stop="goToGrants(data.userId, data.displayName)"
-          />
+          <Tag style="min-width: 2rem;" :value="data.statistics?.villageGrantCount ?? 0" :severity="'secondary'" />
         </template>
       </Column>
       <Column field="lastAccess" header="Last Access" sortable>
@@ -141,7 +137,7 @@ async function onDeleteUser(user) {
       <Column header="Created" sortable :sort-field="row => row.statistics?.created">
         <template #body="{ data }">{{ data.statistics?.created ? formatLocalDateTime(data.statistics.created) : '—' }}</template>
       </Column>
-      <Column header="Actions" :exportable="false">
+      <Column header="Actions" :exportable="false" alignHeader="center" style="text-align: center;">
         <template #body="{ data }">
           <div class="row-actions">
             <Button
