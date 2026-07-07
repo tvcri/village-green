@@ -9,10 +9,12 @@ import { users, villages } from '../../setup/fixtures.js'
 // keep the 403 clean (no OpenAPI body validation 400 ahead of the authz check).
 //
 // The admin write happy-paths run with ?keycloak=false so only the DB side is
-// exercised — mockOidc has no Keycloak admin API. Consequences pinned below:
-// deleteUser has NO keycloak escape hatch (its Keycloak call always fails here,
-// see the todo), and updateUser doesn't call Keycloak at all (a username change
-// silently diverges from the IdP — KeycloakService.updateUsername has no caller).
+// exercised — mockOidc has no Keycloak admin API, so any handler that reaches
+// KeycloakService fails here. Only createUser HAS a ?keycloak=false escape:
+// deleteUser and a username-changing PATCH/PUT (UserService.replaceUser calls
+// KeycloakService.updateUsername) hit Keycloak unconditionally, so their happy
+// paths are untestable until a mockOidc admin facade lands — deleteUser is a
+// todo below; the rename path has no test at all.
 const fullV1Id = String(users.full_v1.userId)
 const adminId = String(users.admin.userId)
 const scratchId = String(users.scratch.userId)
@@ -102,14 +104,9 @@ test('getUserByUserId (admin+elevate) returns the created user', async () => {
   assert.equal(json.username, 'vgtest.user@scratch.test')
 })
 
-test('updateUser patches the username (DB only — not propagated to the IdP)', async () => {
-  assert.ok(createdUserId, 'precondition: create test ran')
-  const { status, json } = await vgFetch(`/users/${createdUserId}`, {
-    ...A, method: 'PATCH', body: { username: 'vgtest.renamed@scratch.test' },
-  })
-  assert.equal(status, 200)
-  assert.equal(json.username, 'vgtest.renamed@scratch.test')
-})
+// No rename test: a username-changing PATCH always calls
+// KeycloakService.updateUsername (no keycloak=false escape), which can only
+// fail against mockOidc. Covered by the gap note in the README.
 
 test('replaceUser (PUT) is unusable: UserPut both requires and forbids villageGrants', async () => {
   // SPEC BUG (characterized): UserPut lists `villageGrants` as required but not
@@ -157,14 +154,15 @@ test('user grants: create -> list -> delete', async () => {
   })
   assert.equal(created.status, 201)
 
+  // rows are {grantId, roleId, village: {villageId, name}, grantees: [...]}
   const listed = await vgFetch(`/users/${scratchId}/grants`, A)
   assert.equal(listed.status, 200)
-  const mine = listed.json.find(g => g.villageId === scratchVillage)
+  const mine = listed.json.find(g => g.village?.villageId === scratchVillage)
   assert.ok(mine, 'created grant is listed')
   assert.equal(mine.roleId, 1)
 
   const del = await vgFetch(`/users/${scratchId}/grants/${mine.grantId}`, { ...A, method: 'DELETE' })
   assert.equal(del.status, 200)
   const after = await vgFetch(`/users/${scratchId}/grants`, A)
-  assert.ok(!after.json.some(g => g.villageId === scratchVillage), 'grant removed')
+  assert.ok(!after.json.some(g => g.village?.villageId === scratchVillage), 'grant removed')
 })

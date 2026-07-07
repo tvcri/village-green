@@ -72,6 +72,11 @@ function startApi () {
     // Exercise the appdata endpoints even though seeding is direct SQL. The
     // "experimental" label deters ops reliance; it's mature enough for testing.
     VG_EXPERIMENTAL_APPDATA: 'true',
+    // MySQL and mockOidc are already up before the API starts, so boot-time
+    // dependency waits never need the 24x5s default. Keeping this small also
+    // caps the stall when a handler hits the (absent) Keycloak admin API —
+    // e.g. deleteUser — at ~10s instead of 2 minutes per request.
+    VG_DEPENDENCY_RETRIES: '2',
     ...(COVERAGE ? { NODE_V8_COVERAGE: coverageTmp } : {}),
   }
   const child = spawn('node', ['index.js'], { cwd: config.apiSourceDir, env })

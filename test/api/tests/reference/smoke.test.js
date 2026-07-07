@@ -24,9 +24,13 @@ test('reference lists return 200 arrays for a read-only caller', async () => {
   }
 })
 
-test('capabilities serves the static reference rows', async () => {
+test('capabilities serves the known reference rows', async () => {
+  // 5 from the static seed + 'Steering Committee' added by migration 0012.
+  // Superset-tolerant so future additive migrations don't break the smoke.
   const { json } = await vgFetch('/capabilities', { token: tokens.users.full_v1 })
-  assert.deepEqual(json.map(c => c.name).sort(),
-    ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support'])
+  const names = json.map(c => c.name)
+  for (const expected of ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support', 'Steering Committee']) {
+    assert.ok(names.includes(expected), `capabilities include ${expected}`)
+  }
   assert.ok(json.every(c => c.capabilityId && c.name), 'items carry {capabilityId, name}')
 })

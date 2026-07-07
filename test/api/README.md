@@ -87,16 +87,16 @@ This prints a text summary and writes an HTML report to `test/api/.coverage/inde
 (both gitignored), scoped to `api/source/**` — the code the API actually executes while
 serving the tests. The report generates even on a red run.
 
-Coverage was **~54%** of `api/source` statements *pre-merge* (the figure predates
-PRs #37–#47 and the seeding breakage; regenerate after the seed fix). At that point,
-well-exercised: `PersonService` (~94%), `FriendService` (~85%), the service-request and
-village controllers (~77-86%), and the auth layer. Thinner: `VillageService` (~65%),
-`UserService` (~45%), and `OperationService` (~7% — the unexercised appdata/ce-dump/SSE
-paths) / `JobService` (the `job` table isn't scaffolded in the test schema). The
-Member/Volunteer controllers have since been implemented as person-scoped sub-resources
-(`/persons/{personId}/member|volunteer`), which nothing exercises yet. Grant-management
-writes are exercised against a disposable `scratch` village/user so the canonical fixtures
-stay intact.
+Coverage is **~66%** of `api/source` statements (2026-07-07, post gap-closure).
+Well-exercised: `MemberService` / `PrivacyService` (100%), `ServiceRequestService`
+(~97%), `VolunteerService` (~94%), `PersonService` (~88%), `FriendService` (~85%),
+`UserService` (~78%), and the auth layer. Thinner, with known causes: `VillageService`
+(~69% — village writes are WIP todos), `OperationService` (~39% — ce-dump / SSE / gzip
+appdata unexercised), `KeycloakService` (~33% — no admin API in mockOidc), `JobService`
+(~32% — the `job` table isn't scaffolded), `ApplicationImportService` (~58%) and the
+OAuth controller (client-facing flows, out of scope). Grant-management writes are
+exercised against a disposable `scratch` village/user so the canonical fixtures stay
+intact.
 
 ## Not yet covered (known gaps)
 
@@ -107,11 +107,12 @@ specced as todos. Gaps, in priority order:
 - **Keycloak-integrated user management:** the `?keycloak=false` paths are covered, but
   the Keycloak admin-API calls themselves are not (mockOidc has no admin API); a minimal
   admin-API facade in mockOidc is deferred pending discussion. Known holes documented as
-  todos/comments in `tests/users/management.test.js`: `DELETE /users/{userId}` has no
-  `keycloak=false` escape (500s in the harness), a `PATCH` username change is never
-  propagated to the IdP (`KeycloakService.updateUsername` has no caller), and
-  `PUT /users/{userId}` is unusable because `UserPut` both requires and forbids
-  `villageGrants` (spec bug, characterized as 400).
+  todos/comments in `tests/users/management.test.js`: only `POST /users` has a
+  `keycloak=false` escape — `DELETE /users/{userId}` and a username-changing `PATCH`
+  (via `KeycloakService.updateUsername`) call Keycloak unconditionally, so they 500 in
+  the harness and their happy paths are untestable; and `PUT /users/{userId}` is
+  unusable because `UserPut` both requires and forbids `villageGrants` (spec bug,
+  characterized as 400).
 - **Volunteer vettings:** the `vettings` arrays on the volunteer role are unexercised —
   `vetting_type` ships no static rows and has no write endpoint, so any `vettingTypeId`
   would violate the FK.
