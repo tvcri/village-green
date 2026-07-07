@@ -39,7 +39,8 @@ chai. The only test dependencies are `mysql2` (seeding) and `c8` (coverage).
 
 ## Running
 
-Requires **Docker** (Compose v2) and **Node 18+** (developed on Node 24).
+Requires **Docker** (Compose v2) and **Node 22+** — the runner uses a test-file
+glob and `--test-concurrency`, which need Node ≥ 21 (developed on Node 24).
 
 ```bash
 cd test/api
@@ -66,10 +67,10 @@ A run is made of three kinds of test:
 - **Red (hard fail)** — assertions of the *correct/secure* behavior on endpoints that are
   implemented but **buggy**. They fail on purpose and flip green when the bug is fixed, no
   edit needed. The red set is exactly the findings in
-  [SECURITY-FINDINGS.md](./SECURITY-FINDINGS.md) — currently **12** (cross-village exposure
+  [SECURITY-FINDINGS.md](./SECURITY-FINDINGS.md) — currently **13** (cross-village exposure
   on the service-request / person by-id paths, cross-village writes — including the
-  member/volunteer role sub-resources — and two double-wrapped multi-`villageId` 500s).
-  Any *unexpected* red is a real regression.
+  member/volunteer role sub-resources — two double-wrapped multi-`villageId` 500s, and
+  the ungated village write endpoints). Any *unexpected* red is a real regression.
 - **Todo** — `node:test`'s `test.todo`: the *desired* behavior of endpoints **not built
   yet** (village writes are WIP). A failing todo does **not** fail the run, so the unbuilt
   surface is documented without drowning the regression signal; when the endpoint lands and
@@ -79,8 +80,8 @@ A run is made of three kinds of test:
   since been retargeted) — todo specs should be written against an agreed OpenAPI change,
   not a predicted one.
 
-So a "clean" run is the **12** documented reds, a stack of todos, and everything else green.
-`npm test` exits non-zero only because of those 12 reds.
+So a "clean" run is the **13** documented reds, a stack of todos, and everything else green.
+`npm test` exits non-zero only because of those 13 reds.
 
 ## Coverage
 
@@ -138,7 +139,7 @@ specced as todos. Gaps, in priority order:
 - **Client / UI:** out of scope. (This includes the CSV exports from PRs #38/#39 — CSV is
   generated client-side from the tested JSON list endpoints; there is no API surface.)
 
-(The 12 red tests are known *bugs*, not coverage gaps — see SECURITY-FINDINGS.md.)
+(The 13 red tests are known *bugs*, not coverage gaps — see SECURITY-FINDINGS.md.)
 
 ## Layout
 
@@ -151,7 +152,8 @@ setup/
                      volunteers / service requests / FCV submissions
   seed.js            inserts fixtures into the scaffolded schema (with a
                      schema-drift tripwire that names any out-of-sync column)
-  tokens.js          mints per-user + special (expired/bad/insecure/scope) tokens
+  tokens.js          mints per-user + special (expired/bad/insecure/scope/
+                     audience/issuer) tokens; aud enforcement is ON in the harness
 lib/
   client.js          vgFetch(path, {token, query, body, method, rawBody, contentType})
   context.js         loads .tokens.json -> { tokens }
@@ -172,6 +174,7 @@ tests/               the endpoint tests, one directory per topic; each topic's
   reference/         /communities /disabilities /capabilities /vetting-types smokes
   service-request/   meta roll-up, cross-village authz, lifecycle incl. cancel
   villages/          read grant-gating, grant-mgmt authz (admin), WIP write todos
+                     (+ finding #6: the write endpoints have no authz gate)
   users/             self-service + admin user/grant management (?keycloak=false)
                      + user groups & grants-via-group
   roles/             role-tier (non-)differentiation

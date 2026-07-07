@@ -100,9 +100,15 @@ test('multi-value villageId returns both selected (granted) villages', async () 
   // row constructor MySQL rejects with ER_OPERAND_COLUMNS (500). Same bug class
   // as service-request finding #3. The grant filter is always ANDed, so this can
   // only under-return, never leak — a correctness bug, not an exposure.
-  const { status } = await vgFetch(FRIENDS, {
+  const { status, json } = await vgFetch(FRIENDS, {
     token: tokens.users.multi,
     query: { villageId: [String(villages.quahog.id), String(villages.innsmouth.id)] },
   })
   assert.equal(status, 200)
+  // Assert the row set too, not just the status: a partial fix that stops the
+  // 500 but under-returns (e.g. only one selected village) must stay red.
+  const ids = idsOf(json)
+  assert.ok(ids.includes(String(fcv.fcvV1.id)), 'includes the Quahog submission')
+  assert.ok(ids.includes(String(fcv.fcvV2.id)), 'includes the Innsmouth submission')
+  assert.ok(!ids.includes(String(fcv.fcvV3.id)), 'still excludes ungranted Miskatonic')
 })

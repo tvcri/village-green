@@ -27,6 +27,10 @@ export const config = {
     port: oidcPort,
     // The issuer the API discovers; mockOidc derives jwks_uri from the request host.
     issuer: process.env.VG_TEST_OIDC_ISSUER || `http://127.0.0.1:${oidcPort}`,
+    // Passed to the API as VG_JWT_AUD_VALUE so aud enforcement is exercised;
+    // every token tokens.js mints carries this aud (except the special
+    // wrong/missing-audience tokens, which assert the rejection path).
+    audience: process.env.VG_TEST_OIDC_AUDIENCE || 'village-green-test',
   },
   db: {
     host: process.env.VG_TEST_DB_HOST || '127.0.0.1',

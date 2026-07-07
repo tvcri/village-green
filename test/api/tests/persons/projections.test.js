@@ -13,7 +13,9 @@ test('person projection=memberInfo expands member details', async () => {
     token: tokens.users.full_v1, query: { projection: ['memberInfo'] },
   })
   assert.equal(status, 200)
-  assert.ok('memberInfo' in json, 'memberInfo projected')
+  // Truthiness, not key presence: the projection is a SQL subquery alias, so the
+  // key exists (as null) even when the underlying view/join returns nothing.
+  assert.ok(json.memberInfo, 'memberInfo projected with data (quahogMember is Active)')
 })
 
 test('person projection=volunteerInfo expands volunteer details', async () => {
@@ -21,5 +23,6 @@ test('person projection=volunteerInfo expands volunteer details', async () => {
     token: tokens.users.full_v1, query: { projection: ['volunteerInfo'] },
   })
   assert.equal(status, 200)
-  assert.ok('volunteerInfo' in json, 'volunteerInfo projected')
+  // Truthiness for the same reason as memberInfo above.
+  assert.ok(json.volunteerInfo, 'volunteerInfo projected with data (quahogVolunteer is active)')
 })

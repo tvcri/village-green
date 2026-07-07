@@ -77,6 +77,9 @@ function startApi () {
     VG_DB_USER: config.db.user,
     VG_DB_PASSWORD: config.db.password,
     VG_OIDC_PROVIDER: config.oidc.issuer,
+    // Enforce the aud claim (jwt.verify {audience}); tokens.js mints matching
+    // tokens plus wrong/missing-aud specials that assert the rejection path.
+    VG_JWT_AUD_VALUE: config.oidc.audience,
     VG_API_PORT: String(config.api.port),
     VG_API_ADDRESS: config.api.host,
     VG_DEV_RESPONSE_VALIDATION: 'logOnly',

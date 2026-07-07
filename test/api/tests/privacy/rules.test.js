@@ -142,8 +142,15 @@ test('publishing a new version re-blocks; acking a STALE version does not clear 
 
 test('all canonical users acknowledge the current rules', async () => {
   const rulesId = await currentRulesId()
+  // Ack every user first, assert afterward: asserting inside the loop would
+  // stop at the first failure and leave the remaining users blocked, turning
+  // one bad ack into privacy_ack_required failures across every later file.
+  const results = []
   for (const [role, token] of Object.entries(tokens.users)) {
     const { status } = await vgFetch(ACKS, { token, body: { rulesId } })
+    results.push({ role, status })
+  }
+  for (const { role, status } of results) {
     assert.equal(status, 201, `${role} acknowledged`)
   }
   const probe = await vgFetch('/service-requests', { token: tokens.users.scratch })

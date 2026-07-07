@@ -82,6 +82,23 @@ Same class as #2 (cross-village writes), for the person resource and its role su
   `tests/members/lifecycle.test.js` and `tests/volunteers/lifecycle.test.js`
 - Expected secure behavior: **403/404** for a person/village outside the caller's grants.
 
+## 6. Village write endpoints have no authorization gate (RED, latent)
+
+`POST /villages`, `PATCH /villages/{villageId}` and `DELETE /villages/{villageId}`
+([controllers/Village.js](../../api/source/controllers/Village.js)) perform **no privilege or
+grant check**, and the OAS requires only the `vg:village` scope — no `x-elevation-required`,
+unlike the village-grant endpoints. Today the hole is **masked by WIP bugs** (createVillage
+500s on a `ReferenceError`; patch/delete 404 for everyone because the existence lookup is
+made grant-blind with no grants) — but fixing those bugs without adding a guard would let any
+user holding the standard scope set create, rename, or delete villages.
+
+- Asserted in: `tests/villages/crud.test.js` (the non-admin create probe is the RED
+  tripwire; a cross-village patch probe guards the patch path; there is deliberately no
+  cross-village delete probe, since a successful insecure delete would destroy a canonical
+  village mid-run)
+- Expected secure behavior: village creation admin-gated (elevation, like user management);
+  patch/delete **403/404** for a village outside the caller's grants.
+
 ---
 
 ### What is verified as already-correct (GREEN)

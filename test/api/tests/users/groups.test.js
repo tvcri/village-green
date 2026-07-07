@@ -93,14 +93,19 @@ test('a village grant to the group flows to its member users', async () => {
   const granted = await vgFetch(villageGrants, {
     ...A, body: [{ userGroupId: groupId, roleId: 2 }],
   })
-  assert.equal(granted.status, 201)
+  let cleared
+  try {
+    assert.equal(granted.status, 201)
 
-  const after = await vgFetch('/villages', { token: tokens.users.scratch })
-  assert.ok(after.json.some(v => v.name === villages.scratch.name),
-    'group grant grants the member user access')
-
-  // cleanup: clear the scratch village's grants; access disappears with them
-  const cleared = await vgFetch(villageGrants, { ...A, method: 'PUT', body: [] })
+    const after = await vgFetch('/villages', { token: tokens.users.scratch })
+    assert.ok(after.json.some(v => v.name === villages.scratch.name),
+      'group grant grants the member user access')
+  } finally {
+    // Cleanup must run even when the assertions above fail: a leftover group
+    // grant on the scratch village bleeds into management.test.js, whose
+    // grant-listing assertions would then match the wrong row.
+    cleared = await vgFetch(villageGrants, { ...A, method: 'PUT', body: [] })
+  }
   assert.equal(cleared.status, 200)
   const revoked = await vgFetch('/villages', { token: tokens.users.scratch })
   assert.ok(!revoked.json.some(v => v.name === villages.scratch.name), 'revoked with the grant')

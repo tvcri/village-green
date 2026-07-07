@@ -32,6 +32,26 @@ test('token with a known-insecure kid -> 401', async () => {
   assert.equal(status, 401)
 })
 
+test('wrong audience -> 401 (harness sets VG_JWT_AUD_VALUE)', async () => {
+  const { status } = await vgFetch(SR, { token: tokens.special.wrongAudience })
+  assert.equal(status, 401)
+})
+
+test('missing audience claim -> 401 under audience enforcement', async () => {
+  const { status } = await vgFetch(SR, { token: tokens.special.missingAudience })
+  assert.equal(status, 401)
+})
+
+test('foreign issuer claim is ACCEPTED (characterization: iss is never validated)', async () => {
+  // The API trusts any token whose signature verifies against the discovered
+  // JWKS (plus aud, when configured); jwt.verify is called with no `issuer`
+  // option, so a token claiming another issuer still authenticates. Signature-
+  // only trust is defensible with a single IdP — this pin makes a future
+  // tightening (or loosening) deliberate rather than accidental.
+  const { status } = await vgFetch(SR, { token: tokens.special.foreignIssuer })
+  assert.equal(status, 200)
+})
+
 test('valid token lacking the service-request scope -> 403 on GET', async () => {
   const { status } = await vgFetch(SR, { token: tokens.special.noServiceRequestScope })
   assert.equal(status, 403)

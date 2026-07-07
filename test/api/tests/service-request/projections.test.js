@@ -13,7 +13,10 @@ test('SR projection=volunteerAddress expands the volunteer address', async () =>
     token: tokens.users.full_v1, query: { projection: ['volunteerAddress'] },
   })
   assert.equal(status, 200)
-  assert.ok('volunteerAddress' in json, 'volunteerAddress projected')
+  // Truthiness, not key presence: the projection is a SQL subquery alias, so the
+  // key exists (as null) even when the join returns nothing — and srV1's
+  // volunteer has a seeded address.
+  assert.ok(json.volunteerAddress, 'volunteerAddress projected with data')
 })
 
 test('SR projection=notificationHistory expands the notification history', async () => {
@@ -21,5 +24,7 @@ test('SR projection=notificationHistory expands the notification history', async
     token: tokens.users.full_v1, query: { projection: ['notificationHistory'] },
   })
   assert.equal(status, 200)
+  // Key presence is the honest assertion here: srV1 has no seeded notification
+  // events, so the projected value is legitimately empty.
   assert.ok('notificationHistory' in json, 'notificationHistory projected')
 })

@@ -31,6 +31,16 @@ test('DELETE /users/{id} as a non-admin -> 403', async () => {
   assert.equal(status, 403)
 })
 
+test('PATCH /users/{id} as a non-admin -> 403 (even on self)', async () => {
+  // UserPatch requires a body, so this can't be body-free; a no-op same-value
+  // status patch keeps a wrongly-authorized write from changing anything
+  // ('available' is the seeded default).
+  const { status } = await vgFetch(`/users/${fullV1Id}`, {
+    token: tokens.users.full_v1, method: 'PATCH', body: { status: 'available' },
+  })
+  assert.equal(status, 403)
+})
+
 test('GET /users/{id}/grants as a non-admin -> 403', async () => {
   const { status } = await vgFetch(`/users/${fullV1Id}/grants`, { token: tokens.users.full_v1 })
   assert.equal(status, 403)

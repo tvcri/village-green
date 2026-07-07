@@ -1,10 +1,18 @@
 // Mints JWTs for every canonical user plus a set of "special" tokens for the
 // authentication/scope tests. Run in the orchestrator (where the mockOidc signing
 // key lives) and serialized to .tokens.json for the test processes to read.
+//
+// The harness sets VG_JWT_AUD_VALUE (see setup/env.js), so every token here
+// carries the matching aud claim — except the wrong/missing-audience specials,
+// which exist to assert the rejection path.
 import { users, scopes } from './fixtures.js'
+import { config } from './env.js'
+
+const AUD = config.oidc.audience
 
 // Build a token payload by hand (for getCustomToken paths) matching VG's default
-// claim layout: realm_access.roles (privileges), preferred_username, name, scope, jti.
+// claim layout: realm_access.roles (privileges), preferred_username, name, scope,
+// jti — plus the enforced aud.
 function payloadFor (user, scope) {
   return {
     jti: Math.random().toString(16).slice(2), // varies per token; value is irrelevant
@@ -12,6 +20,7 @@ function payloadFor (user, scope) {
     preferred_username: user.username,
     name: user.name,
     scope,
+    aud: AUD,
   }
 }
 
@@ -24,6 +33,7 @@ export function buildTokens (oidc) {
       name: u.name,
       privileges: u.privileges, // MUST pass explicitly — getToken defaults to ['create_collection','admin']
       scope: scopes.full,
+      audience: AUD,
       expiresIn: '1h',
     })
   }
@@ -32,17 +42,38 @@ export function buildTokens (oidc) {
 
   // Expired (exp in the past) -> 401 TokenExpiredError.
   tokens.special.expired = oidc.getToken({
-    username: fv1.username, name: fv1.name, privileges: [], scope: scopes.full, expiresIn: -3600,
+    username: fv1.username, name: fv1.name, privileges: [], scope: scopes.full, audience: AUD, expiresIn: -3600,
   })
 
   // Valid identity, read-only scope -> can GET, but POST/PATCH (write) -> 403.
   tokens.special.readOnly = oidc.getToken({
-    username: fv1.username, name: fv1.name, privileges: [], scope: scopes.readOnly, expiresIn: '1h',
+    username: fv1.username, name: fv1.name, privileges: [], scope: scopes.readOnly, audience: AUD, expiresIn: '1h',
   })
 
   // Valid identity, no service-request scope at all -> GET /service-requests -> 403.
   tokens.special.noServiceRequestScope = oidc.getToken({
-    username: fv1.username, name: fv1.name, privileges: [], scope: scopes.noServiceRequest, expiresIn: '1h',
+    username: fv1.username, name: fv1.name, privileges: [], scope: scopes.noServiceRequest, audience: AUD, expiresIn: '1h',
+  })
+
+  // aud claim not matching VG_JWT_AUD_VALUE -> 401 JsonWebTokenError.
+  tokens.special.wrongAudience = oidc.getToken({
+    username: fv1.username, name: fv1.name, privileges: [], scope: scopes.full,
+    audience: 'not-village-green', expiresIn: '1h',
+  })
+
+  // No aud claim at all -> 401 under audience enforcement.
+  tokens.special.missingAudience = oidc.getToken({
+    username: fv1.username, name: fv1.name, privileges: [], scope: scopes.full, expiresIn: '1h',
+  })
+
+  // Foreign `iss` claim signed by the TRUSTED key. The API never validates iss
+  // (jwt.verify gets no `issuer` option), so this token is accepted —
+  // characterized in tests/auth/authentication.test.js.
+  const [kid, { privateKey }] = oidc.keys.entries().next().value
+  tokens.special.foreignIssuer = oidc.getCustomToken({
+    payload: { ...payloadFor(fv1, scopes.full), iss: 'https://idp.evil.example' },
+    privateKey,
+    options: { algorithm: 'RS256', keyid: kid, expiresIn: '1h', allowInsecureKeySizes: true },
   })
 
   // Tampered signature -> 401 (kid valid, signature verification fails).

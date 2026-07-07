@@ -11,9 +11,9 @@ import { serviceRequests as sr, persons } from '../../setup/fixtures.js'
 // importing the *current state* leaves the canonical fixtures intact for the
 // test files that run after this one.
 //
-// user_data is compared by identity (username set) rather than full rows: its
-// lastAccess/lastClaims columns churn on every authenticated request, including
-// the import call itself.
+// user_data is compared with its lastAccess/lastClaims columns nulled out: they
+// churn on every authenticated request, including the import call itself. Every
+// other user_data column must survive the round trip verbatim.
 
 test('appdata export -> import -> re-export round-trips losslessly', async () => {
   const before = await exportAppData(tokens.users.admin)
@@ -30,13 +30,25 @@ test('appdata export -> import -> re-export round-trips losslessly', async () =>
   assert.equal(b.meta.lastMigration, a.meta.lastMigration, 'same migration level')
   assert.deepEqual([...b.tables.keys()].sort(), [...a.tables.keys()].sort(), 'same table set')
 
+  // Floor: the comparison below is vacuously true over an empty export, so pin
+  // that the export actually contains the seeded dataset before comparing.
+  for (const table of ['village', 'person', 'member', 'volunteer', 'service_request', 'user_data', 'village_grant']) {
+    assert.ok(a.tables.get(table)?.length > 0, `export includes seeded ${table} rows`)
+  }
+
   for (const [table, aRows] of a.tables) {
     const bRows = b.tables.get(table)
     if (table === 'user_data') {
-      const usernameIdx = a.columns.get(table).split(',').indexOf('`username`')
-      assert.ok(usernameIdx >= 0, 'user_data export includes username')
-      const names = rows => rows.map(r => JSON.parse(r)[usernameIdx]).sort()
-      assert.deepEqual(names(bRows), names(aRows), 'user_data identities survive the round trip')
+      const cols = a.columns.get(table).split(',').map(c => c.replaceAll('`', ''))
+      const churnIdx = ['lastAccess', 'lastClaims'].map(c => cols.indexOf(c))
+      assert.ok(churnIdx.every(i => i >= 0), 'user_data export includes lastAccess/lastClaims')
+      const scrubbed = rows => rows.map(r => {
+        const vals = JSON.parse(r)
+        for (const i of churnIdx) vals[i] = null
+        return JSON.stringify(vals)
+      }).sort()
+      assert.deepEqual(scrubbed(bRows), scrubbed(aRows),
+        'user_data rows (minus the per-request churn columns) survive the round trip')
     } else {
       // row order within a table is not guaranteed; compare as sorted multisets
       assert.deepEqual([...bRows].sort(), [...aRows].sort(), `table ${table} differs after round trip`)

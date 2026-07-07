@@ -71,7 +71,7 @@ test('full_v1 gets 404 for an ungranted village nested route', async () => {
 // ---- writes across villages: MUST be denied (RED — finding #2) ----
 
 test('full_v1 cannot create a request in Innsmouth', async () => {
-  const { status } = await vgFetch(SR, {
+  const res = await vgFetch(SR, {
     token: tokens.users.full_v1,
     body: {
       // status is server-derived (POST only accepts 'Draft'); omit it so the body
@@ -81,7 +81,14 @@ test('full_v1 cannot create a request in Innsmouth', async () => {
       serviceName: 'cross-village create attempt',
     },
   })
-  assert.ok(status === 403 || status === 404, `expected denial, got ${status}`)
+  // Undo a successful insecure write (the endpoint is grant-blind today) so no
+  // stray Innsmouth request leaks into the files that run after this one.
+  if (res.status === 201 && res.json?.serviceRequestId) {
+    await vgFetch(`/service-requests/${res.json.serviceRequestId}`, {
+      token: tokens.users.full_v2, method: 'DELETE',
+    })
+  }
+  assert.ok(res.status === 403 || res.status === 404, `expected denial, got ${res.status}`)
 })
 
 test('full_v1 cannot patch an Innsmouth request', async () => {
@@ -90,5 +97,13 @@ test('full_v1 cannot patch an Innsmouth request', async () => {
     method: 'PATCH',
     body: { serviceName: 'cross-village tamper attempt' },
   })
+  // Undo a successful insecure tamper: restore the canonical fixture value via
+  // full_v2, who legitimately holds the Innsmouth grant.
+  if (status === 200) {
+    await vgFetch(`/service-requests/${sr.srV2.id}`, {
+      token: tokens.users.full_v2, method: 'PATCH',
+      body: { serviceName: sr.srV2.serviceName },
+    })
+  }
   assert.ok(status === 403 || status === 404, `expected denial, got ${status}`)
 })
