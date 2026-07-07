@@ -40,6 +40,19 @@ async function replaceAssociateVillages (connection, volunteerId, villageIds) {
   }
 }
 
+// Full-array replace of vettings for a volunteer.
+async function replaceVettings (connection, volunteerId, vettings) {
+  await connection.query(
+    'DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId]
+  )
+  if (vettings?.length) {
+    const values = vettings.map(v => [volunteerId, v.vettingTypeId, v.dateEntered ?? null, v.dateExpired ?? null])
+    await connection.query(
+      'INSERT INTO volunteer_vetting (volunteerId, vettingTypeId, dateEntered, dateExpired) VALUES ?', [values]
+    )
+  }
+}
+
 module.exports.volunteerExists = async function (personId) {
   const [rows] = await dbUtils.pool.query(
     'SELECT id FROM volunteer WHERE personId = ?', [personId]
@@ -48,7 +61,7 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [] } = {}) {
+module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [] } = {}) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const volunteerId = await ensureVolunteer(connection, personId)
@@ -57,6 +70,7 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
       )
       await replaceCapabilities(connection, volunteerId, capabilityIds)
       await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
+      await replaceVettings(connection, volunteerId, vettings)
     },
     statusObj: undefined
   })
@@ -80,6 +94,9 @@ module.exports.patchVolunteer = async function (personId, body = {}) {
       }
       if (body.associateVillageIds !== undefined) {
         await replaceAssociateVillages(connection, volunteerId, body.associateVillageIds)
+      }
+      if (body.vettings !== undefined) {
+        await replaceVettings(connection, volunteerId, body.vettings)
       }
     },
     statusObj: undefined
