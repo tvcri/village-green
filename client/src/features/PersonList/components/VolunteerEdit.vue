@@ -28,14 +28,13 @@ const active = ref(true)
 const notes = ref('')
 const vettings = ref([])
 
-async function loadVillageOptions () {
-  villageOptions.value = await getVillages(true)
-}
-
 onMounted(async () => {
-  capabilityOptions.value = await getCapabilities()
-  vettingTypeOptions.value = await getVettingTypes()
-  await loadVillageOptions()
+  const [capabilities, vettingTypes, villages] = await Promise.all([
+    getCapabilities(), getVettingTypes(), getVillages(true),
+  ])
+  capabilityOptions.value = capabilities
+  vettingTypeOptions.value = vettingTypes
+  villageOptions.value = villages
   const p = await getPerson(personId.value, ['volunteerDetail'])
   person.value = p
   if (p.volunteerDetail) {

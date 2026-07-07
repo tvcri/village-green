@@ -243,9 +243,9 @@ const copyEmail = async (email) => {
       </div>
 
       <!-- Volunteer-specific Section -->
-      <div v-if="isVolunteer && person.capabilities?.length" class="section">
+      <div v-if="isVolunteer && (person.capabilities?.length || person.vettings?.length || person.active != null)" class="section">
         <h3 class="section-header">Volunteer Information</h3>
-        <div class="detail-field capabilities-field">
+        <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities:</span>
           <div class="capabilities-list">
             <Tag

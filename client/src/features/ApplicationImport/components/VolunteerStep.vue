@@ -85,7 +85,7 @@ function toggleCommunity (name, checked) {
   communityNames.value = next
 }
 
-async function grantVolunteerRole (personId) {
+async function grantVolunteerRole (personId, { isExisting = false } = {}) {
   const body = {
     providerType: providerType.value || null,
     active: active.value,
@@ -94,7 +94,10 @@ async function grantVolunteerRole (personId) {
     associateVillageIds: [],
   }
   try {
-    await putVolunteer(personId, body)
+    // For an existing person, patch so fields the wizard doesn't collect
+    // (e.g. vettings) are left untouched rather than wiped by a full replace.
+    if (isExisting) await patchVolunteer(personId, body)
+    else await putVolunteer(personId, body)
     emit('volunteer-done', {
       personId: createdPersonId,
       fullName: [form.firstName, form.lastName].filter(Boolean).join(' '),
@@ -111,11 +114,13 @@ async function grantVolunteerRole (personId) {
 }
 
 let createdPersonId = null
+let createdPersonIsExisting = false
 
 async function useExisting (person) {
   createdPersonId = person.personId
+  createdPersonIsExisting = true
   saving.value = true
-  await grantVolunteerRole(person.personId)
+  await grantVolunteerRole(person.personId, { isExisting: true })
   saving.value = false
 }
 
@@ -125,7 +130,7 @@ async function saveVillageAndRetry () {
   try {
     await patchPerson(createdPersonId, { villageId: selectedVillageId.value })
     needsVillage.value = false
-    await grantVolunteerRole(createdPersonId)
+    await grantVolunteerRole(createdPersonId, { isExisting: createdPersonIsExisting })
   }
   catch (err) {
     toast.add({ severity: 'error', summary: 'Error', detail: err?.body?.error ?? 'Failed to save village', life: 4000 })
@@ -149,6 +154,7 @@ async function submit () {
     payload.disabilities = []
     const created = await createPerson(payload)
     createdPersonId = created.personId
+    createdPersonIsExisting = false
     await grantVolunteerRole(created.personId)
   }
   catch (err) {

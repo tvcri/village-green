@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
@@ -57,14 +57,25 @@ function dateToDateString (d) {
 const newVettingTypeId = ref(null)
 const newDateEntered = ref(null)
 const newDateExpired = ref(null)
+const duplicateVettingError = ref('')
+
+watch([newVettingTypeId, newDateEntered], () => { duplicateVettingError.value = '' })
 
 function addVetting () {
   if (!newVettingTypeId.value) return
+  const dateEntered = dateToDateString(newDateEntered.value)
+  const isDuplicate = props.vettings.some(v =>
+    v.vettingTypeId === newVettingTypeId.value && v.dateEntered === dateEntered)
+  if (isDuplicate) {
+    duplicateVettingError.value = 'This vetting type and date is already on the list.'
+    return
+  }
+  duplicateVettingError.value = ''
   const type = props.vettingTypeOptions.find(t => t.vettingTypeId === newVettingTypeId.value)
   const entry = {
     vettingTypeId: newVettingTypeId.value,
     name: type?.name,
-    dateEntered: dateToDateString(newDateEntered.value),
+    dateEntered,
     dateExpired: dateToDateString(newDateExpired.value),
   }
   emit('update:vettings', [...props.vettings, entry])
@@ -167,6 +178,7 @@ function updateVettingDate (index, field, date) {
         <Button type="button" label="Add Vetting" icon="pi pi-plus"
                 :disabled="!newVettingTypeId" @click="addVetting" />
       </div>
+      <p v-if="duplicateVettingError" class="duplicate-vetting-error">{{ duplicateVettingError }}</p>
     </div>
   </div>
 </template>
@@ -232,6 +244,11 @@ function updateVettingDate (index, field, date) {
   margin-top: 1rem;
 }
 .add-vetting-type { min-width: 14rem; }
+.duplicate-vetting-error {
+  color: var(--color-error);
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
 
 @media (max-width: 900px) {
   .section { grid-template-columns: 1fr 1fr; }

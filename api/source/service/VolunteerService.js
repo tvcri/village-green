@@ -116,6 +116,7 @@ module.exports.deleteVolunteer = async function (personId) {
       const volunteerId = rows[0].id
       await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
       await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
+      await connection.query('DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId])
       await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
     },
     statusObj: undefined
