@@ -69,6 +69,34 @@ test('assigning a volunteer via patch derives Confirmed status', async () => {
   assert.equal(patched.json.volunteerPersonId, volunteer)
 })
 
+test('cancelling via patch sets the cancelled status and records the event', async () => {
+  // The PR #46 confirmation dialog is client-side; this is the underlying
+  // transition it guards. Cancelled statuses pass deriveStatus through verbatim
+  // (they are not re-derived to Open/Confirmed from the volunteer assignment).
+  const created = await vgFetch(SR, {
+    token: tokens.users.full_v1,
+    body: { villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer },
+  })
+  assert.equal(created.status, 201)
+  assert.equal(created.json.status, 'Confirmed')
+  const id = created.json.serviceRequestId
+
+  const cancelled = await vgFetch(`/service-requests/${id}`, {
+    token: tokens.users.full_v1, method: 'PATCH',
+    body: { status: 'Member cancelled', notify: true },
+  })
+  assert.equal(cancelled.status, 200)
+  assert.equal(cancelled.json.status, 'Member cancelled',
+    'cancelled status sticks despite the assigned volunteer')
+  assert.ok((await notificationEvents(id)).includes('cancelled'), 'cancelled notification recorded')
+
+  const filtered = await vgFetch(SR, {
+    token: tokens.users.full_v1, query: { status: ['cancelled'] },
+  })
+  assert.ok(filtered.json.map(r => r.serviceRequestId).includes(id),
+    'the cancelled filter maps to all three cancelled db statuses')
+})
+
 test('status query filter maps to db statuses', async () => {
   const open = await vgFetch(SR, {
     token: tokens.users.full_v1,

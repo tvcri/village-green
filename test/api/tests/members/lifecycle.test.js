@@ -2,108 +2,146 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
-import { villages, persons, members as mem } from '../../setup/fixtures.js'
+import { villages, persons } from '../../setup/fixtures.js'
 
-// SPEC — STALE: written against a flat /members CRUD API that was never built.
-// main implemented the member role as a person sub-resource instead
-// (PUT/PATCH/DELETE /persons/{personId}/member), so these todos must be
-// RETARGETED at those endpoints before they can flip green. Auth/scope gating
-// for the real endpoints is verified GREEN in authz.test.js.
-const STUB = 'specced against the superseded flat /members API; retarget to /persons/{id}/member'
-const MEMBERS = '/members'
+// Member-role lifecycle on the person sub-resource: PUT/PATCH/DELETE
+// /persons/{personId}/member — main's design, superseding the flat /members
+// CRUD this suite originally specced (those todos are retired; a flat member
+// list never existed and member data is read via person projections and
+// /villages/{id}/members instead). The write endpoints respond with the full
+// Person expanded with the memberDetail projection.
+//
+// Writes use throwaway Quahog persons so the canonical fixtures stay intact.
+// Like the Person writes (finding #5), these handlers apply NO village-grant
+// check — the cross-village probe at the bottom asserts the secure outcome
+// and is RED until that's fixed.
 const quahog = String(villages.quahog.id)
+const memberPath = id => `/persons/${id}/member`
 
-// Create a throwaway Quahog person + member so the create/update/delete specs
-// operate on disposable rows (the canonical fixtures stay intact). Only does real
-// work once the Member endpoints exist; before then it fails fast at the member
-// POST (the person POST it makes is wiped by the next run's reseed).
-async function makeMember (token, { memberNumber } = {}) {
-  // Unique fullName per call — person has a unique (village_id, full_name) index,
-  // so a fixed name would collide on the 2nd makeMember in a run.
-  const person = await vgFetch('/persons', { token, body: { villageId: quahog, firstName: 'Throwaway', lastName: `M${memberNumber}` } })
-  assert.equal(person.status, 201, 'precondition: person created')
-  const created = await vgFetch(MEMBERS, { token, body: { personId: person.json.personId, memberNumber } })
-  assert.equal(created.status, 201, 'member created')
-  return created.json
+async function makePerson (token, lastName, body = {}) {
+  const res = await vgFetch('/persons', {
+    token, body: { villageId: quahog, firstName: 'Throwaway', lastName, ...body },
+  })
+  assert.equal(res.status, 201, 'precondition: person created')
+  return res.json.personId
 }
 
-// ---- list / read ----
-
-test('GET /members returns the caller\'s granted-village members as an array', { todo: STUB }, async () => {
-  const { status, json } = await vgFetch(MEMBERS, { token: tokens.users.full_v1 })
+test('PUT grants the member role with an auto-assigned memberNumber', async () => {
+  const id = await makePerson(tokens.users.full_v1, 'MbrPut')
+  const { status, json } = await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PUT',
+    body: { status: 'Active', memberLevel: 'Household' },
+  })
   assert.equal(status, 200)
-  assert.ok(Array.isArray(json), 'body must be an array of members')
-  const numbers = json.map(m => m.memberNumber)
-  assert.ok(numbers.includes('Q-1001'), 'includes the caller\'s own Quahog member')
-  assert.ok(!numbers.includes('I-2001'), 'must not leak the Innsmouth member')
-  assert.ok(!numbers.includes('M-3001'), 'must not leak the Miskatonic member')
+  assert.equal(json.personId, id, 'responds with the person')
+  assert.ok(json.memberDetail, 'response carries memberDetail')
+  assert.equal(json.memberDetail.personId, id)
+  assert.ok(json.memberDetail.memberNumber, 'memberNumber is auto-assigned (not settable via PUT)')
+  assert.equal(json.memberDetail.status, 'Active')
+  assert.equal(json.memberDetail.memberLevel, 'Household')
 })
 
-test('GET /members is grant-scoped per caller (full_v2 sees Innsmouth, not Quahog)', { todo: STUB }, async () => {
-  const { status, json } = await vgFetch(MEMBERS, { token: tokens.users.full_v2 })
-  assert.equal(status, 200)
-  const numbers = json.map(m => m.memberNumber)
-  assert.ok(numbers.includes('I-2001'), 'includes the caller\'s own Innsmouth member')
-  assert.ok(!numbers.includes('Q-1001'), 'must not leak the Quahog member')
+test('PUT on an existing member updates the provided fields, keeping the number', async () => {
+  const id = await makePerson(tokens.users.full_v1, 'MbrPut2')
+  const first = await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PUT', body: { status: 'Active', memberLevel: 'Household' },
+  })
+  assert.equal(first.status, 200)
+  const number = first.json.memberDetail.memberNumber
+
+  const second = await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PUT', body: { status: 'Active', memberLevel: 'Individual' },
+  })
+  assert.equal(second.status, 200)
+  assert.equal(second.json.memberDetail.memberLevel, 'Individual')
+  assert.equal(second.json.memberDetail.memberNumber, number, 'memberNumber survives a re-PUT')
 })
 
-test('GET /members/{id} within the caller\'s grant returns the member', { todo: STUB }, async () => {
-  const { status, json } = await vgFetch(`${MEMBERS}/${mem.quahog.id}`, { token: tokens.users.full_v1 })
+test('PATCH updates mutable member fields (including memberNumber)', async () => {
+  const id = await makePerson(tokens.users.full_v1, 'MbrPatch')
+  const put = await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PUT', body: { status: 'Active' },
+  })
+  assert.equal(put.status, 200)
+
+  const { status, json } = await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PATCH',
+    body: { serviceNotes: 'Prefers morning rides', memberNumber: 'Q-9100' },
+  })
   assert.equal(status, 200)
-  assert.equal(json.memberId, String(mem.quahog.id))
-  assert.equal(json.personId, String(persons.quahogMember.id))
-  assert.equal(json.memberNumber, 'Q-1001')
+  assert.equal(json.memberDetail.serviceNotes, 'Prefers morning rides')
+  assert.equal(json.memberDetail.memberNumber, 'Q-9100')
 })
 
-test('GET /members/{id} for a member outside the caller\'s grants -> 404', { todo: STUB }, async () => {
-  const { status } = await vgFetch(`${MEMBERS}/${mem.innsmouth.id}`, { token: tokens.users.full_v1 })
+test('member status drives the active_member view (non-Active hides memberInfo)', async () => {
+  const id = await makePerson(tokens.users.full_v1, 'MbrDrop')
+  await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PUT', body: { status: 'Active' },
+  })
+  const active = await vgFetch(`/persons/${id}`, {
+    token: tokens.users.full_v1, query: { projection: ['memberInfo'] },
+  })
+  assert.ok(active.json.memberInfo, 'Active member projects memberInfo')
+
+  const patched = await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PATCH',
+    body: { status: 'Dropped', dropReason: 'Moved away' },
+  })
+  assert.equal(patched.status, 200)
+  const dropped = await vgFetch(`/persons/${id}`, {
+    token: tokens.users.full_v1, query: { projection: ['memberInfo'] },
+  })
+  assert.ok(!dropped.json.memberInfo, 'Dropped member is filtered out by active_member')
+})
+
+test('DELETE revokes the member role; a second DELETE 404s', async () => {
+  const id = await makePerson(tokens.users.full_v1, 'MbrDel')
+  await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PUT', body: { status: 'Active' },
+  })
+  const del = await vgFetch(memberPath(id), { token: tokens.users.full_v1, method: 'DELETE' })
+  assert.equal(del.status, 204)
+  const again = await vgFetch(memberPath(id), { token: tokens.users.full_v1, method: 'DELETE' })
+  assert.equal(again.status, 404)
+})
+
+test('PATCH on a person with no member role -> 404', async () => {
+  const id = await makePerson(tokens.users.full_v1, 'MbrNone')
+  const { status } = await vgFetch(memberPath(id), {
+    token: tokens.users.full_v1, method: 'PATCH', body: { serviceNotes: 'x' },
+  })
   assert.equal(status, 404)
 })
 
-// ---- create / update / delete ----
-
-test('POST /members creates a member and echoes the fields', { todo: STUB }, async () => {
-  const person = await vgFetch('/persons', {
-    token: tokens.users.full_v1,
-    body: { villageId: quahog, firstName: 'Brand New', lastName: 'Member' },
+test('PUT for a person with no home village -> 422', async () => {
+  const res = await vgFetch('/persons', {
+    token: tokens.users.full_v1, body: { firstName: 'Throwaway', lastName: 'MbrNoVillage' },
   })
-  assert.equal(person.status, 201)
-  const { status, json } = await vgFetch(MEMBERS, {
-    token: tokens.users.full_v1,
-    body: { personId: person.json.personId, memberNumber: 'Q-9001' },
+  assert.equal(res.status, 201, 'precondition: villageless person created')
+  const { status } = await vgFetch(memberPath(res.json.personId), {
+    token: tokens.users.full_v1, method: 'PUT', body: { status: 'Active' },
   })
-  assert.equal(status, 201)
-  assert.ok(json.memberId, 'returns a new memberId')
-  assert.equal(json.personId, person.json.personId)
-  assert.equal(json.memberNumber, 'Q-9001')
+  assert.equal(status, 422)
 })
 
-test('PATCH /members/{id} updates mutable fields', { todo: STUB }, async () => {
-  const member = await makeMember(tokens.users.full_v1, { memberNumber: 'Q-9002' })
-  const { status, json } = await vgFetch(`${MEMBERS}/${member.memberId}`, {
-    token: tokens.users.full_v1,
-    method: 'PATCH',
-    body: { serviceNotes: 'Prefers morning rides' },
+test('PUT for a nonexistent person -> 404', async () => {
+  const { status } = await vgFetch(memberPath(999999), {
+    token: tokens.users.full_v1, method: 'PUT', body: { status: 'Active' },
   })
-  assert.equal(status, 200)
-  assert.equal(json.serviceNotes, 'Prefers morning rides')
+  assert.equal(status, 404)
 })
 
-test('DELETE /members/{id} removes the member', { todo: STUB }, async () => {
-  const member = await makeMember(tokens.users.full_v1, { memberNumber: 'Q-9003' })
-  const del = await vgFetch(`${MEMBERS}/${member.memberId}`, { token: tokens.users.full_v1, method: 'DELETE' })
-  assert.equal(del.status, 200)
-  const after = await vgFetch(`${MEMBERS}/${member.memberId}`, { token: tokens.users.full_v1 })
-  assert.equal(after.status, 404, 'deleted member is gone')
-})
+// ---- cross-village write: MUST be denied (RED — finding #5) ----
 
-// ---- cross-village write authz ----
-
-test('POST /members for a person outside the caller\'s grants is denied', { todo: STUB }, async () => {
-  // full_v1 (Quahog) attempts to enroll an Innsmouth person as a member.
-  const { status } = await vgFetch(MEMBERS, {
-    token: tokens.users.full_v1,
-    body: { personId: String(persons.innsmouthMember.id), memberNumber: 'X-0001' },
+test('PUT member for a person outside the caller\'s grants is denied', async () => {
+  // full_v2 (Innsmouth only) grants a member role to a Quahog person. A
+  // successful insecure write is undone so the rest of the run is unaffected.
+  const id = await makePerson(tokens.users.full_v1, 'MbrCross')
+  const res = await vgFetch(memberPath(id), {
+    token: tokens.users.full_v2, method: 'PUT', body: { status: 'Active' },
   })
-  assert.ok(status === 403 || status === 404, `expected denial, got ${status}`)
+  if (res.status === 200) {
+    await vgFetch(memberPath(id), { token: tokens.users.full_v1, method: 'DELETE' })
+  }
+  assert.ok(res.status === 403 || res.status === 404, `expected denial, got ${res.status}`)
 })

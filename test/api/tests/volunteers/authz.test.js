@@ -3,10 +3,10 @@ import assert from 'node:assert/strict'
 import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 
-// The Volunteer controller is fully stubbed (every handler returns res.json({})).
-// The framework authentication + scope layer runs BEFORE the controller, so the
-// gating asserted here is REAL, current behavior (GREEN). Stubbed body behavior
-// is specced as todos in lifecycle.test.js.
+// Authentication + scope gating on GET /volunteers. The framework auth layer
+// runs BEFORE the controller, so this is independent of handler behavior; the
+// list contents and the person-scoped write endpoints are covered in
+// lifecycle.test.js.
 const VOLUNTEERS = '/volunteers'
 
 test('GET /volunteers with no token -> 401', async () => {

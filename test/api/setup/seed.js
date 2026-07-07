@@ -8,8 +8,9 @@ import { villages, users, persons, members, volunteers, serviceRequests, fcvSubm
 // Tables we own, child-before-parent for clean truncation.
 const TABLES = [
   'notification_event', 'service_request', 'fcv_submission', 'volunteer_vetting',
-  'volunteer_capability', 'volunteer', 'member', 'person_disability', 'person',
-  'village_grant', 'user_group_user_map', 'user_group', 'user_data', 'village',
+  'volunteer_capability', 'volunteer_village_associate', 'volunteer', 'member',
+  'person_disability', 'person', 'village_grant', 'user_group_user_map',
+  'user_group', 'privacy_acknowledgement', 'privacy_rules', 'user_data', 'village',
 ]
 
 // Drift tripwire: every column the INSERTs below reference, per table. Checked

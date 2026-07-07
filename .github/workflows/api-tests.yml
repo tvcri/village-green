@@ -89,6 +89,9 @@ jobs:
       # the OpenAPI spec. Extract them to a report and fail if there are any.
       # (grep pre-filters non-JSON lines so a crash traceback can't break jq;
       # `|| true` because zero JSON lines is still a valid — if alarming — log.)
+      # The violations are printed to the job log (a summary line per violation,
+      # plus the full report in a collapsed group) so failures are diagnosable
+      # without downloading the artifact.
       - name: Test for response validation messages
         working-directory: ./logs
         run: |
@@ -96,6 +99,12 @@ jobs:
           jq -s 'map(select(.type=="responseValidation")|{method:.data.request.method,url:.data.request.url,errors:.data.error.errors,body:.data.body})' json-lines.jsonl > response-validation.json
           count=$(jq 'length' response-validation.json)
           echo "responseValidation entries: $count"
+          if [ "$count" -gt 0 ]; then
+            jq -r '.[] | "\(.method) \(.url) — " + ([.errors[]? | "\(.path // "?"): \(.message // tojson)"] | join("; "))' response-validation.json
+            echo "::group::Full report (response-validation.json)"
+            jq . response-validation.json
+            echo "::endgroup::"
+          fi
           exit "$count"
 
       - name: Upload response validation artifact

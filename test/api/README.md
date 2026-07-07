@@ -6,14 +6,14 @@ regression net), with **authorization / information-exposure** correctness (only
 users see the right data) as the throughline.
 
 > **Status (2026-07-07):** re-synced with `main` after the #37–#47 merge (the person /
-> member / volunteer schema rework): the seeder now targets the camelCase schema and
-> seeds `firstName`/`lastName` (`fullName` is DB-generated as `"last, first"`), with a
-> drift tripwire that names any out-of-sync column at seed time. Still pending: the
-> member/volunteer lifecycle specs were written against a flat `/members` /
-> `/volunteers/{id}` API that was never built — the implemented endpoints are
-> `PUT|PATCH|DELETE /persons/{personId}/member` and `.../volunteer` — so those todo
-> specs need retargeting before they can ever flip green. Coverage figures below marked
-> *pre-merge* will be regenerated once that lands.
+> member / volunteer schema rework): the seeder targets the camelCase schema and seeds
+> `firstName`/`lastName` (`fullName` is DB-generated as `"last, first"`), with a drift
+> tripwire that names any out-of-sync column at seed time. The member/volunteer
+> lifecycle specs have been **retargeted** onto the implemented person sub-resources
+> (`PUT|PATCH|DELETE /persons/{personId}/member` and `.../volunteer`) and run green;
+> the superseded flat-API todos are retired. New coverage: privacy rules +
+> acknowledgement gate, admin user management (`?keycloak=false`), user groups +
+> grants-via-group, SR cancel, and reference-data smokes.
 
 ## How it works
 
@@ -57,19 +57,21 @@ A run is made of three kinds of test:
 - **Red (hard fail)** — assertions of the *correct/secure* behavior on endpoints that are
   implemented but **buggy**. They fail on purpose and flip green when the bug is fixed, no
   edit needed. The red set is exactly the findings in
-  [SECURITY-FINDINGS.md](./SECURITY-FINDINGS.md) — currently **10** (cross-village exposure
-  on the service-request / person by-id paths, cross-village writes, and two double-wrapped
-  multi-`villageId` 500s). Any *unexpected* red is a real regression.
+  [SECURITY-FINDINGS.md](./SECURITY-FINDINGS.md) — currently **12** (cross-village exposure
+  on the service-request / person by-id paths, cross-village writes — including the
+  member/volunteer role sub-resources — and two double-wrapped multi-`villageId` 500s).
+  Any *unexpected* red is a real regression.
 - **Todo** — `node:test`'s `test.todo`: the *desired* behavior of endpoints **not built
   yet** (village writes are WIP). A failing todo does **not** fail the run, so the unbuilt
   surface is documented without drowning the regression signal; when the endpoint lands and
   the todo starts passing, drop the `todo` flag to promote it to a hard guard.
-  *Caveat learned the hard way:* the member/volunteer todos were specced against a
-  guessed flat-API design and `main` built person-scoped endpoints instead — todo specs
-  should be written against an agreed OpenAPI change, not a predicted one.
+  *Caveat learned the hard way:* the original member/volunteer todos were specced against
+  a guessed flat-API design and `main` built person-scoped endpoints instead (they've
+  since been retargeted) — todo specs should be written against an agreed OpenAPI change,
+  not a predicted one.
 
-So a "clean" run is the **10** documented reds, a stack of todos, and everything else green.
-`npm test` exits non-zero only because of those 10 reds.
+So a "clean" run is the **12** documented reds, a stack of todos, and everything else green.
+`npm test` exits non-zero only because of those 12 reds.
 
 ## Coverage
 
@@ -102,28 +104,20 @@ The suite spans every resource that existed at the last sync — auth/scope gati
 grant/role authorization, and characterization of real behavior, with WIP endpoints
 specced as todos. Gaps, in priority order:
 
-- **Member/volunteer writes (PRs #37/#44/#45):** the implemented
-  `PUT|PATCH|DELETE /persons/{personId}/member` and `.../volunteer` endpoints are entirely
-  untested; the existing lifecycle todos target the superseded flat `/members` /
-  `/volunteers/{id}` design and must be retargeted.
-- **Privacy (PR #31):** all four `/privacy/*` endpoints (rules read/publish/correct,
-  acknowledgement) and the API-side acknowledgement enforcement are untested.
-- **Admin user management (PRs #40/#41):** `POST /users`, `PATCH`/`PUT /users/{userId}`
-  have no coverage; `DELETE /users/{userId}` and the grant writes have only non-admin-403
-  checks. These endpoints call the Keycloak admin API, which mockOidc doesn't implement —
-  for now, test the DB-side behavior via `?keycloak=false`; exercising the Keycloak
-  integration itself (e.g. a minimal admin-API facade in mockOidc) is deferred pending
-  discussion.
-- **User groups:** all `/user-groups` endpoints are untested, and only direct user grants
-  are seeded — grants via `user_group` are unverified.
-- **Service-request cancel transition:** the PR #46 confirmation dialog is client-side, but
-  the underlying `PATCH` cancel transition has no dedicated test.
-- **Reference data:** `/communities`, `/disabilities`, `/capabilities`, `/vetting-types`
-  have no smokes.
-- **Notifications:** only the create `open` event; confirmed/cancelled/reminder, patch
-  notifications, recipients, and the notification-history endpoints are untested.
-- **CE member/volunteer fields & active views:** the new fields and `active_member` /
-  `active_volunteer` filtering (e.g. inactive members hidden) aren't asserted.
+- **Keycloak-integrated user management:** the `?keycloak=false` paths are covered, but
+  the Keycloak admin-API calls themselves are not (mockOidc has no admin API); a minimal
+  admin-API facade in mockOidc is deferred pending discussion. Known holes documented as
+  todos/comments in `tests/users/management.test.js`: `DELETE /users/{userId}` has no
+  `keycloak=false` escape (500s in the harness), a `PATCH` username change is never
+  propagated to the IdP (`KeycloakService.updateUsername` has no caller), and
+  `PUT /users/{userId}` is unusable because `UserPut` both requires and forbids
+  `villageGrants` (spec bug, characterized as 400).
+- **Volunteer vettings:** the `vettings` arrays on the volunteer role are unexercised —
+  `vetting_type` ships no static rows and has no write endpoint, so any `vettingTypeId`
+  would violate the FK.
+- **Notifications:** only the create `open` and cancel `cancelled` events; confirmed /
+  reminder, patch notifications, recipients, and the notification-history endpoints are
+  untested.
 - **Meta roll-up:** service-requests only; persons/friends meta not covered.
 - **op/* internals:** `VG_EXPERIMENTAL_APPDATA` is ON in the harness; the JSONL
   export → import → re-export round trip is exercised (`tests/op/appdata-roundtrip.test.js`,
@@ -134,7 +128,7 @@ specced as todos. Gaps, in priority order:
 - **Client / UI:** out of scope. (This includes the CSV exports from PRs #38/#39 — CSV is
   generated client-side from the tested JSON list endpoints; there is no API surface.)
 
-(The 10 red tests are known *bugs*, not coverage gaps — see SECURITY-FINDINGS.md.)
+(The 12 red tests are known *bugs*, not coverage gaps — see SECURITY-FINDINGS.md.)
 
 ## Layout
 
@@ -157,17 +151,21 @@ lib/
 tests/               the endpoint tests, one directory per topic; each topic's
                      projections.test.js covers its `?projection=` expansions
   auth/              authentication + scope, elevation
-  members/           authz/scope gating (green) + CRUD specs (todo — target the
-                     superseded flat /members API; retarget to /persons/{id}/member)
-  volunteers/        authz/scope gating (green) + CRUD/capabilities specs (todo —
-                     same: retarget to /persons/{id}/volunteer)
+  members/           authz/scope gating + /persons/{id}/member lifecycle,
+                     active_member view filtering (+ finding #5 probe)
+  volunteers/        GET /volunteers grant-scoping + /persons/{id}/volunteer
+                     lifecycle, capabilities, active_volunteer (+ #5 probe)
   friends/           grant filtering, elevate, query filters (+ finding #4)
   persons/           cross-village read leak (#1) + cross-village writes (#5)
-  service-request/   meta roll-up, cross-village authz, lifecycle/correctness
+  privacy/           rules lifecycle + the acknowledgement gate (order-sensitive:
+                     ends by acking every canonical user for the files after it)
+  reference/         /communities /disabilities /capabilities /vetting-types smokes
+  service-request/   meta roll-up, cross-village authz, lifecycle incl. cancel
   villages/          read grant-gating, grant-mgmt authz (admin), WIP write todos
-  users/             self-service + admin-gated user/grant/group management
+  users/             self-service + admin user/grant management (?keycloak=false)
+                     + user groups & grants-via-group
   roles/             role-tier (non-)differentiation
-  op/                appdata gating, analytics (admin), jobs (admin surface)
+  op/                appdata gating + round trip, analytics (admin), jobs
   smoke/             state + spec endpoints
 ```
 

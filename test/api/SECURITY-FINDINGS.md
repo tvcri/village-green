@@ -69,10 +69,17 @@ applies **no village-grant check** on any write path:
 - `PATCH /persons/{id}` (`patchPerson`) and `DELETE /persons/{id}` (`deletePerson`) resolve
   the row with a grant-blind `PersonService.getPerson`, so a caller can modify or delete any
   person by id — including persons in villages they do not administer.
+- The person **sub-resource roles** inherit the same hole: the Member and Volunteer
+  controllers ([controllers/Member.js](../../api/source/controllers/Member.js),
+  [controllers/Volunteer.js](../../api/source/controllers/Volunteer.js)) check only that the
+  person exists and has a home village — never that the caller holds a grant on that
+  village — so `PUT|PATCH|DELETE /persons/{personId}/member` and `.../volunteer` accept
+  cross-village role writes.
 
-Same class as #2 (cross-village writes), for the person resource.
+Same class as #2 (cross-village writes), for the person resource and its role sub-resources.
 
-- Asserted in: `tests/persons/write.test.js`
+- Asserted in: `tests/persons/write.test.js`, plus the cross-village probes in
+  `tests/members/lifecycle.test.js` and `tests/volunteers/lifecycle.test.js`
 - Expected secure behavior: **403/404** for a person/village outside the caller's grants.
 
 ---
