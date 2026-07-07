@@ -190,7 +190,7 @@ function handleCancel() {
         <div class="grants-header">
           <h2>Village Grants</h2>
           <Button
-            label="+ Create Grant"
+            label="+ Add Grant"
             :disabled="!!pendingGrant"
             @click="handleCreateGrant"
           />
@@ -334,7 +334,7 @@ h1 {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-top: 2rem;
 }
 
 .grants-header h2 {
@@ -348,6 +348,11 @@ h1 {
   text-align: center;
   color: var(--color-text-dim);
   font-style: italic;
+}
+
+.grants-table-responsive {
+  box-shadow: var(--box-shadow-card);
+  border: 1px solid var(--color-border-default);
 }
 
 .village-select,

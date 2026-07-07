@@ -190,6 +190,11 @@ h1 {
   color: var(--color-text-dim);
 }
 
+.users-table-responsive {
+  box-shadow: var(--box-shadow-card);
+  border: 1px solid var(--color-border-default);
+}
+
 .row-actions {
   display: flex;
   gap: 0.5rem;
@@ -198,6 +203,7 @@ h1 {
 .users-table-clickable-rows :deep(.p-datatable-tbody > tr) {
   cursor: pointer;
 }
+
 
 @media (max-width: 768px) {
   .user-list {
