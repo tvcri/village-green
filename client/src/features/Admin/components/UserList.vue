@@ -9,7 +9,7 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
-import { getUsersWithGrants, updateUser, deleteUser } from '../../../shared/api/userApi.js'
+import { getUsersWithGrantCount, updateUser, deleteUser } from '../../../shared/api/userApi.js'
 import { isDuplicateUsername, getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 
 const router = useRouter()
@@ -19,7 +19,7 @@ const searchText = ref('')
 const cellError = ref({ userId: null, message: '' })
 
 const { state: users, isLoading } = useAsyncState(
-  () => getUsersWithGrants(),
+  () => getUsersWithGrantCount(),
   { immediate: true }
 )
 
@@ -138,7 +138,7 @@ async function onDeleteUser(user) {
       <Column header="Grants">
         <template #body="{ data }">
           <Button
-            :label="String((data.villageGrants || []).length)"
+            :label="String(data.statistics?.villageGrantCount ?? 0)"
             link
             @click="goToGrants(data.userId)"
           />

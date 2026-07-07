@@ -27,10 +27,10 @@ describe('userApi', () => {
     expect(result).toEqual({ userId: 5, username: 'new@b.com' })
   })
 
-  it('deleteUser calls deleteUser op with userId and elevate, no body', async () => {
+  it('deleteUser calls deleteUser op with userId, elevate, and statistics projection', async () => {
     apiCall.mockResolvedValue({ userId: 5, status: 'unavailable' })
     const result = await deleteUser(5)
-    expect(apiCall).toHaveBeenCalledWith('deleteUser', { userId: 5, elevate: true })
+    expect(apiCall).toHaveBeenCalledWith('deleteUser', { userId: 5, elevate: true, projection: ['statistics'] })
     expect(result).toEqual({ userId: 5, status: 'unavailable' })
   })
 })
