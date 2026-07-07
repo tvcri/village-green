@@ -162,7 +162,9 @@ async function onDeleteUser(user) {
           </div>
         </template>
       </Column>
-      <Column field="displayName" header="Display Name" sortable></Column>
+      <Column field="displayName" header="Display Name" sortable>
+        <template #body="{ data }">{{ data.displayName === data.username ? '—' : data.displayName }}</template>
+      </Column>
       <Column field="status" header="Status" sortable>
         <template #body="{ data }">
           <Tag :value="data.status" :severity="data.status === 'available' ? 'success' : 'danger'" />
