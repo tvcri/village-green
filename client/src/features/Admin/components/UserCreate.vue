@@ -34,6 +34,15 @@ function removeGrantRow(key) {
   grantRows.value = grantRows.value.filter(row => row.key !== key)
 }
 
+function villageOptionsForRow(row) {
+  const chosenElsewhere = new Set(
+    grantRows.value
+      .filter(r => r.key !== row.key && r.villageId)
+      .map(r => r.villageId)
+  )
+  return (villages.value || []).filter(v => !chosenElsewhere.has(v.villageId))
+}
+
 const isFormValid = computed(() => {
   if (!username.value.trim()) return false
   return grantRows.value.every(row => row.villageId && row.roleId)
@@ -111,7 +120,7 @@ function handleCancel() {
         <div v-for="row in grantRows" :key="row.key" class="grant-row">
           <Select
             v-model="row.villageId"
-            :options="villages"
+            :options="villageOptionsForRow(row)"
             option-label="name"
             option-value="villageId"
             placeholder="-- Village --"
