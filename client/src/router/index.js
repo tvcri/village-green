@@ -85,12 +85,6 @@ const routes = [
     meta: { requiresAdmin: true },
   },
   {
-    path: '/admin/users/grants/:userId',
-    name: 'admin-create-user-grant',
-    component: () => import('../features/Admin/components/CreateUserGrant.vue'),
-    meta: { requiresAdmin: true },
-  },
-  {
     path: '/admin/analytics',
     name: 'admin-analytics',
     component: () => import('../features/Admin/components/AnalyticsSummary.vue'),

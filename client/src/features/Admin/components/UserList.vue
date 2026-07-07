@@ -12,8 +12,8 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
-import { getUsersWithGrantCount, updateUser, deleteUser } from '../../../shared/api/userApi.js'
-import { isDuplicateUsername, getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
+import { getUsersWithGrantCount, deleteUser } from '../../../shared/api/userApi.js'
+import { getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 
 defineOptions({ name: 'UserList' })
 
@@ -21,7 +21,6 @@ const router = useRouter()
 const toast = useToast()
 
 const searchText = ref('')
-const cellError = ref({ userId: null, message: '' })
 const pageRows = ref(10)
 
 const { state: users, isLoading, execute: refetchUsers } = useAsyncState(
@@ -56,40 +55,8 @@ function goToGrants(userId) {
   router.push({ name: 'admin-user-grants', params: { userId } })
 }
 
-function goToCreateGrant(userId) {
-  router.push({ name: 'admin-create-user-grant', params: { userId } })
-}
-
-async function onCellEditComplete(event) {
-  const { data, newValue, field } = event
-  if (field !== 'username') return
-
-  const trimmed = (newValue || '').trim()
-  cellError.value = { userId: null, message: '' }
-
-  if (!trimmed || trimmed === data.username) {
-    return
-  }
-
-  const otherUsernames = users.value
-    .filter(u => u.userId !== data.userId)
-    .map(u => u.username)
-
-  if (isDuplicateUsername(trimmed, otherUsernames)) {
-    cellError.value = { userId: data.userId, message: 'That username is already in use.' }
-    return
-  }
-
-  try {
-    const updated = await updateUser(data.userId, { username: trimmed })
-    const index = users.value.findIndex(u => u.userId === data.userId)
-    if (index !== -1) {
-      users.value[index] = { ...users.value[index], ...updated }
-    }
-  }
-  catch (err) {
-    cellError.value = { userId: data.userId, message: extractApiErrorMessage(err, 'Failed to rename user.') }
-  }
+function onRowClick(event) {
+  goToGrants(event.data.userId)
 }
 
 async function onDeleteUser(user) {
@@ -134,13 +101,12 @@ async function onDeleteUser(user) {
       v-else
       :value="filteredUsers"
       data-key="userId"
-      edit-mode="cell"
-      @cell-edit-complete="onCellEditComplete"
       sort-field="username"
       :sort-order="1"
       paginator
       :rows="pageRows"
-      class="users-table-responsive"
+      class="users-table-responsive users-table-clickable-rows"
+      @row-click="onRowClick"
     >
       <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
         <div class="paginator-container">
@@ -151,17 +117,7 @@ async function onDeleteUser(user) {
         </div>
       </template>
 
-      <Column field="username" header="Username" sortable>
-        <template #editor="{ data, field }">
-          <InputText v-model="data[field]" autofocus fluid />
-        </template>
-        <template #body="{ data }">
-          <div>
-            {{ data.username }}
-            <div v-if="cellError.userId === data.userId" class="field-error">{{ cellError.message }}</div>
-          </div>
-        </template>
-      </Column>
+      <Column field="username" header="Username" sortable></Column>
       <Column field="displayName" header="Display Name" sortable>
         <template #body="{ data }">{{ data.displayName === data.username ? '—' : data.displayName }}</template>
       </Column>
@@ -175,7 +131,7 @@ async function onDeleteUser(user) {
           <Button
             :label="String(data.statistics?.villageGrantCount ?? 0)"
             link
-            @click="goToGrants(data.userId)"
+            @click.stop="goToGrants(data.userId)"
           />
         </template>
       </Column>
@@ -189,17 +145,10 @@ async function onDeleteUser(user) {
         <template #body="{ data }">
           <div class="row-actions">
             <Button
-              icon="pi pi-plus"
-              severity="secondary"
-              size="small"
-              @click="goToCreateGrant(data.userId)"
-              title="Add grant"
-            />
-            <Button
               icon="pi pi-trash"
               severity="danger"
               size="small"
-              @click="onDeleteUser(data)"
+              @click.stop="onDeleteUser(data)"
               :title="getDeleteConfirmCopy(data).confirmLabel"
             />
           </div>
@@ -241,15 +190,13 @@ h1 {
   color: var(--color-text-dim);
 }
 
-.field-error {
-  color: var(--color-text-error);
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-}
-
 .row-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.users-table-clickable-rows :deep(.p-datatable-tbody > tr) {
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {

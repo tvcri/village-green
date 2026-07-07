@@ -56,7 +56,7 @@ watch(() => route.name, (routeName) => {
 
   if (routeName === 'admin-create-grant' && adminVillages.value === null) {
     fetchAdminVillages()
-  } else if ((routeName === 'admin-create-user-grant' || routeName === 'admin-user-grants') && adminUsers.value === null) {
+  } else if (routeName === 'admin-user-grants' && adminUsers.value === null) {
     fetchAdminUsers()
   } else if (!routeName.startsWith('admin') && (route.params.villageId || routeName.startsWith('meta')) && villages.value === null) {
     fetchVillages()
@@ -101,21 +101,6 @@ const breadcrumbs = computed(() => {
         crumbs.push({
           label: villageName,
           route: { name: 'admin-village-access', query: { villageId } }
-        })
-        crumbs.push({ label: 'Create Grant' })
-        break
-      }
-      case 'admin-create-user-grant': {
-        const userId = route.params.userId
-        const user = adminUsers.value?.find(u => u.userId === userId)
-        const userName = user?.displayName || user?.username || `User ${userId}`
-        crumbs.push({
-          label: 'Users',
-          route: { name: 'admin-user-access' }
-        })
-        crumbs.push({
-          label: userName,
-          route: { name: 'admin-user-grants', params: { userId } }
         })
         crumbs.push({ label: 'Create Grant' })
         break
