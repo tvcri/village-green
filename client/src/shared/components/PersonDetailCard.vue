@@ -162,6 +162,11 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.memberLevel }}</span>
         </div>
 
+        <div v-if="isFullDetail && person.primaryPerson?.fullName" class="detail-field">
+          <span class="label">Primary Person:</span>
+          <span class="value">{{ person.primaryPerson.fullName }}</span>
+        </div>
+
         <div v-if="person.joinDate" class="detail-field">
           <span class="label">Join Date:</span>
           <span class="value">{{ person.joinDate }}</span>
@@ -171,11 +176,6 @@ const copyEmail = async (email) => {
           <div v-if="person.memberType" class="detail-field">
             <span class="label">Member Type:</span>
             <span class="value">{{ person.memberType }}</span>
-          </div>
-
-          <div v-if="person.primaryPerson?.fullName" class="detail-field">
-            <span class="label">Primary Person:</span>
-            <span class="value">{{ person.primaryPerson.fullName }}</span>
           </div>
 
           <div v-if="person.secondaryType" class="detail-field">
@@ -188,7 +188,7 @@ const copyEmail = async (email) => {
             <span class="value">{{ person.status }}</span>
           </div>
 
-          <div v-if="person.dropReason" class="detail-field">
+          <div v-if="person.status === 'Dropped' && person.dropReason" class="detail-field">
             <span class="label">Drop Reason:</span>
             <span class="value">{{ person.dropReason }}</span>
           </div>

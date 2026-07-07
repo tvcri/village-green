@@ -18,13 +18,14 @@ const hasMember = ref(false)
 const hasHomeVillage = computed(() => !!person.value?.village?.villageId)
 const form = reactive({
   memberNumber: '', memberLevel: '', memberType: '', primaryPersonId: '',
-  secondaryType: '', serviceNotes: '', joinDate: '',
+  serviceNotes: '', joinDate: '',
   status: 'Active', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   confidentialNotes: '', statusChangeNotes: '', miscNotes: '',
 })
 const createdDate = ref('')
 const primaryPersonName = ref('')
+const canSave = computed(() => form.memberLevel !== 'Secondary' || !!form.primaryPersonId)
 
 onMounted(async () => {
   const p = await getPerson(personId.value, ['memberDetail'])
@@ -91,6 +92,8 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
         <MemberFormFields
           :form="form"
           :primary-person-name="primaryPersonName"
+          primary-person-editable
+          :village-id="person?.village?.villageId"
           :created-date="createdDate"
           :show-created-date="hasMember"
         />
@@ -98,7 +101,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
         <div class="form-footer">
           <Button v-if="hasMember" type="button" label="Revoke Role" severity="danger" @click="revoke" />
           <Button type="button" label="Cancel" severity="secondary" @click="back" />
-          <Button type="submit" :label="hasMember ? 'Save' : 'Grant Member Role'" />
+          <Button type="submit" :disabled="!canSave" :label="hasMember ? 'Save' : 'Grant Member Role'" />
         </div>
       </form>
     </template>
