@@ -162,8 +162,8 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.memberLevel }}</span>
         </div>
 
-        <div v-if="isFullDetail && person.primaryPerson?.fullName" class="detail-field">
-          <span class="label">Primary Person:</span>
+        <div v-if="person.primaryPerson?.fullName" class="detail-field">
+          <span class="label">Primary Member:</span>
           <span class="value">{{ person.primaryPerson.fullName }}</span>
         </div>
 
