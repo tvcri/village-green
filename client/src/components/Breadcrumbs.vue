@@ -56,7 +56,7 @@ watch(() => route.name, (routeName) => {
 
   if (routeName === 'admin-create-grant' && adminVillages.value === null) {
     fetchAdminVillages()
-  } else if (routeName === 'admin-create-user-grant' && adminUsers.value === null) {
+  } else if ((routeName === 'admin-create-user-grant' || routeName === 'admin-user-grants') && adminUsers.value === null) {
     fetchAdminUsers()
   } else if (!routeName.startsWith('admin') && (route.params.villageId || routeName.startsWith('meta')) && villages.value === null) {
     fetchVillages()
@@ -77,8 +77,19 @@ const breadcrumbs = computed(() => {
         crumbs.push({ label: 'Village Access', siblings: getSiblings('admin-village-access', {}) })
         break
       case 'admin-user-access':
-        crumbs.push({ label: 'User Access', siblings: getSiblings('admin-user-access', {}) })
+        crumbs.push({ label: 'Users', siblings: getSiblings('admin-user-access', {}) })
         break
+      case 'admin-user-grants': {
+        const userId = route.params.userId
+        const user = adminUsers.value?.find(u => u.userId === userId)
+        const userName = user?.displayName || user?.username || `User ${userId}`
+        crumbs.push({
+          label: 'Users',
+          route: { name: 'admin-user-access' }
+        })
+        crumbs.push({ label: userName })
+        break
+      }
       case 'admin-create-grant': {
         const villageId = route.params.villageId
         const village = adminVillages.value?.find(v => v.villageId === villageId)
@@ -99,12 +110,12 @@ const breadcrumbs = computed(() => {
         const user = adminUsers.value?.find(u => u.userId === userId)
         const userName = user?.displayName || user?.username || `User ${userId}`
         crumbs.push({
-          label: 'User Access',
-          route: { name: 'admin-user-access', query: { userId } }
+          label: 'Users',
+          route: { name: 'admin-user-access' }
         })
         crumbs.push({
           label: userName,
-          route: { name: 'admin-user-access', query: { userId } }
+          route: { name: 'admin-user-grants', params: { userId } }
         })
         crumbs.push({ label: 'Create Grant' })
         break

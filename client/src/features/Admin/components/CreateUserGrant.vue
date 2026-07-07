@@ -59,8 +59,8 @@ const handleSubmit = async () => {
 
     await createUserGrant(userId.value, grantsToCreate)
     router.push({
-      name: 'admin-user-access',
-      query: { userId: userId.value }
+      name: 'admin-user-grants',
+      params: { userId: userId.value }
     })
   } catch (err) {
     console.error('Failed to create grants:', err)
