@@ -16,7 +16,7 @@ requests, the member's/volunteer's home address, phone, and email via
 
 The **list** endpoints are grant-filtered; only the single-record-by-ID paths leak.
 
-- Asserted in: `service-request/authz.test.js`, `persons/authz.test.js`
+- Asserted in: `tests/service-request/authz.test.js`, `tests/persons/authz.test.js`
 - Expected secure behavior: **404** for a record outside the caller's grants (matching the
   existing nested-route convention, where `GET /villages/{id}/...` 404s for an ungranted
   village). If the team prefers 403, update the assertion when the guard is added.
@@ -28,21 +28,21 @@ The **list** endpoints are grant-filtered; only the single-record-by-ID paths le
 a user can create a request in, or modify a request belonging to, a village they don't
 administer.
 
-- Asserted in: `service-request/authz.test.js`
+- Asserted in: `tests/service-request/authz.test.js`
 - Expected secure behavior: **403/404** for a village outside the caller's grants.
 
 ## 3. Multi-value `villageId` filter is mis-bound (RED, correctness not security)
 
 In `getServiceRequests`, the client `villageId` filter is bound as `[villageId]` where
 `villageId` is already an array
-([ServiceRequestService.js:174](../../api/source/service/ServiceRequestService.js#L174)),
+([ServiceRequestService.js:194](../../api/source/service/ServiceRequestService.js#L194)),
 double-wrapping it. A single value works by accident; **multiple** selected villages render
 a nested row-constructor — the generated SQL is `sr.village_id IN (('1', '2'))` — which
 MySQL rejects with `ER_OPERAND_COLUMNS` ("Operand should contain 1 column(s)"), so the
 endpoint returns **500**. This is the path the meta view uses when more than one village is
 selected.
 
-- Asserted in: `service-request/meta-rollup.test.js`
+- Asserted in: `tests/service-request/meta-rollup.test.js`
 - Note: not an information-exposure issue (the grant filter is always ANDed on top, so it
   can only *under*-return, never leak), but a correctness bug.
 
@@ -55,7 +55,7 @@ where `villageId` is already an array. With more than one village selected
 MySQL rejects with `ER_OPERAND_COLUMNS`, so the endpoint returns **500**. A single value works
 by accident.
 
-- Asserted in: `friends/list.test.js`
+- Asserted in: `tests/friends/list.test.js`
 - Note: like #3, the caller's grant filter is always ANDed on top, so this can only
   *under*-return, never leak — a correctness bug, not an exposure.
 
@@ -72,7 +72,7 @@ applies **no village-grant check** on any write path:
 
 Same class as #2 (cross-village writes), for the person resource.
 
-- Asserted in: `persons/write.test.js`
+- Asserted in: `tests/persons/write.test.js`
 - Expected secure behavior: **403/404** for a person/village outside the caller's grants.
 
 ---

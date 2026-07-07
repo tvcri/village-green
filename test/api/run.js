@@ -143,6 +143,7 @@ function runTests () {
       '--test', '--test-concurrency=1',
       '--test-reporter=spec', '--test-reporter-destination=stdout',
       '--test-reporter=tap', `--test-reporter-destination=${config.paths.testReport}`,
+      'tests/**/*.test.js', // endpoint tests live under tests/<topic>/; harness dirs are siblings
     ], {
       cwd: config.paths.apiTestDir,
       env: { ...process.env },

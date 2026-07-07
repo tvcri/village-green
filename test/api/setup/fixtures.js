@@ -68,38 +68,42 @@ export const users = {
 
 // person rows. Each village has a member-person and a volunteer-person, with
 // contact details populated so projection-based address leaks are observable.
-// `address` is a generated column (concat of street + unit), so we seed `street`.
-function person (id, villageId, fullName, street, city, zip) {
-  const parts = fullName.toLowerCase().replace(/[^a-z ]/g, '').split(/\s+/).filter(Boolean)
+// `address` (street + unit) and `fullName` ("lastName, firstName") are generated
+// columns, so we seed street/firstName/lastName and precompute `fullName` here in
+// the DB's format so tests can assert against API responses.
+function person (id, villageId, firstName, lastName, street, city, zip) {
   return {
-    id, villageId, fullName,
+    id, villageId, firstName, lastName,
+    fullName: `${lastName}, ${firstName}`,
     street, city, state: 'RI', zip,
-    email: `${parts[0]}.${parts[parts.length - 1]}@residents.test`,
+    email: `${firstName.toLowerCase().replace(/[^a-z]/g, '')}.${lastName.toLowerCase().replace(/[^a-z]/g, '')}@residents.test`,
     phone: '401-555-0101', cell: '401-555-0202',
   }
 }
 
 export const persons = {
   // Quahog: Family Guy (31 Spooner Street is the Griffins' address)
-  quahogMember: person(1, villages.quahog.id, 'Peter Griffin', '31 Spooner St', 'Quahog', '02860'),
-  quahogVolunteer: person(2, villages.quahog.id, 'Joe Swanson', '33 Spooner St', 'Quahog', '02860'),
+  quahogMember: person(1, villages.quahog.id, 'Peter', 'Griffin', '31 Spooner St', 'Quahog', '02860'),
+  quahogVolunteer: person(2, villages.quahog.id, 'Joe', 'Swanson', '33 Spooner St', 'Quahog', '02860'),
   // Innsmouth / Miskatonic: low-key fake residents (the village names are the only nod)
-  innsmouthMember: person(3, villages.innsmouth.id, 'Edith Sargent', '7 Water St', 'Innsmouth', '02882'),
-  innsmouthVolunteer: person(4, villages.innsmouth.id, 'Caleb Easton', '12 Harbor Rd', 'Innsmouth', '02882'),
-  miskatonicMember: person(5, villages.miskatonic.id, 'Eleanor Vance', '9 College St', 'Arkham', '02893'),
-  miskatonicVolunteer: person(6, villages.miskatonic.id, 'Walter Brattle', '10 Library Way', 'Arkham', '02893'),
+  innsmouthMember: person(3, villages.innsmouth.id, 'Edith', 'Sargent', '7 Water St', 'Innsmouth', '02882'),
+  innsmouthVolunteer: person(4, villages.innsmouth.id, 'Caleb', 'Easton', '12 Harbor Rd', 'Innsmouth', '02882'),
+  miskatonicMember: person(5, villages.miskatonic.id, 'Eleanor', 'Vance', '9 College St', 'Arkham', '02893'),
+  miskatonicVolunteer: person(6, villages.miskatonic.id, 'Walter', 'Brattle', '10 Library Way', 'Arkham', '02893'),
 }
 
+// status 'Active' / active 1 so the active_member / active_volunteer views
+// (which the services select from) include the canonical rows.
 export const members = {
-  quahog: { id: 1, personId: persons.quahogMember.id, memberNumber: 'Q-1001' },
-  innsmouth: { id: 2, personId: persons.innsmouthMember.id, memberNumber: 'I-2001' },
-  miskatonic: { id: 3, personId: persons.miskatonicMember.id, memberNumber: 'M-3001' },
+  quahog: { id: 1, personId: persons.quahogMember.id, memberNumber: 'Q-1001', status: 'Active' },
+  innsmouth: { id: 2, personId: persons.innsmouthMember.id, memberNumber: 'I-2001', status: 'Active' },
+  miskatonic: { id: 3, personId: persons.miskatonicMember.id, memberNumber: 'M-3001', status: 'Active' },
 }
 
 export const volunteers = {
-  quahog: { id: 1, personId: persons.quahogVolunteer.id },
-  innsmouth: { id: 2, personId: persons.innsmouthVolunteer.id },
-  miskatonic: { id: 3, personId: persons.miskatonicVolunteer.id },
+  quahog: { id: 1, personId: persons.quahogVolunteer.id, active: 1 },
+  innsmouth: { id: 2, personId: persons.innsmouthVolunteer.id, active: 1 },
+  miskatonic: { id: 3, personId: persons.miskatonicVolunteer.id, active: 1 },
 }
 
 export const serviceRequests = {

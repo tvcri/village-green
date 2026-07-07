@@ -36,7 +36,7 @@ during exploration:
   `elevate` is **admin-only** — non-admins get `InvalidElevationError`.
 - **By-ID endpoints are NOT grant-filtered.** `getServiceRequest(serviceRequestId)`
   (`controllers/ServiceRequest.js:43`) and `getPerson(personId)`
-  (`controllers/Person.js:51`), plus their PATCH/DELETE, operate on a bare id with **no
+  (`controllers/Person.js:43`), plus their PATCH/DELETE, operate on a bare id with **no
   village-grant guard**. A user granted only on village A, holding
   `vg:service-request:read`, can `GET /service-requests/{id}` for a request in village B —
   and pull the member's/volunteer's home address, phone, and email via
@@ -46,12 +46,12 @@ during exploration:
   routes reuse the ordinary list components in "meta mode" (`isMetaMode = !route.params.villageId`,
   `ServiceRequestList.vue`). The roll-up is therefore *entirely* a server-side property of
   the `getServiceRequests` list endpoint. In
-  [ServiceRequestService.js:167-175](../../../api/source/service/ServiceRequestService.js#L167-L175)
+  [ServiceRequestService.js:187-195](../../../api/source/service/ServiceRequestService.js#L187-L195)
   the grant filter (`sr.village_id IN (granted)`) is **always** applied for non-elevated
   requests, and a client-supplied `villageId` is **ANDed** on top — so a `villageId` can
   only ever *narrow within* a user's grants, never expand scope. This is a good (testable
   GREEN) property, and it is what makes the meta view safe.
-- **Likely multi-value `villageId` bug.** Line 118 pushes `[villageId]` where `villageId`
+- **Likely multi-value `villageId` bug.** Line 194 pushes `[villageId]` where `villageId`
   is already an array, double-wrapping it (`[['a','b']]`). For a single village it works by
   accident; for multiple selected villages the `IN (?)` bind renders a nested row
   constructor and the filter misbehaves. Not a security issue, but a correctness one the
@@ -221,7 +221,7 @@ excluding the rest — *even when the client supplies a `villageId`*. These are 
 - **Multi-value filter bug (likely RED):** `multi`
   `GET /service-requests?villageId=<Quahog>&villageId=<Innsmouth>` →
   characterizes the `[villageId]` double-wrap at
-  [ServiceRequestService.js:174](../../../api/source/service/ServiceRequestService.js#L174)
+  [ServiceRequestService.js:194](../../../api/source/service/ServiceRequestService.js#L194)
   (a nested-array bind that misrenders the `IN` list for multiple villages).
 
 ### 3. Cross-village information-exposure — the core (`service-request/authz.test.js`, `persons/authz.test.js`)
