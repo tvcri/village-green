@@ -812,6 +812,13 @@ paths:
       - User
       summary: Create a User
       operationId: createUser
+      parameters:
+      - name: keycloak
+        in: query
+        description: Also create the corresponding Keycloak account. Defaults to true.
+        schema:
+          type: boolean
+          default: true
       requestBody:
         required: true
         content:
@@ -917,7 +924,9 @@ paths:
     delete:
       tags:
       - User
-      summary: Delete a User that has never accessed the system.
+      summary: Delete a User. Users who have never accessed the system are removed
+        entirely; users who have are soft-deleted (status set to unavailable,
+        grants and group memberships cleared) to preserve foreign key references.
       operationId: deleteUser
       responses:
         '200':
@@ -3898,9 +3907,16 @@ components:
           uniqueItems: true
         username:
           $ref: '#/components/schemas/Username'
+        firstName:
+          type: string
+        lastName:
+          type: string
+        villageGrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserVillageGrantWrite'
       required:
       - username
-      - villageGrants
     UserPrivileges:
       type: object
       additionalProperties: false
