@@ -94,25 +94,27 @@ function handleCancel() {
     <h1>New User</h1>
 
     <form @submit.prevent="handleSubmit" class="user-form">
-      <div class="form-field">
-        <label for="username">Username <span class="required">*</span></label>
-        <InputText
-          id="username"
-          v-model="username"
-          class="w-full"
-          :class="{ 'p-invalid': usernameError }"
-        />
-        <small class="field-error" v-if="usernameError">{{ usernameError }}</small>
-      </div>
+      <div class="name-fields-row">
+        <div class="form-field">
+          <label for="username">Username <span class="required">*</span></label>
+          <InputText
+            id="username"
+            v-model="username"
+            class="w-full"
+            :class="{ 'p-invalid': usernameError }"
+          />
+          <small class="field-error" v-if="usernameError">{{ usernameError }}</small>
+        </div>
 
-      <div class="form-field">
-        <label for="firstName">First Name</label>
-        <InputText id="firstName" v-model="firstName" class="w-full" />
-      </div>
+        <div class="form-field">
+          <label for="firstName">First Name</label>
+          <InputText id="firstName" v-model="firstName" class="w-full" />
+        </div>
 
-      <div class="form-field">
-        <label for="lastName">Last Name</label>
-        <InputText id="lastName" v-model="lastName" class="w-full" />
+        <div class="form-field">
+          <label for="lastName">Last Name</label>
+          <InputText id="lastName" v-model="lastName" class="w-full" />
+        </div>
       </div>
 
       <div class="form-field">
@@ -152,7 +154,7 @@ function handleCancel() {
 <style scoped>
 .user-create {
   padding: 2rem;
-  max-width: 600px;
+  max-width: 700px;
 }
 
 h1 {
@@ -164,6 +166,12 @@ h1 {
 .user-form {
   display: flex;
   flex-direction: column;
+  gap: 1.5rem;
+}
+
+.name-fields-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
 }
 
@@ -211,6 +219,10 @@ h1 {
 }
 
 @media (max-width: 600px) {
+  .name-fields-row {
+    grid-template-columns: 1fr;
+  }
+
   .grant-row {
     flex-direction: column;
     align-items: stretch;
