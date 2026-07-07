@@ -124,6 +124,7 @@ function handleCancel() {
             option-label="name"
             option-value="villageId"
             placeholder="-- Village --"
+            class="village-select"
           />
           <Select
             v-model="row.roleId"
@@ -131,6 +132,7 @@ function handleCancel() {
             option-label="label"
             option-value="id"
             placeholder="-- Role --"
+            class="role-select"
           />
           <Button icon="pi pi-trash" severity="danger" size="small" @click="removeGrantRow(row.key)" />
         </div>
@@ -193,6 +195,14 @@ h1 {
   align-items: center;
 }
 
+.village-select {
+  width: 220px;
+}
+
+.role-select {
+  width: 140px;
+}
+
 .form-actions {
   display: flex;
   gap: 1rem;
@@ -204,6 +214,11 @@ h1 {
   .grant-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .village-select,
+  .role-select {
+    width: 100%;
   }
 
   .form-actions {
