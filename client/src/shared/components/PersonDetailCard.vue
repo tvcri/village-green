@@ -22,6 +22,18 @@ const props = defineProps({
     type: String,
     enum: ['info', 'full'],
     default: 'info'
+  },
+  // Explicit override for section visibility, independent of personType
+  // (which reflects only *active* roles). Pass when the caller knows
+  // memberDetail/volunteerDetail data exists even if the role is inactive.
+  // Defaults (null) fall back to personType so single-role pages are unaffected.
+  hasMemberDetail: {
+    type: Boolean,
+    default: null
+  },
+  hasVolunteerDetail: {
+    type: Boolean,
+    default: null
   }
 })
 
@@ -41,8 +53,8 @@ const mapAddress = computed(() => {
   return [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ')
 })
 
-const isMember = computed(() => props.personType === 'member' || props.personType === 'member, volunteer')
-const isVolunteer = computed(() => props.personType === 'volunteer' || props.personType === 'member, volunteer')
+const isMember = computed(() => props.hasMemberDetail ?? (props.personType === 'member' || props.personType === 'member, volunteer'))
+const isVolunteer = computed(() => props.hasVolunteerDetail ?? (props.personType === 'volunteer' || props.personType === 'member, volunteer'))
 const isFullDetail = computed(() => props.detailLevel === 'full')
 
 const serviceNotesSpan = computed(() => Math.min(props.columnCount, 2))
@@ -246,28 +258,22 @@ const copyEmail = async (email) => {
         </div>
 
         <template v-if="isFullDetail">
-          <div v-if="person.providerType" class="detail-field">
-            <span class="label">Provider Type:</span>
-            <span class="value">{{ person.providerType }}</span>
-          </div>
 
           <div v-if="person.active != null" class="detail-field">
             <span class="label">Active:</span>
             <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
           </div>
+          <template v-if="person.vettings?.length">
+            <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
+              <span class="label">{{ vetting.name }}:</span>
+              <span class="value">
+                {{ vetting.dateEntered || 'Unknown' }}<template v-if="vetting.dateExpired"> – {{ vetting.dateExpired }}</template>
+              </span>
+            </div>
+          </template>
         </template>
       </div>
 
-      <!-- Vetting Section (full detail only) -->
-      <div v-if="isFullDetail && isVolunteer && person.vettings?.length" class="section">
-        <h3 class="section-header">Vetting</h3>
-        <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
-          <span class="label">{{ vetting.name }}:</span>
-          <span class="value">
-            {{ vetting.dateEntered || 'Unknown' }}<template v-if="vetting.dateExpired"> – {{ vetting.dateExpired }}</template>
-          </span>
-        </div>
-      </div>
 
       <!-- Emergency Contact Section -->
       <div v-if="person.emergencyContactName || person.emergencyContactRelationship || person.emergencyContactPhone || person.emergencyContactEmail" class="section">
