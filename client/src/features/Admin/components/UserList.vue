@@ -3,6 +3,8 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -103,7 +105,10 @@ async function onDeleteUser(user) {
     <div class="list-header">
       <h1>Users</h1>
       <div class="header-actions">
-        <InputText v-model="searchText" placeholder="Search username or name" />
+        <IconField>
+          <InputText v-model="searchText" placeholder="Search username or name" />
+          <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click="searchText = ''" />
+        </IconField>
         <Button label="+ New User" @click="goToCreate" />
       </div>
     </div>
