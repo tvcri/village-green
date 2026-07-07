@@ -41,6 +41,10 @@ function goToGrants(userId) {
   router.push({ name: 'admin-user-grants', params: { userId } })
 }
 
+function goToCreateGrant(userId) {
+  router.push({ name: 'admin-create-user-grant', params: { userId } })
+}
+
 async function onCellEditComplete(event) {
   const { data, newValue, field } = event
   if (field !== 'username') return
@@ -152,13 +156,22 @@ async function onDeleteUser(user) {
       </Column>
       <Column header="Actions" :exportable="false">
         <template #body="{ data }">
-          <Button
-            icon="pi pi-trash"
-            severity="danger"
-            size="small"
-            @click="onDeleteUser(data)"
-            :title="getDeleteConfirmCopy(data).confirmLabel"
-          />
+          <div class="row-actions">
+            <Button
+              icon="pi pi-plus"
+              severity="secondary"
+              size="small"
+              @click="goToCreateGrant(data.userId)"
+              title="Add grant"
+            />
+            <Button
+              icon="pi pi-trash"
+              severity="danger"
+              size="small"
+              @click="onDeleteUser(data)"
+              :title="getDeleteConfirmCopy(data).confirmLabel"
+            />
+          </div>
         </template>
       </Column>
     </DataTable>
@@ -201,6 +214,11 @@ h1 {
   color: var(--color-text-error);
   font-size: 0.8rem;
   margin-top: 0.25rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 @media (max-width: 768px) {
