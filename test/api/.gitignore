@@ -4,3 +4,4 @@ node_modules/
 .test-report.tap
 .coverage/
 .coverage-tmp/
+test-fixtures.appdata.jsonl

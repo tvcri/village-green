@@ -46,7 +46,16 @@ cd test/api
 npm test           # full run (installs deps on first use)
 npm run test:keep  # leave the MySQL container up for fast re-runs
 npm run test:coverage  # same run, plus an api/source coverage report
+npm run appdata    # NO tests: seed, export the fixtures to test-fixtures.appdata.jsonl, tear down
 ```
+
+`npm run appdata` produces an appdata JSONL of the pristine canonical fixtures
+(pass a path after `--` to write elsewhere: `npm run appdata -- ~/vg-fixtures.jsonl`).
+Import it into a dev instance to click around the test data without the suite
+mutating it, and re-import the same file to reset whatever you changed. Caveat:
+an appdata import truncates and replaces every table in the file — including
+`user_data`, so your dev login's row is replaced too (it's re-created on next
+access, and admin rides on token privileges, not DB rows).
 
 ## Test categories — green, red, and todo
 

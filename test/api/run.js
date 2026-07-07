@@ -1,7 +1,11 @@
 // Orchestrator for the Village Green black-box API test suite.
 //
-//   node run.js          full run: MySQL up -> mockOidc -> API -> seed -> tests -> teardown
-//   node run.js --keep   same, but leave the MySQL container up for fast re-runs
+//   node run.js                  full run: MySQL up -> mockOidc -> API -> seed -> tests -> teardown
+//   node run.js --keep           same, but leave the MySQL container up for fast re-runs
+//   node run.js --appdata [out]  NO tests: boot + seed, export /op/appdata to a JSONL
+//                                file (default test-fixtures.appdata.jsonl), tear down. The file can
+//                                be imported into a dev instance to click around the
+//                                canonical fixtures, and re-imported to reset them.
 //
 // Nothing in production code is modified; the real `node index.js` server is run
 // against a throwaway MySQL schema and the existing test/utils/mockOidc.js.
@@ -21,6 +25,15 @@ const KEEP = process.argv.includes('--keep')
 // Black-box coverage: instrument the API child via NODE_V8_COVERAGE, then turn its
 // V8 profiles into a report with c8. (The tests themselves don't load API code.)
 const COVERAGE = process.argv.includes('--coverage')
+// Seed-and-export mode: skip the tests, write the canonical fixtures as an
+// appdata JSONL file. Optional non-flag arg after --appdata overrides the path.
+const APPDATA = process.argv.includes('--appdata')
+const appdataOut = (() => {
+  const next = process.argv[process.argv.indexOf('--appdata') + 1]
+  return APPDATA && next && !next.startsWith('-')
+    ? path.resolve(next)
+    : path.join(config.paths.apiTestDir, 'test-fixtures.appdata.jsonl')
+})()
 const coverageDir = path.join(config.paths.apiTestDir, '.coverage')     // report output
 const coverageTmp = path.join(config.paths.apiTestDir, '.coverage-tmp') // raw V8 profiles
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
@@ -193,11 +206,27 @@ async function main () {
     log('seeding fixtures ...')
     await seed()
 
-    log('minting tokens ...')
-    await fs.writeFile(config.paths.tokensFile, JSON.stringify(buildTokens(oidc), null, 2))
+    if (APPDATA) {
+      // Export the just-seeded canonical state and stop — no tests touch it.
+      // NOTE: the file contains user_data rows for the canonical test users;
+      // importing it into a dev instance truncates + replaces every table in
+      // the file (your own user row included — it's re-created on next login,
+      // and admin access rides on token privileges, not DB rows).
+      log('exporting appdata ...')
+      const { exportAppData, parseAppData } = await import('./lib/appdata.js')
+      const jsonl = await exportAppData(buildTokens(oidc).users.admin)
+      await fs.writeFile(appdataOut, jsonl)
+      const { summary } = parseAppData(jsonl)
+      log(`appdata written: ${path.relative(process.cwd(), appdataOut)} ` +
+        `(${summary.tables.length} tables, ${summary.totalRows} rows)`)
+      exitCode = 0
+    } else {
+      log('minting tokens ...')
+      await fs.writeFile(config.paths.tokensFile, JSON.stringify(buildTokens(oidc), null, 2))
 
-    log('running tests ...\n')
-    exitCode = await runTests()
+      log('running tests ...\n')
+      exitCode = await runTests()
+    }
   } catch (e) {
     log(`\x1b[31mERROR:\x1b[0m ${e.message}`)
     exitCode = 1

@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node run.js",
     "test:keep": "node run.js --keep",
-    "test:coverage": "node run.js --coverage"
+    "test:coverage": "node run.js --coverage",
+    "appdata": "node run.js --appdata"
   },
   "dependencies": {
     "mysql2": "^3.11.2"
