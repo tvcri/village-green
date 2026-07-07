@@ -127,6 +127,10 @@ module.exports.getPerson = async function (personId, projections = []) {
       'memberId', CAST(id AS CHAR),
       'memberNumber', memberNumber,
       'memberLevel', memberLevel,
+      'primaryPerson', (
+        SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
+        FROM person pp WHERE pp.id = active_member.primaryPersonId
+      ),
       'serviceNotes', serviceNotes,
       'joinDate', DATE_FORMAT(joinDate, '%Y-%m-%d')
     ) FROM active_member WHERE personId = p.id) AS memberInfo`)
