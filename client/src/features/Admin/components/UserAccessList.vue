@@ -1,24 +1,39 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import Dropdown from 'primevue/dropdown'
+import { useRoute } from 'vue-router'
+import Select from 'primevue/select'
+import InputText from 'primevue/inputtext'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRoleLabels } from '../../../shared/composables/useRoleLabels.js'
-import { getUsers, getUserGrants, deleteUserGrant } from '../api/userGrantApi.js'
+import { getVillages } from '../api/villageGrantApi.js'
+import { getUsers, getUserGrants, deleteUserGrant, createUserGrant } from '../api/userGrantApi.js'
+import { updateUser } from '../../../shared/api/userApi.js'
+import { extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 
-const router = useRouter()
 const route = useRoute()
-const { getRoleLabel } = useRoleLabels()
+const { getRoleLabel, getRoles } = useRoleLabels()
+const roles = getRoles()
 
 const selectedUserId = ref(null)
 const sortBy = ref('village')
 const sortDirection = ref('asc')
+const pendingGrant = ref(null)
+const isSavingGrant = ref(false)
+const isEditingUsername = ref(false)
+const usernameDraft = ref('')
+const isSavingUsername = ref(false)
+const usernameError = ref('')
 
-const { state: users, isLoading: usersLoading } = useAsyncState(
+const { state: users } = useAsyncState(
   () => getUsers(),
+  { immediate: true }
+)
+
+const { state: villages } = useAsyncState(
+  () => getVillages(),
   { immediate: true }
 )
 
@@ -28,19 +43,45 @@ const { state: grants, isLoading: grantsLoading, execute: refetchGrants } = useA
 )
 
 onMounted(() => {
-  if (route.query.userId) {
-    selectedUserId.value = route.query.userId
-    refetchGrants()
-  }
+  selectedUserId.value = route.params.userId
+  refetchGrants()
 })
 
 const selectedUser = computed(() => {
   return users.value?.find(u => u.userId === selectedUserId.value)
 })
 
-const handleUserChange = () => {
-  if (selectedUserId.value) {
-    refetchGrants()
+const handleEditUsername = () => {
+  usernameDraft.value = selectedUser.value?.username || ''
+  usernameError.value = ''
+  isEditingUsername.value = true
+}
+
+const handleCancelUsername = () => {
+  isEditingUsername.value = false
+  usernameError.value = ''
+}
+
+const handleSaveUsername = async () => {
+  const trimmed = usernameDraft.value.trim()
+  if (!trimmed || trimmed === selectedUser.value?.username) {
+    isEditingUsername.value = false
+    return
+  }
+
+  isSavingUsername.value = true
+  usernameError.value = ''
+  try {
+    const updated = await updateUser(selectedUserId.value, { username: trimmed })
+    const index = users.value.findIndex(u => u.userId === selectedUserId.value)
+    if (index !== -1) {
+      users.value[index] = { ...users.value[index], ...updated }
+    }
+    isEditingUsername.value = false
+  } catch (err) {
+    usernameError.value = extractApiErrorMessage(err, 'Failed to rename user.')
+  } finally {
+    isSavingUsername.value = false
   }
 }
 
@@ -55,20 +96,39 @@ const handleDeleteGrant = async (grantId) => {
 }
 
 const handleCreateGrant = () => {
-  router.push({
-    name: 'admin-create-user-grant',
-    params: { userId: selectedUserId.value }
-  })
+  pendingGrant.value = { villageId: null, roleId: null }
 }
 
-const handleSort = (column) => {
-  if (sortBy.value === column) {
-    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortBy.value = column
-    sortDirection.value = 'asc'
+const handleCancelGrant = () => {
+  pendingGrant.value = null
+}
+
+const handleSaveGrant = async () => {
+  if (!pendingGrant.value?.villageId || !pendingGrant.value?.roleId) return
+
+  isSavingGrant.value = true
+  try {
+    await createUserGrant(selectedUserId.value, [{
+      villageId: pendingGrant.value.villageId,
+      roleId: pendingGrant.value.roleId
+    }])
+    await refetchGrants()
+    pendingGrant.value = null
+  } catch (err) {
+    console.error('Failed to create grant:', err)
+  } finally {
+    isSavingGrant.value = false
   }
 }
+
+const grantedVillageIds = computed(() => {
+  if (!grants.value) return new Set()
+  return new Set(grants.value.map(g => g.village.villageId))
+})
+
+const availableVillages = computed(() => {
+  return (villages.value || []).filter(v => !grantedVillageIds.value.has(v.villageId))
+})
 
 const displayGrants = computed(() => {
   if (!grants.value) return []
@@ -99,26 +159,32 @@ const displayGrants = computed(() => {
 
   return sorted
 })
+
+const PENDING_ROW_KEY = '__pending__'
+
+const tableRows = computed(() => {
+  if (!pendingGrant.value) return displayGrants.value
+  return [{ grantId: PENDING_ROW_KEY }, ...displayGrants.value]
+})
+
+const isPendingRow = (data) => data.grantId === PENDING_ROW_KEY
+
+const sortVillageName = (a, b) => {
+  if (isPendingRow(a)) return -1
+  if (isPendingRow(b)) return 1
+  return sortDirection.value === 'asc' ? a.villageName.localeCompare(b.villageName) : b.villageName.localeCompare(a.villageName)
+}
+
+const sortRoleId = (a, b) => {
+  if (isPendingRow(a)) return -1
+  if (isPendingRow(b)) return 1
+  return sortDirection.value === 'asc' ? a.roleId - b.roleId : b.roleId - a.roleId
+}
 </script>
 
 <template>
   <div class="user-access-list">
     <h1>User Access List</h1>
-
-    <div class="user-selector">
-      <label for="user-dropdown">Select User:</label>
-      <Dropdown
-        id="user-dropdown"
-        v-model="selectedUserId"
-        :options="users"
-        option-label="displayName"
-        option-value="userId"
-        :option-label-fn="(option) => option.displayName || option.username"
-        placeholder="-- Choose a user --"
-        :disabled="usersLoading"
-        @change="handleUserChange"
-      />
-    </div>
 
     <div v-if="selectedUserId && grantsLoading" class="loading-state">
       <p>Loading grants...</p>
@@ -126,33 +192,109 @@ const displayGrants = computed(() => {
 
     <div v-else-if="selectedUserId" class="grants-section">
       <div class="grants-header">
-        <h2>Grants for {{ selectedUser?.displayName || selectedUser?.username }}</h2>
+        <div v-if="isEditingUsername" class="username-edit">
+          <InputText v-model="usernameDraft" autofocus :disabled="isSavingUsername" @keyup.enter="handleSaveUsername" @keyup.escape="handleCancelUsername" />
+          <Button
+            icon="pi pi-check"
+            severity="success"
+            size="small"
+            :disabled="!usernameDraft.trim() || isSavingUsername"
+            @click="handleSaveUsername"
+            title="Save username"
+          />
+          <Button
+            icon="pi pi-times"
+            severity="secondary"
+            size="small"
+            :disabled="isSavingUsername"
+            @click="handleCancelUsername"
+            title="Cancel"
+          />
+          <small v-if="usernameError" class="field-error">{{ usernameError }}</small>
+        </div>
+        <h2 v-else>
+          Grants for {{ selectedUser?.username }}
+          <Button
+            icon="pi pi-pencil"
+            text
+            rounded
+            size="small"
+            @click="handleEditUsername"
+            title="Edit username"
+          />
+        </h2>
         <Button
           label="+ Create Grant"
+          :disabled="!!pendingGrant"
           @click="handleCreateGrant"
         />
       </div>
 
-      <div v-if="displayGrants.length === 0" class="empty-state">
+      <div v-if="displayGrants.length === 0 && !pendingGrant" class="empty-state">
         <p>No grants found for this user</p>
       </div>
 
       <DataTable
-        :value="displayGrants"
+        :value="tableRows"
         @sort="(event) => { sortBy = event.sortField; sortDirection = event.sortOrder === 1 ? 'asc' : 'desc' }"
         :sort-field="sortBy"
         :sort-order="sortDirection === 'asc' ? 1 : -1"
         class="grants-table-responsive"
       >
-        <Column field="villageName" header="Village" sortable></Column>
-        <Column field="roleLabel" header="Role" sortable :sort-function="(a, b) => a.roleId - b.roleId"></Column>
+        <Column field="villageName" header="Village" sortable :sort-function="sortVillageName">
+          <template #body="{ data }">
+            <Select
+              v-if="isPendingRow(data)"
+              v-model="pendingGrant.villageId"
+              :options="availableVillages"
+              option-label="name"
+              option-value="villageId"
+              placeholder="-- Village --"
+              class="village-select"
+            />
+            <template v-else>{{ data.villageName }}</template>
+          </template>
+        </Column>
+        <Column field="roleLabel" header="Role" sortable :sort-function="sortRoleId">
+          <template #body="{ data }">
+            <Select
+              v-if="isPendingRow(data)"
+              v-model="pendingGrant.roleId"
+              :options="roles"
+              option-label="label"
+              option-value="id"
+              placeholder="-- Role --"
+              class="role-select"
+            />
+            <template v-else>{{ data.roleLabel }}</template>
+          </template>
+        </Column>
         <Column header="Actions" :exportable="false">
-          <template #body="slotProps">
+          <template #body="{ data }">
+            <div v-if="isPendingRow(data)" class="row-actions">
+              <Button
+                icon="pi pi-check"
+                severity="success"
+                size="small"
+                :disabled="!pendingGrant.villageId || !pendingGrant.roleId || isSavingGrant"
+                @click="handleSaveGrant"
+                title="Save grant"
+              />
+              <Button
+                icon="pi pi-times"
+                severity="secondary"
+                size="small"
+                :disabled="isSavingGrant"
+                @click="handleCancelGrant"
+                title="Cancel"
+              />
+            </div>
             <Button
+              v-else
               icon="pi pi-trash"
               severity="danger"
               size="small"
-              @click="handleDeleteGrant(slotProps.data.grantId)"
+              @click="handleDeleteGrant(data.grantId)"
               title="Delete grant"
             />
           </template>
@@ -171,40 +313,6 @@ h1 {
   margin: 0 0 2rem 0;
   color: var(--color-text-primary);
   font-size: 1.5rem;
-}
-
-.user-selector {
-  margin-bottom: 2rem;
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.user-selector label {
-  color: var(--color-text-primary);
-  font-weight: 500;
-}
-
-.dropdown {
-  padding: 0.5rem 0.75rem;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  color: var(--color-text-primary);
-  font-size: 0.9rem;
-  cursor: pointer;
-  min-width: 300px;
-}
-
-.dropdown:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.dropdown:focus {
-  outline: none;
-  border-color: var(--p-primary-300);
-  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.1);
 }
 
 .loading-state {
@@ -231,22 +339,27 @@ h1 {
   margin: 0;
   color: var(--color-text-primary);
   font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
-.btn-create {
-  padding: 0.4rem 0.75rem;
-  background-color: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
+.username-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.btn-create:hover {
-  background-color: var(--p-primary-600);
+.username-edit :deep(.p-inputtext) {
+  width: 320px;
+  max-width: 100%;
+}
+
+.field-error {
+  color: var(--color-text-error);
+  font-size: 0.8rem;
+  width: 100%;
 }
 
 .empty-state {
@@ -256,61 +369,14 @@ h1 {
   font-style: italic;
 }
 
-.grants-table {
-  width: 100%;
-  border-collapse: collapse;
-  background-color: var(--color-background-light);
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
-  overflow: hidden;
+.village-select,
+.role-select {
+  min-width: 180px;
 }
 
-.grants-table thead {
-  background-color: var(--color-background-dark);
-}
-
-.grants-table th {
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  border-bottom: 1px solid var(--color-border-default);
-}
-
-.grants-table th.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-
-.grants-table th.sortable:hover {
-  background-color: var(--color-background-dark);
-}
-
-.sort-indicator {
-  margin-left: 0.5rem;
-  font-size: 0.75rem;
-}
-
-.grants-table td {
-  padding: 1rem;
-  border-bottom: 1px solid var(--color-border-default);
-  color: var(--color-text-primary);
-}
-
-.btn-delete {
-  padding: 0.4rem 0.8rem;
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 4px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-delete:hover {
-  background-color: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.5);
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 @media (max-width: 375px) {
@@ -357,30 +423,9 @@ h1 {
   }
 }
 
-/* Stack when label + dropdown can't fit comfortably (~350px content) */
-@media (max-width: 350px) {
-  .user-selector {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .dropdown {
-    min-width: 100%;
-  }
-}
-
 @media (max-width: 768px) {
   .user-access-list {
     padding: 1rem;
-  }
-
-  .grants-table {
-    font-size: 0.85rem;
-  }
-
-  .grants-table th,
-  .grants-table td {
-    padding: 0.75rem;
   }
 }
 </style>

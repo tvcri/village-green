@@ -28,7 +28,7 @@ const navigateToPrivacy = () => {
 
     <div class="button-group">
       <Button label="Village Access List" @click="navigateToVillageAccess" />
-      <Button label="User Access List" @click="navigateToUserAccess" />
+      <Button label="Users" @click="navigateToUserAccess" />
       <Button label="Analytics" @click="navigateToAnalytics" />
       <Button label="Privacy Agreement" @click="navigateToPrivacy" />
     </div>

@@ -4,6 +4,18 @@ export const getUser = () => apiCall('getUser')
 
 export const getUsers = () => apiCall('getUsers', { elevate: true })
 
+export const getUsersWithGrantCount = () =>
+  apiCall('getUsers', { elevate: true, projection: ['statistics'] })
+
+export const createUser = (body) =>
+  apiCall('createUser', { elevate: true }, body)
+
+export const updateUser = (userId, body) =>
+  apiCall('updateUser', { userId, elevate: true }, body)
+
+export const deleteUser = (userId) =>
+  apiCall('deleteUser', { userId, elevate: true, projection: ['statistics'] })
+
 /**
  * Fetches the current user data from the API
  * @returns {Promise<object>} The user object with sorted collectionGrants

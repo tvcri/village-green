@@ -3992,9 +3992,13 @@ components:
           $ref: '#/components/schemas/Created'
         lastClaims:
           type: object
+        villageGrantCount:
+          type: integer
+          minimum: 0
       required:
       - created
       - lastClaims
+      - villageGrantCount
     UserStatus:
       type: string
       enum:
