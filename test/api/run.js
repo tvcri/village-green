@@ -69,6 +69,9 @@ function startApi () {
     VG_DEV_RESPONSE_VALIDATION: 'logOnly',
     VG_CLIENT_DISABLED: 'true',
     VG_DOCS_DISABLED: 'true',
+    // Exercise the appdata endpoints even though seeding is direct SQL. The
+    // "experimental" label deters ops reliance; it's mature enough for testing.
+    VG_EXPERIMENTAL_APPDATA: 'true',
     ...(COVERAGE ? { NODE_V8_COVERAGE: coverageTmp } : {}),
   }
   const child = spawn('node', ['index.js'], { cwd: config.apiSourceDir, env })

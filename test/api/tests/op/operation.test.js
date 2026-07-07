@@ -4,12 +4,24 @@ import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 
 // Operation app-data surface (export/import + table introspection). Export/import
-// are gated behind VG_EXPERIMENTAL_APPDATA (off in this harness); the table list
-// only needs elevation.
-test('GET /op/appdata is disabled unless VG_EXPERIMENTAL_APPDATA=true -> 404', async () => {
-  // The experimental gate is checked first, so even admin+elevate gets 404.
-  const { status } = await vgFetch('/op/appdata', { token: tokens.users.admin, query: { elevate: 'true' } })
-  assert.equal(status, 404)
+// are gated behind VG_EXPERIMENTAL_APPDATA (ON in this harness — run.js sets it so
+// these endpoints stay exercised even though seeding is direct SQL); the table
+// list only needs elevation.
+test('GET /op/appdata requires elevation -> 403 even for admin without elevate', async () => {
+  const { status } = await vgFetch('/op/appdata', { token: tokens.users.admin })
+  assert.equal(status, 403)
+})
+
+test('GET /op/appdata as admin+elevate exports JSONL', async () => {
+  const { status, text, res } = await vgFetch('/op/appdata', {
+    token: tokens.users.admin, query: { elevate: 'true', format: 'jsonl' },
+  })
+  assert.equal(status, 200)
+  assert.match(res.headers.get('content-type'), /application\/jsonl/)
+  assert.match(res.headers.get('content-disposition'), /attachment/)
+  const lines = text.split('\n').filter(Boolean)
+  assert.ok(lines.length > 0, 'export streams at least one JSONL record')
+  assert.doesNotThrow(() => JSON.parse(lines[0]), 'first line is valid JSON')
 })
 
 test('POST /op/appdata (import) requires application/jsonl -> 415 for a json body', async () => {

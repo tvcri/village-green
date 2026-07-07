@@ -125,9 +125,11 @@ specced as todos. Gaps, in priority order:
 - **CE member/volunteer fields & active views:** the new fields and `active_member` /
   `active_volunteer` filtering (e.g. inactive members hidden) aren't asserted.
 - **Meta roll-up:** service-requests only; persons/friends meta not covered.
-- **op/* internals:** `appdata` import/export round-trip (needs `VG_EXPERIMENTAL_APPDATA`),
-  `ce-dump`, and the `state/sse` stream are only gated/probed, not exercised end-to-end;
-  `jobs` and `op/configuration` need their tables scaffolded in the test schema.
+- **op/* internals:** `VG_EXPERIMENTAL_APPDATA` is ON in the harness; the JSONL
+  export → import → re-export round trip is exercised (`tests/op/appdata-roundtrip.test.js`,
+  helpers in `lib/appdata.js`). Still unexercised: gzip-format appdata, `ce-dump`, and the
+  `state/sse` stream; `jobs` and `op/configuration` need their tables scaffolded in the
+  test schema.
 - **Validation / negative cases:** request-body 400s and pagination are only spot-checked.
 - **Client / UI:** out of scope. (This includes the CSV exports from PRs #38/#39 — CSV is
   generated client-side from the tested JSON list endpoints; there is no API surface.)
@@ -147,9 +149,11 @@ setup/
                      schema-drift tripwire that names any out-of-sync column)
   tokens.js          mints per-user + special (expired/bad/insecure/scope) tokens
 lib/
-  client.js          vgFetch(path, {token, query, body, method})
+  client.js          vgFetch(path, {token, query, body, method, rawBody, contentType})
   context.js         loads .tokens.json -> { tokens }
   db.js              withDb() for assertions on rows the API doesn't expose
+  appdata.js         export/import/parse helpers for /op/appdata (JSONL); also
+                     the hook for importing special-purpose datasets in tests
 tests/               the endpoint tests, one directory per topic; each topic's
                      projections.test.js covers its `?projection=` expansions
   auth/              authentication + scope, elevation
