@@ -63,6 +63,18 @@ const routes = [
   {
     path: '/admin/users',
     name: 'admin-user-access',
+    component: () => import('../features/Admin/components/UserList.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/users/new',
+    name: 'admin-user-create',
+    component: () => import('../features/Admin/components/UserCreate.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/users/:userId/grants',
+    name: 'admin-user-grants',
     component: () => import('../features/Admin/components/UserAccessList.vue'),
     meta: { requiresAdmin: true },
   },
@@ -73,15 +85,15 @@ const routes = [
     meta: { requiresAdmin: true },
   },
   {
-    path: '/admin/users/grants/:userId',
-    name: 'admin-create-user-grant',
-    component: () => import('../features/Admin/components/CreateUserGrant.vue'),
-    meta: { requiresAdmin: true },
-  },
-  {
     path: '/admin/analytics',
     name: 'admin-analytics',
     component: () => import('../features/Admin/components/AnalyticsSummary.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/privacy',
+    name: 'admin-privacy',
+    component: () => import('../features/Admin/components/PrivacyRulesAdmin.vue'),
     meta: { requiresAdmin: true },
   },
   {
@@ -108,6 +120,31 @@ const routes = [
     path: '/meta/persons',
     name: 'meta-persons',
     component: () => import('../features/PersonList/components/PersonList.vue'),
+  },
+  {
+    path: '/meta/persons/create',
+    name: 'meta-person-create',
+    component: () => import('../features/PersonList/components/PersonEditForm.vue'),
+  },
+  {
+    path: '/meta/persons/import',
+    name: 'meta-person-import',
+    component: () => import('../features/ApplicationImport/components/ApplicationImportWizard.vue'),
+  },
+  {
+    path: '/meta/persons/:personId/edit',
+    name: 'meta-person-edit',
+    component: () => import('../features/PersonList/components/PersonEditForm.vue'),
+  },
+  {
+    path: '/meta/persons/:personId/member',
+    name: 'meta-person-member',
+    component: () => import('../features/PersonList/components/MemberEdit.vue'),
+  },
+  {
+    path: '/meta/persons/:personId/volunteer',
+    name: 'meta-person-volunteer',
+    component: () => import('../features/PersonList/components/VolunteerEdit.vue'),
   },
   {
     path: '/meta/persons/:personId/:personName?',

@@ -17,11 +17,11 @@ module.exports.getFriends = async function ({ villageIdsGranted, elevate, villag
       NULL
     ) AS village`,
     `IF(fcv.volunteerPersonId IS NOT NULL,
-      JSON_OBJECT('personId', CAST(pv.id AS CHAR), 'fullName', pv.full_name),
+      JSON_OBJECT('personId', CAST(pv.id AS CHAR), 'fullName', pv.fullName),
       JSON_OBJECT('rawName', fcv.rawVolunteerName)
     ) AS volunteer`,
     `IF(fcv.memberPersonId IS NOT NULL,
-      JSON_OBJECT('personId', CAST(pm.id AS CHAR), 'fullName', pm.full_name),
+      JSON_OBJECT('personId', CAST(pm.id AS CHAR), 'fullName', pm.fullName),
       JSON_OBJECT('rawName', fcv.rawMemberName)
     ) AS member`
   ]
@@ -67,11 +67,11 @@ module.exports.getFriends = async function ({ villageIdsGranted, elevate, villag
     predicates.binds.push(activityType)
   }
   if (volunteerName) {
-    predicates.statements.push('(pv.full_name LIKE ? OR fcv.rawVolunteerName LIKE ?)')
+    predicates.statements.push('(pv.fullName LIKE ? OR fcv.rawVolunteerName LIKE ?)')
     predicates.binds.push(`%${volunteerName}%`, `%${volunteerName}%`)
   }
   if (memberName) {
-    predicates.statements.push('(pm.full_name LIKE ? OR fcv.rawMemberName LIKE ?)')
+    predicates.statements.push('(pm.fullName LIKE ? OR fcv.rawMemberName LIKE ?)')
     predicates.binds.push(`%${memberName}%`, `%${memberName}%`)
   }
 

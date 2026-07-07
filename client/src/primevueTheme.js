@@ -23,7 +23,7 @@ export const BluePreset = definePreset(Material, {
 
 export const MyPrimeVuePT = {
   Select: {
-    root: { style: 'border-color: var(--color-border-default); width: 100%' },
+    // root: { style: 'border-color: var(--color-border-default); width: 100%' },
     label: { style: 'color: var(--color-text-primary)' },
     option: { style: 'color: var(--color-text-primary)' },
   },

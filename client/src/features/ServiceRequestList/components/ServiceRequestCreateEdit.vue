@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import SplitButton from 'primevue/splitbutton'
@@ -15,17 +16,20 @@ import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
 import Popover from 'primevue/popover'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { apiCall } from '../../../shared/api/apiClient.js'
+import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
-import { getVillageVolunteers } from '../../VolunteerList/api/volunteerApi.js'
+import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
+import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
+import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
+const confirm = useConfirm()
 
 const isEdit = computed(() => !!route.params.id)
 const serviceRequestId = computed(() => route.params.id)
@@ -40,8 +44,13 @@ const { state: villageMembers, execute: fetchMembers } = useAsyncState(
   { immediate: false }
 )
 
+const anyVillageVolunteers = ref(false)
+
 const { state: villageVolunteers, execute: fetchVolunteers } = useAsyncState(
-  () => form.value.villageId ? getVillageVolunteers(form.value.villageId) : null,
+  () => {
+    if (anyVillageVolunteers.value) return getVolunteers()
+    return form.value.villageId ? getVillageVolunteers(form.value.villageId) : null
+  },
   { immediate: false }
 )
 
@@ -100,6 +109,10 @@ watch(existingRequest, async (val) => {
       if (!dateStr) return ''
       return new Date(dateStr)
     }
+    // A volunteer from outside the member's village only appears in the
+    // "any village" list, so flip the checkbox before villageId's watcher
+    // triggers fetchVolunteers, or the loaded volunteer won't be findable.
+    anyVillageVolunteers.value = !!(val.volunteerVillageId && val.volunteerVillageId !== val.villageId)
     form.value = {
       villageId: val.villageId || '',
       memberPersonId: val.memberPersonId || '',
@@ -135,6 +148,12 @@ const allMemberOptions = computed(() => {
     label: m.personFullName || m.fullName,
     value: String(m.personId || m.id)
   }))
+})
+
+const selectedMemberServiceNotes = computed(() => {
+  if (!Array.isArray(villageMembers.value) || !form.value.memberPersonId) return ''
+  const member = villageMembers.value.find(m => String(m.personId || m.id) === String(form.value.memberPersonId))
+  return member?.serviceNotes || ''
 })
 
 const allVolunteerOptions = computed(() => {
@@ -197,6 +216,10 @@ watch(() => form.value.villageId, (villageId, oldVillageId) => {
   }
 })
 
+watch(anyVillageVolunteers, () => {
+  if (form.value.villageId) fetchVolunteers()
+})
+
 watch([allMemberOptions, () => form.value.memberPersonId], ([members, memberId]) => {
   if (members.length > 0 && memberId) {
     const matching = members.find(m => m.value === String(memberId))
@@ -226,6 +249,8 @@ const computedStatus = computed(() => {
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
+const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
+
 const formattedCreatedAt = computed(() => {
   if (!form.value.createdAt) return ''
   const d = new Date(form.value.createdAt)
@@ -252,25 +277,51 @@ const seedNext = (field, val, delta = 15) => {
   seedDepth--
 }
 
-watch(() => form.value.startTime, (val) => {
-  if (seedDepth > 0 || val == null || !formLoaded.value) return
+const cascadeFromStart = (val) => {
+  if (val == null) {
+    seedDepth++
+    form.value.apptTime = null
+    form.value.returnTime = null
+    form.value.finishTime = null
+    seedDepth--
+    return
+  }
   seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
-}, { flush: 'sync' })
+}
 
-watch(() => form.value.apptTime, (val) => {
-  if (seedDepth > 0 || val == null || !formLoaded.value) return
+const cascadeFromAppt = (val) => {
+  if (val == null) return
   seedNext('returnTime', val)
-}, { flush: 'sync' })
+}
 
-watch(() => form.value.returnTime, (val) => {
-  if (seedDepth > 0 || val == null || !formLoaded.value) return
+const cascadeFromReturn = (val) => {
+  if (val == null) return
   // Seed finish using the same duration as start→arrival, so the ride home
   // mirrors the outbound leg. Fall back to +15 if start/arrival aren't set.
   const start = form.value.startTime
   const appt = form.value.apptTime
   const delta = (start != null && appt != null) ? (appt - start) : 15
   seedNext('finishTime', val, delta)
+}
+
+watch(() => form.value.startTime, (val) => {
+  if (seedDepth > 0 || !formLoaded.value) return
+  cascadeFromStart(val)
 }, { flush: 'sync' })
+
+watch(() => form.value.apptTime, (val) => {
+  if (seedDepth > 0 || !formLoaded.value) return
+  cascadeFromAppt(val)
+}, { flush: 'sync' })
+
+watch(() => form.value.returnTime, (val) => {
+  if (seedDepth > 0 || !formLoaded.value) return
+  cascadeFromReturn(val)
+}, { flush: 'sync' })
+
+const onStartHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromStart(form.value.startTime) }
+const onApptHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromAppt(form.value.apptTime) }
+const onReturnHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromReturn(form.value.returnTime) }
 
 const serviceNameOptions = [
   'Ride: Medical Appnt',
@@ -320,7 +371,12 @@ const slotsAfter = (after, current) => {
   return timeSlotOptions.filter(o => o.value > after || o.value === current)
 }
 
-const startOptions = computed(() => timeSlotOptions)
+const startOptions = computed(() => [
+  ...timeSlotOptions.filter(o => o.value >= START_OF_DAY),
+  ...timeSlotOptions.filter(o => o.value < START_OF_DAY)
+])
+
+const START_OF_DAY = 7 * 60 // 7:00 AM — open position for start time dropdown
 const apptOptions = computed(() => slotsAfter(form.value.startTime, form.value.apptTime))
 const returnOptions = computed(() => slotsAfter(form.value.apptTime, form.value.returnTime))
 const finishOptions = computed(() =>
@@ -528,6 +584,7 @@ const handleSubmit = async (notify = false) => {
 
     if (isEdit.value) {
       setTimeout(() => {
+        setPendingHighlight(serviceRequestId.value)
         router.push({ name: 'meta-service-requests' })
       }, 500)
     } else {
@@ -535,6 +592,9 @@ const handleSubmit = async (notify = false) => {
       resetForNewRequest()
     }
   } catch (err) {
+    // Privacy-ack gate already handled globally (ack modal opens); skip the
+    // misleading "failed" toast for a request that was intercepted, not failed.
+    if (isPrivacyAckError(err)) return
     console.error(err)
     toast.add({
       severity: 'error',
@@ -554,6 +614,7 @@ const splitButtonModel = computed(() => {
 })
 
 const handleCancel = () => {
+  if (isEdit.value) setPendingHighlight(serviceRequestId.value)
   router.push({ name: 'meta-service-requests' })
 }
 
@@ -576,10 +637,12 @@ const handleComplete = async () => {
     await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: 'Completed' })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request marked as completed', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
     statusOverride.value = null
+    if (isPrivacyAckError(err)) return
     console.error(err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to complete service request', life: 5000 })
   } finally {
@@ -595,9 +658,11 @@ const handleDeleteDraft = async () => {
     await apiCall('deleteServiceRequest', { serviceRequestId: serviceRequestId.value })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Draft deleted', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
+    if (isPrivacyAckError(err)) return
     console.error(err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete draft', life: 5000 })
   } finally {
@@ -605,21 +670,44 @@ const handleDeleteDraft = async () => {
   }
 }
 
-const handleCancelRequest = async (reason) => {
-  cancelPopover.value.hide()
+const doCancelRequest = async (reason, notify) => {
   isCancelling.value = true
   try {
-    await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason, notify: true })
+    await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason, notify })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request cancelled', life: 3000 })
     setTimeout(() => {
+      setPendingHighlight(serviceRequestId.value)
       router.push({ name: 'meta-service-requests' })
     }, 500)
   } catch (err) {
+    if (isPrivacyAckError(err)) return
     console.error(err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to cancel service request', life: 5000 })
   } finally {
     isCancelling.value = false
   }
+}
+
+const handleCancelRequest = (reason) => {
+  cancelPopover.value.hide()
+  confirm.require({
+    header: 'Cancel Service Request',
+    message: 'Should notifications be sent for this cancellation?',
+    acceptLabel: 'Cancel and Notify',
+    rejectLabel: 'Cancel without Notification',
+    acceptProps: { severity: 'danger' },
+    rejectProps: { severity: 'danger' },
+    accept: () => doCancelRequest(reason, true),
+    reject: () => doCancelRequest(reason, false)
+  })
+}
+
+const personDialogVisible = ref(false)
+const personDialogPersonId = ref(null)
+
+const openPersonDialog = (personId) => {
+  personDialogPersonId.value = personId
+  personDialogVisible.value = true
 }
 
 </script>
@@ -633,7 +721,7 @@ const handleCancelRequest = async (reason) => {
             <div class="title-row">
               <h2 class="card-title">{{ isEdit ? `Edit Service Request (#${existingRequest?.requestNumber ?? serviceRequestId})` : 'Create Service Request' }}</h2>
             </div>
-            <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}</div>
+            <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}<template v-if="createdByDisplayName"> by {{ createdByDisplayName }}</template></div>
           </div>
           <div class="header-right">
             <Tag
@@ -684,28 +772,60 @@ const handleCancelRequest = async (reason) => {
 
             <div v-if="form.villageId">
               <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Member<span class="req">*</span></label>
-              <AutoComplete
-                v-model="selectedMember"
-                :suggestions="memberFilteredOptions"
-                option-label="label"
-                placeholder="Search member"
-                :force-selection="true"
-                showClear
-                @complete="filterMembers"
-              />
+              <div class="person-field-row">
+                <AutoComplete
+                  v-model="selectedMember"
+                  :suggestions="memberFilteredOptions"
+                  option-label="label"
+                  placeholder="Search member"
+                  :force-selection="true"
+                  showClear
+                  @complete="filterMembers"
+                />
+                <Button
+                  v-if="form.memberPersonId"
+                  type="button"
+                  icon="pi pi-id-card"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="View member details"
+                  v-tooltip.top="'View member details'"
+                  @click="openPersonDialog(form.memberPersonId)"
+                />
+              </div>
             </div>
 
             <div v-if="form.villageId">
-              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Volunteer</label>
-              <AutoComplete
-                v-model="selectedVolunteer"
-                :suggestions="volunteerFilteredOptions"
-                option-label="label"
-                placeholder="Search volunteer"
-                :force-selection="true"
-                showClear
-                @complete="filterVolunteers"
-              />
+              <label class="volunteer-label">
+                <span>Volunteer</span>
+                <span class="any-village-toggle">
+                  <Checkbox v-model="anyVillageVolunteers" binary input-id="any-village-volunteers" />
+                  <label for="any-village-volunteers">From any village</label>
+                </span>
+              </label>
+              <div class="person-field-row">
+                <AutoComplete
+                  v-model="selectedVolunteer"
+                  :suggestions="volunteerFilteredOptions"
+                  option-label="label"
+                  placeholder="Search volunteer"
+                  :force-selection="true"
+                  showClear
+                  @complete="filterVolunteers"
+                />
+                <Button
+                  v-if="form.volunteerPersonId"
+                  type="button"
+                  icon="pi pi-id-card"
+                  text
+                  rounded
+                  severity="secondary"
+                  aria-label="View volunteer details"
+                  v-tooltip.top="'View volunteer details'"
+                  @click="openPersonDialog(form.volunteerPersonId)"
+                />
+              </div>
             </div>
           </div>
 
@@ -714,8 +834,20 @@ const handleCancelRequest = async (reason) => {
             Select a village to continue…
           </div>
 
-          <!-- Remaining sections, revealed once a village is chosen -->
-          <template v-if="form.villageId">
+          <!-- Hint shown once village is selected but before a member is chosen -->
+          <div v-if="form.villageId && !form.memberPersonId" class="village-hint">
+            Select a member to continue…
+          </div>
+
+          <!-- Remaining sections, revealed once a member is chosen -->
+          <template v-if="form.villageId && form.memberPersonId">
+
+          <!-- Service Notes: display-only, sourced from the selected member's record -->
+          <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Service Notes</h3>
+          </div>
+          <div v-if="selectedMemberServiceNotes" style="white-space: pre-wrap;">{{ selectedMemberServiceNotes }}</div>
+          <div v-else class="service-notes-empty">There are no service notes for this member</div>
 
           <!-- Service Section -->
           <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
@@ -786,8 +918,9 @@ const handleCancelRequest = async (reason) => {
                 option-label="label"
                 option-value="value"
                 placeholder="Start time"
-                filter
+                show-clear
                 style="width: 100%;"
+                @hide="onStartHide"
               />
             </div>
 
@@ -799,8 +932,9 @@ const handleCancelRequest = async (reason) => {
                 option-label="label"
                 option-value="value"
                 placeholder="Arrival time"
-                filter
+                show-clear
                 style="width: 100%;"
+                @hide="onApptHide"
               />
             </div>
 
@@ -812,8 +946,9 @@ const handleCancelRequest = async (reason) => {
                 option-label="label"
                 option-value="value"
                 placeholder="Return time"
-                filter
+                show-clear
                 style="width: 100%;"
+                @hide="onReturnHide"
               />
             </div>
 
@@ -825,7 +960,7 @@ const handleCancelRequest = async (reason) => {
                 option-label="label"
                 option-value="value"
                 placeholder="Finish time"
-                filter
+                show-clear
                 style="width: 100%;"
               />
             </div>
@@ -968,6 +1103,10 @@ const handleCancelRequest = async (reason) => {
         </form>
       </template>
     </Card>
+    <PersonDetailDialog
+      v-model:visible="personDialogVisible"
+      :person-id="personDialogPersonId"
+    />
   </div>
 </template>
 
@@ -988,9 +1127,41 @@ const handleCancelRequest = async (reason) => {
   font-size: 0.9rem;
 }
 
+.service-notes-empty {
+  color: var(--color-text-dim);
+  font-style: italic;
+}
+
 .req {
   color: var(--color-error);
   margin-left: 0.15rem;
+}
+
+.person-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.volunteer-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.any-village-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+}
+
+.any-village-toggle label {
+  cursor: pointer;
 }
 
 .card-header-wrapper {

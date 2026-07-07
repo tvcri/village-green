@@ -5,6 +5,7 @@ const UserService = require(`../service/UserService`)
 const VillageService = require(`../service/VillageService`)
 const SmError = require('../utils/error')
 const dbUtils = require('../service/utils')
+const KeycloakService = require('../service/KeycloakService')
 
 async function validateVillageGrants(villageGrants, {elevate}) {
   if (villageGrants?.length) {
@@ -25,10 +26,33 @@ module.exports.createUser = async function createUser (req, res, next) {
     if (!elevate) throw new SmError.PrivilegeError()
     let body = req.body
     let projection = req.query.projection
+    const createInKeycloak = req.query.keycloak !== false
 
-    body.status = 'available'
+    if (body.villageGrants?.length) {
+      await validateVillageGrants(body.villageGrants, {elevate})
+    }
+
+    if (createInKeycloak) {
+      try {
+        await KeycloakService.createUser({
+          username: body.username,
+          email: body.username,
+          firstName: body.firstName,
+          lastName: body.lastName
+        })
+      }
+      catch (err) {
+        if (err.status === 409) {
+          throw new SmError.UnprocessableError('User already exists in Keycloak.')
+        }
+        throw err
+      }
+    }
+
+    const { firstName, lastName, ...userDataBody } = body
+    userDataBody.status = 'available'
     try {
-      let response = await UserService.createUser(body, projection, elevate, req.userObject, res.svcStatus)
+      let response = await UserService.createUser(userDataBody, projection, elevate, req.userObject, res.svcStatus)
       res.status(201).json(response)
     }
     catch (err) {
@@ -53,15 +77,29 @@ module.exports.deleteUser = async function deleteUser (req, res, next) {
       let userId = req.params.userId
       let projection = req.query.projection
       let userData = await UserService.getUserByUserId(userId, [], elevate, req.userObject)
-      if (userData?.lastAccess) {
-        // User has accessed the system, so we need to reject the request
-        throw new SmError.UnprocessableError('User has accessed the system. Use PATCH to remove village grants or configure Authentication provider to reject user entirely.')
+      if (userData) {
+        await KeycloakService.deleteUser({ username: userData.username })
       }
-      let response = await UserService.deleteUser(userId, projection, elevate, req.userObject)
+      let response
+      if (userData?.lastAccess) {
+        // User has accessed the system: preserve the user_data row (foreign
+        // key references elsewhere depend on it) and soft-delete by setting
+        // status to unavailable instead of removing the row.
+        response = await UserService.replaceUser(userId, {
+          status: 'unavailable',
+          statusUser: req.userObject.userId,
+          statusDate: new Date(),
+          villageGrants: [],
+          userGroups: []
+        }, projection, elevate, req.userObject, res.svcStatus)
+      }
+      else {
+        response = await UserService.deleteUser(userId, projection, elevate, req.userObject)
+      }
       res.json(response)
     }
     else {
-      throw new SmError.PrivilegeError()    
+      throw new SmError.PrivilegeError()
     }
   }
   catch(err) {
@@ -90,9 +128,12 @@ module.exports.exportUserGroups = async function exportUserGroups (projections, 
 
 module.exports.getUser = async function getUser (req, res, next) {
   try {
-    const projection = ['villageGrants', 'statistics']
+    // privacyStatus is always included (not opt-in): the privacy-ack gate
+    // allowlists this endpoint specifically so bootstrap can read it while
+    // blocked, and the client has no other way to learn its own ack status.
+    const projection = ['villageGrants', 'statistics', 'privacyStatus']
     if (req.query.projection) {
-      projection.push(req.query.projection)
+      projection.push(...req.query.projection)
     }
 
     let response = await UserService.getUserByUserId(req.userObject.userId, projection)

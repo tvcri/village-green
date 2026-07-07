@@ -27,8 +27,8 @@ const phone = ref('')
 const email = ref('')
 const selectedVillage = ref('All villages')
 
-const showMembers = ref(true)
-const showVolunteers = ref(true)
+const showMembers = ref(false)
+const showVolunteers = ref(false)
 
 // Village options for the filter; 'All villages' is the sentinel meaning no
 // village restriction (server returns persons across all granted villages).
@@ -61,6 +61,7 @@ const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
 
 const filteredPersons = computed(() => {
   if (!persons.value) return null
+  if (!showMembers.value && !showVolunteers.value) return persons.value
   return persons.value.filter(p => {
     const roles = parseJson(p.roles)
     if (showMembers.value && roles.includes('member')) return true
@@ -112,9 +113,14 @@ function onSearch() {
   <div class="person-list">
     <div class="list-header">
       <h2>Persons</h2>
-      <span v-if="filteredPersons !== null && !isLoading" class="result-count">
-        {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
-      </span>
+      <div class="header-actions">
+        <span v-if="filteredPersons !== null && !isLoading" class="result-count">
+          {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
+        </span>
+        <Button label="New Person" icon="pi pi-plus" @click="$router.push({ name: 'meta-person-create' })" />
+        <Button label="Import Application" icon="pi pi-file-import" severity="secondary"
+          @click="$router.push({ name: 'meta-person-import' })" />
+      </div>
     </div>
 
     <div class="filters">
@@ -233,6 +239,12 @@ function onSearch() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .list-header h2 {

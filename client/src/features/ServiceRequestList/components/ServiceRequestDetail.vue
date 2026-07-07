@@ -40,7 +40,7 @@ const mapOrigin = computed(() => {
 const mapDestination = computed(() => {
   const r = request.value
   if (!r || (!r.address && !r.city)) return ''
-  return [r.address, r.city, 'RI'].filter(Boolean).join(', ')
+  return [r.address, r.city, r.state].filter(Boolean).join(', ')
 })
 
 const mapWaypoint = computed(() => {
@@ -75,6 +75,22 @@ function formatTimeRange(startStr, finishStr) {
   return `${start} - ${finish}`
 }
 
+const timeDisplay = computed(() => {
+  if (!request.value?.startAt) return null
+  const r = request.value
+  const start = formatTimeOnly(r.startAt)
+  const finish = formatTimeOnly(r.finishAt)
+  if (r.requestNumber == null && r.transportationType === 'Round Trip') {
+    return [
+      { label: 'Start / Arrive', value: [start, formatTimeOnly(r.apptTime)].map(t => t ?? '—').join(' - ') },
+      { label: 'Return / Finish', value: [formatTimeOnly(r.returnTime), finish].map(t => t ?? '—').join(' - ') }
+    ]
+  }
+  return [
+    { label: 'Start / Finish', value: [start, finish].map(t => t ?? '—').join(' / ') }
+  ]
+})
+
 </script>
 
 <template>
@@ -82,7 +98,7 @@ function formatTimeRange(startStr, finishStr) {
     <Card v-if="request" class="detail-card">
       <template #header>
         <div class="card-header-wrapper">
-          <h2 class="card-title">{{ request.serviceName ?? 'Service Request' }}</h2>
+          <h2 class="card-title">{{ `${request.serviceName ?? 'Service Request'} (#${request.requestNumber ?? request.serviceRequestId})` }}</h2>
           <Tag
             v-if="request.status"
             :value="request.status"
@@ -91,86 +107,102 @@ function formatTimeRange(startStr, finishStr) {
         </div>
       </template>
       <template #content>
-        <!-- Member Section -->
-        <div class="section">
-          <h3 class="section-header">Member</h3>
-          <div v-if="request.memberFullName" class="detail-field">
-            <span class="label">Name:</span>
-            <span class="value"><strong>{{ request.memberFullName }}</strong></span>
+        <!-- Member / Volunteer Row -->
+        <div class="section-row">
+          <!-- Member Section -->
+          <div class="section" :class="request.volunteerFullName ? 'section-half' : 'section-full'">
+            <h3 class="section-header">
+              Member
+              <Tag v-if="request.villageName" :value="request.villageName" severity="secondary" class="village-tag" />
+            </h3>
+            <div v-if="request.memberFullName" class="detail-field">
+              <span class="label">Name:</span>
+              <span class="value">{{ request.memberFullName }}</span>
+            </div>
+            <template v-if="request.memberAddress">
+              <div v-if="request.memberAddress.address" class="detail-field">
+                <span class="label">Address:</span>
+                <span class="value">{{ request.memberAddress.address }}</span>
+              </div>
+              <div v-if="request.memberAddress.city || request.memberAddress.state || request.memberAddress.zip" class="detail-field">
+                <span class="label">City/State/Zip:</span>
+                <span class="value">{{ [request.memberAddress.city, request.memberAddress.state, request.memberAddress.zip].filter(Boolean).join(', ') }}</span>
+              </div>
+              <div v-if="request.memberAddress.phone" class="detail-field">
+                <span class="label">Phone:</span>
+                <div class="phone-numbers">
+                  <a :href="`tel:${request.memberAddress.phone}`" class="phone-item">
+                    <i class="pi pi-phone"></i>
+                    <span class="phone-number">{{ request.memberAddress.phone }}</span>
+                  </a>
+                </div>
+              </div>
+              <div v-if="request.memberAddress.cell" class="detail-field">
+                <span class="label">Cell:</span>
+                <div class="phone-numbers">
+                  <a :href="`tel:${request.memberAddress.cell}`" class="phone-item">
+                    <i class="pi pi-phone"></i>
+                    <span class="phone-number">{{ request.memberAddress.cell }}</span>
+                  </a>
+                </div>
+              </div>
+              <div v-if="request.memberAddress.email" class="detail-field">
+                <span class="label">Email:</span>
+                <span class="value">{{ request.memberAddress.email }}</span>
+              </div>
+            </template>
           </div>
-          <template v-if="request.memberAddress">
-            <div v-if="request.memberAddress.address" class="detail-field">
-              <span class="label">Address:</span>
-              <span class="value">{{ request.memberAddress.address }}</span>
+
+          <!-- Volunteer Section -->
+          <div v-if="request.volunteerFullName" class="section section-half">
+            <h3 class="section-header">
+              Volunteer
+              <Tag v-if="request.volunteerVillageName" :value="request.volunteerVillageName" severity="secondary" class="village-tag" />
+            </h3>
+            <div class="detail-field">
+              <span class="label">Name:</span>
+              <span class="value">{{ request.volunteerFullName }}</span>
             </div>
-            <div v-if="request.memberAddress.city || request.memberAddress.state || request.memberAddress.zip" class="detail-field">
-              <span class="label">City/State/Zip:</span>
-              <span class="value">{{ [request.memberAddress.city, request.memberAddress.state, request.memberAddress.zip].filter(Boolean).join(', ') }}</span>
-            </div>
-            <div v-if="request.memberAddress.phone" class="detail-field">
-              <span class="label">Phone:</span>
-              <div class="phone-numbers">
-                <a :href="`tel:${request.memberAddress.phone}`" class="phone-item">
-                  <i class="pi pi-phone"></i>
-                  <span class="phone-number">{{ request.memberAddress.phone }}</span>
-                </a>
+            <template v-if="request.volunteerAddress">
+              <div v-if="request.volunteerAddress.address" class="detail-field">
+                <span class="label">Address:</span>
+                <span class="value">{{ request.volunteerAddress.address }}</span>
               </div>
-            </div>
-            <div v-if="request.memberAddress.cell" class="detail-field">
-              <span class="label">Cell:</span>
-              <div class="phone-numbers">
-                <a :href="`tel:${request.memberAddress.cell}`" class="phone-item">
-                  <i class="pi pi-phone"></i>
-                  <span class="phone-number">{{ request.memberAddress.cell }}</span>
-                </a>
+              <div v-if="request.volunteerAddress.city || request.volunteerAddress.state || request.volunteerAddress.zip" class="detail-field">
+                <span class="label">City/State/Zip:</span>
+                <span class="value">{{ [request.volunteerAddress.city, request.volunteerAddress.state, request.volunteerAddress.zip].filter(Boolean).join(', ') }}</span>
               </div>
-            </div>
-            <div v-if="request.memberAddress.email" class="detail-field">
-              <span class="label">Email:</span>
-              <span class="value">{{ request.memberAddress.email }}</span>
-            </div>
-          </template>
+              <div v-if="request.volunteerAddress.phone" class="detail-field">
+                <span class="label">Phone:</span>
+                <div class="phone-numbers">
+                  <a :href="`tel:${request.volunteerAddress.phone}`" class="phone-item">
+                    <i class="pi pi-phone"></i>
+                    <span class="phone-number">{{ request.volunteerAddress.phone }}</span>
+                  </a>
+                </div>
+              </div>
+              <div v-if="request.volunteerAddress.cell" class="detail-field">
+                <span class="label">Cell:</span>
+                <div class="phone-numbers">
+                  <a :href="`tel:${request.volunteerAddress.cell}`" class="phone-item">
+                    <i class="pi pi-phone"></i>
+                    <span class="phone-number">{{ request.volunteerAddress.cell }}</span>
+                  </a>
+                </div>
+              </div>
+              <div v-if="request.volunteerAddress.email" class="detail-field">
+                <span class="label">Email:</span>
+                <span class="value">{{ request.volunteerAddress.email }}</span>
+              </div>
+            </template>
+          </div>
         </div>
 
-        <!-- Volunteer Section -->
-        <div v-if="request.volunteerFullName" class="section">
-          <h3 class="section-header">Volunteer</h3>
-          <div class="detail-field">
-            <span class="label">Name:</span>
-            <span class="value"><strong>{{ request.volunteerFullName }}</strong></span>
-          </div>
-          <template v-if="request.volunteerAddress">
-            <div v-if="request.volunteerAddress.address" class="detail-field">
-              <span class="label">Address:</span>
-              <span class="value">{{ request.volunteerAddress.address }}</span>
-            </div>
-            <div v-if="request.volunteerAddress.city || request.volunteerAddress.state || request.volunteerAddress.zip" class="detail-field">
-              <span class="label">City/State/Zip:</span>
-              <span class="value">{{ [request.volunteerAddress.city, request.volunteerAddress.state, request.volunteerAddress.zip].filter(Boolean).join(', ') }}</span>
-            </div>
-            <div v-if="request.volunteerAddress.phone" class="detail-field">
-              <span class="label">Phone:</span>
-              <div class="phone-numbers">
-                <a :href="`tel:${request.volunteerAddress.phone}`" class="phone-item">
-                  <i class="pi pi-phone"></i>
-                  <span class="phone-number">{{ request.volunteerAddress.phone }}</span>
-                </a>
-              </div>
-            </div>
-            <div v-if="request.volunteerAddress.cell" class="detail-field">
-              <span class="label">Cell:</span>
-              <div class="phone-numbers">
-                <a :href="`tel:${request.volunteerAddress.cell}`" class="phone-item">
-                  <i class="pi pi-phone"></i>
-                  <span class="phone-number">{{ request.volunteerAddress.cell }}</span>
-                </a>
-              </div>
-            </div>
-            <div v-if="request.volunteerAddress.email" class="detail-field">
-              <span class="label">Email:</span>
-              <span class="value">{{ request.volunteerAddress.email }}</span>
-            </div>
-          </template>
+        <!-- Service Notes Section -->
+        <div class="section description-section">
+          <h3 class="section-header">Service Notes</h3>
+          <p v-if="request.memberServiceNotes" class="description-text">{{ request.memberServiceNotes }}</p>
+          <p v-else class="description-text service-notes-empty">There are no service notes for this member</p>
         </div>
 
         <!-- Description Section -->
@@ -187,9 +219,9 @@ function formatTimeRange(startStr, finishStr) {
             <span class="value">{{ formatDateOnly(request.startAt) }}</span>
           </div>
 
-          <div v-if="request.startAt && request.finishAt" class="detail-field">
-            <span class="label">Start/Finish:</span>
-            <span class="value">{{ formatTimeRange(request.startAt, request.finishAt) }}</span>
+          <div v-for="row in timeDisplay" :key="row.label" class="detail-field">
+            <span class="label">{{ row.label }}:</span>
+            <span class="value">{{ row.value }}</span>
           </div>
 
           <div v-if="request.transportationType" class="detail-field">
@@ -207,9 +239,9 @@ function formatTimeRange(startStr, finishStr) {
             <span class="value">{{ request.address }}</span>
           </div>
 
-          <div v-if="request.city" class="detail-field">
-            <span class="label">City:</span>
-            <span class="value">{{ request.city }}</span>
+          <div v-if="request.city || request.state" class="detail-field">
+            <span class="label">City/State:</span>
+            <span class="value">{{ [request.city, request.state].filter(Boolean).join(', ') }}</span>
           </div>
 
           <div v-if="request.phone" class="detail-field">
@@ -265,6 +297,18 @@ function formatTimeRange(startStr, finishStr) {
 
 <style scoped>
 @import '../../../shared/styles/phone-link.css';
+
+.phone-numbers {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-weight: 600;
+}
+
+.phone-item i {
+  color: var(--color-text-dim);
+  font-size: 0.9rem;
+}
 
 .request-detail {
   padding: 2rem;
@@ -331,6 +375,7 @@ function formatTimeRange(startStr, finishStr) {
 .detail-field .value {
   color: var(--color-text-primary);
   font-size: 1rem;
+  font-weight: 600;
   word-break: break-word;
 }
 
@@ -349,7 +394,7 @@ function formatTimeRange(startStr, finishStr) {
 
 .section {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;
@@ -361,6 +406,29 @@ function formatTimeRange(startStr, finishStr) {
 
 .section:last-child {
   margin-bottom: 0;
+}
+
+.section-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: 1rem 1.5rem;
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+}
+
+.section-row .section {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.section-half {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.section-full {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, 1fr);
 }
 
 /* The notification list is a single grid child; without this it would sit in
@@ -379,6 +447,17 @@ function formatTimeRange(startStr, finishStr) {
   color: var(--color-primary);
   border-bottom: 2px solid var(--color-border-default);
   padding-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.village-tag {
+  text-transform: none;
+  font-weight: 700;
+  letter-spacing: normal;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
 }
 
 .description-section {
@@ -393,6 +472,11 @@ function formatTimeRange(startStr, finishStr) {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.service-notes-empty {
+  font-style: italic;
+  color: var(--color-text-dim);
 }
 
 .map-section {
@@ -442,6 +526,10 @@ function formatTimeRange(startStr, finishStr) {
   .section {
     grid-template-columns: 1fr 1fr;
   }
+
+  .section-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 600px) {
@@ -452,6 +540,10 @@ function formatTimeRange(startStr, finishStr) {
   .section {
     grid-template-columns: 1fr;
     gap: 1rem;
+  }
+
+  .section-half {
+    grid-template-columns: 1fr;
   }
 }
 </style>

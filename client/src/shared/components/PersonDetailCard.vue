@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import Card from 'primevue/card'
+import Tag from 'primevue/tag'
 import PersonMap from '../../components/PersonMap.vue'
 
 const props = defineProps({
@@ -12,6 +13,27 @@ const props = defineProps({
     type: String,
     enum: ['member', 'volunteer', 'member, volunteer'],
     required: true
+  },
+  columnCount: {
+    type: Number,
+    default: 4
+  },
+  detailLevel: {
+    type: String,
+    enum: ['info', 'full'],
+    default: 'info'
+  },
+  // Explicit override for section visibility, independent of personType
+  // (which reflects only *active* roles). Pass when the caller knows
+  // memberDetail/volunteerDetail data exists even if the role is inactive.
+  // Defaults (null) fall back to personType so single-role pages are unaffected.
+  hasMemberDetail: {
+    type: Boolean,
+    default: null
+  },
+  hasVolunteerDetail: {
+    type: Boolean,
+    default: null
   }
 })
 
@@ -31,8 +53,11 @@ const mapAddress = computed(() => {
   return [p.address, p.city, p.state, p.zip].filter(Boolean).join(', ')
 })
 
-const isMember = computed(() => props.personType === 'member' || props.personType === 'member, volunteer')
-const isVolunteer = computed(() => props.personType === 'volunteer' || props.personType === 'member, volunteer')
+const isMember = computed(() => props.hasMemberDetail ?? (props.personType === 'member' || props.personType === 'member, volunteer'))
+const isVolunteer = computed(() => props.hasVolunteerDetail ?? (props.personType === 'volunteer' || props.personType === 'member, volunteer'))
+const isFullDetail = computed(() => props.detailLevel === 'full')
+
+const serviceNotesSpan = computed(() => Math.min(props.columnCount, 2))
 
 const copyEmail = async (email) => {
   try {
@@ -49,7 +74,12 @@ const copyEmail = async (email) => {
 
 <template>
   <Card v-if="person" class="detail-card">
-    <template #title>{{ person.fullName }}</template>
+    <template #title>
+      <div class="title-row">
+        <span>{{ person.fullName }}</span>
+        <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
+      </div>
+    </template>
     <template #content>
       <!-- Personal Information Section -->
       <div class="section">
@@ -57,6 +87,11 @@ const copyEmail = async (email) => {
         <div v-if="person.firstName" class="detail-field">
           <span class="label">First Name:</span>
           <span class="value">{{ person.firstName }}</span>
+        </div>
+
+        <div v-if="person.middleInitial" class="detail-field">
+          <span class="label">Middle Initial:</span>
+          <span class="value">{{ person.middleInitial }}</span>
         </div>
 
         <div v-if="person.lastName" class="detail-field">
@@ -127,33 +162,118 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.memberLevel }}</span>
         </div>
 
+        <div v-if="person.primaryPerson?.fullName" class="detail-field">
+          <span class="label">Primary Member:</span>
+          <span class="value">{{ person.primaryPerson.fullName }}</span>
+        </div>
+
         <div v-if="person.joinDate" class="detail-field">
           <span class="label">Join Date:</span>
           <span class="value">{{ person.joinDate }}</span>
         </div>
 
-        <div v-if="person.serviceNotes" class="detail-field">
-          <span class="label">Service Notes:</span>
+        <template v-if="isFullDetail">
+          <div v-if="person.memberType" class="detail-field">
+            <span class="label">Member Type:</span>
+            <span class="value">{{ person.memberType }}</span>
+          </div>
+
+          <div v-if="person.secondaryType" class="detail-field">
+            <span class="label">Secondary Type:</span>
+            <span class="value">{{ person.secondaryType }}</span>
+          </div>
+
+          <div v-if="person.status" class="detail-field">
+            <span class="label">Status:</span>
+            <span class="value">{{ person.status }}</span>
+          </div>
+
+          <div v-if="person.status === 'Dropped' && person.dropReason" class="detail-field">
+            <span class="label">Drop Reason:</span>
+            <span class="value">{{ person.dropReason }}</span>
+          </div>
+
+          <div v-if="person.householdSize != null" class="detail-field">
+            <span class="label">Household Size:</span>
+            <span class="value">{{ person.householdSize }}</span>
+          </div>
+
+          <div v-if="person.householdDues != null" class="detail-field">
+            <span class="label">Household Dues:</span>
+            <span class="value">{{ Number(person.householdDues).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) }}</span>
+          </div>
+
+          <div v-if="person.quickbooksKey" class="detail-field">
+            <span class="label">Quickbooks Key:</span>
+            <span class="value">{{ person.quickbooksKey }}</span>
+          </div>
+
+          <div v-if="person.printedNewsletter != null" class="detail-field">
+            <span class="label">Printed Newsletter:</span>
+            <span class="value">{{ person.printedNewsletter ? 'Yes' : 'No' }}</span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Member Notes Section (full detail only) -->
+      <div v-if="isFullDetail && (person.confidentialNotes || person.statusChangeNotes || person.miscNotes)" class="section">
+        <h3 class="section-header">Member Notes</h3>
+        <div v-if="person.confidentialNotes" class="detail-field notes-field">
+          <span class="label">Confidential Notes:</span>
+          <span class="value">{{ person.confidentialNotes }}</span>
+        </div>
+
+        <div v-if="person.statusChangeNotes" class="detail-field notes-field">
+          <span class="label">Status Change Notes:</span>
+          <span class="value">{{ person.statusChangeNotes }}</span>
+        </div>
+
+        <div v-if="person.miscNotes" class="detail-field notes-field">
+          <span class="label">Misc Notes:</span>
+          <span class="value">{{ person.miscNotes }}</span>
+        </div>
+      </div>
+
+      <!-- Service Notes Section -->
+      <div v-if="person.serviceNotes" class="section">
+        <h3 class="section-header">Service Notes</h3>
+        <div class="detail-field service-notes-field">
           <span class="value">{{ person.serviceNotes }}</span>
         </div>
       </div>
 
       <!-- Volunteer-specific Section -->
-      <div v-if="isVolunteer && person.capabilities?.length" class="section">
+      <div v-if="isVolunteer && (person.capabilities?.length || person.vettings?.length || person.active != null)" class="section">
         <h3 class="section-header">Volunteer Information</h3>
-        <div class="detail-field capabilities-field">
+        <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities:</span>
           <div class="capabilities-list">
-            <span
+            <Tag
               v-for="cap in person.capabilities"
               :key="cap"
+              :value="cap"
               class="capability-badge"
-            >
-              {{ cap }}
-            </span>
+            />
           </div>
         </div>
+
+        <template v-if="isFullDetail">
+
+          <div v-if="person.active != null" class="detail-field">
+            <span class="label">Active:</span>
+            <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
+          </div>
+          <template v-if="person.vettings?.length">
+            <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
+              <span class="label">{{ vetting.name }}:</span>
+              <span class="value">
+                {{ vetting.dateEntered || 'Unknown' }}<template v-if="vetting.dateExpired"> – {{ vetting.dateExpired }}</template>
+              </span>
+            </div>
+          </template>
+        </template>
       </div>
+
 
       <!-- Emergency Contact Section -->
       <div v-if="person.emergencyContactName || person.emergencyContactRelationship || person.emergencyContactPhone || person.emergencyContactEmail" class="section">
@@ -211,6 +331,18 @@ const copyEmail = async (email) => {
   font-size: 2rem;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.village-tag {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
 :deep(.p-card-content) {
   display: block;
 }
@@ -235,13 +367,14 @@ const copyEmail = async (email) => {
 .detail-field .value {
   color: var(--color-text-primary);
   font-size: 1rem;
+  font-weight: 600;
   word-break: break-word;
 }
 
 
 .section {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(v-bind(columnCount), 1fr);
   gap: 1rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;
@@ -308,12 +441,17 @@ const copyEmail = async (email) => {
   display: flex;
   gap: 1rem;
   align-items: center;
+  font-weight: 600
+}
+.phone_number {
+  white-space: nowrap;
 }
 
 
 .phone-item i {
   color: var(--color-text-dim);
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .capabilities-list {
@@ -324,15 +462,23 @@ const copyEmail = async (email) => {
 
 .capability-badge {
   display: inline-block;
-  padding: 0.35rem 0.7rem;
+  padding: 0.3rem 0.6rem;
   background-color: var(--color-background-dark);
   border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  font-size: 0.85rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
   color: var(--color-text-dim);
 }
 
 .capabilities-field {
+  grid-column: 1 / -1;
+}
+
+.service-notes-field {
+  grid-column: span v-bind(serviceNotesSpan);
+}
+
+.notes-field {
   grid-column: 1 / -1;
 }
 

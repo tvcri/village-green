@@ -84,6 +84,7 @@ const sorted = computed(() => sortHistory(props.history))
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
 
 .event-type {

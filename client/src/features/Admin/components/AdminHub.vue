@@ -15,6 +15,10 @@ const navigateToUserAccess = () => {
 const navigateToAnalytics = () => {
   router.push({ name: 'admin-analytics' })
 }
+
+const navigateToPrivacy = () => {
+  router.push({ name: 'admin-privacy' })
+}
 </script>
 
 <template>
@@ -24,8 +28,9 @@ const navigateToAnalytics = () => {
 
     <div class="button-group">
       <Button label="Village Access List" @click="navigateToVillageAccess" />
-      <Button label="User Access List" @click="navigateToUserAccess" />
+      <Button label="Users" @click="navigateToUserAccess" />
       <Button label="Analytics" @click="navigateToAnalytics" />
+      <Button label="Privacy Agreement" @click="navigateToPrivacy" />
     </div>
   </div>
 </template>
@@ -51,7 +56,7 @@ h1 {
 
 .button-group {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 1rem;
 }
 

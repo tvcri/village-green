@@ -1,11 +1,12 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
+import { setPendingHighlight } from '../shared/lib/pendingHighlight.js'
 import Menu from 'primevue/menu'
 
 const router = useRouter()
@@ -20,30 +21,49 @@ const routeToGroupMap = Object.fromEntries(
   )
 )
 
-function getSiblings(routeName, currentParams) {
+function getSiblings(routeName, currentParams, excludeName) {
   const groupName = routeToGroupMap[routeName]
   if (!groupName) return null
 
-  return siblingGroups[groupName].map(sibling => ({
-    label: sibling.label,
-    route: { name: sibling.name, params: currentParams }
-  }))
+  return siblingGroups[groupName]
+    .filter(sibling => sibling.name !== excludeName)
+    .map(sibling => ({
+      label: sibling.label,
+      route: { name: sibling.name, params: currentParams }
+    }))
 }
 
-const { state: villages } = useAsyncState(
+// Only needed for village-scoped and meta routes (village name/dropdown).
+// Fetched lazily so the root villages route doesn't duplicate VillageList's
+// own (differently-projected) fetch of the same data.
+const { state: villages, execute: fetchVillages } = useAsyncState(
   () => getVillages(),
-  { immediate: true, onError: null }
+  { immediate: false, onError: null }
 )
 
-const { state: adminVillages } = useAsyncState(
+// Elevated-privilege lookups: only needed on the admin create-grant routes,
+// so fetch lazily and on-demand rather than for every user on every page.
+const { state: adminVillages, execute: fetchAdminVillages } = useAsyncState(
   () => getAdminVillages(),
-  { immediate: true, onError: null }
+  { immediate: false, onError: null }
 )
 
-const { state: adminUsers } = useAsyncState(
+const { state: adminUsers, execute: fetchAdminUsers } = useAsyncState(
   () => getAdminUsers(),
-  { immediate: true, onError: null }
+  { immediate: false, onError: null }
 )
+
+watch(() => route.name, (routeName) => {
+  if (!routeName) return
+
+  if (routeName === 'admin-create-grant' && adminVillages.value === null) {
+    fetchAdminVillages()
+  } else if (routeName === 'admin-user-grants' && adminUsers.value === null) {
+    fetchAdminUsers()
+  } else if (!routeName.startsWith('admin') && (route.params.villageId || routeName.startsWith('meta')) && villages.value === null) {
+    fetchVillages()
+  }
+}, { immediate: true })
 
 const breadcrumbs = computed(() => {
   const crumbs = [
@@ -59,8 +79,27 @@ const breadcrumbs = computed(() => {
         crumbs.push({ label: 'Village Access', siblings: getSiblings('admin-village-access', {}) })
         break
       case 'admin-user-access':
-        crumbs.push({ label: 'User Access', siblings: getSiblings('admin-user-access', {}) })
+        crumbs.push({ label: 'Users', siblings: getSiblings('admin-user-access', {}) })
         break
+      case 'admin-user-create':
+        crumbs.push({
+          label: 'Users',
+          siblings: getSiblings('admin-user-access', {}, 'admin-user-access'),
+          route: { name: 'admin-user-access' }
+        })
+        crumbs.push({ label: 'New User' })
+        break
+      case 'admin-user-grants': {
+        const userId = route.params.userId
+        const user = adminUsers.value?.find(u => u.userId === userId)
+        const userName = route.params.displayName || user?.displayName || user?.username || `User ${userId}`
+        crumbs.push({
+          label: 'Users',
+          route: { name: 'admin-user-access' }
+        })
+        crumbs.push({ label: userName })
+        break
+      }
       case 'admin-create-grant': {
         const villageId = route.params.villageId
         const village = adminVillages.value?.find(v => v.villageId === villageId)
@@ -72,21 +111,6 @@ const breadcrumbs = computed(() => {
         crumbs.push({
           label: villageName,
           route: { name: 'admin-village-access', query: { villageId } }
-        })
-        crumbs.push({ label: 'Create Grant' })
-        break
-      }
-      case 'admin-create-user-grant': {
-        const userId = route.params.userId
-        const user = adminUsers.value?.find(u => u.userId === userId)
-        const userName = user?.displayName || user?.username || `User ${userId}`
-        crumbs.push({
-          label: 'User Access',
-          route: { name: 'admin-user-access', query: { userId } }
-        })
-        crumbs.push({
-          label: userName,
-          route: { name: 'admin-user-access', query: { userId } }
         })
         crumbs.push({ label: 'Create Grant' })
         break
@@ -180,8 +204,33 @@ const breadcrumbs = computed(() => {
       break
     case 'meta-person-detail':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: [
+        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
+        { label: 'Friends', route: { name: 'meta-friends' } }
+      ]})
       crumbs.push({ label: route.params.personName || 'Person' })
+      break
+    case 'meta-person-create':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'New Person' })
+      break
+    case 'meta-person-edit':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Edit Person' })
+      break
+    case 'meta-person-member':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Person', route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
+      crumbs.push({ label: 'Member' })
+      break
+    case 'meta-person-volunteer':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Person', route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
+      crumbs.push({ label: 'Volunteer' })
       break
     case 'members':
       crumbs.push({ label: 'Members', siblings: getSiblings('members', { villageId: vId }) })
@@ -216,6 +265,9 @@ const breadcrumbs = computed(() => {
 
 const navigate = (crumb) => {
   if (crumb.route) {
+    if (crumb.route.name === 'meta-service-requests' && route.name === 'service-request-detail') {
+      setPendingHighlight(route.params.id)
+    }
     router.push(crumb.route)
   }
 }
@@ -244,7 +296,7 @@ const navigate = (crumb) => {
           />
           <button
             :class="index === breadcrumbs.length - 1 ? 'breadcrumb-current' : ['breadcrumb-link', 'breadcrumb-link-label']"
-            @click="navigate(crumb)"
+            @click="index === breadcrumbs.length - 1 ? menuRefs.get(index)?.toggle($event) : navigate(crumb)"
           >
             {{ crumb.label }}
           </button>
@@ -335,6 +387,7 @@ const navigate = (crumb) => {
   border: none;
   padding: 0;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .breadcrumb-separator {

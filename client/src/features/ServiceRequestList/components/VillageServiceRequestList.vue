@@ -2,9 +2,9 @@
 import { computed, ref, watch, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
-import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
-import InputText from 'primevue/inputtext'
+import MultiSelect from 'primevue/multiselect'
+import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
@@ -13,7 +13,8 @@ import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
-import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { toCsv, downloadCsv, withLocalDateTimeColumns } from '../../../shared/lib/csvUtils.js'
+import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 defineOptions({ name: 'VillageServiceRequestList' })
 
@@ -28,29 +29,26 @@ useScrollRestore('service-requests', 'service-request-detail')
 const villageId = computed(() => route.params.villageId)
 
 const isCreatingSheet = ref(false)
-const filtersCollapsed = ref(true)
-const selectedMember = ref('All members')
-const selectedVolunteer = ref('All volunteers')
+const selectedMember = ref('')
+const selectedVolunteer = ref('')
+const appliedMember = ref('')
+const appliedVolunteer = ref('')
+const memberSuggestions = ref([])
+const volunteerSuggestions = ref([])
 const selectedService = ref('All services')
-const idSearch = ref('')
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
-const historyIsVgManaged = ref(false)
-const historyRequestStatus = ref(null)
-
 const openHistory = (row) => {
   historyRequestId.value = row.serviceRequestId
   historyRequestLabel.value = row.displayNumber
-  historyIsVgManaged.value = false
-  historyRequestStatus.value = row.status
   historyDialogVisible.value = true
 }
 
 const onNotified = (updated) => {
   requests.value = requests.value.map(r =>
     r.serviceRequestId === updated.serviceRequestId
-      ? { ...r, notifications: updated.notificationHistory.map(e => e.eventType) }
+      ? { ...r, notifications: updated.notificationHistory?.map(e => e.eventType) ?? [] }
       : r
   )
 }
@@ -69,10 +67,14 @@ const { state: village, execute: fetchVillage } = useAsyncState(
 
 const hasActivatedOnce = ref(false)
 const villageIdAtDeactivation = ref(null)
+const flashRowId = ref(null)
+const flashTimer = ref(null)
 
 const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
-  selectedMember.value = 'All members'
-  selectedVolunteer.value = 'All volunteers'
+  selectedMember.value = ''
+  selectedVolunteer.value = ''
+  appliedMember.value = ''
+  appliedVolunteer.value = ''
   selectedService.value = 'All services'
   selectedStatuses.value = ['open', 'confirmed']
   fetchRequests()
@@ -84,7 +86,7 @@ onDeactivated(() => {
   villageIdAtDeactivation.value = villageId.value
 })
 
-onActivated(() => {
+onActivated(async () => {
   resumeVillageWatch()
   if (!hasActivatedOnce.value) {
     hasActivatedOnce.value = true
@@ -92,9 +94,16 @@ onActivated(() => {
   }
   const villageChanged = villageId.value !== villageIdAtDeactivation.value
   if (villageChanged) {
+    consumePendingHighlight()
     return
   }
-  fetchRequests()
+  await fetchRequests()
+  const id = consumePendingHighlight()
+  if (id) {
+    flashRowId.value = id
+    clearTimeout(flashTimer.value)
+    flashTimer.value = setTimeout(() => { flashRowId.value = null }, 2000)
+  }
 })
 
 const hasLoadedOnce = ref(false)
@@ -102,44 +111,59 @@ watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
 
 const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled']
 
-const memberOptions = computed(() => {
+const memberNames = computed(() => {
   if (!Array.isArray(requests.value)) return []
-  const members = new Set(requests.value.map(r => r.memberFullName).filter(Boolean))
-  return ['All members', ...Array.from(members).sort()]
+  return Array.from(new Set(requests.value.map(r => r.memberFullName).filter(Boolean))).sort()
 })
 
-const volunteerOptions = computed(() => {
+const volunteerNames = computed(() => {
   if (!Array.isArray(requests.value)) return []
-  const volunteers = new Set(requests.value.map(r => r.volunteerFullName).filter(Boolean))
-  return ['All volunteers', ...Array.from(volunteers).sort()]
+  return Array.from(new Set(requests.value.map(r => r.volunteerFullName).filter(Boolean))).sort()
 })
+
+const filterMemberSuggestions = (event) => {
+  const q = event.query.toLowerCase()
+  memberSuggestions.value = memberNames.value.filter(n => n.toLowerCase().includes(q))
+}
+
+const filterVolunteerSuggestions = (event) => {
+  const q = event.query.toLowerCase()
+  volunteerSuggestions.value = volunteerNames.value.filter(n => n.toLowerCase().includes(q))
+}
+
+const onMemberSelect = (event) => { appliedMember.value = event.value }
+const onVolunteerSelect = (event) => { appliedVolunteer.value = event.value }
+
+watch(selectedMember, (val) => { if (!val) appliedMember.value = '' })
+watch(selectedVolunteer, (val) => { if (!val) appliedVolunteer.value = '' })
 
 const serviceOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
-  const services = new Set(requests.value.map(r => r.serviceName).filter(Boolean))
-  return ['All services', ...Array.from(services).sort()]
+  const seen = new Map()
+  for (const r of requests.value) {
+    if (r.serviceName) {
+      const key = r.serviceName.toLowerCase().replace(/:\s*/g, ': ').trim()
+      if (!seen.has(key)) seen.set(key, r.serviceName)
+    }
+  }
+  return ['All services', ...Array.from(seen.values()).sort()]
 })
 
 const filteredRequests = computed(() => {
   if (!Array.isArray(requests.value)) return []
   return requests.value.filter(r => {
     let memberMatch = true
-    if (selectedMember.value && selectedMember.value !== 'All members') {
-      memberMatch = r.memberFullName === selectedMember.value
+    if (appliedMember.value) {
+      memberMatch = r.memberFullName === appliedMember.value
     }
     let volunteerMatch = true
-    if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') {
-      volunteerMatch = r.volunteerFullName === selectedVolunteer.value
+    if (appliedVolunteer.value) {
+      volunteerMatch = r.volunteerFullName === appliedVolunteer.value
     }
     let serviceMatch = true
     if (selectedService.value && selectedService.value !== 'All services') {
-      serviceMatch = r.serviceName === selectedService.value
-    }
-    let idMatch = true
-    const idQuery = idSearch.value.trim().toLowerCase()
-    if (idQuery) {
-      const displayedId = String(r.displayNumber ?? '').toLowerCase()
-      idMatch = displayedId.includes(idQuery)
+      const normalize = s => s?.toLowerCase().replace(/:\s*/g, ': ').trim()
+      serviceMatch = normalize(r.serviceName) === normalize(selectedService.value)
     }
     let statusMatch = true
     if (selectedStatuses.value.length > 0) {
@@ -150,16 +174,15 @@ const filteredRequests = computed(() => {
         return statusLower === sl
       })
     }
-    return memberMatch && volunteerMatch && serviceMatch && statusMatch && idMatch
+    return memberMatch && volunteerMatch && serviceMatch && statusMatch
   })
 })
 
 const activeFilterCount = computed(() => {
   let count = 0
-  if (selectedMember.value && selectedMember.value !== 'All members') count++
-  if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') count++
+  if (appliedMember.value) count++
+  if (appliedVolunteer.value) count++
   if (selectedService.value && selectedService.value !== 'All services') count++
-  if (idSearch.value.trim()) count++
   return count
 })
 
@@ -169,20 +192,23 @@ const columnsForCsv = [
   { header: 'Service', key: 'serviceName' },
   { header: 'Member', key: 'memberFullName' },
   { header: 'Volunteer', key: 'volunteerFullName' },
+  { header: 'Description', key: 'description' },
   { header: 'Start At', key: 'startAt' },
+  { header: 'Arrive At', key: 'apptTime' },
+  { header: 'Return At', key: 'returnTime' },
   { header: 'Finish At', key: 'finishAt' },
-  { header: 'Transportation Type', key: 'transportationType' },
   { header: 'Destination', key: 'destination' },
   { header: 'Address', key: 'address' },
   { header: 'City', key: 'city' },
-  { header: 'Phone', key: 'phone' },
-  { header: 'Description', key: 'description' },
+  { header: 'State', key: 'state' },
   { header: 'Created At', key: 'createdAt' }
 ]
+  
+const DATE_TIME_CSV_KEYS = ['startAt', 'apptTime', 'returnTime', 'finishAt', 'createdAt']
 
 const handleDownloadCsv = async () => {
   if (!village.value && villageId.value) await fetchVillage()
-  const csv = toCsv(requests.value || [], columnsForCsv)
+  const csv = toCsv(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv)
   const villageName = village.value?.name || 'village'
   downloadCsv(csv, `${villageName}-service-requests.csv`)
 }
@@ -192,7 +218,7 @@ async function handleCreateSheet() {
     isCreatingSheet.value = true
     if (!village.value && villageId.value) await fetchVillage()
     const villageName = village.value?.name || 'Village Green'
-    const result = await createSheet(requests.value || [], columnsForCsv, `${villageName} Service Requests`)
+    const result = await createSheet(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv, `${villageName} Service Requests`)
     const sheetUrl = result.url || result
     if (result.popupBlocked) {
       if (toast) {
@@ -226,15 +252,17 @@ async function handleCreateSheet() {
 }
 
 const navigateToRequest = (serviceRequestId, rowVillageId) => {
+  setPendingHighlight(serviceRequestId)
   router.push({ name: 'service-request-detail', params: { villageId: rowVillageId ?? villageId.value, id: serviceRequestId } })
 }
 
 const clearFilters = () => {
-  selectedMember.value = 'All members'
-  selectedVolunteer.value = 'All volunteers'
+  selectedMember.value = ''
+  selectedVolunteer.value = ''
+  appliedMember.value = ''
+  appliedVolunteer.value = ''
   selectedService.value = 'All services'
   selectedStatuses.value = []
-  idSearch.value = ''
 }
 </script>
 
@@ -244,62 +272,14 @@ const clearFilters = () => {
       <div class="title-group">
         <h1>Service Requests</h1>
       </div>
-      <div class="header-actions">
-        <ExportButton
-          :disabled="isLoading || isCreatingSheet"
-          @download="handleDownloadCsv"
-          @export="handleCreateSheet"
-        />
-      </div>
     </div>
 
-    <div class="filter-section">
-      <div class="filters-container">
-        <div class="filters-header">
-          <button
-            type="button"
-            class="filters-toggle"
-            :class="{ collapsed: filtersCollapsed }"
-            @click="filtersCollapsed = !filtersCollapsed"
-          >
-            <span class="toggle-icon">▼</span>
-            <span class="filters-title">
-              Filters
-            </span>
-          </button>
-        </div>
-
-        <div v-if="!filtersCollapsed" class="filters-content">
-          <div class="status-id-row">
-            <div class="status-filter-group">
-              <label class="filter-group-label">Status:</label>
-              <div class="status-filters">
-                <div v-for="status in statusOptions" :key="status" class="status-filter">
-                  <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
-                  <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
-                </div>
-              </div>
-            </div>
-            <div class="search-box">
-              <label>Request ID / #:</label>
-              <InputText v-model="idSearch" placeholder="Search by ID or number" />
-            </div>
-          </div>
-
-          <div class="search-box">
-            <label>Member:</label>
-            <Select v-model="selectedMember" :options="memberOptions" placeholder="-- Select member --" />
-          </div>
-          <div class="search-box">
-            <label>Volunteer:</label>
-            <Select v-model="selectedVolunteer" :options="volunteerOptions" placeholder="-- Select volunteer --" />
-          </div>
-          <div class="search-box">
-            <label>Service:</label>
-            <Select v-model="selectedService" :options="serviceOptions" placeholder="-- Select service --" />
-          </div>
-        </div>
-      </div>
+    <div class="filter-row">
+      <AutoComplete v-model="selectedMember" :suggestions="memberSuggestions" placeholder="Member" show-clear force-selection fluid @complete="filterMemberSuggestions" @item-select="onMemberSelect" />
+      <AutoComplete v-model="selectedVolunteer" :suggestions="volunteerSuggestions" placeholder="Volunteer" show-clear force-selection fluid @complete="filterVolunteerSuggestions" @item-select="onVolunteerSelect" />
+      <Select v-model="selectedService" :options="serviceOptions" placeholder="Service" />
+      <MultiSelect v-model="selectedStatuses" :options="statusOptions" :option-label="s => s.charAt(0).toUpperCase() + s.slice(1)" placeholder="Status" :max-selected-labels="5" selected-items-label="{0} statuses" showClear/>
+      <Button v-if="activeFilterCount > 0" icon="pi pi-times" text rounded v-tooltip="'Clear filters'" @click="clearFilters" />
     </div>
 
     <ServiceRequestTable
@@ -307,8 +287,16 @@ const clearFilters = () => {
       :is-loading="isLoading"
       :has-loaded-once="hasLoadedOnce"
       :error="error"
+      :flash-row-id="flashRowId"
       @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
     >
+      <template #paginator-extra>
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
+      </template>
       <template #actions="{ data }">
         <span class="bell-wrapper">
           <Button
@@ -327,8 +315,6 @@ const clearFilters = () => {
       v-model:visible="historyDialogVisible"
       :service-request-id="historyRequestId"
       :display-label="historyRequestLabel"
-      :is-vg-managed="historyIsVgManaged"
-      :status="historyRequestStatus"
       @notified="onNotified"
     />
   </div>
@@ -336,31 +322,10 @@ const clearFilters = () => {
 
 <style scoped>
 .service-request-list { padding: 2rem; }
-.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .title-group { display: flex; flex-direction: column; gap: 0.25rem; }
-h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
-.header-actions { display: flex; align-items: center; gap: 1rem; }
-.filter-section { margin-bottom: 1.5rem; padding: 1rem 0; background-color: var(--color-background-primary); border-bottom: 1px solid var(--color-border-default); width: 100%; display: flex; flex-direction: column; gap: 1rem; }
-.filters-container { display: flex; flex-direction: column; gap: 0; }
-.filters-header { display: flex; align-items: center; gap: 0.5rem; }
-.filters-toggle { display: flex; align-items: center; gap: 0.75rem; flex: 1; padding: 0.75rem; background: none; border: none; cursor: pointer; font-size: 1rem; text-align: left; color: var(--color-text-primary); font-weight: 500; transition: background-color 0.2s ease; min-height: 3rem; }
-.filters-toggle:hover { background-color: var(--color-background-subtle); border-radius: 4px; }
-.toggle-icon { display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; transition: transform 0.2s ease; color: var(--color-text-dim); flex-shrink: 0; }
-.filters-toggle .toggle-icon { transform: rotate(0deg); }
-.filters-toggle.collapsed .toggle-icon { transform: rotate(-90deg); }
-.filters-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; color: var(--color-text-primary); }
-.filter-count-tag { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; background-color: var(--color-background-subtle); border: 1px solid var(--color-border-default); border-radius: 12px; font-size: 0.8rem; color: var(--color-text-dim); font-weight: 500; white-space: nowrap; }
-.clear-filters-icon { display: inline-flex; align-items: center; justify-content: center; margin-left: 0.5rem; cursor: pointer; color: var(--color-text-dim); font-size: 0.75rem; font-weight: bold; line-height: 1; transition: color 0.2s ease; }
-.clear-filters-icon:hover { color: var(--color-text-primary); }
-.filters-content { display: flex; gap: 2rem; flex-wrap: wrap; align-items: flex-start; padding: 1rem; background-color: var(--color-background-light); border: 1px solid var(--color-border-default); border-radius: 4px; }
-.status-id-row { display: flex; gap: 2rem; align-items: flex-start; flex: 1 1 100%; }
-.status-id-row .status-filter-group { flex: 1 1 auto; }
-.status-filter-group { display: flex; flex-direction: column; gap: 0.5rem; flex: 1 1 100%; }
-.filter-group-label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
-.filters-content .search-box { display: flex; flex-direction: column; gap: 0.5rem; min-width: 160px; }
-.filters-content .search-box label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
-.status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.status-filter { display: flex; align-items: center; gap: 0.375rem; }
+h1 { margin: 0; color: var(--color-text-primary); }
+.filter-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 2rem; }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
 }

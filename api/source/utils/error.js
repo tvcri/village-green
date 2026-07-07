@@ -36,6 +36,16 @@ class PrivilegeError extends SmError {
   }
 }
 
+class PrivacyAckRequiredError extends SmError {
+  constructor() {
+    // message is the client-facing `error` discriminator the interceptor matches
+    // on. No detail needed: the client fetches the current rules itself and acks
+    // the version it displays — the API is the source of truth.
+    super('privacy_ack_required')
+    this.status = 403
+  }
+}
+
 class NotFoundError extends SmError {
   constructor(detail) {
     super('Resource not found.')
@@ -160,6 +170,7 @@ module.exports = {
   SmError,
   AuthorizeError,  
   PrivilegeError,
+  PrivacyAckRequiredError,
   NotFoundError,
   ClientError,
   UnprocessableError,

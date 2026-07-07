@@ -1,23 +1,33 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 import ReauthPrompt from './auth/ReauthPrompt.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import HeaderMenu from './components/HeaderMenu.vue'
 import Breadcrumbs from './components/Breadcrumbs.vue'
 import { useOidcWorker } from './auth/useOidcWorker.js'
 import GlobalErrorModal from './components/global/GlobalErrorModal.vue'
+import PrivacyAckModal from './components/PrivacyAckModal.vue'
+import { usePrivacyAck } from './shared/composables/usePrivacyAck.js'
 
+const { needsAck } = usePrivacyAck()
 const oidcWorker = useOidcWorker()
 const version = computed(() => VG?.Env?.version || '')
 const isDev = VG?.Env?.nodeEnv === 'development'
+
+onMounted(() => {
+  document.getElementById('loading-mask')?.remove()
+})
 </script>
 
 <template>
-  <div v-if="isDev" class="dev-instance" aria-hidden="true">TEST DEPLOYMENT</div>
+  <div v-if="isDev" class="dev-instance" aria-hidden="true">FOR DEMONSTRATION ONLY -- DOES NOT MANAGE PRODUCTION DATA</div>
   <div class="app-container">
     <Toast />
+    <ConfirmDialog />
     <GlobalErrorModal />
+    <PrivacyAckModal />
     <ReauthPrompt
       v-if="oidcWorker.noTokenMessage.value"
       :redirect-oidc="oidcWorker.noTokenMessage.value?.redirectOidc"
@@ -27,7 +37,7 @@ const isDev = VG?.Env?.nodeEnv === 'development'
 
     <header class="app-header">
       <div class="app-title-container">
-        <img src="/house.svg" alt="Village Green Logo" class="app-logo" />
+        <img src="/tvcri-logo.svg" alt="Village Green Logo" class="app-logo" />
         <h1 class="app-title">Village Green</h1>
       </div>
       <div class="header-controls">
@@ -39,8 +49,8 @@ const isDev = VG?.Env?.nodeEnv === 'development'
     <Breadcrumbs />
 
     <main class="app-main">
-      <router-view v-slot="{ Component }">
-        <keep-alive include="MetaServiceRequestList,VillageServiceRequestList,MemberList,VolunteerList,PersonList">
+      <router-view v-if="!needsAck" v-slot="{ Component }">
+        <keep-alive include="MetaServiceRequestList,VillageServiceRequestList,MemberList,VolunteerList,PersonList,UserList">
           <component :is="Component" />
         </keep-alive>
       </router-view>
@@ -69,7 +79,7 @@ const isDev = VG?.Env?.nodeEnv === 'development'
   margin: 0 auto;
   max-width: 1200px;
   height: 20px;
-  background-color: #783d1066;
+  background-color: #ff6f00c9;
   pointer-events: none;
   z-index: 9999;
   display: flex;
@@ -94,7 +104,7 @@ const isDev = VG?.Env?.nodeEnv === 'development'
 
 .app-title-container {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 1rem;
   flex: 1;
 }
@@ -107,6 +117,7 @@ const isDev = VG?.Env?.nodeEnv === 'development'
 
 .app-title {
   margin: 0;
+  line-height: 1;
   font-size: 2.5rem;
   font-weight: 700;
   color: var(--color-text-primary);

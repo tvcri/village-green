@@ -200,10 +200,6 @@ function appendError(message, showReauth = true) {
 }
 
 async function loadApp() {
-  const loadingMask = document.getElementById('loading-mask')
-  if (loadingMask) {
-    loadingMask.remove()
-  }
   import('./main.js').catch((error) => {
     console.error('Failed to load main.js:', error)
     appendError(`Failed to load application: ${error.message || 'Unknown error'}`, false)
@@ -418,6 +414,17 @@ async function getUserObject() {
     },
   })
   const user = await response.json()
+
+  // GET /user is allowlisted by the privacy-ack gate, so this succeeds even
+  // while the user owes an ack — seed the block from the real status instead
+  // of mounting a stub user. App.vue hides the router-view (v-if="!needsAck")
+  // and the ack modal takes over; clearing it needs no reload since the real
+  // user (grants/prefs) was already loaded here.
+  if (user?.privacyStatus?.needsAck) {
+    const { usePrivacyAck } = await import('./shared/composables/usePrivacyAck.js')
+    usePrivacyAck().requireAck()
+  }
+
   user.villageGrants.sort((a, b) => {
     const nameA = a.village.name
     const nameB = b.village.name

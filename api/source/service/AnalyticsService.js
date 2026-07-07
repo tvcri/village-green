@@ -13,26 +13,26 @@ module.exports.postEvents = async function (userId, events) {
     e.metadata ? JSON.stringify(e.metadata) : null,
   ])
   await dbUtils.pool.query(
-    `INSERT INTO analytics_events (user_id, event_type, route_name, path, event_name, metadata)
+    `INSERT INTO analytics_events (userId, eventType, routeName, path, eventName, metadata)
      VALUES ?`,
     [values]
   )
 }
 
 module.exports.getSummary = async function ({ from, to, userId } = {}) {
-  const predicates = [`event_type = 'page_view'`]
+  const predicates = [`eventType = 'page_view'`]
   const params = []
 
   if (from) {
-    predicates.push(`created_at >= ?`)
+    predicates.push(`createdAt >= ?`)
     params.push(from)
   }
   if (to) {
-    predicates.push(`created_at <= ?`)
+    predicates.push(`createdAt <= ?`)
     params.push(to)
   }
   if (userId) {
-    predicates.push(`user_id = ?`)
+    predicates.push(`userId = ?`)
     params.push(userId)
   }
 
@@ -40,13 +40,13 @@ module.exports.getSummary = async function ({ from, to, userId } = {}) {
 
   const sql = `
     SELECT
-      route_name AS routeName,
+      routeName,
       COUNT(*) AS totalVisits,
-      COUNT(DISTINCT user_id) AS uniqueUsers,
-      MAX(created_at) AS lastVisited
+      COUNT(DISTINCT userId) AS uniqueUsers,
+      MAX(createdAt) AS lastVisited
     FROM analytics_events
     ${where}
-    GROUP BY route_name
+    GROUP BY routeName
     ORDER BY totalVisits DESC
   `
   const [rows] = await dbUtils.pool.query(sql, params)

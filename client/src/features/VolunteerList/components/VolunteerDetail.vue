@@ -2,29 +2,25 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { getVillagePerson } from '../../../shared/api/villageApi.js'
-import { getVillageVolunteers } from '../api/volunteerApi.js'
+import { getPerson } from '../../PersonList/api/personApi.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
 
 const route = useRoute()
 
-const villageId = computed(() => route.params.villageId)
 const personId = computed(() => route.params.personId)
 
+// getPerson returns the full person (flat phone/cell) plus volunteer data via
+// the volunteerInfo projection. Flatten volunteerInfo so PersonDetailCard can
+// read capabilities directly.
 const { state: person } = useAsyncState(
-  () => getVillagePerson(villageId.value, personId.value),
-  { immediate: true, onError: null }
-)
-
-const { state: volunteers } = useAsyncState(
-  () => villageId.value ? getVillageVolunteers(villageId.value) : Promise.resolve([]),
+  () => getPerson(personId.value, ['volunteerInfo']),
   { immediate: true, onError: null }
 )
 
 const volunteer = computed(() => {
   if (!person.value) return null
-  const volunteerRecord = volunteers.value?.find(v => v.personId === personId.value)
-  return { ...person.value, ...volunteerRecord }
+  const { volunteerInfo, ...rest } = person.value
+  return { ...rest, ...volunteerInfo }
 })
 </script>
 

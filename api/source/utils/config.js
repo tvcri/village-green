@@ -127,6 +127,22 @@ const config = {
         clientSecret: process.env.VG_GOOGLE_CLIENT_SECRET ?? '',
         redirectUri: process.env.VG_GOOGLE_REDIRECT_URI ?? '',
         mapsKey: process.env.VG_GOOGLE_MAPS_KEY ?? '',
+    },
+    anthropic: {
+        // Server-side only. Never expose via getClientEnv().
+        apiKey: process.env.VG_ANTHROPIC_API_KEY
+    },
+    keycloak: {
+        // Server-side only. Never expose via getClientEnv().
+        adminClientId: process.env.VG_KC_ADMIN_CLIENT_ID,
+        adminClientSecret: process.env.VG_KC_ADMIN_CLIENT_SECRET
+    },
+    privacy: {
+        ackIntervalDays: (() => {
+            const val = parseInt(process.env.VG_PRIVACY_ACK_INTERVAL_DAYS)
+            if (isNaN(val) || val < 1) return 365
+            return val
+        })(),
     }
 }
 
