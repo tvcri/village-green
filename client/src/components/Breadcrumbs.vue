@@ -21,14 +21,16 @@ const routeToGroupMap = Object.fromEntries(
   )
 )
 
-function getSiblings(routeName, currentParams) {
+function getSiblings(routeName, currentParams, excludeName) {
   const groupName = routeToGroupMap[routeName]
   if (!groupName) return null
 
-  return siblingGroups[groupName].map(sibling => ({
-    label: sibling.label,
-    route: { name: sibling.name, params: currentParams }
-  }))
+  return siblingGroups[groupName]
+    .filter(sibling => sibling.name !== excludeName)
+    .map(sibling => ({
+      label: sibling.label,
+      route: { name: sibling.name, params: currentParams }
+    }))
 }
 
 // Only needed for village-scoped and meta routes (village name/dropdown).
@@ -78,6 +80,14 @@ const breadcrumbs = computed(() => {
         break
       case 'admin-user-access':
         crumbs.push({ label: 'Users', siblings: getSiblings('admin-user-access', {}) })
+        break
+      case 'admin-user-create':
+        crumbs.push({
+          label: 'Users',
+          siblings: getSiblings('admin-user-access', {}, 'admin-user-access'),
+          route: { name: 'admin-user-access' }
+        })
+        crumbs.push({ label: 'New User' })
         break
       case 'admin-user-grants': {
         const userId = route.params.userId
