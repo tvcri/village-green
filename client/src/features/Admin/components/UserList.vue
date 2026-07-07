@@ -15,6 +15,8 @@ import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
 import { getUsersWithGrantCount, updateUser, deleteUser } from '../../../shared/api/userApi.js'
 import { isDuplicateUsername, getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 
+defineOptions({ name: 'UserList' })
+
 const router = useRouter()
 const toast = useToast()
 
