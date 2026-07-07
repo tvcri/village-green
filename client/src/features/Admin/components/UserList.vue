@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import InputText from 'primevue/inputtext'
@@ -24,10 +24,19 @@ const searchText = ref('')
 const cellError = ref({ userId: null, message: '' })
 const pageRows = ref(10)
 
-const { state: users, isLoading } = useAsyncState(
+const { state: users, isLoading, execute: refetchUsers } = useAsyncState(
   () => getUsersWithGrantCount(),
   { immediate: true }
 )
+
+let hasActivatedOnce = false
+onActivated(() => {
+  if (!hasActivatedOnce) {
+    hasActivatedOnce = true
+    return
+  }
+  refetchUsers()
+})
 
 const filteredUsers = computed(() => {
   if (!users.value) return []
