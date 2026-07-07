@@ -170,7 +170,7 @@ async function onDeleteUser(user) {
           <Tag :value="data.status" :severity="data.status === 'available' ? 'success' : 'danger'" />
         </template>
       </Column>
-      <Column header="Grants">
+      <Column header="Grants" sortable :sort-field="row => row.statistics?.villageGrantCount ?? 0">
         <template #body="{ data }">
           <Button
             :label="String(data.statistics?.villageGrantCount ?? 0)"
