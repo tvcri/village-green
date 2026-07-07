@@ -28,8 +28,9 @@ const { state: grants, isLoading: grantsLoading, execute: refetchGrants } = useA
 )
 
 onMounted(() => {
-  if (route.query.userId) {
-    selectedUserId.value = route.query.userId
+  const userId = route.params.userId || route.query.userId
+  if (userId) {
+    selectedUserId.value = userId
     refetchGrants()
   }
 })
