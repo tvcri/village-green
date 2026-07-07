@@ -9,7 +9,7 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
-import { getUsers, updateUser, deleteUser } from '../../../shared/api/userApi.js'
+import { getUsersWithGrants, updateUser, deleteUser } from '../../../shared/api/userApi.js'
 import { isDuplicateUsername, getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 
 const router = useRouter()
@@ -19,7 +19,7 @@ const searchText = ref('')
 const cellError = ref({ userId: null, message: '' })
 
 const { state: users, isLoading } = useAsyncState(
-  () => getUsers(),
+  () => getUsersWithGrants(),
   { immediate: true }
 )
 
@@ -145,7 +145,7 @@ async function onDeleteUser(user) {
         </template>
       </Column>
       <Column field="lastAccess" header="Last Access" sortable>
-        <template #body="{ data }">{{ data.lastAccess ? formatLocalDateTime(data.lastAccess) : '—' }}</template>
+        <template #body="{ data }">{{ data.lastAccess ? formatLocalDateTime(data.lastAccess * 1000) : '—' }}</template>
       </Column>
       <Column header="Created" sortable :sort-field="row => row.statistics?.created">
         <template #body="{ data }">{{ data.statistics?.created ? formatLocalDateTime(data.statistics.created) : '—' }}</template>

@@ -4,6 +4,9 @@ export const getUser = () => apiCall('getUser')
 
 export const getUsers = () => apiCall('getUsers', { elevate: true })
 
+export const getUsersWithGrants = () =>
+  apiCall('getUsers', { elevate: true, projection: ['villageGrants', 'statistics'] })
+
 export const createUser = (body) =>
   apiCall('createUser', { elevate: true }, body)
 
