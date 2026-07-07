@@ -57,9 +57,14 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
   }
 
   if (inProjection?.includes('statistics')) {
+    if (!needsCollectionGrantees) {
+      needsCollectionGrantees = true
+      joins.add('left join cteGrantees cgs on ud.userId = cgs.userId')
+    }
     columns.push(`json_object(
         'created', date_format(ud.created, '%Y-%m-%dT%TZ'),
-        'lastClaims', ud.lastClaims
+        'lastClaims', ud.lastClaims,
+        'villageGrantCount', count(distinct cgs.villageId, cgs.roleId)
       ) as statistics`)
     groupBy.push(
       'ud.lastAccess',

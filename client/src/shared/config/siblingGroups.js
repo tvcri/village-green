@@ -12,7 +12,7 @@ export const siblingGroups = {
   ],
   'admin-sections': [
     { name: 'admin-village-access', label: 'Village Access' },
-    { name: 'admin-user-access', label: 'User Access' }
+    { name: 'admin-user-access', label: 'Users' }
   ]
 }
 
