@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -23,13 +23,14 @@ const toast = useToast()
 // Full member-form shape (matches MemberEdit) with import prefills merged in
 const form = reactive({
   memberNumber: '', memberLevel: '', memberType: '', primaryPersonId: '',
-  secondaryType: '', serviceNotes: '', joinDate: '',
+  serviceNotes: '', joinDate: '',
   status: 'Active', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   confidentialNotes: '', statusChangeNotes: '', miscNotes: '',
   ...mapMemberForm(props.extraction, props.memberIndex, props.primaryPersonId),
 })
 const uncertain = reactive(uncertainMapForMember(props.extraction, props.memberIndex))
+const canSubmit = computed(() => form.memberLevel !== 'Secondary' || !!form.primaryPersonId)
 const hasMember = ref(false)
 const saving = ref(false)
 const needsVillage = ref(false)
@@ -140,7 +141,7 @@ async function saveVillageAndRetry () {
         @edited="onEdited"
       />
       <div class="step-footer">
-        <Button type="submit" :label="hasMember ? 'Update Member & Continue' : 'Grant Member Role & Continue'" :loading="saving" />
+        <Button type="submit" :disabled="!canSubmit" :label="hasMember ? 'Update Member & Continue' : 'Grant Member Role & Continue'" :loading="saving" />
       </div>
     </form>
   </div>

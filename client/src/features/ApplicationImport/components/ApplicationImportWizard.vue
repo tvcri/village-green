@@ -14,7 +14,7 @@ const router = useRouter()
 
 const extraction = ref(null)
 const stepIndex = ref(0)
-const created = ref([])            // [{ personId, fullName, existing, memberGranted }]
+const created = ref([])            // [{ personId, fullName, existing, role: 'member'|'volunteer', roleGranted }]
 const cancelVisible = ref(false)
 
 const isDual = computed(() =>
@@ -58,17 +58,17 @@ function onExtracted (result) {
 }
 
 function onPersonDone ({ personId, fullName, existing }) {
-  created.value.push({ personId, fullName, existing, memberGranted: false })
+  created.value.push({ personId, fullName, existing, role: 'member', roleGranted: false })
   stepIndex.value++
 }
 
 function onMemberDone () {
-  created.value[created.value.length - 1].memberGranted = true
+  created.value[created.value.length - 1].roleGranted = true
   stepIndex.value++
 }
 
 function onVolunteerDone ({ personId, fullName }) {
-  created.value.push({ personId, fullName, existing: false, memberGranted: true })
+  created.value.push({ personId, fullName, existing: false, role: 'volunteer', roleGranted: true })
   stepIndex.value++
 }
 
@@ -128,7 +128,7 @@ function restart () {
         <p>The following were already created and will remain:</p>
         <ul>
           <li v-for="c in created" :key="c.personId">
-            {{ c.fullName }} — {{ c.memberGranted ? 'person and member role' : 'person only (no member role yet)' }}
+            {{ c.fullName }} — {{ c.roleGranted ? `person and ${c.role} role` : `person only (no ${c.role} role yet)` }}
           </li>
         </ul>
         <template #footer>
