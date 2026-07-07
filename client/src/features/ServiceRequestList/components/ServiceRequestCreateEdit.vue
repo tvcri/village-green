@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import SplitButton from 'primevue/splitbutton'
@@ -28,6 +29,7 @@ defineOptions({ name: 'ServiceRequestCreateEdit' })
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
+const confirm = useConfirm()
 
 const isEdit = computed(() => !!route.params.id)
 const serviceRequestId = computed(() => route.params.id)
@@ -668,11 +670,10 @@ const handleDeleteDraft = async () => {
   }
 }
 
-const handleCancelRequest = async (reason) => {
-  cancelPopover.value.hide()
+const doCancelRequest = async (reason, notify) => {
   isCancelling.value = true
   try {
-    await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason, notify: true })
+    await apiCall('patchServiceRequest', { serviceRequestId: serviceRequestId.value }, { status: reason, notify })
     toast.add({ severity: 'success', summary: 'Success', detail: 'Service request cancelled', life: 3000 })
     setTimeout(() => {
       setPendingHighlight(serviceRequestId.value)
@@ -685,6 +686,20 @@ const handleCancelRequest = async (reason) => {
   } finally {
     isCancelling.value = false
   }
+}
+
+const handleCancelRequest = (reason) => {
+  cancelPopover.value.hide()
+  confirm.require({
+    header: 'Cancel Service Request',
+    message: 'Should notifications be sent for this cancellation?',
+    acceptLabel: 'Cancel and Notify',
+    rejectLabel: 'Cancel without Notification',
+    acceptProps: { severity: 'danger' },
+    rejectProps: { severity: 'danger' },
+    accept: () => doCancelRequest(reason, true),
+    reject: () => doCancelRequest(reason, false)
+  })
 }
 
 const personDialogVisible = ref(false)
