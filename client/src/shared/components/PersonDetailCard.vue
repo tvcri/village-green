@@ -149,6 +149,21 @@ const copyEmail = async (email) => {
         </div>
       </div>
 
+      <!-- Communities Section -->
+      <div v-if="person.communities?.length" class="section">
+        <h3 class="section-header">Communities</h3>
+        <div class="detail-field capabilities-field">
+          <div class="capabilities-list">
+            <Tag
+              v-for="community in person.communities"
+              :key="community.communityId"
+              :value="community.name"
+              class="capability-badge"
+            />
+          </div>
+        </div>
+      </div>
+
       <!-- Member-specific Section -->
       <div v-if="isMember" class="section">
         <h3 class="section-header">Member Information</h3>
@@ -243,7 +258,7 @@ const copyEmail = async (email) => {
       </div>
 
       <!-- Volunteer-specific Section -->
-      <div v-if="isVolunteer && (person.capabilities?.length || person.vettings?.length || person.active != null)" class="section">
+      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.active != null)" class="section">
         <h3 class="section-header">Volunteer Information</h3>
         <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities:</span>
@@ -252,6 +267,18 @@ const copyEmail = async (email) => {
               v-for="cap in person.capabilities"
               :key="cap"
               :value="cap"
+              class="capability-badge"
+            />
+          </div>
+        </div>
+
+        <div v-if="person.associateVillages?.length" class="detail-field capabilities-field">
+          <span class="label">Associate Villages:</span>
+          <div class="capabilities-list">
+            <Tag
+              v-for="village in person.associateVillages"
+              :key="village.villageId"
+              :value="village.name"
               class="capability-badge"
             />
           </div>
