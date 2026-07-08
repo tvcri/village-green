@@ -7,6 +7,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { useElevate } from '../../../shared/composables/useElevate.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
+import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { getVillages } from '../api/villageApi.js'
 
 const router = useRouter()
@@ -16,8 +17,13 @@ const { getStatusSeverity } = useStatusSeverity()
 
 const { state: villages, isLoading, error, execute } = useAsyncState(
   () => getVillages(elevate.value, ['personCounts', 'srStatusCounts']),
-  { immediate: true }
+  // A 403 here means the user has no village access at all (no grants, not
+  // admin, not a volunteer) — an expected outcome, not a bug. Show it inline
+  // instead of the global crash-style error modal.
+  { immediate: true, onError: null }
 )
+
+const isAccessDenied = computed(() => getHttpStatus(error.value) === 403)
 
 // Refetch when elevate is toggled
 watch(elevateEnabled, () => {
@@ -60,6 +66,10 @@ const navigateToVillage = (villageId) => {
 
     <div v-if="isLoading" class="loading-state">
       <p>Loading villages...</p>
+    </div>
+
+    <div v-else-if="isAccessDenied" class="error-state">
+      <p>You don't have access to any villages yet. Contact your administrator if you believe this is a mistake.</p>
     </div>
 
     <div v-else-if="error" class="error-state">
