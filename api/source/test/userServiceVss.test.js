@@ -15,3 +15,8 @@ test('VSS identity functions are exported', () => {
   assert.equal(typeof UserService.attemptPersonAutoMatch, 'function')
   assert.equal(typeof UserService.getVolunteerVillages, 'function')
 })
+
+test('person-link admin functions are exported', () => {
+  assert.equal(typeof UserService.setUserPersonLink, 'function')
+  assert.equal(typeof UserService.deleteUserPersonLink, 'function')
+})

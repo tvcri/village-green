@@ -138,6 +138,16 @@ module.exports.getUser = async function getUser (req, res, next) {
 
     let response = await UserService.getUserByUserId(req.userObject.userId, projection)
     response.privileges = req.userObject.privileges
+
+    // Volunteer block (VSS): identity-derived from the caller's linked person.
+    const personId = req.userObject.personId
+    if (personId) {
+      const villages = await UserService.getVolunteerVillages(personId)
+      response.volunteer = { personId: String(personId), villages }
+    } else {
+      response.volunteer = null
+    }
+
     res.json(response)
 }
   catch(err) {
@@ -479,6 +489,35 @@ module.exports.deleteUserGrant = async function deleteUserGrant (req, res, next)
 
     const response = await UserService.deleteUserGrant(userId, grantId)
     res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.setUserPersonLink = async function setUserPersonLink (req, res, next) {
+  try {
+    const elevate = req.query.elevate
+    if (!elevate) throw new SmError.PrivilegeError()
+    const userId = req.params.userId
+    const personId = req.body.personId
+    const found = await UserService.setUserPersonLink(userId, personId)
+    if (!found) throw new SmError.NotFoundError()
+    res.json({ userId, personId })
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.deleteUserPersonLink = async function deleteUserPersonLink (req, res, next) {
+  try {
+    const elevate = req.query.elevate
+    if (!elevate) throw new SmError.PrivilegeError()
+    const userId = req.params.userId
+    const found = await UserService.deleteUserPersonLink(userId)
+    if (!found) throw new SmError.NotFoundError()
+    res.json({})
   }
   catch (err) {
     next(err)

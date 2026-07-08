@@ -774,3 +774,30 @@ exports.getVolunteerVillages = async function (personId) {
   )
   return rows
 }
+
+// Admin fallback for auto-match misses/collisions (VSS design spec §1).
+exports.setUserPersonLink = async function (userId, personId) {
+  try {
+    const [result] = await dbUtils.pool.query(
+      'UPDATE user_data SET personId = ? WHERE userId = ?',
+      [personId, userId]
+    )
+    return result.affectedRows === 1
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') {
+      throw new SmError.ConflictError('Person is already linked to another user.')
+    }
+    if (e.code === 'ER_NO_REFERENCED_ROW_2') {
+      throw new SmError.UnprocessableError('Invalid personId.')
+    }
+    throw e
+  }
+}
+
+exports.deleteUserPersonLink = async function (userId) {
+  const [result] = await dbUtils.pool.query(
+    'UPDATE user_data SET personId = NULL WHERE userId = ?',
+    [userId]
+  )
+  return result.affectedRows === 1
+}
