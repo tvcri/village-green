@@ -11,12 +11,19 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Popover from 'primevue/popover'
+import { useToast } from 'primevue/usetoast'
+import ExportButton from '../../../components/ExportButton.vue'
 import { getFriends } from '../api/friendApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { createSheet } from '../../../shared/services/googleSheetsService.js'
 
 defineOptions({ name: 'FriendList' })
 
 const route = useRoute()
+
+let toast = null
+onMounted(() => { toast = useToast() })
 
 const isMetaMode = computed(() => !route.params.villageId)
 
@@ -174,6 +181,72 @@ const sortedFriends = computed(() => {
 function onSort(event) {
   sortField.value = event.sortField
   sortOrder.value = event.sortOrder
+}
+
+const pageRows = ref(10)
+const isCreatingSheet = ref(false)
+
+const friendsForCsv = computed(() => sortedFriends.value.map(f => ({
+  visitDate: f.visitDate,
+  villageName: f.village?.name ?? '',
+  memberName: personName(f.member),
+  volunteerName: personName(f.volunteer),
+  contactType: f.contactType ?? '',
+  activityTypes: (f.activityTypes ?? []).join('; '),
+  timeSpentMinutes: f.timeSpentMinutes,
+  notes: f.notes ?? ''
+})))
+
+const columnsForCsv = computed(() => [
+  { header: 'Visit Date', key: 'visitDate' },
+  ...(isMetaMode.value ? [{ header: 'Village', key: 'villageName' }] : []),
+  { header: 'Member', key: 'memberName' },
+  { header: 'Volunteer', key: 'volunteerName' },
+  { header: 'Contact Type', key: 'contactType' },
+  { header: 'Activities', key: 'activityTypes' },
+  { header: 'Time (minutes)', key: 'timeSpentMinutes' },
+  { header: 'Notes', key: 'notes' }
+])
+
+const handleDownloadCsv = () => {
+  const csv = toCsv(friendsForCsv.value, columnsForCsv.value)
+  downloadCsv(csv, 'friends.csv')
+}
+
+async function handleCreateSheet() {
+  try {
+    isCreatingSheet.value = true
+    const result = await createSheet(friendsForCsv.value, columnsForCsv.value, 'Village Green Friends')
+    const sheetUrl = result.url || result
+    if (result.popupBlocked) {
+      if (toast) {
+        toast.add({
+          severity: 'success',
+          summary: 'Sheet Created',
+          detail: `Your Google Sheet has been created. <a href="${sheetUrl}" target="_blank" style="color: inherit; text-decoration: underline;">Open it here</a>.`,
+          life: 0,
+        })
+      }
+    } else {
+      if (toast) {
+        toast.add({ severity: 'success', summary: 'Sheet Created', detail: 'Your Google Sheet has been created and opened in a new tab.', life: 3000 })
+      }
+    }
+  } catch (err) {
+    let message = 'Failed to create Google Sheet'
+    if (err.message.includes('Popup was blocked')) {
+      message = 'Please allow popups for this site to use Google Sheets export'
+    } else if (err.message.includes('timeout')) {
+      message = 'Sheet creation timed out. Please try again.'
+    } else {
+      message = `Error: ${err.message}`
+    }
+    if (toast) {
+      toast.add({ severity: 'error', summary: 'Sheet Creation Failed', detail: message, life: 5000 })
+    }
+  } finally {
+    isCreatingSheet.value = false
+  }
 }
 
 const popoverRefs = ref({})
@@ -356,11 +429,27 @@ function toggleNotes(event, friendId) {
       class="friend-table desktop-only"
       row-hover
       stripedRows
+      paginator
+      :rows="pageRows"
       :sortField="sortField"
       :sortOrder="sortOrder"
       @sort="onSort"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
     >
+      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
+        <div class="paginator-container">
+          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
+          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
+          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
+          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <ExportButton
+            :disabled="isLoading || isCreatingSheet"
+            @download="handleDownloadCsv"
+            @export="handleCreateSheet"
+          />
+        </div>
+      </template>
+
       <Column field="visitDate" header="Visit Date" sortable style="width: 10%" />
 
       <Column v-if="isMetaMode" header="Village" style="width: 12%">
