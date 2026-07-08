@@ -84,7 +84,7 @@ function confirmRelease(row) {
     icon: 'pi pi-exclamation-triangle',
     acceptLabel: 'Release',
     rejectLabel: 'Keep it',
-    acceptClass: 'p-button-danger',
+    acceptProps: { severity: 'danger' },
     accept: () => doRelease(row),
   })
 }

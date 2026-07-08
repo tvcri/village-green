@@ -82,6 +82,7 @@ function configureAuth(app) {
   app.use('/api', auth.requirePrivacyAck)
   // VSS gates (design spec §2): the volunteer gate authorizes its own
   // namespace; the staff gate denies everything else by default.
+  // This mount is the ONLY authorization on /volunteer-requests; it is exempt from the staff gate below (see accessGates.js STAFF_GATE_EXEMPT_PREFIXES) — do not remove without also re-adding staff-gate coverage.
   app.use('/api/volunteer-requests', accessGates.requireVolunteerAccess)
   app.use('/api', accessGates.requireStaffAccess)
 }
