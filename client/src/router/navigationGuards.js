@@ -5,6 +5,21 @@ const { isAdmin, hasCollectionAccess, getCollectionRoleId } = useCurrentUser()
 export function navigationGuard(to) {
   console.log('navigationGuard called for route:', to.name, 'params:', to.params, 'isAdmin.value:', isAdmin.value)
 
+  // VSS: the volunteer surface requires identity-derived volunteer access
+  if (to.meta.requiresVolunteer && !VG.curUser?.volunteer) {
+    return { name: 'villages' }
+  }
+
+  // VSS: volunteer-only users (no grants, not admin) live on the volunteer
+  // surface — the staff app would be all 403s for them anyway
+  const isVolunteerOnly =
+    !!VG.curUser?.volunteer &&
+    !isAdmin.value &&
+    !(VG.curUser?.villageGrants?.length)
+  if (isVolunteerOnly && to.name !== 'volunteer') {
+    return { name: 'volunteer' }
+  }
+
   // admin routes
   if (to.meta.requiresAdmin && !isAdmin.value) {
     return { name: 'villages' }

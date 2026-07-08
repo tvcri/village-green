@@ -49,6 +49,12 @@ const routes = [
     component: () => import('../features/FriendList/components/FriendList.vue'),
   },
   {
+    path: '/volunteer',
+    name: 'volunteer',
+    component: () => import('../features/VolunteerHome/components/VolunteerHome.vue'),
+    meta: { requiresVolunteer: true },
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('../features/Admin/components/AdminHub.vue'),

@@ -134,3 +134,34 @@ describe('navigation guards', () => {
     })
   })
 })
+
+describe('volunteer surface', () => {
+  beforeEach(() => {
+    mockIsAdmin.value = false
+    globalThis.VG = { curUser: null }
+  })
+
+  it('blocks /volunteer for users without a volunteer block', () => {
+    globalThis.VG = { curUser: { volunteer: null, villageGrants: [{ village: { villageId: '3' } }] } }
+    const result = navigationGuard({ name: 'volunteer', path: '/volunteer', params: {}, meta: { requiresVolunteer: true } })
+    expect(result).toEqual({ name: 'villages' })
+  })
+
+  it('allows /volunteer for users with a volunteer block', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] }, villageGrants: [] } }
+    const result = navigationGuard({ name: 'volunteer', path: '/volunteer', params: {}, meta: { requiresVolunteer: true } })
+    expect(result).toBeUndefined()
+  })
+
+  it('redirects volunteer-only users to /volunteer from anywhere else', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] }, villageGrants: [] } }
+    const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
+    expect(result).toEqual({ name: 'volunteer' })
+  })
+
+  it('does not redirect staff who also volunteer', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] }, villageGrants: [{ village: { villageId: '3' } }] } }
+    const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
+    expect(result).toBeUndefined()
+  })
+})

@@ -44,6 +44,14 @@ const menuItems = computed(() => {
     })
   }
 
+  if (user.value?.volunteer) {
+    items.push({
+      label: 'Volunteer',
+      icon: 'pi pi-heart',
+      command: () => router.push({ name: 'volunteer' }),
+    })
+  }
+
   items.push({
     label: 'Logout',
     icon: 'pi pi-sign-out',
