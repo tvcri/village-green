@@ -777,12 +777,16 @@ exports.getVolunteerVillages = async function (personId) {
 
 // Admin fallback for auto-match misses/collisions (VSS design spec §1).
 exports.setUserPersonLink = async function (userId, personId) {
+  const [existing] = await dbUtils.pool.query('SELECT userId FROM user_data WHERE userId = ?', [userId])
+  if (existing.length === 0) {
+    return false
+  }
   try {
-    const [result] = await dbUtils.pool.query(
+    await dbUtils.pool.query(
       'UPDATE user_data SET personId = ? WHERE userId = ?',
       [personId, userId]
     )
-    return result.affectedRows === 1
+    return true
   } catch (e) {
     if (e.code === 'ER_DUP_ENTRY') {
       throw new SmError.ConflictError('Person is already linked to another user.')
@@ -795,9 +799,13 @@ exports.setUserPersonLink = async function (userId, personId) {
 }
 
 exports.deleteUserPersonLink = async function (userId) {
-  const [result] = await dbUtils.pool.query(
+  const [existing] = await dbUtils.pool.query('SELECT userId FROM user_data WHERE userId = ?', [userId])
+  if (existing.length === 0) {
+    return false
+  }
+  await dbUtils.pool.query(
     'UPDATE user_data SET personId = NULL WHERE userId = ?',
     [userId]
   )
-  return result.affectedRows === 1
+  return true
 }
