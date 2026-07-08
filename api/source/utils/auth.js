@@ -147,7 +147,11 @@ const setupUser = async function (req, res, next) {
                 }
             }
 
-            // Get privileges and check elevate param  
+            if (userObject.userId && userObject.personId == null) {
+                userObject.personId = await UserService.attemptPersonAutoMatch(userObject)
+            }
+
+            // Get privileges and check elevate param
             userObject.privileges = {
                 create_village: getClaimByPath(tokenPayload).includes('create_village'),
                 admin: getClaimByPath(tokenPayload).includes('admin')

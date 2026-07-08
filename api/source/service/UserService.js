@@ -552,6 +552,7 @@ exports.getUserObject = async function (username) {
     lastAccess,
     lastClaims,
     status,
+    personId,
     (select
       coalesce(json_objectagg(
         dt2.villageId, json_object(
@@ -726,4 +727,50 @@ exports.deleteUserGrant = async function (userId, grantId) {
 
   const grants = await exports.getUserGrants(userId)
   return grants[0] || { grantId }
+}
+
+// ─── VSS identity link ──────────────────────────────────────────────────────
+
+// Pure decision: link only on an unambiguous single-candidate match.
+exports.decideAutoMatch = function (rows) {
+  return rows.length === 1 ? rows[0].id : null
+}
+
+// Called by auth.setupUser when the authenticated user has no linked person.
+// Every outcome other than a clean single match is silent (stays unlinked):
+// zero matches, multiple matches, person already claimed, concurrent loser.
+exports.attemptPersonAutoMatch = async function (userObject) {
+  const [rows] = await dbUtils.pool.query(
+    'SELECT id FROM person WHERE LOWER(email) = LOWER(?) LIMIT 2',
+    [userObject.username]
+  )
+  const personId = exports.decideAutoMatch(rows)
+  if (personId === null) return null
+  try {
+    const [result] = await dbUtils.pool.query(
+      'UPDATE user_data SET personId = ? WHERE userId = ? AND personId IS NULL',
+      [personId, userObject.userId]
+    )
+    return result.affectedRows === 1 ? personId : null
+  } catch (e) {
+    // ER_DUP_ENTRY: the person is already linked to another user, or a
+    // concurrent request won the race. Never fail authentication over it.
+    if (e.code === 'ER_DUP_ENTRY') return null
+    throw e
+  }
+}
+
+// A volunteer's village is their person's village. active_volunteer is the
+// correct source here: this feeds authorization, and inactive volunteers
+// must lose the surface.
+exports.getVolunteerVillages = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    `SELECT CAST(p.villageId AS CHAR) AS villageId, v.name
+     FROM active_volunteer av
+     JOIN person p ON av.personId = p.id
+     JOIN village v ON p.villageId = v.id
+     WHERE av.personId = ?`,
+    [personId]
+  )
+  return rows
 }
