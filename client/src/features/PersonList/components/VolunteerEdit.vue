@@ -29,25 +29,30 @@ const notes = ref('')
 const vettings = ref([])
 
 onMounted(async () => {
-  const [capabilities, vettingTypes, villages] = await Promise.all([
-    getCapabilities(), getVettingTypes(), getVillages(true),
-  ])
-  capabilityOptions.value = capabilities
-  vettingTypeOptions.value = vettingTypes
-  villageOptions.value = villages
-  const p = await getPerson(personId.value, ['volunteerDetail'])
-  person.value = p
-  if (p.volunteerDetail) {
-    hasVolunteer.value = true
-    const d = p.volunteerDetail
-    // volunteerDetail.capabilities are names; map to ids via capabilityOptions
-    const nameToId = new Map(capabilityOptions.value.map(c => [c.name, c.capabilityId]))
-    selectedCapabilityIds.value = (d.capabilities ?? []).map(n => nameToId.get(n)).filter(Boolean)
-    selectedAssociateVillageIds.value = (d.associateVillages ?? []).map(v => v.villageId)
-    providerType.value = d.providerType ?? ''
-    active.value = d.active ?? true
-    notes.value = d.notes ?? ''
-    vettings.value = d.vettings ?? []
+  try {
+    const [capabilities, vettingTypes, villages] = await Promise.all([
+      getCapabilities(), getVettingTypes(), getVillages(true),
+    ])
+    capabilityOptions.value = capabilities
+    vettingTypeOptions.value = vettingTypes
+    villageOptions.value = villages
+    const p = await getPerson(personId.value, ['volunteerDetail'])
+    person.value = p
+    if (p.volunteerDetail) {
+      hasVolunteer.value = true
+      const d = p.volunteerDetail
+      // volunteerDetail.capabilities are names; map to ids via capabilityOptions
+      const nameToId = new Map(capabilityOptions.value.map(c => [c.name, c.capabilityId]))
+      selectedCapabilityIds.value = (d.capabilities ?? []).map(n => nameToId.get(n)).filter(Boolean)
+      selectedAssociateVillageIds.value = (d.associateVillages ?? []).map(v => v.villageId)
+      providerType.value = d.providerType ?? ''
+      active.value = d.active ?? true
+      notes.value = d.notes ?? ''
+      vettings.value = d.vettings ?? []
+    }
+  }
+  catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load person', life: 3000 })
   }
 })
 
