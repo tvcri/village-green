@@ -944,6 +944,70 @@ paths:
       security:
       - oauth:
         - vg:user
+  /users/{userId}/person:
+    parameters:
+    - $ref: '#/components/parameters/ElevateQuery'
+    - $ref: '#/components/parameters/UserIdPath'
+    put:
+      tags:
+      - User
+      summary: Link a User to a Person (admin)
+      operationId: setUserPersonLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              additionalProperties: false
+              type: object
+              properties:
+                personId:
+                  $ref: '#/components/schemas/StringIntId'
+              required:
+              - personId
+      responses:
+        '200':
+          description: The established link
+          content:
+            application/json:
+              schema:
+                additionalProperties: false
+                type: object
+                properties:
+                  userId:
+                    $ref: '#/components/schemas/UserId'
+                  personId:
+                    $ref: '#/components/schemas/StringIntId'
+        default:
+          description: error (409 person already linked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:user
+    delete:
+      tags:
+      - User
+      summary: Remove a User's Person link (admin)
+      operationId: deleteUserPersonLink
+      responses:
+        '200':
+          description: Link removed
+          content:
+            application/json:
+              schema:
+                type: object
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:user
   /user-groups:
     post:
       tags:
@@ -1679,6 +1743,88 @@ paths:
                 $ref: '#/components/schemas/ServiceRequest'
         default:
           description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
+  /volunteer-requests:
+    get:
+      summary: List service requests visible to the requesting volunteer
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequests
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          description: open = pickable requests in the caller's volunteer village(s); mine = the caller's commitments
+          schema:
+            type: string
+            enum:
+            - open
+            - mine
+      responses:
+        '200':
+          description: List of volunteer-scoped service requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/{serviceRequestId}/pickup:
+    post:
+      summary: Commit the requesting volunteer to an open service request
+      tags:
+      - VolunteerRequest
+      operationId: pickupVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: The confirmed service request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible, 409 not open)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
+  /volunteer-requests/{serviceRequestId}/release:
+    post:
+      summary: Release the requesting volunteer's commitment, reopening the request
+      tags:
+      - VolunteerRequest
+      operationId: releaseVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: The reopened service request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible, 409 not the caller's confirmed request)
           content:
             application/json:
               schema:
@@ -3978,6 +4124,23 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserVillageGrantRead'
+        volunteer:
+          nullable: true
+          additionalProperties: false
+          type: object
+          properties:
+            personId:
+              $ref: '#/components/schemas/StringIntId'
+            villages:
+              type: array
+              items:
+                additionalProperties: false
+                type: object
+                properties:
+                  villageId:
+                    $ref: '#/components/schemas/StringIntId'
+                  name:
+                    type: string
       required:
       - userId
       - username
@@ -4299,6 +4462,112 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+    VolunteerMemberContact:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        fullName:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        cell:
+          type: string
+          nullable: true
+    VolunteerEmergencyContact:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        relationship:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+    VolunteerServiceRequest:
+      additionalProperties: false
+      type: object
+      properties:
+        serviceRequestId:
+          $ref: '#/components/schemas/StringIntId'
+        villageId:
+          $ref: '#/components/schemas/StringIntId'
+        villageName:
+          type: string
+          nullable: true
+        status:
+          type: string
+        serviceName:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        instructions:
+          type: string
+          nullable: true
+        transportationType:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          nullable: true
+        startAt:
+          type: string
+          nullable: true
+        finishAt:
+          type: string
+          nullable: true
+        apptTime:
+          type: string
+          nullable: true
+        returnTime:
+          type: string
+          nullable: true
+        destination:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        member:
+          $ref: '#/components/schemas/VolunteerMemberContact'
+        emergencyContact:
+          $ref: '#/components/schemas/VolunteerEmergencyContact'
+      required:
+      - serviceRequestId
+      - villageId
+      - status
     WebPreferences:
       type: object
       properties:
