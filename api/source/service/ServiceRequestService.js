@@ -333,3 +333,5 @@ module.exports.deleteServiceRequest = async function (serviceRequestId) {
   )
   return result.affectedRows > 0
 }
+
+module.exports.writeNotificationEvent = writeNotificationEvent
