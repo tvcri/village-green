@@ -14,7 +14,7 @@
 // DYNAMICALLY, after ensureDeps() installs them — static imports would resolve
 // before any code runs and fail on a fresh checkout.
 import { spawn, execFileSync } from 'node:child_process'
-import { existsSync, createWriteStream } from 'node:fs'
+import { existsSync, createWriteStream, readFileSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -44,8 +44,19 @@ function compose (...args) {
 }
 
 function ensureDeps () {
+  // Install when node_modules is missing OR a declared dep isn't present in it
+  // (catches a dep added to package.json after an earlier run already installed).
+  const depsMissing = (dir) => {
+    const nm = path.join(dir, 'node_modules')
+    if (!existsSync(nm)) return true
+    const pkgPath = path.join(dir, 'package.json')
+    if (!existsSync(pkgPath)) return false
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+    return Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })
+      .some(name => !existsSync(path.join(nm, ...name.split('/'))))
+  }
   for (const dir of [config.apiSourceDir, path.dirname(config.mockOidcPath), config.paths.apiTestDir]) {
-    if (!existsSync(path.join(dir, 'node_modules'))) {
+    if (depsMissing(dir)) {
       log(`installing deps in ${path.relative(config.repoRoot, dir) || '.'} ...`)
       execFileSync('npm', ['install', '--no-audit', '--no-fund'], { cwd: dir, stdio: 'inherit' })
     }
@@ -226,6 +237,13 @@ async function main () {
     } else {
       log('minting tokens ...')
       await fs.writeFile(config.paths.tokensFile, JSON.stringify(buildTokens(oidc), null, 2))
+
+      // Capture the OAS definition the API actually serves (public endpoint,
+      // already used as the readiness probe) for the operationId-driven request
+      // helper (lib/ops.js) — same source the Vue client builds its API layer from.
+      log('capturing OAS definition ...')
+      const definition = await (await fetch(`${config.api.baseUrl}/api/op/definition`)).json()
+      await fs.writeFile(config.paths.definitionFile, JSON.stringify(definition))
 
       log('running tests ...\n')
       exitCode = await runTests()

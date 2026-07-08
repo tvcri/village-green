@@ -24,7 +24,9 @@ users see the right data) as the throughline.
 3. spawns the **real API** (`node api/source/index.js`) pointed at the test DB + mock OIDC
    (it auto-scaffolds the schema), and waits for it to reach the `available` state;
 4. **seeds** the canonical RI-themed fixtures (`setup/fixtures.js`, `setup/seed.js`);
-5. **mints** a JWT per canonical user to `.tokens.json`;
+5. **mints** a JWT per canonical user to `.tokens.json`, and captures the API's served
+   OAS definition (`GET /op/definition`) to `.definition.json` for the
+   operationId-driven request helper (`lib/ops.js`);
 6. runs the `*.test.js` files (Node's built-in `node:test`, hitting the API over HTTP);
 7. tears everything down.
 
@@ -35,7 +37,28 @@ with `node:assert/strict` — **not** mocha/chai. It's been stable since Node 20
 dependencies or config file, and runs via `node --test`. If you know mocha it maps almost
 1:1: `describe`/`it`/`before`/`after` all exist (we mostly use flat `test()`), and
 assertions are `node:assert` (`assert.equal`, `assert.deepEqual`, `assert.ok`) instead of
-chai. The only test dependencies are `mysql2` (seeding) and `c8` (coverage).
+chai. The only test dependencies are `mysql2` (seeding), `c8` (coverage), and
+`@trojs/openapi-dereference` (the spec-driven request helper — see below).
+
+### Two request helpers: `vgFetch` and `vgCall`
+
+- **`vgFetch(path, opts)`** (`lib/client.js`) — the raw HTTP helper: literal path,
+  explicit method. Use it for **RED security probes** (pin the literal URL so a spec
+  rename can't silently retarget a finding) and anything the spec can't express
+  (wrong-method probes, raw JSONL bodies, hostile inputs).
+- **`vgCall(operationId, params, opts)`** (`lib/ops.js`) — spec-driven: resolves the
+  path and method from the OAS definition the API actually serves, with path + query
+  params in a single object (`vgCall('getVillage', { villageId: 1, projection: ['owners'] },
+  { token })`). This is the same operationId contract the Vue client consumes
+  (`client/src/shared/api/apiClient.js`), built on **byte-identical vendored copies** of
+  the client's `openApiOps.js`/`queryString.js` (`lib/vendor/`, sync enforced by
+  `tests/smoke/vendor-sync.test.js`). Unlike the client's helper, `vgCall` **throws on
+  params the operation doesn't declare** (the client silently drops them) — in a test, a
+  typo'd param would silently weaken the assertion. Prefer it for green/characterization
+  tests: a path rename on `main` follows the spec automatically, and a removed
+  operationId fails loudly. `lib/ops.js` also exports the raw `ops` instance for spec
+  introspection (`operationMap`, `getOperationIds()`, `getProjectedUrls()`) — see the
+  projection drift tripwire in `tests/villages/projections.test.js`.
 
 ## Running
 
@@ -156,6 +179,10 @@ setup/
                      audience/issuer) tokens; aud enforcement is ON in the harness
 lib/
   client.js          vgFetch(path, {token, query, body, method, rawBody, contentType})
+  ops.js             vgCall(operationId, params, opts) — spec-driven requests, plus
+                     the ops instance for spec introspection (loads .definition.json)
+  vendor/            byte-identical copies of the Vue client's openApiOps.js /
+                     queryString.js (sync enforced by tests/smoke/vendor-sync.test.js)
   context.js         loads .tokens.json -> { tokens }
   db.js              withDb() for assertions on rows the API doesn't expose
   appdata.js         export/import/parse helpers for /op/appdata (JSONL); also
@@ -179,23 +206,24 @@ tests/               the endpoint tests, one directory per topic; each topic's
                      + user groups & grants-via-group
   roles/             role-tier (non-)differentiation
   op/                appdata gating + round trip, analytics (admin), jobs
-  smoke/             state + spec endpoints
+  smoke/             state + spec endpoints, vendored-module sync tripwire
 ```
 
 ## Adding tests
 
 Add files under `tests/<topic>/`; import the helpers and fixtures and key tests off
-the stable `role` handles:
+the stable `role` handles. Prefer `vgCall` (operationId) for green tests, `vgFetch`
+(literal path) for RED probes and off-spec requests:
 
 ```js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { vgFetch } from '../../lib/client.js'
+import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { serviceRequests as sr } from '../../setup/fixtures.js'
 
 test('full_v1 cannot read an Innsmouth service request by id', async () => {
-  const { status } = await vgFetch(`/service-requests/${sr.srV2.id}`, { token: tokens.users.full_v1 })
+  const { status } = await vgCall('getServiceRequest', { serviceRequestId: sr.srV2.id }, { token: tokens.users.full_v1 })
   assert.equal(status, 404)
 })
 ```

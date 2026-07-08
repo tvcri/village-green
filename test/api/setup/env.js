@@ -42,6 +42,9 @@ export const config = {
   paths: {
     apiTestDir,
     tokensFile: path.join(apiTestDir, '.tokens.json'),
+    // The API's served OAS definition (GET /op/definition), captured by run.js
+    // for the operationId-driven request helper (lib/ops.js).
+    definitionFile: path.join(apiTestDir, '.definition.json'),
     composeFile: path.join(apiTestDir, 'docker-compose.yml'),
     apiLog: path.join(apiTestDir, '.api.log'),
     testReport: path.join(apiTestDir, '.test-report.tap'),

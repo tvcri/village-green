@@ -10,6 +10,7 @@
     "appdata": "node run.js --appdata"
   },
   "dependencies": {
+    "@trojs/openapi-dereference": "^1.0.0",
     "mysql2": "^3.11.2"
   },
   "devDependencies": {
