@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { vgCall } from '../../lib/ops.js'
 import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 import { villages, persons } from '../../setup/fixtures.js'
@@ -9,7 +10,8 @@ import { villages, persons } from '../../setup/fixtures.js'
 // (createPerson trusts body.villageId; patch/delete look the row up with a
 // grant-blind getPerson), so cross-village writes slip through — finding #5.
 // Each cross-village probe asserts the SECURE outcome and undoes any successful
-// insecure write so the rest of the run is unaffected.
+// insecure write so the rest of the run is unaffected. The RED probes pin
+// literal URLs (vgFetch) so a spec rename can't silently retarget them.
 const PERSONS = '/persons'
 const quahog = String(villages.quahog.id)
 const innsmouth = String(villages.innsmouth.id)
@@ -17,13 +19,13 @@ const innsmouth = String(villages.innsmouth.id)
 // ---- createPerson happy path (GREEN) ----
 
 test('createPerson in the caller\'s own village returns 201 and echoes fields', async () => {
-  const { status, json } = await vgFetch(PERSONS, {
+  const { status, json } = await vgCall('createPerson', {}, {
     token: tokens.users.full_v1,
     body: { villageId: quahog, firstName: 'Glenn', lastName: 'Quagmire' },
   })
   assert.equal(status, 201)
   assert.equal(json.fullName, 'Quagmire, Glenn') // fullName is DB-generated as "last, first"
-  if (json.personId) await vgFetch(`${PERSONS}/${json.personId}`, { token: tokens.users.full_v1, method: 'DELETE' })
+  if (json.personId) await vgCall('deletePerson', { personId: json.personId }, { token: tokens.users.full_v1 })
 })
 
 // ---- cross-village writes: MUST be denied (RED — finding #5) ----
@@ -50,7 +52,7 @@ test('patchPerson on a person in an ungranted village is denied', async () => {
 
 test('deletePerson on a person in an ungranted village is denied', async () => {
   // Probe a throwaway Innsmouth person so a successful insecure delete is harmless.
-  const created = await vgFetch(PERSONS, {
+  const created = await vgCall('createPerson', {}, {
     token: tokens.users.admin, body: { villageId: innsmouth, firstName: 'Throwaway', lastName: 'Innsmouth' },
   })
   assert.equal(created.status, 201)

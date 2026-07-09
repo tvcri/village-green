@@ -1,44 +1,44 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { vgFetch } from '../../lib/client.js'
+import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { villages } from '../../setup/fixtures.js'
 
-// Authentication + scope enforcement on a representative protected endpoint.
-const SR = '/service-requests'
+// Authentication + scope enforcement on a representative protected endpoint
+// (the service-request list — addressed by operationId).
 
 test('no Authorization header -> 401', async () => {
-  const { status } = await vgFetch(SR)
+  const { status } = await vgCall('getServiceRequests')
   assert.equal(status, 401)
 })
 
 test('non-JWT bearer value -> 401', async () => {
-  const { status } = await vgFetch(SR, { token: tokens.special.notAJwt })
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.special.notAJwt })
   assert.equal(status, 401)
 })
 
 test('tampered signature -> 401', async () => {
-  const { status } = await vgFetch(SR, { token: tokens.special.badSignature })
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.special.badSignature })
   assert.equal(status, 401)
 })
 
 test('expired token -> 401', async () => {
-  const { status } = await vgFetch(SR, { token: tokens.special.expired })
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.special.expired })
   assert.equal(status, 401)
 })
 
 test('token with a known-insecure kid -> 401', async () => {
-  const { status } = await vgFetch(SR, { token: tokens.special.insecureKid })
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.special.insecureKid })
   assert.equal(status, 401)
 })
 
 test('wrong audience -> 401 (harness sets VG_JWT_AUD_VALUE)', async () => {
-  const { status } = await vgFetch(SR, { token: tokens.special.wrongAudience })
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.special.wrongAudience })
   assert.equal(status, 401)
 })
 
 test('missing audience claim -> 401 under audience enforcement', async () => {
-  const { status } = await vgFetch(SR, { token: tokens.special.missingAudience })
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.special.missingAudience })
   assert.equal(status, 401)
 })
 
@@ -48,22 +48,22 @@ test('foreign issuer claim is ACCEPTED (characterization: iss is never validated
   // option, so a token claiming another issuer still authenticates. Signature-
   // only trust is defensible with a single IdP — this pin makes a future
   // tightening (or loosening) deliberate rather than accidental.
-  const { status } = await vgFetch(SR, { token: tokens.special.foreignIssuer })
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.special.foreignIssuer })
   assert.equal(status, 200)
 })
 
 test('valid token lacking the service-request scope -> 403 on GET', async () => {
-  const { status } = await vgFetch(SR, { token: tokens.special.noServiceRequestScope })
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.special.noServiceRequestScope })
   assert.equal(status, 403)
 })
 
 test('read-only scope can GET but is forbidden from writing', async () => {
-  const get = await vgFetch(SR, { token: tokens.special.readOnly })
+  const get = await vgCall('getServiceRequests', {}, { token: tokens.special.readOnly })
   assert.equal(get.status, 200)
 
   // Body is schema-valid (only villageId required; status is server-derived) so
   // the only thing that can fail is the write-scope check.
-  const post = await vgFetch(SR, {
+  const post = await vgCall('createServiceRequest', {}, {
     token: tokens.special.readOnly,
     body: { villageId: String(villages.quahog.id) },
   })

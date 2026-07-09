@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { vgCall } from '../../lib/ops.js'
 import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 
@@ -8,13 +9,13 @@ import { tokens } from '../../lib/context.js'
 // these endpoints stay exercised even though seeding is direct SQL); the table
 // list only needs elevation.
 test('GET /op/appdata requires elevation -> 403 even for admin without elevate', async () => {
-  const { status } = await vgFetch('/op/appdata', { token: tokens.users.admin })
+  const { status } = await vgCall('getAppData', {}, { token: tokens.users.admin })
   assert.equal(status, 403)
 })
 
 test('GET /op/appdata as admin+elevate exports JSONL', async () => {
-  const { status, text, res } = await vgFetch('/op/appdata', {
-    token: tokens.users.admin, query: { elevate: 'true', format: 'jsonl' },
+  const { status, text, res } = await vgCall('getAppData', { elevate: 'true', format: 'jsonl' }, {
+    token: tokens.users.admin,
   })
   assert.equal(status, 200)
   assert.match(res.headers.get('content-type'), /application\/jsonl/)
@@ -25,8 +26,8 @@ test('GET /op/appdata as admin+elevate exports JSONL', async () => {
 })
 
 test('POST /op/appdata (import) requires application/jsonl -> 415 for a json body', async () => {
-  // vgFetch sends application/json; the import endpoint only accepts
-  // application/jsonl, so the media-type check rejects it before anything else.
+  // Off-spec on purpose (vgFetch): sends application/json to the jsonl-only
+  // import endpoint so the media-type check rejects it before anything else.
   const { status } = await vgFetch('/op/appdata', {
     token: tokens.users.admin, query: { elevate: 'true' }, method: 'POST', body: {},
   })
@@ -34,11 +35,11 @@ test('POST /op/appdata (import) requires application/jsonl -> 415 for a json bod
 })
 
 test('GET /op/appdata/tables requires elevation -> 403 for a non-elevated caller', async () => {
-  const { status } = await vgFetch('/op/appdata/tables', { token: tokens.users.full_v1 })
+  const { status } = await vgCall('getAppDataTables', {}, { token: tokens.users.full_v1 })
   assert.equal(status, 403)
 })
 
 test('GET /op/appdata/tables as admin with elevate=true -> 200', async () => {
-  const { status } = await vgFetch('/op/appdata/tables', { token: tokens.users.admin, query: { elevate: 'true' } })
+  const { status } = await vgCall('getAppDataTables', { elevate: 'true' }, { token: tokens.users.admin })
   assert.equal(status, 200)
 })

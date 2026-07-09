@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { vgFetch } from '../../lib/client.js'
+import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { exportAppData, importAppData, parseAppData } from '../../lib/appdata.js'
 import { serviceRequests as sr, persons } from '../../setup/fixtures.js'
@@ -57,12 +57,12 @@ test('appdata export -> import -> re-export round-trips losslessly', async () =>
 })
 
 test('canonical fixtures are still served after the round-trip import', async () => {
-  const srs = await vgFetch('/service-requests', { token: tokens.users.full_v1 })
+  const srs = await vgCall('getServiceRequests', {}, { token: tokens.users.full_v1 })
   assert.equal(srs.status, 200)
   assert.ok(srs.json.map(r => r.serviceRequestId).includes(String(sr.srV1.id)),
     'srV1 still visible to full_v1')
 
-  const person = await vgFetch(`/persons/${persons.quahogMember.id}`, { token: tokens.users.full_v1 })
+  const person = await vgCall('getPerson', { personId: persons.quahogMember.id }, { token: tokens.users.full_v1 })
   assert.equal(person.status, 200)
   assert.equal(person.json.fullName, persons.quahogMember.fullName)
 })

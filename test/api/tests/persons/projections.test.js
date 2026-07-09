@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { vgFetch } from '../../lib/client.js'
+import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { persons } from '../../setup/fixtures.js'
 
@@ -9,9 +9,9 @@ import { persons } from '../../setup/fixtures.js'
 // is finding #1, asserted in authz.test.js.
 
 test('person projection=memberInfo expands member details', async () => {
-  const { status, json } = await vgFetch(`/persons/${persons.quahogMember.id}`, {
-    token: tokens.users.full_v1, query: { projection: ['memberInfo'] },
-  })
+  const { status, json } = await vgCall('getPerson',
+    { personId: persons.quahogMember.id, projection: ['memberInfo'] },
+    { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   // Truthiness, not key presence: the projection is a SQL subquery alias, so the
   // key exists (as null) even when the underlying view/join returns nothing.
@@ -19,9 +19,9 @@ test('person projection=memberInfo expands member details', async () => {
 })
 
 test('person projection=volunteerInfo expands volunteer details', async () => {
-  const { status, json } = await vgFetch(`/persons/${persons.quahogVolunteer.id}`, {
-    token: tokens.users.full_v1, query: { projection: ['volunteerInfo'] },
-  })
+  const { status, json } = await vgCall('getPerson',
+    { personId: persons.quahogVolunteer.id, projection: ['volunteerInfo'] },
+    { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   // Truthiness for the same reason as memberInfo above.
   assert.ok(json.volunteerInfo, 'volunteerInfo projected with data (quahogVolunteer is active)')

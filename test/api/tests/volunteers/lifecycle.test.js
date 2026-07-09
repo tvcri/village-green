@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { vgCall } from '../../lib/ops.js'
 import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 import { villages, persons } from '../../setup/fixtures.js'
@@ -14,25 +15,24 @@ import { villages, persons } from '../../setup/fixtures.js'
 //
 // Writes use throwaway Quahog persons so the canonical fixtures stay intact.
 // Like the Person writes (finding #5), the handlers apply NO village-grant
-// check — the cross-village probe at the bottom is RED until that's fixed.
+// check — the cross-village probe at the bottom is RED until that's fixed
+// (literal vgFetch, pinned URL).
 //
 // Capability reference ids (static seed): 1=Errands, 2=Friends, 5=Rides.
 // Volunteer vettings are NOT exercised: the vetting_type table has no static
 // rows and no write endpoint, so any vettingTypeId would violate the FK.
-const VOLUNTEERS = '/volunteers'
 const quahog = String(villages.quahog.id)
-const volPath = id => `/persons/${id}/volunteer`
 
 async function makePerson (token, lastName, body = {}) {
-  const res = await vgFetch('/persons', {
+  const res = await vgCall('createPerson', {}, {
     token, body: { villageId: quahog, firstName: 'Throwaway', lastName, ...body },
   })
   assert.equal(res.status, 201, 'precondition: person created')
   return res.json.personId
 }
 
-async function listedNames (token, query) {
-  const { status, json } = await vgFetch(VOLUNTEERS, { token, query })
+async function listedNames (token, params = {}) {
+  const { status, json } = await vgCall('getVolunteers', params, { token })
   assert.equal(status, 200)
   return json.map(v => v.fullName)
 }
@@ -40,7 +40,7 @@ async function listedNames (token, query) {
 // ---- list (GREEN — grant-scoped via active_volunteer) ----
 
 test('GET /volunteers returns the caller\'s granted-village volunteers', async () => {
-  const { status, json } = await vgFetch(VOLUNTEERS, { token: tokens.users.full_v1 })
+  const { status, json } = await vgCall('getVolunteers', {}, { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   const mine = json.find(v => v.fullName === persons.quahogVolunteer.fullName)
   assert.ok(mine, 'includes the Quahog volunteer')
@@ -69,15 +69,15 @@ test('GET /volunteers: grantless admin sees none plain, all with elevate=true', 
 // ---- lifecycle on /persons/{personId}/volunteer (GREEN) ----
 
 test('PUT grants the volunteer role with capabilities', async () => {
-  const id = await makePerson(tokens.users.full_v1, 'VPut')
-  const { status, json } = await vgFetch(volPath(id), {
-    token: tokens.users.full_v1, method: 'PUT',
+  const personId = await makePerson(tokens.users.full_v1, 'VPut')
+  const { status, json } = await vgCall('putPersonVolunteer', { personId }, {
+    token: tokens.users.full_v1,
     body: { active: true, capabilityIds: ['1', '5'] }, // Errands, Rides
   })
   assert.equal(status, 200)
-  assert.equal(json.personId, id, 'responds with the person')
+  assert.equal(json.personId, personId, 'responds with the person')
   assert.ok(json.volunteerDetail, 'response carries volunteerDetail')
-  assert.equal(json.volunteerDetail.personId, id)
+  assert.equal(json.volunteerDetail.personId, personId)
   assert.deepEqual([...json.volunteerDetail.capabilities].sort(), ['Errands', 'Rides'])
 
   const names = await listedNames(tokens.users.full_v1)
@@ -88,9 +88,9 @@ test('PUT without `active` leaves the volunteer out of the active list', async (
   // putVolunteer defaults every omitted scalar to null — including active — so
   // a PUT that only sets capabilities creates a volunteer the active_volunteer
   // view (active=1) filters out. Surprising but current behavior; pinned here.
-  const id = await makePerson(tokens.users.full_v1, 'VInactive')
-  const { status } = await vgFetch(volPath(id), {
-    token: tokens.users.full_v1, method: 'PUT', body: { capabilityIds: ['2'] },
+  const personId = await makePerson(tokens.users.full_v1, 'VInactive')
+  const { status } = await vgCall('putPersonVolunteer', { personId }, {
+    token: tokens.users.full_v1, body: { capabilityIds: ['2'] },
   })
   assert.equal(status, 200)
   const names = await listedNames(tokens.users.full_v1)
@@ -98,20 +98,20 @@ test('PUT without `active` leaves the volunteer out of the active list', async (
 })
 
 test('PATCH replaces the capability set and toggles active-list membership', async () => {
-  const id = await makePerson(tokens.users.full_v1, 'VPatch')
-  await vgFetch(volPath(id), {
-    token: tokens.users.full_v1, method: 'PUT', body: { active: true, capabilityIds: ['1'] },
+  const personId = await makePerson(tokens.users.full_v1, 'VPatch')
+  await vgCall('putPersonVolunteer', { personId }, {
+    token: tokens.users.full_v1, body: { active: true, capabilityIds: ['1'] },
   })
 
-  const patched = await vgFetch(volPath(id), {
-    token: tokens.users.full_v1, method: 'PATCH', body: { capabilityIds: ['2'] }, // -> Friends only
+  const patched = await vgCall('patchPersonVolunteer', { personId }, {
+    token: tokens.users.full_v1, body: { capabilityIds: ['2'] }, // -> Friends only
   })
   assert.equal(patched.status, 200)
   assert.deepEqual(patched.json.volunteerDetail.capabilities, ['Friends'])
   assert.ok((await listedNames(tokens.users.full_v1)).includes('VPatch, Throwaway'), 'still active')
 
-  const deactivated = await vgFetch(volPath(id), {
-    token: tokens.users.full_v1, method: 'PATCH', body: { active: false },
+  const deactivated = await vgCall('patchPersonVolunteer', { personId }, {
+    token: tokens.users.full_v1, body: { active: false },
   })
   assert.equal(deactivated.status, 200)
   assert.ok(!(await listedNames(tokens.users.full_v1)).includes('VPatch, Throwaway'),
@@ -119,10 +119,10 @@ test('PATCH replaces the capability set and toggles active-list membership', asy
 })
 
 test('PATCH associates villages (echoed in volunteerDetail)', async () => {
-  const id = await makePerson(tokens.users.full_v1, 'VAssoc')
-  await vgFetch(volPath(id), { token: tokens.users.full_v1, method: 'PUT', body: { active: true } })
-  const { status, json } = await vgFetch(volPath(id), {
-    token: tokens.users.full_v1, method: 'PATCH',
+  const personId = await makePerson(tokens.users.full_v1, 'VAssoc')
+  await vgCall('putPersonVolunteer', { personId }, { token: tokens.users.full_v1, body: { active: true } })
+  const { status, json } = await vgCall('patchPersonVolunteer', { personId }, {
+    token: tokens.users.full_v1,
     body: { associateVillageIds: [String(villages.innsmouth.id)] },
   })
   assert.equal(status, 200)
@@ -132,31 +132,31 @@ test('PATCH associates villages (echoed in volunteerDetail)', async () => {
 })
 
 test('DELETE revokes the volunteer role; a second DELETE 404s', async () => {
-  const id = await makePerson(tokens.users.full_v1, 'VDel')
-  await vgFetch(volPath(id), { token: tokens.users.full_v1, method: 'PUT', body: { active: true } })
-  const del = await vgFetch(volPath(id), { token: tokens.users.full_v1, method: 'DELETE' })
+  const personId = await makePerson(tokens.users.full_v1, 'VDel')
+  await vgCall('putPersonVolunteer', { personId }, { token: tokens.users.full_v1, body: { active: true } })
+  const del = await vgCall('deletePersonVolunteer', { personId }, { token: tokens.users.full_v1 })
   assert.equal(del.status, 204)
-  const again = await vgFetch(volPath(id), { token: tokens.users.full_v1, method: 'DELETE' })
+  const again = await vgCall('deletePersonVolunteer', { personId }, { token: tokens.users.full_v1 })
   assert.equal(again.status, 404)
   const names = await listedNames(tokens.users.full_v1)
   assert.ok(!names.includes('VDel, Throwaway'), 'revoked volunteer is gone from the list')
 })
 
 test('PATCH on a person with no volunteer role -> 404', async () => {
-  const id = await makePerson(tokens.users.full_v1, 'VNone')
-  const { status } = await vgFetch(volPath(id), {
-    token: tokens.users.full_v1, method: 'PATCH', body: { notes: 'x' },
+  const personId = await makePerson(tokens.users.full_v1, 'VNone')
+  const { status } = await vgCall('patchPersonVolunteer', { personId }, {
+    token: tokens.users.full_v1, body: { notes: 'x' },
   })
   assert.equal(status, 404)
 })
 
 test('PUT for a person with no home village -> 422', async () => {
-  const res = await vgFetch('/persons', {
+  const res = await vgCall('createPerson', {}, {
     token: tokens.users.full_v1, body: { firstName: 'Throwaway', lastName: 'VNoVillage' },
   })
   assert.equal(res.status, 201, 'precondition: villageless person created')
-  const { status } = await vgFetch(volPath(res.json.personId), {
-    token: tokens.users.full_v1, method: 'PUT', body: { active: true },
+  const { status } = await vgCall('putPersonVolunteer', { personId: res.json.personId }, {
+    token: tokens.users.full_v1, body: { active: true },
   })
   assert.equal(status, 422)
 })
@@ -167,11 +167,11 @@ test('PUT volunteer for a person outside the caller\'s grants is denied', async 
   // full_v2 (Innsmouth only) grants a volunteer role to a Quahog person. A
   // successful insecure write is undone so the rest of the run is unaffected.
   const id = await makePerson(tokens.users.full_v1, 'VCross')
-  const res = await vgFetch(volPath(id), {
+  const res = await vgFetch(`/persons/${id}/volunteer`, {
     token: tokens.users.full_v2, method: 'PUT', body: { active: true },
   })
   if (res.status === 200) {
-    await vgFetch(volPath(id), { token: tokens.users.full_v1, method: 'DELETE' })
+    await vgFetch(`/persons/${id}/volunteer`, { token: tokens.users.full_v1, method: 'DELETE' })
   }
   assert.ok(res.status === 403 || res.status === 404, `expected denial, got ${res.status}`)
 })

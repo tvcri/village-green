@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { vgCall } from '../../lib/ops.js'
 import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 import { villages, persons } from '../../setup/fixtures.js'
@@ -7,7 +8,7 @@ import { villages, persons } from '../../setup/fixtures.js'
 // ---- list endpoint: grant-filtered (GREEN) ----
 
 test('full_v1 person list shows only Quahog people', async () => {
-  const { status, json } = await vgFetch('/persons', { token: tokens.users.full_v1 })
+  const { status, json } = await vgCall('getPersons', {}, { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   const names = json.map(p => p.fullName)
   assert.ok(names.includes(persons.quahogMember.fullName), 'should include a Quahog person')
@@ -18,11 +19,11 @@ test('full_v1 person list shows only Quahog people', async () => {
 // ---- by-id within own grant: works (GREEN sanity) ----
 
 test('full_v1 can read its own village person by id', async () => {
-  const { status } = await vgFetch(`/persons/${persons.quahogMember.id}`, { token: tokens.users.full_v1 })
+  const { status } = await vgCall('getPerson', { personId: persons.quahogMember.id }, { token: tokens.users.full_v1 })
   assert.equal(status, 200)
 })
 
-// ---- by-id across villages: MUST be denied (RED — finding #1) ----
+// ---- by-id across villages: MUST be denied (RED — finding #1; literal URL) ----
 
 test('full_v1 cannot read an Innsmouth person by id', async () => {
   const { status, json } = await vgFetch(`/persons/${persons.innsmouthMember.id}`, { token: tokens.users.full_v1 })
@@ -35,6 +36,6 @@ test('full_v1 cannot read an Innsmouth person by id', async () => {
 // ---- nested route: guarded (GREEN) ----
 
 test('full_v1 gets 404 for an ungranted village persons route', async () => {
-  const { status } = await vgFetch(`/villages/${villages.innsmouth.id}/persons`, { token: tokens.users.full_v1 })
+  const { status } = await vgCall('getVillagePersons', { villageId: villages.innsmouth.id }, { token: tokens.users.full_v1 })
   assert.equal(status, 404)
 })

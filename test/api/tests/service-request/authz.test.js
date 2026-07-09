@@ -1,16 +1,19 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { vgCall } from '../../lib/ops.js'
 import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 import { villages, serviceRequests as sr, persons } from '../../setup/fixtures.js'
 
+// Green tests go through vgCall; the RED probes (findings #1/#2) pin literal
+// URLs (vgFetch) so a spec rename can't silently retarget them.
 const SR = '/service-requests'
 const idsOf = (rows) => rows.map(r => r.serviceRequestId)
 
 // ---- list endpoint: grant-filtered (GREEN) ----
 
 test('full_v1 list shows only Quahog requests', async () => {
-  const { status, json } = await vgFetch(SR, { token: tokens.users.full_v1 })
+  const { status, json } = await vgCall('getServiceRequests', {}, { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   const ids = idsOf(json)
   assert.ok(ids.includes(String(sr.srV1.id)))
@@ -19,7 +22,7 @@ test('full_v1 list shows only Quahog requests', async () => {
 })
 
 test('full_v2 list shows only Innsmouth requests', async () => {
-  const { status, json } = await vgFetch(SR, { token: tokens.users.full_v2 })
+  const { status, json } = await vgCall('getServiceRequests', {}, { token: tokens.users.full_v2 })
   assert.equal(status, 200)
   const ids = idsOf(json)
   assert.ok(ids.includes(String(sr.srV2.id)))
@@ -27,7 +30,7 @@ test('full_v2 list shows only Innsmouth requests', async () => {
 })
 
 test('nogrants user sees nothing', async () => {
-  const { status, json } = await vgFetch(SR, { token: tokens.users.nogrants })
+  const { status, json } = await vgCall('getServiceRequests', {}, { token: tokens.users.nogrants })
   assert.equal(status, 200)
   assert.equal(json.length, 0)
 })
@@ -35,7 +38,7 @@ test('nogrants user sees nothing', async () => {
 // ---- by-id within own grant: works (GREEN sanity) ----
 
 test('full_v1 can read its own village request by id', async () => {
-  const { status, json } = await vgFetch(`/service-requests/${sr.srV1.id}`, { token: tokens.users.full_v1 })
+  const { status, json } = await vgCall('getServiceRequest', { serviceRequestId: sr.srV1.id }, { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   assert.equal(json.villageId, String(villages.quahog.id))
 })
@@ -62,7 +65,7 @@ test('full_v1 cannot pull an Innsmouth member address via projection', async () 
 // ---- nested route: guarded (GREEN) ----
 
 test('full_v1 gets 404 for an ungranted village nested route', async () => {
-  const { status } = await vgFetch(`/villages/${villages.innsmouth.id}/service-requests`, {
+  const { status } = await vgCall('getVillageServiceRequests', { villageId: villages.innsmouth.id }, {
     token: tokens.users.full_v1,
   })
   assert.equal(status, 404)

@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { vgCall } from '../../lib/ops.js'
 import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 import { villages } from '../../setup/fixtures.js'
@@ -16,8 +17,9 @@ import { villages } from '../../setup/fixtures.js'
 // AUTHZ (finding #6): none of the three write paths has an authorization gate —
 // the OAS asks only for the vg:village scope (no x-elevation-required, unlike
 // the grant endpoints) and the controller checks no privilege or grant. The WIP
-// bugs mask the hole today; the RED test below keeps it visible so fixing the
-// 500 without adding a guard cannot silently open village writes to everyone.
+// bugs mask the hole today; the RED tests below (literal vgFetch, pinned URLs)
+// keep it visible so fixing the 500 without adding a guard cannot silently open
+// village writes to everyone.
 const V = '/villages'
 const WIP = 'Village write endpoints are WIP (createVillage 500s; patch/delete 404 for everyone)'
 
@@ -54,23 +56,23 @@ test('patchVillage on an ungranted village is denied', async () => {
 // create RED above is the tripwire for the missing guard.
 
 test('createVillage (admin) creates a village', { todo: WIP }, async () => {
-  const { status, json } = await vgFetch(V, { token: tokens.users.admin, body: { name: 'New Village' } })
+  const { status, json } = await vgCall('createVillage', {}, { token: tokens.users.admin, body: { name: 'New Village' } })
   assert.equal(status, 201)
   assert.equal(json.name, 'New Village')
 })
 
 test('patchVillage renames a village the caller administers', { todo: WIP }, async () => {
-  const { status, json } = await vgFetch(`${V}/${villages.quahog.id}`, {
-    token: tokens.users.owner_v1, method: 'PATCH', body: { name: 'Quahog Renamed' },
+  const { status, json } = await vgCall('patchVillage', { villageId: villages.quahog.id }, {
+    token: tokens.users.owner_v1, body: { name: 'Quahog Renamed' },
   })
   assert.equal(status, 200)
   assert.equal(json.name, 'Quahog Renamed')
 })
 
 test('deleteVillage removes a village the caller administers', { todo: WIP }, async () => {
-  const created = await vgFetch(V, { token: tokens.users.admin, body: { name: 'Disposable Village' } })
+  const created = await vgCall('createVillage', {}, { token: tokens.users.admin, body: { name: 'Disposable Village' } })
   assert.equal(created.status, 201) // depends on createVillage (also WIP)
   const id = created.json.villageId ?? created.json.id
-  const del = await vgFetch(`${V}/${id}`, { token: tokens.users.admin, method: 'DELETE' })
+  const del = await vgCall('deleteVillage', { villageId: id }, { token: tokens.users.admin })
   assert.equal(del.status, 200)
 })

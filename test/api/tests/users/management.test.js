@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { vgFetch } from '../../lib/client.js'
+import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { users, villages } from '../../setup/fixtures.js'
 
@@ -19,15 +19,16 @@ const fullV1Id = String(users.full_v1.userId)
 const adminId = String(users.admin.userId)
 const scratchId = String(users.scratch.userId)
 const scratchVillage = String(villages.scratch.id)
-const A = { token: tokens.users.admin, query: { elevate: 'true' } }
+const E = { elevate: 'true' }
+const admin = { token: tokens.users.admin }
 
 test('GET /users/{id} as a non-admin -> 403', async () => {
-  const { status } = await vgFetch(`/users/${fullV1Id}`, { token: tokens.users.full_v1 })
+  const { status } = await vgCall('getUserByUserId', { userId: fullV1Id }, { token: tokens.users.full_v1 })
   assert.equal(status, 403)
 })
 
 test('DELETE /users/{id} as a non-admin -> 403', async () => {
-  const { status } = await vgFetch(`/users/${adminId}`, { token: tokens.users.full_v1, method: 'DELETE' })
+  const { status } = await vgCall('deleteUser', { userId: adminId }, { token: tokens.users.full_v1 })
   assert.equal(status, 403)
 })
 
@@ -35,36 +36,34 @@ test('PATCH /users/{id} as a non-admin -> 403 (even on self)', async () => {
   // UserPatch requires a body, so this can't be body-free; a no-op same-value
   // status patch keeps a wrongly-authorized write from changing anything
   // ('available' is the seeded default).
-  const { status } = await vgFetch(`/users/${fullV1Id}`, {
-    token: tokens.users.full_v1, method: 'PATCH', body: { status: 'available' },
+  const { status } = await vgCall('updateUser', { userId: fullV1Id }, {
+    token: tokens.users.full_v1, body: { status: 'available' },
   })
   assert.equal(status, 403)
 })
 
 test('GET /users/{id}/grants as a non-admin -> 403', async () => {
-  const { status } = await vgFetch(`/users/${fullV1Id}/grants`, { token: tokens.users.full_v1 })
+  const { status } = await vgCall('getUserGrants', { userId: fullV1Id }, { token: tokens.users.full_v1 })
   assert.equal(status, 403)
 })
 
 test('DELETE /users/{id}/grants/{grantId} as a non-admin -> 403 (no self-revoke/escalate)', async () => {
-  const { status } = await vgFetch(`/users/${fullV1Id}/grants/99999`, { token: tokens.users.full_v1, method: 'DELETE' })
+  const { status } = await vgCall('deleteUserGrant', { userId: fullV1Id, grantId: 99999 }, { token: tokens.users.full_v1 })
   assert.equal(status, 403)
 })
 
 test('getUserGrants as admin with elevate=true lists the user\'s grants', async () => {
-  const { status, json } = await vgFetch(`/users/${fullV1Id}/grants`, {
-    token: tokens.users.admin, query: { elevate: 'true' },
-  })
+  const { status, json } = await vgCall('getUserGrants', { userId: fullV1Id, ...E }, admin)
   assert.equal(status, 200)
   assert.ok(Array.isArray(json))
 })
 
 test('getUsers: non-admin may list, but a projection requires elevation', async () => {
-  const list = await vgFetch('/users', { token: tokens.users.full_v1 })
+  const list = await vgCall('getUsers', {}, { token: tokens.users.full_v1 })
   assert.equal(list.status, 200)
   assert.ok(Array.isArray(list.json))
 
-  const projected = await vgFetch('/users', { token: tokens.users.full_v1, query: { projection: ['villageGrants'] } })
+  const projected = await vgCall('getUsers', { projection: ['villageGrants'] }, { token: tokens.users.full_v1 })
   assert.equal(projected.status, 403)
 })
 
@@ -74,14 +73,14 @@ test('getUsers: non-admin may list, but a projection requires elevation', async 
 let createdUserId
 
 test('createUser (keycloak=false) creates the user with village grants', async () => {
-  const { status, json } = await vgFetch('/users', {
-    token: tokens.users.admin,
-    query: { elevate: 'true', keycloak: 'false', projection: ['villageGrants'] },
-    body: {
-      username: 'vgtest.user@scratch.test',
-      villageGrants: [{ villageId: scratchVillage, roleId: 2 }],
-    },
-  })
+  const { status, json } = await vgCall('createUser',
+    { ...E, keycloak: 'false', projection: ['villageGrants'] }, {
+      ...admin,
+      body: {
+        username: 'vgtest.user@scratch.test',
+        villageGrants: [{ villageId: scratchVillage, roleId: 2 }],
+      },
+    })
   assert.equal(status, 201)
   assert.ok(json.userId, 'returns a new userId')
   assert.equal(json.username, 'vgtest.user@scratch.test')
@@ -91,24 +90,22 @@ test('createUser (keycloak=false) creates the user with village grants', async (
 
 test('createUser with a duplicate username -> 422', async () => {
   assert.ok(createdUserId, 'precondition: create test ran')
-  const { status } = await vgFetch('/users', {
-    token: tokens.users.admin, query: { elevate: 'true', keycloak: 'false' },
-    body: { username: 'vgtest.user@scratch.test' },
+  const { status } = await vgCall('createUser', { ...E, keycloak: 'false' }, {
+    ...admin, body: { username: 'vgtest.user@scratch.test' },
   })
   assert.equal(status, 422)
 })
 
 test('createUser without elevation is denied (no user created)', async () => {
-  const { status } = await vgFetch('/users', {
-    token: tokens.users.full_v1, query: { keycloak: 'false' },
-    body: { username: 'vgtest.denied@scratch.test' },
+  const { status } = await vgCall('createUser', { keycloak: 'false' }, {
+    token: tokens.users.full_v1, body: { username: 'vgtest.denied@scratch.test' },
   })
   assert.equal(status, 403)
 })
 
 test('getUserByUserId (admin+elevate) returns the created user', async () => {
   assert.ok(createdUserId, 'precondition: create test ran')
-  const { status, json } = await vgFetch(`/users/${createdUserId}`, A)
+  const { status, json } = await vgCall('getUserByUserId', { userId: createdUserId, ...E }, admin)
   assert.equal(status, 200)
   assert.equal(json.userId, createdUserId)
   assert.equal(json.username, 'vgtest.user@scratch.test')
@@ -123,12 +120,12 @@ test('replaceUser (PUT) is unusable: UserPut both requires and forbids villageGr
   // among its properties, and sets additionalProperties:false — so no body can
   // conform. Omitting it fails `required`; sending it fails additionalProperties.
   assert.ok(createdUserId, 'precondition: create test ran')
-  const without = await vgFetch(`/users/${createdUserId}`, {
-    ...A, method: 'PUT', body: { username: 'vgtest.renamed@scratch.test' },
+  const without = await vgCall('replaceUser', { userId: createdUserId, ...E }, {
+    ...admin, body: { username: 'vgtest.renamed@scratch.test' },
   })
   assert.equal(without.status, 400, 'missing required villageGrants')
-  const withGrants = await vgFetch(`/users/${createdUserId}`, {
-    ...A, method: 'PUT',
+  const withGrants = await vgCall('replaceUser', { userId: createdUserId, ...E }, {
+    ...admin,
     body: { username: 'vgtest.renamed@scratch.test', villageGrants: [{ villageId: scratchVillage, roleId: 2 }] },
   })
   assert.equal(withGrants.status, 400, 'villageGrants rejected as an unknown property')
@@ -136,12 +133,12 @@ test('replaceUser (PUT) is unusable: UserPut both requires and forbids villageGr
 
 test('patching status to unavailable clears the user\'s grants', async () => {
   assert.ok(createdUserId, 'precondition: create test ran')
-  const { status, json } = await vgFetch(`/users/${createdUserId}`, {
-    ...A, method: 'PATCH', body: { status: 'unavailable' },
+  const { status, json } = await vgCall('updateUser', { userId: createdUserId, ...E }, {
+    ...admin, body: { status: 'unavailable' },
   })
   assert.equal(status, 200)
   assert.equal(json.status, 'unavailable')
-  const grants = await vgFetch(`/users/${createdUserId}/grants`, A)
+  const grants = await vgCall('getUserGrants', { userId: createdUserId, ...E }, admin)
   assert.equal(grants.status, 200)
   assert.equal(grants.json.length, 0, 'soft-disable revoked the village grant')
 })
@@ -150,29 +147,29 @@ test('deleteUser removes a never-accessed user',
   { todo: 'blocked: deleteUser calls the Keycloak admin API unconditionally (no ?keycloak=false escape) and mockOidc has no admin API, so this 500s today' },
   async () => {
     assert.ok(createdUserId, 'precondition: create test ran')
-    const del = await vgFetch(`/users/${createdUserId}`, { ...A, method: 'DELETE' })
+    const del = await vgCall('deleteUser', { userId: createdUserId, ...E }, admin)
     assert.equal(del.status, 200)
-    const after = await vgFetch(`/users/${createdUserId}`, A)
+    const after = await vgCall('getUserByUserId', { userId: createdUserId, ...E }, admin)
     assert.equal(after.status, 404, 'never-accessed user is hard-deleted')
   })
 
 // ---- user grants lifecycle (scratch user; direct grants) ----
 
 test('user grants: create -> list -> delete', async () => {
-  const created = await vgFetch(`/users/${scratchId}/grants`, {
-    ...A, body: [{ villageId: scratchVillage, roleId: 1 }],
+  const created = await vgCall('createUserGrant', { userId: scratchId, ...E }, {
+    ...admin, body: [{ villageId: scratchVillage, roleId: 1 }],
   })
   assert.equal(created.status, 201)
 
   // rows are {grantId, roleId, village: {villageId, name}, grantees: [...]}
-  const listed = await vgFetch(`/users/${scratchId}/grants`, A)
+  const listed = await vgCall('getUserGrants', { userId: scratchId, ...E }, admin)
   assert.equal(listed.status, 200)
   const mine = listed.json.find(g => g.village?.villageId === scratchVillage)
   assert.ok(mine, 'created grant is listed')
   assert.equal(mine.roleId, 1)
 
-  const del = await vgFetch(`/users/${scratchId}/grants/${mine.grantId}`, { ...A, method: 'DELETE' })
+  const del = await vgCall('deleteUserGrant', { userId: scratchId, grantId: mine.grantId, ...E }, admin)
   assert.equal(del.status, 200)
-  const after = await vgFetch(`/users/${scratchId}/grants`, A)
+  const after = await vgCall('getUserGrants', { userId: scratchId, ...E }, admin)
   assert.ok(!after.json.some(g => g.village?.villageId === scratchVillage), 'grant removed')
 })

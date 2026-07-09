@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { vgFetch } from '../../lib/client.js'
+import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { withDb } from '../../lib/db.js'
 import { villages, persons } from '../../setup/fixtures.js'
@@ -8,7 +8,6 @@ import { villages, persons } from '../../setup/fixtures.js'
 // Lifecycle / correctness for the current service-request model:
 //  - status is DERIVED (deriveStatus): a volunteer makes it Confirmed, else Open
 //  - notifications are OPT-IN via `notify` and recorded in notification_event
-const SR = '/service-requests'
 const quahog = String(villages.quahog.id)
 const member = String(persons.quahogMember.id)
 const volunteer = String(persons.quahogVolunteer.id)
@@ -26,7 +25,7 @@ test('create returns 201, derives Open (no volunteer), and round-trips fields', 
     serviceName: 'Ride to Arkham Hospital',
     finishAt: '2026-07-20T14:00:00Z',
   }
-  const { status, json } = await vgFetch(SR, { token: tokens.users.full_v1, body })
+  const { status, json } = await vgCall('createServiceRequest', {}, { token: tokens.users.full_v1, body })
   assert.equal(status, 201)
   assert.equal(json.status, 'Open') // derived: no volunteer assigned
   assert.equal(json.villageId, quahog)
@@ -36,14 +35,14 @@ test('create returns 201, derives Open (no volunteer), and round-trips fields', 
 })
 
 test('notify=true records an open notification_event; omitting notify records none', async () => {
-  const withNotify = await vgFetch(SR, {
+  const withNotify = await vgCall('createServiceRequest', {}, {
     token: tokens.users.full_v1,
     body: { villageId: quahog, memberPersonId: member, notify: true },
   })
   assert.equal(withNotify.status, 201)
   assert.deepEqual(await notificationEvents(withNotify.json.serviceRequestId), ['open'])
 
-  const withoutNotify = await vgFetch(SR, {
+  const withoutNotify = await vgCall('createServiceRequest', {}, {
     token: tokens.users.full_v1,
     body: { villageId: quahog, memberPersonId: member },
   })
@@ -52,16 +51,15 @@ test('notify=true records an open notification_event; omitting notify records no
 })
 
 test('assigning a volunteer via patch derives Confirmed status', async () => {
-  const created = await vgFetch(SR, {
+  const created = await vgCall('createServiceRequest', {}, {
     token: tokens.users.full_v1,
     body: { villageId: quahog, memberPersonId: member },
   })
   assert.equal(created.status, 201)
   assert.equal(created.json.status, 'Open')
 
-  const patched = await vgFetch(`/service-requests/${created.json.serviceRequestId}`, {
+  const patched = await vgCall('patchServiceRequest', { serviceRequestId: created.json.serviceRequestId }, {
     token: tokens.users.full_v1,
-    method: 'PATCH',
     body: { volunteerPersonId: volunteer },
   })
   assert.equal(patched.status, 200)
@@ -73,7 +71,7 @@ test('cancelling via patch sets the cancelled status and records the event', asy
   // The PR #46 confirmation dialog is client-side; this is the underlying
   // transition it guards. Cancelled statuses pass deriveStatus through verbatim
   // (they are not re-derived to Open/Confirmed from the volunteer assignment).
-  const created = await vgFetch(SR, {
+  const created = await vgCall('createServiceRequest', {}, {
     token: tokens.users.full_v1,
     body: { villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer },
   })
@@ -81,8 +79,8 @@ test('cancelling via patch sets the cancelled status and records the event', asy
   assert.equal(created.json.status, 'Confirmed')
   const id = created.json.serviceRequestId
 
-  const cancelled = await vgFetch(`/service-requests/${id}`, {
-    token: tokens.users.full_v1, method: 'PATCH',
+  const cancelled = await vgCall('patchServiceRequest', { serviceRequestId: id }, {
+    token: tokens.users.full_v1,
     body: { status: 'Member cancelled', notify: true },
   })
   assert.equal(cancelled.status, 200)
@@ -90,28 +88,27 @@ test('cancelling via patch sets the cancelled status and records the event', asy
     'cancelled status sticks despite the assigned volunteer')
   assert.ok((await notificationEvents(id)).includes('cancelled'), 'cancelled notification recorded')
 
-  const filtered = await vgFetch(SR, {
-    token: tokens.users.full_v1, query: { status: ['cancelled'] },
+  const filtered = await vgCall('getServiceRequests', { status: ['cancelled'] }, {
+    token: tokens.users.full_v1,
   })
   assert.ok(filtered.json.map(r => r.serviceRequestId).includes(id),
     'the cancelled filter maps to all three cancelled db statuses')
 })
 
 test('status query filter maps to db statuses', async () => {
-  const open = await vgFetch(SR, {
+  const open = await vgCall('createServiceRequest', {}, {
     token: tokens.users.full_v1,
     body: { villageId: quahog, memberPersonId: member },
   })
-  const confirmed = await vgFetch(SR, {
+  const confirmed = await vgCall('createServiceRequest', {}, {
     token: tokens.users.full_v1,
     body: { villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer },
   })
   assert.equal(open.json.status, 'Open')
   assert.equal(confirmed.json.status, 'Confirmed')
 
-  const { status, json } = await vgFetch(SR, {
+  const { status, json } = await vgCall('getServiceRequests', { status: ['confirmed'] }, {
     token: tokens.users.full_v1,
-    query: { status: ['confirmed'] },
   })
   assert.equal(status, 200)
   const ids = json.map(r => r.serviceRequestId)
