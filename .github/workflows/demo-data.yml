@@ -1,0 +1,129 @@
+# Demo dataset generator CI — stand-alone (API tests live in their own workflow).
+#
+# Brings up the full dev stack (MySQL, mock OIDC, the API — which applies the
+# schema migrations on startup), then runs the generator suite:
+#
+#   unit tests -> doctor -> roundtrip (seed:db -> emit -> seed:api -> sanity) -> export
+#
+# The DOCTOR step is the schema-drift gate: it FAILS the workflow when the live
+# schema and the generator's builders/baseline disagree (renamed/dropped column,
+# new NOT NULL column, or a new column nobody has populated or acknowledged in
+# data/generator/doctor-baseline.json). A PR that changes the schema is expected
+# to update the generator in the same PR. To demote drift to a warning instead,
+# add `continue-on-error: true` to that step.
+#
+# Artifacts: the generator-emitted demo-appdata.jsonl and the app-exported
+# appdata-export.jsonl from the freshly seeded DB.
+
+name: demo-data
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  generate:
+    name: doctor + roundtrip
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: vg
+          MYSQL_USER: vg
+          MYSQL_PASSWORD: vg
+        ports:
+          - 3308:3306 # same host port as docker-compose.dev.yml, so all VG_DB_* defaults apply
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpw"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          npm ci --prefix test/utils
+          npm ci --prefix api/source
+          npm ci --prefix data
+
+      - name: Start mock OIDC (:18080)
+        run: |
+          nohup node test/utils/mockOidc.js --port 18080 > mock-oidc.log 2>&1 &
+
+      - name: Start API (:54000, applies migrations)
+        working-directory: api/source
+        env:
+          VG_DB_HOST: 127.0.0.1
+          VG_DB_PORT: "3308"
+          VG_DB_SCHEMA: vg
+          VG_DB_USER: vg
+          VG_DB_PASSWORD: vg
+          VG_OIDC_PROVIDER: http://localhost:18080
+          VG_CLIENT_OIDC_PROVIDER: http://localhost:18080
+          VG_API_PORT: "54000"
+          VG_API_ADDRESS: 127.0.0.1
+          VG_CLIENT_DISABLED: "true"
+          VG_DEPENDENCY_RETRIES: "48"
+          VG_EXPERIMENTAL_APPDATA: "true"
+        run: |
+          nohup node index.js > $GITHUB_WORKSPACE/api.log 2>&1 &
+
+      - name: Wait for API + schema migrations
+        run: |
+          echo "waiting for the API to answer and migrations to land..."
+          for i in $(seq 1 60); do
+            if curl -fs http://localhost:54000/api/op/definition > /dev/null 2>&1 \
+               && mysql -h 127.0.0.1 -P 3308 -u vg -pvg vg \
+                    -e "SELECT 1 FROM service_request LIMIT 1" > /dev/null 2>&1; then
+              echo "ready after ~$((i*2))s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::API/schema never became ready"
+          tail -n 50 api.log mock-oidc.log || true
+          exit 1
+
+      - name: Unit tests
+        working-directory: data
+        run: npm test
+
+      # THE schema-drift gate. Red here means the live schema and the generator
+      # disagree — fix a builder or acknowledge the column in doctor-baseline.json.
+      - name: Doctor (schema-drift gate)
+        working-directory: data
+        run: npm run doctor
+
+      - name: Roundtrip (seed:db -> emit -> seed:api -> sanity)
+        working-directory: data
+        run: npm run roundtrip
+
+      - name: Emit + app-export the JSONL artifacts
+        working-directory: data
+        run: |
+          npm run emit
+          npm run export
+
+      - name: Upload JSONL artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-appdata
+          path: |
+            data/demo-appdata.jsonl
+            data/appdata-export.jsonl
+          if-no-files-found: error
+
+      - name: Server logs on failure
+        if: failure()
+        run: |
+          echo "=== api.log ==="; tail -n 200 api.log || true
+          echo "=== mock-oidc.log ==="; tail -n 100 mock-oidc.log || true
