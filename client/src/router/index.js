@@ -55,6 +55,12 @@ const routes = [
     meta: { requiresVolunteer: true },
   },
   {
+    path: '/volunteer/requests/:id',
+    name: 'volunteer-request-detail',
+    component: () => import('../features/VolunteerHome/components/VolunteerRequestDetail.vue'),
+    meta: { requiresVolunteer: true },
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('../features/Admin/components/AdminHub.vue'),

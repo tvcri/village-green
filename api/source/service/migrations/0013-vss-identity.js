@@ -10,7 +10,7 @@ const upMigration = [
       FOREIGN KEY (personId) REFERENCES person (id) ON DELETE SET NULL`,
   `ALTER TABLE person
     ADD INDEX INDEX_email (email)`,
-  // Attribution for volunteer pickup/release (SR history is out of scope).
+  // Attribution for volunteer sign-up/release (SR history is out of scope).
   `ALTER TABLE service_request
     ADD COLUMN modifiedUserId INT NULL,
     ADD COLUMN modifiedAt DATETIME NULL,

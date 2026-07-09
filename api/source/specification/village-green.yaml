@@ -1760,12 +1760,13 @@ paths:
         - name: scope
           in: query
           required: true
-          description: open = pickable requests in the caller's volunteer village(s); mine = the caller's commitments
+          description: open = pickable requests across all villages; mine = the caller's upcoming (Confirmed) commitments; history = the caller's past (Completed) requests
           schema:
             type: string
             enum:
             - open
             - mine
+            - history
       responses:
         '200':
           description: List of volunteer-scoped service requests
@@ -1784,12 +1785,61 @@ paths:
       security:
       - oauth:
         - vg:service-request:read
-  /volunteer-requests/{serviceRequestId}/pickup:
+  /volunteer-requests/villages:
+    get:
+      summary: List all villages, for volunteer-facing filter UIs
+      description: Unfiltered by grants (the caller is a volunteer, not staff) — the full current village list, id and name only.
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequestVillages
+      responses:
+        '200':
+          description: List of villages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolunteerVillage'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/{serviceRequestId}:
+    get:
+      summary: Get a single service request visible to the requesting volunteer (deep-link landing)
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: The service request, if it is Open (any village) or one of the caller's own Confirmed/Completed requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible to this volunteer)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/{serviceRequestId}/sign-up:
     post:
       summary: Commit the requesting volunteer to an open service request
       tags:
       - VolunteerRequest
-      operationId: pickupVolunteerRequest
+      operationId: signUpVolunteerRequest
       parameters:
         - $ref: '#/components/parameters/ServiceRequestIdPath'
       responses:
@@ -4502,6 +4552,34 @@ components:
         phone:
           type: string
           nullable: true
+    VolunteerOwnAddress:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+    VolunteerVillage:
+      additionalProperties: false
+      type: object
+      properties:
+        villageId:
+          $ref: '#/components/schemas/StringIntId'
+        name:
+          type: string
+      required:
+      - villageId
+      - name
     VolunteerServiceRequest:
       additionalProperties: false
       type: object
@@ -4564,6 +4642,8 @@ components:
           $ref: '#/components/schemas/VolunteerMemberContact'
         emergencyContact:
           $ref: '#/components/schemas/VolunteerEmergencyContact'
+        volunteerAddress:
+          $ref: '#/components/schemas/VolunteerOwnAddress'
       required:
       - serviceRequestId
       - villageId

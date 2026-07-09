@@ -46,7 +46,7 @@ const menuItems = computed(() => {
 
   if (user.value?.volunteer) {
     items.push({
-      label: 'Volunteer',
+      label: 'Volunteer Self Signup',
       icon: 'pi pi-heart',
       command: () => router.push({ name: 'volunteer' }),
     })

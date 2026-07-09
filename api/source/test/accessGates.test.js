@@ -19,7 +19,7 @@ test('isStaffGateExempt matches exact prefixes and their subpaths only', () => {
   assert.equal(gates.isStaffGateExempt('/privacy/acknowledgements'), true)
   assert.equal(gates.isStaffGateExempt('/oauth/token'), true)
   assert.equal(gates.isStaffGateExempt('/volunteer-requests'), true)
-  assert.equal(gates.isStaffGateExempt('/volunteer-requests/12/pickup'), true)
+  assert.equal(gates.isStaffGateExempt('/volunteer-requests/12/sign-up'), true)
   // NOT exempt: staff surface
   assert.equal(gates.isStaffGateExempt('/users'), false)          // no prefix bleed from /user
   assert.equal(gates.isStaffGateExempt('/persons'), false)

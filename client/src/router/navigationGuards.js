@@ -16,7 +16,8 @@ export function navigationGuard(to) {
     !!VG.curUser?.volunteer &&
     !isAdmin.value &&
     !(VG.curUser?.villageGrants?.length)
-  if (isVolunteerOnly && to.name !== 'volunteer') {
+  const isVolunteerRoute = to.name === 'volunteer' || to.name === 'volunteer-request-detail'
+  if (isVolunteerOnly && !isVolunteerRoute) {
     return { name: 'volunteer' }
   }
 

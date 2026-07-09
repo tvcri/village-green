@@ -164,4 +164,10 @@ describe('volunteer surface', () => {
     const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
     expect(result).toBeUndefined()
   })
+
+  it('allows volunteer-only users onto the request detail deep link', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] }, villageGrants: [] } }
+    const result = navigationGuard({ name: 'volunteer-request-detail', path: '/volunteer/requests/2303', params: { id: '2303' }, meta: { requiresVolunteer: true } })
+    expect(result).toBeUndefined()
+  })
 })

@@ -39,7 +39,11 @@ function baseColumns() {
   ]
 }
 
-// Emergency contact is reserved for the volunteer confirmed on the request.
+// Emergency contact mirrors the email precedent exactly (vg-email-sidecar
+// templates.js): the Open broadcast email never includes it — nobody owns
+// the request yet — only the Confirmed email does. Once a volunteer owns a
+// request, it stays visible for that owner in both Confirmed and Completed
+// (no further distinction by status once owned).
 function emergencyContactColumn(ownershipSql) {
   return `IF(${ownershipSql}, JSON_OBJECT(
     'name', mp.emergencyContactName,
@@ -48,40 +52,74 @@ function emergencyContactColumn(ownershipSql) {
   ), NULL) AS emergencyContact`
 }
 
+// The volunteer's own address, for the caller's own map (volunteer -> member
+// -> destination). Not a new disclosure — it's the caller's own record —
+// but gated the same ownership rule as emergencyContact to keep Open rows clean.
+function volunteerAddressColumn(ownershipSql) {
+  return `IF(${ownershipSql}, JSON_OBJECT(
+    'address', vp.address,
+    'city', vp.city,
+    'state', vp.state,
+    'zip', LPAD(vp.zip, 5, '0')
+  ), NULL) AS volunteerAddress`
+}
+
 function baseJoins() {
   return new Set([
     'service_request sr',
     'JOIN village v ON sr.villageId = v.id',
     'LEFT JOIN person mp ON sr.memberPersonId = mp.id',
+    'LEFT JOIN person vp ON sr.volunteerPersonId = vp.id',
   ])
 }
 
 // Pure classifiers for a failed atomic UPDATE (row read back in the same
-// transaction). Visibility (the caller's volunteer villages) decides
-// notFound vs conflict so out-of-scope ids don't leak existence.
-module.exports.classifyPickupFailure = function ({ row, personId, villageIds }) {
-  if (!row || !villageIds.includes(String(row.villageId))) return 'notFound'
+// transaction). Any active volunteer can see and act on any village's
+// requests (VSS design refinement: cross-village visibility/sign-up), so
+// only existence — not village membership — decides notFound vs conflict.
+module.exports.classifySignUpFailure = function ({ row, personId }) {
+  if (!row) return 'notFound'
   if (row.status === 'Confirmed' && String(row.volunteerPersonId) === String(personId)) return 'alreadyOwn'
   return 'conflict'
 }
 
-module.exports.classifyReleaseFailure = function ({ row, villageIds }) {
-  if (!row || !villageIds.includes(String(row.villageId))) return 'notFound'
+module.exports.classifyReleaseFailure = function ({ row }) {
+  if (!row) return 'notFound'
   return 'conflict'
 }
 
-module.exports.getVolunteerRequests = async function ({ scope, personId, villageIds }) {
+// Full village list for volunteer-facing filter UIs. Unlike VillageService's
+// queryVillages, this is deliberately unfiltered by grants — the caller is
+// a volunteer, not staff, and has none.
+module.exports.getVolunteerRequestVillages = async function () {
+  const [rows] = await dbUtils.pool.query(
+    `SELECT CAST(id AS CHAR) AS villageId, name FROM village ORDER BY name ASC`
+  )
+  return rows
+}
+
+// open: pickable requests, any village — emergencyContact/volunteerAddress
+// are never included here (matches the Open broadcast email, which has no
+// owning volunteer to gate on yet). mine: the caller's upcoming (Confirmed)
+// commitments. history: the caller's past (Completed) requests. Once a
+// volunteer owns a request, emergencyContact/volunteerAddress are visible
+// the same way in both mine and history — no further gating by status.
+module.exports.getVolunteerRequests = async function ({ scope, personId }) {
   const columns = baseColumns()
   const joins = baseJoins()
   const predicates = { statements: [], binds: [] }
 
   if (scope === 'open') {
-    if (!villageIds.length) return []
-    predicates.statements.push("sr.status = 'Open'", 'sr.villageId IN (?)')
-    predicates.binds.push(villageIds)
+    predicates.statements.push("sr.status = 'Open'")
   } else {
-    columns.push(emergencyContactColumn("sr.status = 'Confirmed'"))
-    predicates.statements.push('sr.volunteerPersonId = ?', "sr.status IN ('Confirmed', 'Completed')")
+    // Ownership expressed as an inline-escaped literal (not a `?` bind) so it
+    // can sit inside the column list ahead of the WHERE predicates without
+    // disturbing mysql.format's single linear bind-array ordering.
+    const ownershipSql = `sr.volunteerPersonId = ${mysql.escape(personId)}`
+    columns.push(emergencyContactColumn(ownershipSql))
+    columns.push(volunteerAddressColumn(ownershipSql))
+    const statusFilter = scope === 'mine' ? "sr.status = 'Confirmed'" : "sr.status = 'Completed'"
+    predicates.statements.push('sr.volunteerPersonId = ?', statusFilter)
     predicates.binds.push(personId)
   }
 
@@ -91,45 +129,57 @@ module.exports.getVolunteerRequests = async function ({ scope, personId, village
   return rows
 }
 
+// Same visibility boundary as the list endpoint's open/mine/history scopes,
+// combined: an Open request (any village) or one of the caller's own
+// Confirmed/Completed requests. Used both for the deep-link single-item GET
+// and for read-back after a successful sign-up/release, where the
+// just-completed UPDATE has already put the row into one of these states.
 module.exports.getVolunteerRequest = async function ({ serviceRequestId, personId }) {
   const columns = baseColumns()
   // personId is an integer from our own DB; escaped inline because
   // makeQueryString applies binds to predicates only (NAME_CLAIM_PATH pattern).
-  columns.push(emergencyContactColumn(
-    `sr.status = 'Confirmed' AND sr.volunteerPersonId = ${mysql.escape(personId)}`
-  ))
+  // Ownership alone, any status — an Open row never matches (volunteerPersonId
+  // is NULL), so this still returns null for Open, matching the email precedent.
+  const ownershipSql = `sr.volunteerPersonId = ${mysql.escape(personId)}`
+  columns.push(emergencyContactColumn(ownershipSql))
+  columns.push(volunteerAddressColumn(ownershipSql))
   const joins = baseJoins()
-  const predicates = { statements: ['sr.id = ?'], binds: [serviceRequestId] }
+  const predicates = {
+    statements: [
+      'sr.id = ?',
+      `(sr.status = 'Open' OR (sr.volunteerPersonId = ? AND sr.status IN ('Confirmed', 'Completed')))`,
+    ],
+    binds: [serviceRequestId, personId],
+  }
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows[0] ?? null
 }
 
-module.exports.pickupVolunteerRequest = async function ({ serviceRequestId, personId, userId, villageIds }) {
+module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, personId, userId }) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      // Atomic first-wins: only an unassigned Open request in the caller's
-      // volunteer village(s) can be picked up.
+      // Atomic first-wins: any unassigned Open request, any village.
       const [result] = await connection.query(
         `UPDATE service_request
          SET volunteerPersonId = ?, status = 'Confirmed', modifiedUserId = ?, modifiedAt = UTC_TIMESTAMP()
-         WHERE id = ? AND status = 'Open' AND volunteerPersonId IS NULL AND villageId IN (?)`,
-        [personId, userId, serviceRequestId, villageIds]
+         WHERE id = ? AND status = 'Open' AND volunteerPersonId IS NULL`,
+        [personId, userId, serviceRequestId]
       )
       if (result.affectedRows === 1) {
         await ServiceRequestService.writeNotificationEvent(connection, serviceRequestId, 'Confirmed')
         return { outcome: 'confirmed' }
       }
       const [rows] = await connection.query(
-        'SELECT status, volunteerPersonId, villageId FROM service_request WHERE id = ?',
+        'SELECT status, volunteerPersonId FROM service_request WHERE id = ?',
         [serviceRequestId]
       )
-      return { outcome: module.exports.classifyPickupFailure({ row: rows[0], personId, villageIds }) }
+      return { outcome: module.exports.classifySignUpFailure({ row: rows[0], personId }) }
     },
   })
 }
 
-module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, personId, userId, villageIds }) {
+module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, personId, userId }) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [result] = await connection.query(
@@ -145,10 +195,10 @@ module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, per
         return { outcome: 'released' }
       }
       const [rows] = await connection.query(
-        'SELECT status, volunteerPersonId, villageId FROM service_request WHERE id = ?',
+        'SELECT status, volunteerPersonId FROM service_request WHERE id = ?',
         [serviceRequestId]
       )
-      return { outcome: module.exports.classifyReleaseFailure({ row: rows[0], villageIds }) }
+      return { outcome: module.exports.classifyReleaseFailure({ row: rows[0] }) }
     },
   })
 }

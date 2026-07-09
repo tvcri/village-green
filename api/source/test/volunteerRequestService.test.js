@@ -5,41 +5,36 @@ const path = require('node:path')
 
 const svc = require(path.join('..', 'service', 'VolunteerRequestService'))
 
-test('classifyPickupFailure: invisible rows are notFound (no existence leak)', () => {
-  assert.equal(svc.classifyPickupFailure({ row: undefined, personId: 5, villageIds: ['3'] }), 'notFound')
-  assert.equal(
-    svc.classifyPickupFailure({ row: { villageId: 9, status: 'Open', volunteerPersonId: null }, personId: 5, villageIds: ['3'] }),
-    'notFound'
-  )
+test('classifySignUpFailure: missing rows are notFound', () => {
+  assert.equal(svc.classifySignUpFailure({ row: undefined, personId: 5 }), 'notFound')
 })
 
-test('classifyPickupFailure: own confirmed request is an idempotent no-op', () => {
+test('classifySignUpFailure: own confirmed request is an idempotent no-op', () => {
   assert.equal(
-    svc.classifyPickupFailure({ row: { villageId: 3, status: 'Confirmed', volunteerPersonId: 5 }, personId: 5, villageIds: ['3'] }),
+    svc.classifySignUpFailure({ row: { status: 'Confirmed', volunteerPersonId: 5 }, personId: 5 }),
     'alreadyOwn'
   )
 })
 
-test('classifyPickupFailure: anything else visible is a conflict', () => {
+test('classifySignUpFailure: anything else is a conflict (any village)', () => {
   assert.equal(
-    svc.classifyPickupFailure({ row: { villageId: 3, status: 'Confirmed', volunteerPersonId: 8 }, personId: 5, villageIds: ['3'] }),
+    svc.classifySignUpFailure({ row: { status: 'Confirmed', volunteerPersonId: 8 }, personId: 5 }),
     'conflict'
   )
   assert.equal(
-    svc.classifyPickupFailure({ row: { villageId: 3, status: 'Completed', volunteerPersonId: null }, personId: 5, villageIds: ['3'] }),
+    svc.classifySignUpFailure({ row: { status: 'Completed', volunteerPersonId: null }, personId: 5 }),
     'conflict'
   )
 })
 
-test('classifyReleaseFailure: invisible rows are notFound, visible are conflict', () => {
-  assert.equal(svc.classifyReleaseFailure({ row: undefined, villageIds: ['3'] }), 'notFound')
-  assert.equal(svc.classifyReleaseFailure({ row: { villageId: 9 }, villageIds: ['3'] }), 'notFound')
-  assert.equal(svc.classifyReleaseFailure({ row: { villageId: 3 }, villageIds: ['3'] }), 'conflict')
+test('classifyReleaseFailure: missing rows are notFound, existing are conflict', () => {
+  assert.equal(svc.classifyReleaseFailure({ row: undefined }), 'notFound')
+  assert.equal(svc.classifyReleaseFailure({ row: { status: 'Open' } }), 'conflict')
 })
 
 test('service exports the request functions', () => {
   assert.equal(typeof svc.getVolunteerRequests, 'function')
   assert.equal(typeof svc.getVolunteerRequest, 'function')
-  assert.equal(typeof svc.pickupVolunteerRequest, 'function')
+  assert.equal(typeof svc.signUpVolunteerRequest, 'function')
   assert.equal(typeof svc.releaseVolunteerRequest, 'function')
 })
