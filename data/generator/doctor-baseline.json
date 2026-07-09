@@ -1,0 +1,22 @@
+{
+  "_comment": "Columns the generator consciously leaves unset (DB default/NULL applies). The doctor errors on any unset column NOT listed here — when the schema grows a column, either populate it in a builder or acknowledge it here with a reason.",
+  "user_data.created": "DB default CURRENT_TIMESTAMP is correct",
+  "user_data.lastAccess": "runtime bookkeeping, set by the app on login",
+  "user_data.status": "DB default 'available' is correct",
+  "user_data.statusDate": "DB default (created) is correct",
+  "user_data.statusUser": "runtime bookkeeping, set by the app",
+  "user_data.webPreferences": "DB default preferences JSON is correct",
+  "village_grant.userGroupId": "demo grants are per-user, not per-group",
+  "person.emailStatus": "app-managed email verification state",
+  "member.memberLevel": "CE-era field, not exercised in demo",
+  "member.createdDate": "joinDate covers demo needs",
+  "member.quickbooksKey": "billing not exercised in demo",
+  "member.printedNewsletter": "ops field, not exercised in demo",
+  "member.statusChangeNotes": "serviceNotes carries the demo flavor",
+  "member.miscNotes": "serviceNotes carries the demo flavor",
+  "volunteer_vetting.additionalData": "not exercised in demo",
+  "volunteer_vetting.notes": "not exercised in demo",
+  "notification_event.failedAt": "demo data has no failed sends",
+  "fcv_submission.fuzzyVolunteerName": "populated by the app's FCV fuzzy-match intake",
+  "fcv_submission.fuzzyMemberName": "populated by the app's FCV fuzzy-match intake"
+}

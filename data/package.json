@@ -1,0 +1,31 @@
+{
+  "name": "village-green-demo-data",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic RI-lore demo dataset generator + loaders for Village Green",
+  "//": {
+    "doctor": "schema-drift check only (also auto-runs before every generating command)",
+    "seed": "alias of seed:db",
+    "seed:db": "generate the dataset -> direct SQL INSERTs into the dev DB (no API needed)",
+    "seed:api": "generate the dataset -> POST to the app's /op/appdata importer (needs API + mock OIDC)",
+    "emit": "generate the dataset -> write demo-appdata.jsonl locally (meta date pinned for byte-identical output)",
+    "import": "POST an EXISTING app-data file as-is (default demo-appdata.jsonl; -- --import=<file>); no generation, no doctor",
+    "export": "the app's GET /op/appdata exporter -> appdata-export.jsonl (whatever is in the DB now, serialized by the app)",
+    "roundtrip": "seed:db -> emit -> seed:api -> sanity, exercising both load paths end to end"
+  },
+  "scripts": {
+    "test": "node --test",
+    "doctor": "node generator/cli.js --doctor",
+    "seed": "node generator/cli.js --seed-db",
+    "seed:db": "node generator/cli.js --seed-db",
+    "seed:api": "node generator/cli.js --seed-api",
+    "emit": "node generator/cli.js --emit",
+    "import": "node generator/cli.js --import",
+    "export": "node generator/cli.js --export",
+    "roundtrip": "node generator/cli.js --roundtrip"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.0"
+  }
+}
