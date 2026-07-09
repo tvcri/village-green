@@ -28,5 +28,17 @@ export default defineConfig(({ mode, command }) => {
     build: {
       sourcemap: true,
     },
+    optimizeDeps: {
+      // Only reachable via the lazy-loaded /volunteer route, so Vite's dep
+      // scanner never sees them at startup — without this they're discovered
+      // on first visit, forcing a one-time full dev-server reload.
+      include: [
+        'primevue/tabs',
+        'primevue/tablist',
+        'primevue/tab',
+        'primevue/tabpanels',
+        'primevue/tabpanel',
+      ],
+    },
   }
 })
