@@ -18,14 +18,22 @@ const { state: person } = useAsyncState(
   { immediate: true }
 )
 
+const isMember = computed(() => (person.value?.roles ?? []).includes('member'))
+const isVolunteer = computed(() => (person.value?.roles ?? []).includes('volunteer'))
+
 const personType = computed(() => {
-  const roles = person.value?.roles ?? []
-  const isMember = roles.includes('member')
-  const isVolunteer = roles.includes('volunteer')
-  if (isMember && isVolunteer) return 'member, volunteer'
-  if (isVolunteer) return 'volunteer'
+  if (isMember.value && isVolunteer.value) return 'member, volunteer'
+  if (isVolunteer.value) return 'volunteer'
   return 'member'
 })
+
+// Section visibility should reflect whether the detail data exists, not
+// whether the role is currently active (a volunteer can be inactive but
+// still have vettings/capabilities on record).
+const hasMemberDetail = computed(() => !!person.value?.memberDetail)
+const hasVolunteerDetail = computed(() => !!person.value?.volunteerDetail)
+
+const canDelete = computed(() => !(person.value?.roles ?? []).length)
 
 const flatPerson = computed(() => {
   if (!person.value) return null
@@ -54,11 +62,20 @@ async function removePerson () {
   <div class="person-detail">
     <div class="actions" style="display:flex;gap:0.5rem;margin-bottom:1rem;">
       <Button label="Edit Person" icon="pi pi-pencil" @click="goEdit" />
-      <Button label="Member" icon="pi pi-id-card" severity="secondary" @click="goMember" />
-      <Button label="Volunteer" icon="pi pi-users" severity="secondary" @click="goVolunteer" />
-      <Button label="Delete" icon="pi pi-trash" severity="danger" @click="removePerson" />
+      <Button label="Member" icon="pi pi-id-card" :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
+      <Button label="Volunteer" icon="pi pi-users" :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
+      <span style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
+        <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="!canDelete" @click="removePerson" />
+      </span>
     </div>
-    <PersonDetailCard v-if="flatPerson" :person="flatPerson" :person-type="personType" detail-level="full" />
+    <PersonDetailCard
+      v-if="flatPerson"
+      :person="flatPerson"
+      :person-type="personType"
+      :has-member-detail="hasMemberDetail"
+      :has-volunteer-detail="hasVolunteerDetail"
+      detail-level="full"
+    />
   </div>
 </template>
 

@@ -1,10 +1,13 @@
 <script setup>
+import { ref, watch } from 'vue'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import DatePicker from 'primevue/datepicker'
+import Button from 'primevue/button'
 
 const props = defineProps({
   providerType: { type: String, default: '' },
@@ -14,13 +17,15 @@ const props = defineProps({
   selectedAssociateVillageIds: { type: Array, required: true },
   capabilityOptions: { type: Array, required: true },
   villageOptions: { type: Array, required: true },
+  vettingTypeOptions: { type: Array, default: () => [] },
   vettings: { type: Array, default: () => [] },
   showVettings: { type: Boolean, default: false },
   uncertain: { type: Object, default: () => ({}) },
 })
-defineEmits([
+const emit = defineEmits([
   'update:providerType', 'update:active', 'update:notes',
   'update:selectedCapabilityIds', 'update:selectedAssociateVillageIds',
+  'update:vettings',
 ])
 
 const providerTypeOptions = [
@@ -32,36 +37,74 @@ function uncertainText (field) {
   const u = props.uncertain[field]
   return u?.alternative ? `${u.reason} — alternative: ${u.alternative}` : u?.reason
 }
+
+// Dates are exchanged with the API as 'YYYY-MM-DD' strings; PrimeVue's
+// DatePicker works in local Date objects. Convert at the edges, using local
+// (not UTC) fields so the picker's displayed day never shifts.
+function dateStringToDate (s) {
+  if (!s) return null
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+function dateToDateString (d) {
+  if (!d) return null
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const newVettingTypeId = ref(null)
+const newDateEntered = ref(null)
+const newDateExpired = ref(null)
+const duplicateVettingError = ref('')
+
+watch([newVettingTypeId, newDateEntered], () => { duplicateVettingError.value = '' })
+
+function addVetting () {
+  if (!newVettingTypeId.value) return
+  const dateEntered = dateToDateString(newDateEntered.value)
+  const isDuplicate = props.vettings.some(v =>
+    v.vettingTypeId === newVettingTypeId.value && v.dateEntered === dateEntered)
+  if (isDuplicate) {
+    duplicateVettingError.value = 'This vetting type and date is already on the list.'
+    return
+  }
+  duplicateVettingError.value = ''
+  const type = props.vettingTypeOptions.find(t => t.vettingTypeId === newVettingTypeId.value)
+  const entry = {
+    vettingTypeId: newVettingTypeId.value,
+    name: type?.name,
+    dateEntered,
+    dateExpired: dateToDateString(newDateExpired.value),
+  }
+  emit('update:vettings', [...props.vettings, entry])
+  newVettingTypeId.value = null
+  newDateEntered.value = null
+  newDateExpired.value = null
+}
+
+function removeVetting (index) {
+  const next = props.vettings.slice()
+  next.splice(index, 1)
+  emit('update:vettings', next)
+}
+
+function updateVettingDate (index, field, date) {
+  const next = props.vettings.slice()
+  next[index] = { ...next[index], [field]: dateToDateString(date) }
+  emit('update:vettings', next)
+}
 </script>
 
 <template>
   <div class="section">
-    <h3 class="section-header">Provider</h3>
-
-    <div class="form-field">
-      <label class="label" for="providerType">Provider Type</label>
-      <Select id="providerType" :modelValue="providerType" @update:modelValue="$emit('update:providerType', $event)"
-              :options="providerTypeOptions" optionLabel="label" optionValue="value"
-              placeholder="Select provider type" class="w-full" />
-    </div>
-
-    <div class="form-field checkbox-field">
+    <div class="section-header-row">
+      <h3 class="section-header">Provider</h3>
       <label class="checkbox-item">
         <Checkbox :modelValue="active" @update:modelValue="$emit('update:active', $event)" binary />
         <span class="checkbox-label">Active</span>
       </label>
-    </div>
-
-    <div class="form-field span-2">
-      <label class="label" for="associateVillages">
-        Associate Villages
-        <i v-if="uncertain.associateVillageIds" class="pi pi-exclamation-triangle uncertain-icon"
-           v-tooltip.top="uncertainText('associateVillageIds')" />
-      </label>
-      <MultiSelect id="associateVillages" :modelValue="selectedAssociateVillageIds"
-                   @update:modelValue="$emit('update:selectedAssociateVillageIds', $event)"
-                   :options="villageOptions" optionLabel="name" optionValue="villageId"
-                   display="chip" placeholder="Select villages" class="w-full" />
     </div>
 
     <div class="form-field span-4">
@@ -81,6 +124,19 @@ function uncertainText (field) {
       <Textarea id="volunteerNotes" :modelValue="notes" @update:modelValue="$emit('update:notes', $event)"
                 rows="4" class="w-full" />
     </div>
+
+    <div class="form-field ">
+      <label class="label" for="associateVillages">
+        Associate Villages
+        <i v-if="uncertain.associateVillageIds" class="pi pi-exclamation-triangle uncertain-icon"
+           v-tooltip.top="uncertainText('associateVillageIds')" />
+      </label>
+      <MultiSelect id="associateVillages" :modelValue="selectedAssociateVillageIds"
+                   @update:modelValue="$emit('update:selectedAssociateVillageIds', $event)"
+                   :options="villageOptions" optionLabel="name" optionValue="villageId"
+                   display="chip" placeholder="Select villages" class="w-full" />
+    </div>
+
   </div>
 
   <div v-if="showVettings" class="section">
@@ -88,10 +144,41 @@ function uncertainText (field) {
     <div class="form-field span-4">
       <DataTable :value="vettings" size="small">
         <Column field="name" header="Type"></Column>
-        <Column field="dateEntered" header="Date Entered"></Column>
-        <Column field="dateExpired" header="Date Expired"></Column>
+        <Column header="Date Completed">
+          <template #body="{ data, index }">
+            <DatePicker :modelValue="dateStringToDate(data.dateEntered)"
+                        @update:modelValue="updateVettingDate(index, 'dateEntered', $event)"
+                        dateFormat="mm/dd/yy" placeholder="Select date" showIcon showButtonBar />
+          </template>
+        </Column>
+        <Column header="Date Expired">
+          <template #body="{ data, index }">
+            <DatePicker :modelValue="dateStringToDate(data.dateExpired)"
+                        @update:modelValue="updateVettingDate(index, 'dateExpired', $event)"
+                        dateFormat="mm/dd/yy" placeholder="Select date" showIcon showButtonBar />
+          </template>
+        </Column>
+        <Column header="">
+          <template #body="{ index }">
+            <Button type="button" icon="pi pi-trash" severity="danger" text
+                    @click="removeVetting(index)" aria-label="Remove vetting" />
+          </template>
+        </Column>
         <template #empty>No vettings on record.</template>
       </DataTable>
+
+      <div class="add-vetting-row">
+        <Select v-model="newVettingTypeId" :options="vettingTypeOptions"
+                optionLabel="name" optionValue="vettingTypeId"
+                placeholder="Select vetting type" class="add-vetting-type" />
+        <DatePicker v-model="newDateEntered" dateFormat="mm/dd/yy"
+                    placeholder="Date Completed" showIcon showButtonBar />
+        <DatePicker v-model="newDateExpired" dateFormat="mm/dd/yy"
+                    placeholder="Date Expired" showIcon showButtonBar />
+        <Button type="button" label="Add Vetting" icon="pi pi-plus"
+                :disabled="!newVettingTypeId" @click="addVetting" />
+      </div>
+      <p v-if="duplicateVettingError" class="duplicate-vetting-error">{{ duplicateVettingError }}</p>
     </div>
   </div>
 </template>
@@ -106,6 +193,21 @@ function uncertainText (field) {
 }
 .section:first-of-type { margin-top: 1rem; }
 .section:last-child { margin-bottom: 0; }
+.section-header-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 2px solid var(--color-border-default);
+  padding-bottom: 0.75rem;
+  margin: 0 0 0.75rem 0;
+}
+.section-header-row .section-header {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin: 0;
+}
 .section-header {
   grid-column: 1 / -1;
   margin: 0 0 0.75rem 0;
@@ -132,10 +234,21 @@ function uncertainText (field) {
   letter-spacing: 0.5px;
 }
 .w-full { width: 100%; }
-.checkbox-field { justify-content: flex-end; }
 .checkbox-item { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
 .checkbox-label { font-size: 1rem; color: var(--color-text-primary); }
 .uncertain-icon { color: var(--p-amber-500, #f59e0b); margin-left: 0.35rem; cursor: help; }
+.add-vetting-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.add-vetting-type { min-width: 14rem; }
+.duplicate-vetting-error {
+  color: var(--color-error);
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
 
 @media (max-width: 900px) {
   .section { grid-template-columns: 1fr 1fr; }

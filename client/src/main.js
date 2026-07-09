@@ -1,4 +1,5 @@
 import PrimeVue from 'primevue/config'
+import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
 import Tooltip from 'primevue/tooltip'
 import { createApp, h } from 'vue'
@@ -43,6 +44,7 @@ try {
   })
 
   app.use(ToastService)
+  app.use(ConfirmationService)
   app.directive('tooltip', Tooltip)
   app.use(router)
   app.provide('worker', VG.oidcWorker)

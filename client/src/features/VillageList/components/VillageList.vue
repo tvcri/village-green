@@ -4,11 +4,13 @@ import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { useElevate } from '../../../shared/composables/useElevate.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { getVillages } from '../api/villageApi.js'
 
 const router = useRouter()
+const { user } = useCurrentUser()
 const { elevateEnabled, elevate } = useElevate()
 const { getStatusSeverity } = useStatusSeverity()
 
@@ -44,6 +46,9 @@ const metaVillageCounts = computed(() => {
   )
 })
 
+// Temporary: Meta Village is limited to users with exactly 13 village grants
+const showMetaVillage = computed(() => user.value?.villageGrants?.length === 13)
+
 const navigateToVillage = (villageId) => {
   router.push({ name: 'village-detail', params: { villageId } })
 }
@@ -67,7 +72,7 @@ const navigateToVillage = (villageId) => {
 
     <div v-else class="village-grid">
       <Card
-        v-if="metaVillageCounts"
+        v-if="showMetaVillage && metaVillageCounts"
         class="village-card meta-village-card"
         @click="router.push({ name: 'meta' })"
       >

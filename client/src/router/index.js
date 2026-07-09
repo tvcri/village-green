@@ -63,6 +63,18 @@ const routes = [
   {
     path: '/admin/users',
     name: 'admin-user-access',
+    component: () => import('../features/Admin/components/UserList.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/users/new',
+    name: 'admin-user-create',
+    component: () => import('../features/Admin/components/UserCreate.vue'),
+    meta: { requiresAdmin: true },
+  },
+  {
+    path: '/admin/users/:userId/grants',
+    name: 'admin-user-grants',
     component: () => import('../features/Admin/components/UserAccessList.vue'),
     meta: { requiresAdmin: true },
   },
@@ -70,12 +82,6 @@ const routes = [
     path: '/admin/villages/grants/:villageId',
     name: 'admin-create-grant',
     component: () => import('../features/Admin/components/CreateGrant.vue'),
-    meta: { requiresAdmin: true },
-  },
-  {
-    path: '/admin/users/grants/:userId',
-    name: 'admin-create-user-grant',
-    component: () => import('../features/Admin/components/CreateUserGrant.vue'),
     meta: { requiresAdmin: true },
   },
   {

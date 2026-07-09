@@ -132,6 +132,11 @@ const config = {
         // Server-side only. Never expose via getClientEnv().
         apiKey: process.env.VG_ANTHROPIC_API_KEY
     },
+    keycloak: {
+        // Server-side only. Never expose via getClientEnv().
+        adminClientId: process.env.VG_KC_ADMIN_CLIENT_ID,
+        adminClientSecret: process.env.VG_KC_ADMIN_CLIENT_SECRET
+    },
     privacy: {
         ackIntervalDays: (() => {
             const val = parseInt(process.env.VG_PRIVACY_ACK_INTERVAL_DAYS)

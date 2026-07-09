@@ -19,7 +19,7 @@ const router = useRouter()
           {{ c.fullName }}
         </router-link>
         — {{ c.existing ? 'existing person' : 'person created' }},
-        {{ c.memberGranted ? 'member role saved' : 'member role not saved' }}
+        {{ c.roleGranted ? `${c.role} role saved` : `${c.role} role not saved` }}
       </li>
     </ul>
     <div class="done-footer">

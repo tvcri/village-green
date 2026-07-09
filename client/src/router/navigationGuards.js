@@ -10,6 +10,14 @@ export function navigationGuard(to) {
     return { name: 'villages' }
   }
 
+  // Temporary: Meta Village section is limited to users with exactly 13 village grants
+  if (to.path === '/meta' || to.path.startsWith('/meta/')) {
+    const grantCount = VG.curUser?.villageGrants?.length ?? 0
+    if (grantCount !== 13) {
+      return { name: 'villages' }
+    }
+  }
+
   // village-specific routes require a village grant (skip if in admin section)
   if (to.params.villageId && !to.meta.requiresAdmin) {
     const villageId = String(to.params.villageId)

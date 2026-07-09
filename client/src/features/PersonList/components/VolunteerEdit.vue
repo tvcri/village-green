@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import { getPerson, getCapabilities } from '../api/personApi.js'
+import { getPerson, getCapabilities, getVettingTypes } from '../api/personApi.js'
 import { putVolunteer, patchVolunteer, deleteVolunteer } from '../api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import VolunteerFormFields from './VolunteerFormFields.vue'
@@ -20,6 +20,7 @@ const hasHomeVillage = computed(() => !!person.value?.village?.villageId)
 
 const capabilityOptions = ref([])   // [{ capabilityId, name }] from getCapabilities()
 const villageOptions = ref([])      // [{ villageId, name }] from getVillages()
+const vettingTypeOptions = ref([])  // [{ vettingTypeId, name }] from getVettingTypes()
 const selectedCapabilityIds = ref([])
 const selectedAssociateVillageIds = ref([])
 const providerType = ref('')
@@ -27,26 +28,31 @@ const active = ref(true)
 const notes = ref('')
 const vettings = ref([])
 
-async function loadVillageOptions () {
-  villageOptions.value = await getVillages(true)
-}
-
 onMounted(async () => {
-  capabilityOptions.value = await getCapabilities()
-  await loadVillageOptions()
-  const p = await getPerson(personId.value, ['volunteerDetail'])
-  person.value = p
-  if (p.volunteerDetail) {
-    hasVolunteer.value = true
-    const d = p.volunteerDetail
-    // volunteerDetail.capabilities are names; map to ids via capabilityOptions
-    const nameToId = new Map(capabilityOptions.value.map(c => [c.name, c.capabilityId]))
-    selectedCapabilityIds.value = (d.capabilities ?? []).map(n => nameToId.get(n)).filter(Boolean)
-    selectedAssociateVillageIds.value = (d.associateVillages ?? []).map(v => v.villageId)
-    providerType.value = d.providerType ?? ''
-    active.value = d.active ?? true
-    notes.value = d.notes ?? ''
-    vettings.value = d.vettings ?? []
+  try {
+    const [capabilities, vettingTypes, villages] = await Promise.all([
+      getCapabilities(), getVettingTypes(), getVillages(true),
+    ])
+    capabilityOptions.value = capabilities
+    vettingTypeOptions.value = vettingTypes
+    villageOptions.value = villages
+    const p = await getPerson(personId.value, ['volunteerDetail'])
+    person.value = p
+    if (p.volunteerDetail) {
+      hasVolunteer.value = true
+      const d = p.volunteerDetail
+      // volunteerDetail.capabilities are names; map to ids via capabilityOptions
+      const nameToId = new Map(capabilityOptions.value.map(c => [c.name, c.capabilityId]))
+      selectedCapabilityIds.value = (d.capabilities ?? []).map(n => nameToId.get(n)).filter(Boolean)
+      selectedAssociateVillageIds.value = (d.associateVillages ?? []).map(v => v.villageId)
+      providerType.value = d.providerType ?? ''
+      active.value = d.active ?? true
+      notes.value = d.notes ?? ''
+      vettings.value = d.vettings ?? []
+    }
+  }
+  catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load person', life: 3000 })
   }
 })
 
@@ -57,6 +63,7 @@ async function save () {
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
     associateVillageIds: selectedAssociateVillageIds.value,
+    vettings: vettings.value.map(({ vettingTypeId, dateEntered, dateExpired }) => ({ vettingTypeId, dateEntered, dateExpired })),
   }
   try {
     if (hasVolunteer.value) await patchVolunteer(personId.value, body)
@@ -99,10 +106,11 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           v-model:notes="notes"
           v-model:selectedCapabilityIds="selectedCapabilityIds"
           v-model:selectedAssociateVillageIds="selectedAssociateVillageIds"
+          v-model:vettings="vettings"
           :capability-options="capabilityOptions"
           :village-options="villageOptions"
-          :vettings="vettings"
-          :show-vettings="hasVolunteer"
+          :vetting-type-options="vettingTypeOptions"
+          show-vettings
         />
 
         <div class="form-footer">

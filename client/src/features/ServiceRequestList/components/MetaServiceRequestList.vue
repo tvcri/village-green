@@ -16,7 +16,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getServiceRequests } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
-import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { toCsv, downloadCsv, withLocalDateTimeColumns } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 defineOptions({ name: 'MetaServiceRequestList' })
 
@@ -158,30 +158,34 @@ const activeFilterCount = computed(() => {
 
 const columnsForCsv = [
   { header: 'Request #', key: 'displayNumber' },
+  { header: 'Village', key: 'villageName' },
   { header: 'Status', key: 'status' },
   { header: 'Service', key: 'serviceName' },
   { header: 'Member', key: 'memberFullName' },
   { header: 'Volunteer', key: 'volunteerFullName' },
+  { header: 'Description', key: 'description' },
   { header: 'Start At', key: 'startAt' },
+  { header: 'Arrive At', key: 'apptTime' },
+  { header: 'Return At', key: 'returnTime' },
   { header: 'Finish At', key: 'finishAt' },
-  { header: 'Transportation Type', key: 'transportationType' },
   { header: 'Destination', key: 'destination' },
   { header: 'Address', key: 'address' },
   { header: 'City', key: 'city' },
-  { header: 'Phone', key: 'phone' },
-  { header: 'Description', key: 'description' },
+  { header: 'State', key: 'state' },
   { header: 'Created At', key: 'createdAt' }
 ]
 
+const DATE_TIME_CSV_KEYS = ['startAt', 'apptTime', 'returnTime', 'finishAt', 'createdAt']
+
 const handleDownloadCsv = async () => {
-  const csv = toCsv(requests.value || [], columnsForCsv)
+  const csv = toCsv(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv)
   downloadCsv(csv, 'service-requests.csv')
 }
 
 async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
-    const result = await createSheet(requests.value || [], columnsForCsv, 'Village Green Service Requests')
+    const result = await createSheet(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv, 'Village Green Service Requests')
     const sheetUrl = result.url || result
     if (result.popupBlocked) {
       if (toast) {

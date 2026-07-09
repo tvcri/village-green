@@ -18,32 +18,40 @@ const hasMember = ref(false)
 const hasHomeVillage = computed(() => !!person.value?.village?.villageId)
 const form = reactive({
   memberNumber: '', memberLevel: '', memberType: '', primaryPersonId: '',
-  secondaryType: '', serviceNotes: '', joinDate: '',
+  serviceNotes: '', joinDate: '',
   status: 'Active', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   confidentialNotes: '', statusChangeNotes: '', miscNotes: '',
 })
 const createdDate = ref('')
 const primaryPersonName = ref('')
+const original = ref({ ...form })
+const canSave = computed(() => form.memberLevel !== 'Secondary' || !!form.primaryPersonId)
 
 onMounted(async () => {
-  const p = await getPerson(personId.value, ['memberDetail'])
-  person.value = p
-  if (p.memberDetail) {
-    hasMember.value = true
-    const d = p.memberDetail
-    Object.keys(form).forEach(k => {
-      if (k === 'primaryPersonId') {
-        form.primaryPersonId = d.primaryPerson?.personId ?? ''
-      }
-      else if (d[k] != null) form[k] = d[k]
-    })
-    primaryPersonName.value = d.primaryPerson?.fullName ?? ''
-    createdDate.value = d.createdDate ?? ''
+  try {
+    const p = await getPerson(personId.value, ['memberDetail'])
+    person.value = p
+    if (p.memberDetail) {
+      hasMember.value = true
+      const d = p.memberDetail
+      Object.keys(form).forEach(k => {
+        if (k === 'primaryPersonId') {
+          form.primaryPersonId = d.primaryPerson?.personId ?? ''
+        }
+        else if (d[k] != null) form[k] = d[k]
+      })
+      primaryPersonName.value = d.primaryPerson?.fullName ?? ''
+      createdDate.value = d.createdDate ?? ''
+      original.value = { ...form }
+    }
+  }
+  catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load person', life: 3000 })
   }
 })
 
-function payload () {
+function putPayload () {
   const out = {}
   Object.entries(form).forEach(([k, v]) => {
     if (v === '' || v === null) return
@@ -52,10 +60,28 @@ function payload () {
   return out
 }
 
+function patchPayload () {
+  const isBlank = v => v === '' || v === null
+  const out = {}
+  Object.entries(form).forEach(([k, v]) => {
+    const prev = original.value[k]
+    if (v === prev || (isBlank(v) && isBlank(prev))) return
+    if (isBlank(v)) {
+      // MemberPatch disallows null joinDate; a cleared joinDate stays unchanged
+      if (k !== 'joinDate') out[k] = null
+    }
+    else out[k] = v
+  })
+  return out
+}
+
 async function save () {
   try {
-    if (hasMember.value) await patchMember(personId.value, payload())
-    else await putMember(personId.value, payload())
+    if (hasMember.value) {
+      const body = patchPayload()
+      if (Object.keys(body).length) await patchMember(personId.value, body)
+    }
+    else await putMember(personId.value, putPayload())
     toast.add({ severity: 'success', summary: 'Saved', detail: 'Member role saved', life: 2000 })
     back()
   }
@@ -91,6 +117,8 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
         <MemberFormFields
           :form="form"
           :primary-person-name="primaryPersonName"
+          primary-person-editable
+          :village-id="person?.village?.villageId"
           :created-date="createdDate"
           :show-created-date="hasMember"
         />
@@ -98,7 +126,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
         <div class="form-footer">
           <Button v-if="hasMember" type="button" label="Revoke Role" severity="danger" @click="revoke" />
           <Button type="button" label="Cancel" severity="secondary" @click="back" />
-          <Button type="submit" :label="hasMember ? 'Save' : 'Grant Member Role'" />
+          <Button type="submit" :disabled="!canSave" :label="hasMember ? 'Save' : 'Grant Member Role'" />
         </div>
       </form>
     </template>

@@ -1,3 +1,15 @@
+import { formatLocalDateTime } from './dateUtils.js'
+
+export function withLocalDateTimeColumns(rows, keys) {
+  return rows.map(row => {
+    const formatted = { ...row }
+    for (const key of keys) {
+      if (key in formatted) formatted[key] = formatLocalDateTime(formatted[key])
+    }
+    return formatted
+  })
+}
+
 export function toCsv(rows, columns) {
   if (!rows || rows.length === 0) {
     return columns.map(col => col.header).join(',')

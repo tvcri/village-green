@@ -2,6 +2,7 @@
 const config = require('../utils/config');
 const SmError = require('../utils/error');
 const dbUtils = require('./utils')
+const KeycloakService = require('./KeycloakService')
 
 const _this = this
 
@@ -56,9 +57,14 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
   }
 
   if (inProjection?.includes('statistics')) {
+    if (!needsCollectionGrantees) {
+      needsCollectionGrantees = true
+      joins.add('left join cteGrantees cgs on ud.userId = cgs.userId')
+    }
     columns.push(`json_object(
         'created', date_format(ud.created, '%Y-%m-%dT%TZ'),
-        'lastClaims', ud.lastClaims
+        'lastClaims', ud.lastClaims,
+        'villageGrantCount', count(distinct cgs.villageId, cgs.roleId)
       ) as statistics`)
     groupBy.push(
       'ud.lastAccess',
@@ -168,7 +174,7 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
 }
 
 exports.addOrUpdateUser = async function (writeAction, userId, body, projection, elevate, userObject, svcStatus = {}) {
-  let connection 
+  let connection
   try {
     // CREATE: userId will be null
     // REPLACE/UPDATE: userId is not null
@@ -176,39 +182,51 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
     // Extract or initialize non-scalar properties to separate variables
     let { villageGrants, userGroups, ...userFields } = body
 
+    // If username is being changed on an existing user, Keycloak must be
+    // updated first (before the local UPDATE commits), so the two systems
+    // never drift out of sync with each other.
+    if (writeAction !== dbUtils.WRITE_ACTION.CREATE && userFields.username) {
+      const [existingRows] = await dbUtils.pool.query('SELECT username FROM user_data WHERE userId = ?', [userId])
+      const currentUsername = existingRows[0]?.username
+      if (currentUsername && currentUsername !== userFields.username) {
+        try {
+          await KeycloakService.updateUsername({ oldUsername: currentUsername, newUsername: userFields.username })
+        }
+        catch (err) {
+          if (err.status === 409) {
+            throw new SmError.UnprocessableError('Username already exists in Keycloak.')
+          }
+          throw err
+        }
+      }
+    }
+
     connection = await dbUtils.pool.getConnection()
-    connection.config.namedPlaceholders = true
     async function transaction () {
       await connection.query('START TRANSACTION');
 
       // Process scalar properties
-      let binds
       if (writeAction === dbUtils.WRITE_ACTION.CREATE) {
         // INSERT into user_data
-        binds = {...userFields}
         let sqlInsert =
           `INSERT INTO
               user_data
               ( username, status )
             VALUES
-              (:username, :status )`
-        let [result] = await connection.query(sqlInsert, binds)
+              ( ?, ? )`
+        let [result] = await connection.query(sqlInsert, [userFields.username, userFields.status])
         userId = result.insertId
       }
       else if (writeAction === dbUtils.WRITE_ACTION.UPDATE || writeAction === dbUtils.WRITE_ACTION.REPLACE) {
-        binds = {
-          userId: userId,
-          values: userFields
-        }
-        if (Object.keys(binds.values).length > 0) {
+        if (Object.keys(userFields).length > 0) {
           let sqlUpdate =
             `UPDATE
                 user_data
               SET
-                :values
+                ?
               WHERE
-                userid = :userId`
-          await connection.query(sqlUpdate, binds)
+                userid = ?`
+          await connection.query(sqlUpdate, [userFields, userId])
         }
       }
       else {
@@ -219,26 +237,26 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
       if (villageGrants) {
         if ( writeAction !== dbUtils.WRITE_ACTION.CREATE ) {
           // DELETE from village_grant
-          const binds = [userId]
+          const deleteBinds = [userId]
           let sqlDeleteCollGrant = 'DELETE FROM village_grant where userId = ?'
           if (villageGrants.length > 0) {
             const villageIds = villageGrants.map(grant => grant.villageId)
             sqlDeleteCollGrant += ' and villageId NOT IN (?)'
-            binds.push(villageIds)
+            deleteBinds.push(villageIds)
           }
-          await connection.query(sqlDeleteCollGrant, binds)
+          await connection.query(sqlDeleteCollGrant, deleteBinds)
         }
         if (villageGrants.length > 0) {
           let sqlInsertCollGrant = `
-            INSERT INTO 
+            INSERT INTO
               village_grant (userId, villageId, roleId)
             VALUES
               ? as new
             ON DUPLICATE KEY UPDATE
-              roleId = new.roleId`      
-          binds = villageGrants.map( grant => [userId, grant.villageId, grant.roleId])
+              roleId = new.roleId`
+          const insertBinds = villageGrants.map( grant => [userId, grant.villageId, grant.roleId])
           // INSERT into village_grant
-          await connection.query(sqlInsertCollGrant, [binds] )
+          await connection.query(sqlInsertCollGrant, [insertBinds] )
         }
       }
       if (userGroups) {
@@ -258,7 +276,9 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
     await dbUtils.retryOnDeadlock(transaction, svcStatus)
   }
   catch (err) {
-    await connection.rollback()
+    if (typeof connection !== 'undefined') {
+      await connection.rollback()
+    }
     throw err
   }
   finally {

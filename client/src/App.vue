@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 import ReauthPrompt from './auth/ReauthPrompt.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import HeaderMenu from './components/HeaderMenu.vue'
@@ -24,6 +25,7 @@ onMounted(() => {
   <div v-if="isDev" class="dev-instance" aria-hidden="true">FOR DEMONSTRATION ONLY -- DOES NOT MANAGE PRODUCTION DATA</div>
   <div class="app-container">
     <Toast />
+    <ConfirmDialog />
     <GlobalErrorModal />
     <PrivacyAckModal />
     <ReauthPrompt
@@ -48,7 +50,7 @@ onMounted(() => {
 
     <main class="app-main">
       <router-view v-if="!needsAck" v-slot="{ Component }">
-        <keep-alive include="MetaServiceRequestList,VillageServiceRequestList,MemberList,VolunteerList,PersonList">
+        <keep-alive include="MetaServiceRequestList,VillageServiceRequestList,MemberList,VolunteerList,PersonList,UserList">
           <component :is="Component" />
         </keep-alive>
       </router-view>

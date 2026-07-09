@@ -21,14 +21,16 @@ const routeToGroupMap = Object.fromEntries(
   )
 )
 
-function getSiblings(routeName, currentParams) {
+function getSiblings(routeName, currentParams, excludeName) {
   const groupName = routeToGroupMap[routeName]
   if (!groupName) return null
 
-  return siblingGroups[groupName].map(sibling => ({
-    label: sibling.label,
-    route: { name: sibling.name, params: currentParams }
-  }))
+  return siblingGroups[groupName]
+    .filter(sibling => sibling.name !== excludeName)
+    .map(sibling => ({
+      label: sibling.label,
+      route: { name: sibling.name, params: currentParams }
+    }))
 }
 
 // Only needed for village-scoped and meta routes (village name/dropdown).
@@ -56,7 +58,7 @@ watch(() => route.name, (routeName) => {
 
   if (routeName === 'admin-create-grant' && adminVillages.value === null) {
     fetchAdminVillages()
-  } else if (routeName === 'admin-create-user-grant' && adminUsers.value === null) {
+  } else if (routeName === 'admin-user-grants' && adminUsers.value === null) {
     fetchAdminUsers()
   } else if (!routeName.startsWith('admin') && (route.params.villageId || routeName.startsWith('meta')) && villages.value === null) {
     fetchVillages()
@@ -77,8 +79,27 @@ const breadcrumbs = computed(() => {
         crumbs.push({ label: 'Village Access', siblings: getSiblings('admin-village-access', {}) })
         break
       case 'admin-user-access':
-        crumbs.push({ label: 'User Access', siblings: getSiblings('admin-user-access', {}) })
+        crumbs.push({ label: 'Users', siblings: getSiblings('admin-user-access', {}) })
         break
+      case 'admin-user-create':
+        crumbs.push({
+          label: 'Users',
+          siblings: getSiblings('admin-user-access', {}, 'admin-user-access'),
+          route: { name: 'admin-user-access' }
+        })
+        crumbs.push({ label: 'New User' })
+        break
+      case 'admin-user-grants': {
+        const userId = route.params.userId
+        const user = adminUsers.value?.find(u => u.userId === userId)
+        const userName = route.params.displayName || user?.displayName || user?.username || `User ${userId}`
+        crumbs.push({
+          label: 'Users',
+          route: { name: 'admin-user-access' }
+        })
+        crumbs.push({ label: userName })
+        break
+      }
       case 'admin-create-grant': {
         const villageId = route.params.villageId
         const village = adminVillages.value?.find(v => v.villageId === villageId)
@@ -90,21 +111,6 @@ const breadcrumbs = computed(() => {
         crumbs.push({
           label: villageName,
           route: { name: 'admin-village-access', query: { villageId } }
-        })
-        crumbs.push({ label: 'Create Grant' })
-        break
-      }
-      case 'admin-create-user-grant': {
-        const userId = route.params.userId
-        const user = adminUsers.value?.find(u => u.userId === userId)
-        const userName = user?.displayName || user?.username || `User ${userId}`
-        crumbs.push({
-          label: 'User Access',
-          route: { name: 'admin-user-access', query: { userId } }
-        })
-        crumbs.push({
-          label: userName,
-          route: { name: 'admin-user-access', query: { userId } }
         })
         crumbs.push({ label: 'Create Grant' })
         break
