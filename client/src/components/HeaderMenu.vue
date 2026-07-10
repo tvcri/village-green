@@ -14,7 +14,7 @@ defineProps({
 const router = useRouter()
 const route = useRoute()
 const menuRef = ref()
-const { isAdmin } = useCurrentUser()
+const { hasPermission } = useCurrentUser()
 
 const { state: user, isLoading } = useAsyncState(
   () => getUser(),
@@ -36,7 +36,7 @@ const adminLabel = computed(() => {
 const menuItems = computed(() => {
   const items = []
 
-  if (isAdmin.value) {
+  if (hasPermission('user:admin')) {
     items.push({
       label: adminLabel.value,
       icon: isInAdmin.value ? 'pi pi-home' : 'pi pi-cog',
