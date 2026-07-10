@@ -544,6 +544,28 @@ exports.deleteUserGroup = async function({userGroupId}) {
     return userGroupId
 }
 
+exports.getUserRoleData = async function (userId) {
+  const sql = `
+  select
+    rg.grantId,
+    rg.roleId,
+    r.name as roleName,
+    r.scope,
+    rg.villageId,
+    v.name as villageName,
+    rp.permission
+  from
+    role_grant rg
+    inner join role r on rg.roleId = r.roleId
+    left join role_permission rp on r.roleId = rp.roleId
+    left join village v on rg.villageId = v.id
+  where
+    rg.userId = ?
+    or rg.userGroupId in (select userGroupId from user_group_user_map where userId = ?)`
+  const [rows] = await dbUtils.pool.query(sql, [userId, userId])
+  return rows
+}
+
 exports.getUserObject = async function (username) {
   const sql = `
   select
@@ -552,51 +574,6 @@ exports.getUserObject = async function (username) {
     lastAccess,
     lastClaims,
     status,
-    (select
-      coalesce(json_objectagg(
-        dt2.villageId, json_object(
-          'villageId', dt2.villageId,
-          'name', dt2.name,
-          'roleId', dt2.roleId, 
-          'grantIds', dt2.grantIds)), json_object())
-      from   
-      (select 
-        cg.villageId,
-        v.name,
-        cg.roleId,
-        json_array(cg.grantId) as grantIds
-      from
-        village_grant cg
-        inner join village v on (cg.villageId = v.id)
-        left join user_data ud2 on cg.userId = ud2.userId
-      where
-        ud2.userId = ud.userId
-      union 
-      select
-        villageId,
-        name,
-        roleId,
-        grantIds
-      from
-        (select
-          ROW_NUMBER() OVER(PARTITION BY ugu.userId, cg.villageId ORDER BY cg.roleId desc) as rn,
-          cg.villageId,
-          v.name, 
-          cg.roleId,
-          json_arrayagg(cg.grantId) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantIds
-        from 
-          village_grant cg
-          inner join village v on (cg.villageId = v.id)
-          left join user_group_user_map ugu on cg.userGroupId = ugu.userGroupId
-          left join user_group ug on ugu.userGroupId = ug.userGroupId
-          left join user_data ud3 on ugu.userId = ud3.userId
-          left join village_grant cgDirect on (cg.villageId = cgDirect.villageId and ugu.userId = cgDirect.userId)
-        where
-        cg.userGroupId is not null
-        and cgDirect.userId is null
-        and ud3.userId = ud.userId) dt
-    where
-      dt.rn = 1) dt2) as grants,
     -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
     -- published and the user has no acknowledgement of the current version within
     -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
@@ -621,6 +598,9 @@ exports.getUserObject = async function (username) {
   const row = rows[0]
   if (row) {
     row.privacyAckRequired = row.privacyAckRequired === 1
+    const { computeEffective } = require('../utils/authz')
+    const roleData = await _this.getUserRoleData(row.userId)
+    Object.assign(row, computeEffective(roleData))  // grants, federationGrants, permissions
   }
   return row
 }
