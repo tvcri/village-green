@@ -58,10 +58,10 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
           'created', DATE_FORMAT(c.created, '%Y-%m-%dT%TZ'),
           'userCount', dt4.userCount,
           )
-          from 
+          from
             (SELECT
-            (select roleId from cteGrantees where villageId = v.id and userId = ?) as roleId,
-            (select count(userId) from cteGrantees where villageId = v.id) as userCount,
+            (select max(cg.roleId) from cteGrantees cg where cg.villageId = v.id and cg.userId = ?) as roleId,
+            (select count(distinct userId) from cteGrantees where villageId = v.id) as userCount,
           ) dt4
         ) as statistics`)
         predicates.binds.push(userId)
@@ -73,9 +73,9 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
           'created', DATE_FORMAT(c.created, '%Y-%m-%dT%TZ'),
           'userCount', dt4.userCount,
           )
-          from 
+          from
             (SELECT
-            (select count(userId) from cteGrantees where villageId = v.id) as userCount,
+            (select count(distinct userId) from cteGrantees where villageId = v.id) as userCount,
           ) dt4
         ) as statistics`)
       }
