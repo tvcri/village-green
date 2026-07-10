@@ -12,7 +12,7 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
-import { getUsersWithGrantCount, deleteUser } from '../../../shared/api/userApi.js'
+import { getUsersWithGrants, deleteUser } from '../../../shared/api/userApi.js'
 import { getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 
 defineOptions({ name: 'UserList' })
@@ -24,9 +24,18 @@ const searchText = ref('')
 const pageRows = ref(10)
 
 const { state: users, isLoading, execute: refetchUsers } = useAsyncState(
-  () => getUsersWithGrantCount(),
+  () => getUsersWithGrants(),
   { immediate: true }
 )
+
+// Hub role wins when present (a hub grant implies federation-wide access);
+// otherwise the user's village role names, de-duplicated across villages.
+function roleLabel(user) {
+  const hubNames = (user.federationGrants ?? []).map(g => g.name)
+  if (hubNames.length) return [...new Set(hubNames)].join(', ')
+  const villageNames = Object.values(user.grants ?? {}).flatMap(g => (g.roles ?? []).map(r => r.name))
+  return villageNames.length ? [...new Set(villageNames)].join(', ') : '—'
+}
 
 let hasActivatedOnce = false
 onActivated(() => {
@@ -126,16 +135,11 @@ async function onDeleteUser(user) {
           <Tag :value="data.status" :severity="data.status === 'available' ? 'success' : 'danger'" />
         </template>
       </Column>
-      <Column header="Grants" sortable :sort-field="row => row.statistics?.villageGrantCount ?? 0" alignHeader="center" style="text-align: center;">
-        <template #body="{ data }">
-          <Tag style="min-width: 2rem;" :value="data.statistics?.villageGrantCount ?? 0" :severity="'secondary'" />
-        </template>
+      <Column header="Role" sortable :sort-field="row => roleLabel(row)">
+        <template #body="{ data }">{{ roleLabel(data) }}</template>
       </Column>
       <Column field="lastAccess" header="Last Access" sortable>
         <template #body="{ data }">{{ data.lastAccess ? formatLocalDateTime(data.lastAccess * 1000) : '—' }}</template>
-      </Column>
-      <Column header="Created" sortable :sort-field="row => row.statistics?.created">
-        <template #body="{ data }">{{ data.statistics?.created ? formatLocalDateTime(data.statistics.created) : '—' }}</template>
       </Column>
       <Column header="Actions" :exportable="false" alignHeader="center" style="text-align: center;">
         <template #body="{ data }">
