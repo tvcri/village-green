@@ -152,7 +152,7 @@ module.exports.getVillageVolunteers = async function getVillageVolunteers (req, 
 module.exports.getVillagePersons = async function getVillagePersons (req, res, next) {
   try {
     const villageId = req.params.villageId
-    if (!hasPermission(req.userObject, 'village:read', { villageId })) {
+    if (!hasPermission(req.userObject, 'person:read', { villageId })) {
       throw new SmError.PrivilegeError()
     }
 
@@ -173,7 +173,7 @@ module.exports.getVillagePerson = async function getVillagePerson (req, res, nex
   try {
     const villageId = req.params.villageId
     const personId = req.params.personId
-    if (!hasPermission(req.userObject, 'village:read', { villageId })) {
+    if (!hasPermission(req.userObject, 'person:read', { villageId })) {
       throw new SmError.PrivilegeError()
     }
 
@@ -196,7 +196,7 @@ module.exports.getVillagePerson = async function getVillagePerson (req, res, nex
 module.exports.getVillageServiceRequests = async function getVillageServiceRequests (req, res, next) {
   try {
     const villageId = req.params.villageId
-    if (!hasPermission(req.userObject, 'village:read', { villageId })) {
+    if (!hasPermission(req.userObject, 'sr:read', { villageId })) {
       throw new SmError.PrivilegeError()
     }
     const status = req.query.status
