@@ -1,5 +1,6 @@
 'use strict';
 const dbUtils = require('./utils')
+const { hasPermission } = require('../utils/authz')
 
 const _this = this
 
@@ -57,7 +58,28 @@ async function queryPersons (inPredicates = {}) {
   return rows
 }
 
-module.exports.getPerson = async function (personId, projections = []) {
+module.exports.getPerson = async function (personId, projections = [], userObject = null) {
+  // memberDetail/memberInfo carry village-scoped financial/confidential
+  // fields; the gate must be evaluated against *this* person's village.
+  // getPerson is single-row (predicated on p.id), so that village is a
+  // query-level constant — a cheap pre-fetch resolves it before the main
+  // query is built. A userObject holding the federation-level grant (no
+  // villageId) is covered without this lookup running at all: hasPermission
+  // short-circuits on federation membership regardless of villageId.
+  let financial = false
+  let confidential = false
+  if (projections.includes('memberDetail') || projections.includes('memberInfo')) {
+    if (hasPermission(userObject, 'member:read_financial') && hasPermission(userObject, 'person:read_confidential')) {
+      financial = true
+      confidential = true
+    }
+    else {
+      const [[personVillage]] = await dbUtils.pool.query('SELECT villageId FROM person WHERE id = ?', [personId])
+      const villageId = personVillage?.villageId
+      financial = hasPermission(userObject, 'member:read_financial', { villageId })
+      confidential = hasPermission(userObject, 'person:read_confidential', { villageId })
+    }
+  }
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
     'p.fullName',
@@ -126,7 +148,7 @@ module.exports.getPerson = async function (personId, projections = []) {
     columns.push(`(SELECT JSON_OBJECT(
       'memberId', CAST(id AS CHAR),
       'memberNumber', memberNumber,
-      'memberLevel', memberLevel,
+      ${financial ? `'memberLevel', memberLevel,` : ''}
       'primaryPerson', (
         SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
         FROM person pp WHERE pp.id = active_member.primaryPersonId
@@ -141,7 +163,8 @@ module.exports.getPerson = async function (personId, projections = []) {
       'memberId', CAST(m2.id AS CHAR),
       'personId', CAST(m2.personId AS CHAR),
       'memberNumber', m2.memberNumber,
-      'memberLevel', m2.memberLevel,
+      ${financial ? `'memberLevel', m2.memberLevel,
+      'householdDues', m2.householdDues,` : ''}
       'memberType', m2.memberType,
       'primaryPerson', (
         SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
@@ -154,10 +177,9 @@ module.exports.getPerson = async function (personId, projections = []) {
       'status', m2.status,
       'dropReason', m2.dropReason,
       'householdSize', m2.householdSize,
-      'householdDues', m2.householdDues,
       'quickbooksKey', m2.quickbooksKey,
       'printedNewsletter', m2.printedNewsletter != 0,
-      'confidentialNotes', m2.confidentialNotes,
+      ${confidential ? `'confidentialNotes', m2.confidentialNotes,` : ''}
       'statusChangeNotes', m2.statusChangeNotes,
       'miscNotes', m2.miscNotes
     ) FROM member m2 WHERE m2.personId = p.id) AS memberDetail`)
@@ -296,7 +318,7 @@ module.exports.deletePerson = async function (personId) {
   await dbUtils.pool.query('DELETE FROM person WHERE id = ?', [personId])
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, elevate, villageId, firstName, lastName, phone, email, role }) {
+module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, role }) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
     'p.fullName',
@@ -318,7 +340,10 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   ])
   const predicates = { statements: [], binds: [] }
 
-  if (!elevate) {
+  if (villageIdsGranted !== null) {
+    // Non-federation caller: restrict to the villages they were granted
+    // person:read in. villageIdsGranted === null means a federation-wide
+    // read, which is unrestricted here.
     if (!villageIdsGranted.length) return []
     predicates.statements.push('p.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)
