@@ -5,6 +5,9 @@ const component = 'logSocket'
 const auth = require('./auth')
 const SmError = require('./error')
 const asyncApiValidator = require('./asyncApiValidator')
+const config = require('./config')
+const UserService = require('../service/UserService')
+const { hasPermission } = require('./authz')
 
 const socketPath = '/socket/log-socket'
 
@@ -171,8 +174,20 @@ class LogSession {
       auth.checkInsecureKid(decoded);
       const signingKey = await auth.getSigningKey(decoded);
       auth.verifyToken(authData.token, signingKey);
-      const privileges = auth.getClaimByPath(decoded.payload);
-      if (!privileges.includes('admin')) {
+
+      // Resolve username the same way auth.js#setupUser does, then gate on
+      // the DB-defined app:admin permission (not a token claim). Elevation is
+      // intentionally not required here: unlike an ambient per-request read,
+      // this WS session is opened explicitly by an operator with intent, so
+      // holding app:admin is treated as sufficient on its own.
+      const tokenPayload = decoded.payload;
+      const usernamePrecedence = [config.oauth.claims.username, 'preferred_username', config.oauth.claims.servicename, 'azp', 'client_id', 'clientId'];
+      const username = tokenPayload[usernamePrecedence.find(element => !!tokenPayload[element])];
+      if (username === undefined) {
+        throw new SmError.PrivilegeError();
+      }
+      const userObject = await UserService.getUserObject(username);
+      if (!hasPermission(userObject, 'app:admin')) {
         throw new SmError.PrivilegeError();
       }
 
