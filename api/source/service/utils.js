@@ -800,11 +800,12 @@ module.exports.sqlGrantees = function ({villageId, villageIds, userId, username,
   json_array(json_object('userId', cast(ud.userId as char),'username', ud.username)) as grantees,
   json_array(cg.grantId) as grantIds
 from
-  village_grant cg
+  role_grant cg
   inner join village v on (cg.villageId = v.id)
   left join user_data ud on cg.userId = ud.userId
 where
     cg.userId is not null
+    and cg.villageId is not null
     ${predicates.statements.length ? `and ${predicates.statements.join(' and ')}` : ''}`
   const sqlFormattedDirectGrants = mysql.format(sqlDirectGrants, predicates.binds)
 
@@ -822,15 +823,16 @@ from
     cg.roleId,
     json_arrayagg(json_object('userGroupId', cast(cg.userGroupId as char),'name', ug.name)) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantees,
     json_arrayagg(cg.grantId) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantIds
-from 
-    village_grant cg
+from
+    role_grant cg
     inner join village v on cg.villageId = v.id
     left join user_group_user_map ugu on cg.userGroupId = ugu.userGroupId
     left join user_group ug on ugu.userGroupId = ug.userGroupId
     left join user_data ud on ugu.userId = ud.userId
-    left join village_grant cgDirect on (cg.villageId = cgDirect.villageId and ugu.userId = cgDirect.userId)
+    left join role_grant cgDirect on (cg.villageId = cgDirect.villageId and ugu.userId = cgDirect.userId)
   where
     cg.userGroupId is not null
+    and cg.villageId is not null
     and cgDirect.userId is null
     ${predicates.statements.length ? `and ${predicates.statements.join(' and ')}` : ''}
   ) dt

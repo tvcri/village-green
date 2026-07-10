@@ -41,14 +41,14 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
           'displayName', JSON_UNQUOTE(JSON_EXTRACT(user_data.lastClaims, "$.${config.oauth.claims.name}"))
           ) as grantJson
         from
-          village_grant inner join user_data using (userId) where villageId = v.id and roleId = 4
+          role_grant inner join user_data using (userId) where villageId = v.id and roleId = 4
         UNION
         select json_object(
           'userGroupId', CAST(user_group.userGroupId as char),
           'name', user_group.name,
           'description', user_group.description
         ) as grantJson
-        from village_grant inner join user_group using (userGroupId) where villageId = v.id and roleId = 4) o) as owners`)
+        from role_grant inner join user_group using (userGroupId) where villageId = v.id and roleId = 4) o) as owners`)
     }
     if (projections.includes('statistics')) {
       if (!elevate) {
@@ -96,7 +96,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
                   'roleId', roleId)
                 as grantJson
             from
-              village_grant inner join user_data using (userId) where villageId = v.id
+              role_grant inner join user_data using (userId) where villageId = v.id
             UNION
             select
               json_object(
@@ -107,7 +107,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
                   ),
                 'roleId', roleId
               ) as grantJson
-            from village_grant inner join user_group using (userGroupId) where villageId = v.id
+            from role_grant inner join user_group using (userGroupId) where villageId = v.id
           ) as grantJsons)
         , json_array()
         )
@@ -386,7 +386,7 @@ module.exports.getVillageGrants = async function (villageId) {
       CAST(ug.userGroupId AS CHAR) AS userGroup_userGroupId,
       ug.name AS userGroup_name,
       ug.description AS userGroup_description
-    FROM village_grant vg
+    FROM role_grant vg
     LEFT JOIN user_data ud ON vg.userId = ud.userId
     LEFT JOIN user_group ug ON vg.userGroupId = ug.userGroupId
     WHERE vg.villageId = ?
@@ -436,7 +436,7 @@ module.exports.createVillageGrant = async function (villageId, body) {
           mappedFields.userGroupId = grant.userGroupId
         }
 
-        await connection.query('INSERT INTO village_grant SET ?', mappedFields)
+        await connection.query('INSERT INTO role_grant SET ?', mappedFields)
       }
     },
     statusObj: undefined
@@ -449,7 +449,7 @@ module.exports.createVillageGrant = async function (villageId, body) {
 module.exports.replaceVillageGrants = async function (villageId, body) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      await connection.query('DELETE FROM village_grant WHERE villageId = ?', [villageId])
+      await connection.query('DELETE FROM role_grant WHERE villageId = ?', [villageId])
 
       if (body && body.length > 0) {
         for (const grant of body) {
@@ -464,7 +464,7 @@ module.exports.replaceVillageGrants = async function (villageId, body) {
             mappedFields.userGroupId = grant.userGroupId
           }
 
-          await connection.query('INSERT INTO village_grant SET ?', mappedFields)
+          await connection.query('INSERT INTO role_grant SET ?', mappedFields)
         }
       }
     },
@@ -476,7 +476,7 @@ module.exports.replaceVillageGrants = async function (villageId, body) {
 
 module.exports.deleteVillageGrant = async function (villageId, grantId) {
   const [existing] = await dbUtils.pool.query(
-    'SELECT * FROM village_grant WHERE grantId = ? AND villageId = ?',
+    'SELECT * FROM role_grant WHERE grantId = ? AND villageId = ?',
     [grantId, villageId]
   )
 
@@ -485,7 +485,7 @@ module.exports.deleteVillageGrant = async function (villageId, grantId) {
     throw new SmError.NotFoundError()
   }
 
-  await dbUtils.pool.query('DELETE FROM village_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId])
+  await dbUtils.pool.query('DELETE FROM role_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId])
 
   const sql = `
     SELECT
