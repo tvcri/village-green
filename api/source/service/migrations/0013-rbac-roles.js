@@ -73,6 +73,16 @@ const upMigration = [
   `INSERT INTO role_grant (userId, userGroupId, roleId, villageId)
     SELECT userId, userGroupId, LEAST(roleId, 3), villageId FROM village_grant`,
 
+  // Users whose only "admin" was the JWT realm_access.roles claim (never a
+  // village_grant row) get no grant from the copy above. Detect them from
+  // their last-seen token claims and seed the federation Admin (roleId 4)
+  // grant so they don't lose access post-migration. INSERT IGNORE: safe if
+  // a user already holds Admin via some other path (unique key on
+  // (userId, roleId, villageKey) would otherwise collide).
+  `INSERT IGNORE INTO role_grant (userId, roleId, villageId)
+    SELECT userId, 4, NULL FROM user_data
+    WHERE JSON_CONTAINS(lastClaims->'$.realm_access.roles', '"admin"')`,
+
   `DROP TABLE village_grant`,
 ]
 
