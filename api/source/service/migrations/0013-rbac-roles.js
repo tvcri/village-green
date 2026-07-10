@@ -83,6 +83,38 @@ const upMigration = [
     SELECT userId, 4, NULL FROM user_data
     WHERE JSON_CONTAINS(lastClaims->'$.realm_access.roles', '"admin"')`,
 
+  // Deployment-specific cleanup: on this app's one real deployment, the old
+  // way to fake federation-wide access was granting a village-scoped role
+  // (Steering Committee, LSC, etc.) on every single village. Any admin-claim
+  // user who did this no longer needs those grants once they hold Admin
+  // federation-wide (above) - fold them into Staff (real operational access,
+  // distinct from Admin's pure escalation role) and drop the redundant
+  // per-village rows. Scoped strictly to admin-claim users so it doesn't
+  // touch other users who happen to also hold all-village grants for
+  // unrelated reasons.
+  `INSERT IGNORE INTO role_grant (userId, roleId, villageId)
+    SELECT rg.userId, 5, NULL
+    FROM role_grant rg
+    JOIN role r ON rg.roleId = r.roleId AND r.scope = 'village'
+    JOIN user_data ud ON ud.userId = rg.userId
+    WHERE JSON_CONTAINS(ud.lastClaims->'$.realm_access.roles', '"admin"')
+    GROUP BY rg.userId
+    HAVING COUNT(DISTINCT rg.villageId) = (SELECT COUNT(*) FROM village)`,
+
+  `DELETE rg FROM role_grant rg
+    JOIN role r ON rg.roleId = r.roleId AND r.scope = 'village'
+    JOIN user_data ud ON ud.userId = rg.userId
+    WHERE JSON_CONTAINS(ud.lastClaims->'$.realm_access.roles', '"admin"')
+      AND rg.userId IN (
+        SELECT userId FROM (
+          SELECT rg2.userId
+          FROM role_grant rg2
+          JOIN role r2 ON rg2.roleId = r2.roleId AND r2.scope = 'village'
+          GROUP BY rg2.userId
+          HAVING COUNT(DISTINCT rg2.villageId) = (SELECT COUNT(*) FROM village)
+        ) all_village_holders
+      )`,
+
   `DROP TABLE village_grant`,
 ]
 
