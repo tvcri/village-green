@@ -4,13 +4,14 @@ import { useRouter, useRoute } from 'vue-router'
 import Dropdown from 'primevue/dropdown'
 import AutoComplete from 'primevue/autocomplete'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { useRoleLabels } from '../../../shared/composables/useRoleLabels.js'
+import { useRoles } from '../../../shared/composables/useRoles.js'
 import { getVillageGrants, createVillageGrant } from '../api/villageGrantApi.js'
 import { getUsers } from '../../../shared/api/userApi.js'
 
 const router = useRouter()
 const route = useRoute()
-const { getRoles } = useRoleLabels()
+const { villageRoles, fetchRoles } = useRoles()
+fetchRoles()
 
 const villageId = computed(() => route.params.villageId)
 
@@ -52,8 +53,6 @@ const filteredUsers = computed(() => {
     return displayName.includes(query) || username.includes(query)
   })
 })
-
-const roles = getRoles()
 
 const handleAddUser = (userId) => {
   if (!selectedUsers.value.includes(userId)) {
@@ -111,9 +110,9 @@ const isFormValid = computed(() => {
         <Dropdown
           id="role-select"
           v-model="selectedRoleId"
-          :options="roles"
-          option-label="label"
-          option-value="id"
+          :options="villageRoles"
+          option-label="name"
+          option-value="roleId"
           placeholder="-- Choose a role --"
         />
       </div>

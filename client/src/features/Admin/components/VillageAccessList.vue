@@ -7,12 +7,13 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { useRoleLabels } from '../../../shared/composables/useRoleLabels.js'
+import { useRoles } from '../../../shared/composables/useRoles.js'
 import { getVillages, getVillageGrants, deleteVillageGrant } from '../api/villageGrantApi.js'
 
 const router = useRouter()
 const route = useRoute()
-const { getRoleLabel } = useRoleLabels()
+const { getRoleLabel, fetchRoles } = useRoles()
+fetchRoles()
 
 const selectedVillageId = ref(null)
 

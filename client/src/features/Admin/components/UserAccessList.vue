@@ -7,15 +7,15 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { useRoleLabels } from '../../../shared/composables/useRoleLabels.js'
+import { useRoles } from '../../../shared/composables/useRoles.js'
 import { getVillages } from '../api/villageGrantApi.js'
 import { getUsers, getUserGrants, deleteUserGrant, createUserGrant } from '../api/userGrantApi.js'
 import { updateUser } from '../../../shared/api/userApi.js'
 import { extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 
 const route = useRoute()
-const { getRoleLabel, getRoles } = useRoleLabels()
-const roles = getRoles()
+const { roles, getRoleLabel, fetchRoles } = useRoles()
+fetchRoles()
 
 const selectedUserId = ref(null)
 const sortBy = ref('village')
@@ -110,7 +110,7 @@ const handleSaveGrant = async () => {
   try {
     await createUserGrant(selectedUserId.value, [{
       villageId: pendingGrant.value.villageId,
-      roleId: pendingGrant.value.roleId
+      roleId: parseInt(pendingGrant.value.roleId, 10)
     }])
     await refetchGrants()
     pendingGrant.value = null
@@ -261,8 +261,8 @@ const sortRoleId = (a, b) => {
               v-if="isPendingRow(data)"
               v-model="pendingGrant.roleId"
               :options="roles"
-              option-label="label"
-              option-value="id"
+              option-label="name"
+              option-value="roleId"
               placeholder="-- Role --"
               class="role-select"
             />

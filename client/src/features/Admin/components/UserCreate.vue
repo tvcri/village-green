@@ -7,14 +7,14 @@ import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { useRoleLabels } from '../../../shared/composables/useRoleLabels.js'
+import { useRoles } from '../../../shared/composables/useRoles.js'
 import { getVillages } from '../api/villageGrantApi.js'
 import { createUser } from '../../../shared/api/userApi.js'
 import { extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 
 const router = useRouter()
-const { getRoleLabel, getRoles } = useRoleLabels()
-const roles = getRoles()
+const { roles, getRoleLabel, fetchRoles } = useRoles()
+fetchRoles()
 
 const { state: villages } = useAsyncState(() => getVillages(), { immediate: true })
 
@@ -47,7 +47,7 @@ const handleSaveGrant = () => {
   grants.value.push({
     grantId: nextGrantId++,
     villageId: pendingGrant.value.villageId,
-    roleId: pendingGrant.value.roleId
+    roleId: parseInt(pendingGrant.value.roleId, 10)
   })
   pendingGrant.value = null
 }
@@ -129,7 +129,7 @@ async function handleSubmit() {
       username: username.value.trim(),
       firstName: firstName.value.trim() || undefined,
       lastName: lastName.value.trim() || undefined,
-      villageGrants: grants.value.map(g => ({ villageId: g.villageId, roleId: g.roleId })),
+      roleGrants: grants.value.map(g => ({ roleId: g.roleId, villageId: g.villageId })),
     })
     router.push({ name: 'admin-user-access' })
   }
@@ -228,8 +228,8 @@ function handleCancel() {
                 v-if="isPendingRow(data)"
                 v-model="pendingGrant.roleId"
                 :options="roles"
-                option-label="label"
-                option-value="id"
+                option-label="name"
+                option-value="roleId"
                 placeholder="-- Role --"
                 class="role-select"
               />

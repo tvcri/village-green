@@ -1,7 +1,7 @@
 import { apiCall } from '../../../shared/api/apiClient.js'
 
 export const getPersons = ({ villageId, role, firstName, lastName, phone, email } = {}) => {
-  const params = { elevate: true }
+  const params = {}
   if (villageId?.length) params.villageId = villageId
   if (role) params.role = role
   if (firstName) params.firstName = firstName

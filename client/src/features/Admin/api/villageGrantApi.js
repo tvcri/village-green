@@ -1,18 +1,22 @@
 import { apiCall } from '../../../shared/api/apiClient.js'
+import { useElevate } from '../../../shared/composables/useElevate.js'
 import { getVillages as getVillagesBase } from '../../VillageList/api/villageApi.js'
 
 export const getVillages = () => {
-  return getVillagesBase(true, [])
+  return getVillagesBase([])
 }
 
 export const getVillageGrants = (villageId) => {
-  return apiCall('getVillageGrants', { villageId, elevate: true })
+  const { elevate } = useElevate()
+  return apiCall('getVillageGrants', { villageId, elevate: elevate.value ?? true })
 }
 
 export const deleteVillageGrant = (villageId, grantId) => {
-  return apiCall('deleteVillageGrant', { villageId, grantId, elevate: true })
+  const { elevate } = useElevate()
+  return apiCall('deleteVillageGrant', { villageId, grantId, elevate: elevate.value ?? true })
 }
 
 export const createVillageGrant = (villageId, grants) => {
-  return apiCall('createVillageGrant', { villageId, elevate: true }, grants)
+  const { elevate } = useElevate()
+  return apiCall('createVillageGrant', { villageId, elevate: elevate.value ?? true }, grants)
 }
