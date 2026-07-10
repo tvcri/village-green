@@ -64,7 +64,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.apptTime',
     'sr.returnTime',
     // JSON boolean (0/1 tinyint would fail the OAS boolean type).
-    'CAST(IF(sr.timesFlexible, TRUE, FALSE) AS JSON) AS timesFlexible',
+    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
@@ -166,7 +166,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     'sr.apptTime',
     'sr.returnTime',
     // JSON boolean (0/1 tinyint would fail the OAS boolean type).
-    'CAST(IF(sr.timesFlexible, TRUE, FALSE) AS JSON) AS timesFlexible',
+    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
