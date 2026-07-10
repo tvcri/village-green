@@ -164,10 +164,12 @@ const columnsForCsv = [
   { header: 'Member', key: 'memberFullName' },
   { header: 'Volunteer', key: 'volunteerFullName' },
   { header: 'Description', key: 'description' },
-  { header: 'Start At', key: 'startAt' },
-  { header: 'Arrive At', key: 'apptTime' },
-  { header: 'Return At', key: 'returnTime' },
-  { header: 'Finish At', key: 'finishAt' },
+  { header: 'Date', key: 'serviceDate' },
+  { header: 'Start', key: 'startTime' },
+  { header: 'Arrive', key: 'apptTime' },
+  { header: 'Return', key: 'returnTime' },
+  { header: 'Finish', key: 'finishTime' },
+  { header: 'Times Flexible', key: 'timesFlexible' },
   { header: 'Destination', key: 'destination' },
   { header: 'Address', key: 'address' },
   { header: 'City', key: 'city' },
@@ -175,7 +177,7 @@ const columnsForCsv = [
   { header: 'Created At', key: 'createdAt' }
 ]
 
-const DATE_TIME_CSV_KEYS = ['startAt', 'apptTime', 'returnTime', 'finishAt', 'createdAt']
+const DATE_TIME_CSV_KEYS = ['createdAt']
 
 const handleDownloadCsv = async () => {
   const csv = toCsv(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv)
