@@ -6,6 +6,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useCurrentUser } from '../shared/composables/useCurrentUser.js'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getUser } from '../shared/api/userApi.js'
+import MyAccessSummary from './MyAccessSummary.vue'
 
 defineProps({
   version: String
@@ -93,6 +94,7 @@ const toggleMenu = (event) => {
             <span class="status-badge">{{ status }}</span>
           </div>
         </div>
+        <MyAccessSummary :user="user" />
       </template>
       <template #end>
         <div v-if="version" class="menu-version-section">
