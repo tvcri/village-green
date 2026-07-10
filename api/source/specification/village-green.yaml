@@ -591,6 +591,22 @@ paths:
       security:
       - oauth:
         - vg:read
+  /op/roles:
+    get:
+      summary: List roles and their permissions
+      tags: [Operation]
+      operationId: getRoles
+      responses:
+        '200':
+          description: Role list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Role' }
+      security:
+      - oauth:
+        - vg:op:read
   /user:
     parameters:
     - $ref: '#/components/parameters/UserPreferenceQuery'
@@ -1215,7 +1231,6 @@ paths:
       - Person
       operationId: getPersons
       parameters:
-        - $ref: '#/components/parameters/ElevateQuery'
         - name: villageId
           in: query
           description: Filter to specific villages (omit for all granted villages)
@@ -1382,8 +1397,6 @@ paths:
       tags:
       - Volunteer
       operationId: getVolunteers
-      parameters:
-        - $ref: '#/components/parameters/ElevateQuery'
       responses:
         '200':
           description: List of volunteers
@@ -1551,7 +1564,6 @@ paths:
       - ServiceRequest
       operationId: getServiceRequests
       parameters:
-        - $ref: '#/components/parameters/ElevateQuery'
         - $ref: '#/components/parameters/ServiceRequestStatusQuery'
         - $ref: '#/components/parameters/HasNotificationsQuery'
         - name: villageId
@@ -1693,7 +1705,6 @@ paths:
       - Friend
       operationId: getFriends
       parameters:
-        - $ref: '#/components/parameters/ElevateQuery'
         - name: villageId
           in: query
           description: Filter to specific villages (omit for all granted villages)
@@ -1770,7 +1781,6 @@ paths:
       - Village
       operationId: getVillages
       parameters:
-      - $ref: '#/components/parameters/ElevateQuery'
       - $ref: '#/components/parameters/VillageProjectionQuery'
       responses:
         '200':
@@ -1795,6 +1805,8 @@ paths:
       tags:
       - Village
       operationId: createVillage
+      parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       requestBody:
         required: true
         content:
@@ -3314,9 +3326,29 @@ components:
       - volunteers
       - both
     RoleId:
-      maximum: 4
+      maximum: 7
       minimum: 1
       type: integer
+    Role:
+      type: object
+      additionalProperties: false
+      required: [roleId, name, scope, isSystem, permissions]
+      properties:
+        roleId: { type: string }
+        name: { type: string }
+        scope: { type: string, enum: [federation, village] }
+        description: { type: string, nullable: true }
+        isSystem: { type: boolean }
+        permissions:
+          type: array
+          items: { type: string }
+    RoleGrantAssign:
+      type: object
+      additionalProperties: false
+      required: [roleId]
+      properties:
+        roleId: { $ref: '#/components/schemas/RoleId' }
+        villageId: { type: string, nullable: true }
     PersonAddress:
       additionalProperties: false
       type: object
@@ -3927,20 +3959,12 @@ components:
           type: string
         lastName:
           type: string
-        villageGrants:
+        roleGrants:
           type: array
           items:
-            $ref: '#/components/schemas/UserVillageGrantWrite'
+            $ref: '#/components/schemas/RoleGrantAssign'
       required:
       - username
-    UserPrivileges:
-      type: object
-      additionalProperties: false
-      properties:
-        admin:
-          type: boolean
-        create_village:
-          type: boolean
     UserProjected:
       additionalProperties: false
       type: object
@@ -3952,8 +3976,55 @@ components:
           type: string
         lastAccess:
           $ref: '#/components/schemas/UserLastAccess'
-        privileges:
-          $ref: '#/components/schemas/UserPrivileges'
+        permissions:
+          type: object
+          additionalProperties: false
+          properties:
+            federation:
+              type: array
+              items: { type: string }
+            byVillage:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+        grants:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            properties:
+              villageId:
+                type: string
+              name:
+                type: string
+              roles:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    roleId:
+                      type: string
+                    name:
+                      type: string
+              grantIds:
+                type: array
+                items: { type: string }
+        federationGrants:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              grantId:
+                type: string
+              roleId:
+                type: string
+              name:
+                type: string
+        canElevate:
+          type: boolean
         statistics:
           $ref: '#/components/schemas/UserStatistics'
         status:
@@ -3974,10 +4045,6 @@ components:
           $ref: '#/components/schemas/WebPreferences'
         privacyStatus:
           $ref: '#/components/schemas/PrivacyStatus'
-        villageGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserVillageGrantRead'
       required:
       - userId
       - username
@@ -3999,7 +4066,7 @@ components:
           $ref: '#/components/schemas/UserStatus'
       required:
       - username
-      - villageGrants
+      - roleGrants
     UserStatistics:
       additionalProperties: false
       type: object
@@ -4628,7 +4695,7 @@ components:
         items:
           type: string
           enum:
-          - villageGrants
+          - grants
           - statistics
           - privacyStatus
           - userGroups
