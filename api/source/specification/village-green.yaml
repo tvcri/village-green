@@ -556,6 +556,7 @@ paths:
       summary: Get analytics summary (admin only)
       operationId: getSummary
       parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       - name: from
         in: query
         required: false
@@ -591,6 +592,7 @@ paths:
       security:
       - oauth:
         - vg:read
+      x-elevation-required: true
   /op/roles:
     get:
       summary: List roles and their permissions
@@ -707,6 +709,8 @@ paths:
       - Privacy
       summary: Publish a new version of privacy rules
       operationId: publishPrivacyRules
+      parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       requestBody:
         required: true
         content:
@@ -729,12 +733,15 @@ paths:
       security:
       - oauth:
         - vg:user:read
+      x-elevation-required: true
   /privacy/rules/current:
     patch:
       tags:
       - Privacy
       summary: Correct the current published privacy rules without creating a new version
       operationId: patchPrivacyRulesCurrent
+      parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       requestBody:
         required: true
         content:
@@ -763,6 +770,7 @@ paths:
       security:
       - oauth:
         - vg:user:read
+      x-elevation-required: true
   /privacy/acknowledgements:
     post:
       tags:
@@ -802,7 +810,6 @@ paths:
       operationId: getUsers
       parameters:
       - $ref: '#/components/parameters/UsernameQuery'
-      - $ref: '#/components/parameters/PrivilegeQuery'
       - $ref: '#/components/parameters/UsernameMatchQuery'
       - $ref: '#/components/parameters/UserStatusQuery'
       responses:
@@ -4064,6 +4071,10 @@ components:
           $ref: '#/components/schemas/Username'
         status:
           $ref: '#/components/schemas/UserStatus'
+        roleGrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleGrantAssign'
       required:
       - username
       - roleGrants
@@ -4579,15 +4590,6 @@ components:
           - memberDetail
           - volunteerInfo
           - volunteerDetail
-    PrivilegeQuery:
-      name: privilege
-      in: query
-      description: Selects Users with the specified privilege
-      schema:
-        type: string
-        enum:
-        - admin
-        - create_village
     RunSequenceQuery:
       name: after-seq
       in: query

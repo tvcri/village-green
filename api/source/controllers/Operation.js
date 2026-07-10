@@ -4,6 +4,7 @@ const escape = require('../utils/escape')
 const {JSONPath} = require('jsonpath-plus')
 const SmError = require('../utils/error.js')
 const state = require('../utils/state')
+const { hasElevatedPermission } = require('../utils/authz')
 
 module.exports.getConfiguration = async function getConfiguration (req, res, next) {
   try {
@@ -28,7 +29,7 @@ module.exports.setConfigurationItem = async function setConfigurationItem (req, 
 module.exports.getAppData = async function getAppData (req, res, next) {
   try {
     if (!config.experimental.appData) throw new SmError.NotFoundError('endpoint disabled, to enable set VG_EXPERIMENTAL_APPDATA=true')
-    if (!req.query.elevate) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'app:admin', req)) throw new SmError.PrivilegeError()
     const format = req.query.format || 'gzip'
     res.attachment(`appdata-v${config.lastMigration}_${escape.filenameComponentFromDate()}.jsonl${format==='gzip'?'.gz':''}`)
     if (format === 'jsonl') res.type('application/jsonl')
@@ -44,7 +45,7 @@ module.exports.getAppData = async function getAppData (req, res, next) {
 
 module.exports.getAppDataTables = async function (req, res, next) {
   try {
-    if (!req.query.elevate) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'app:admin', req)) throw new SmError.PrivilegeError()
     const response = await OperationService.getAppDataTables()
     res.json(response)
   }
@@ -61,7 +62,7 @@ module.exports.replaceAppData = async function replaceAppData (req, res, next) {
   
   try {
     if (!config.experimental.appData) throw new SmError.NotFoundError('endpoint disabled, to enable set VG_EXPERIMENTAL_APPDATA=true')
-    if (!req.query.elevate) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'app:admin', req)) throw new SmError.PrivilegeError()
     let chunks = []
     for await (const chunk of req) {
       chunks.push(chunk)
@@ -95,8 +96,7 @@ module.exports.getDefinition = async function getDefinition (req, res, next) {
 
 module.exports.getAppInfo = async function getAppInfo (req, res, next) {
   try {
-    let elevate = req.query.elevate
-    if ( elevate ) {
+    if (hasElevatedPermission(req.userObject, 'app:admin', req)) {
       const options = {
         includeRowCounts: req.query.includeRowCounts
       }

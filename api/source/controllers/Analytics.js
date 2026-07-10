@@ -2,6 +2,7 @@
 
 const AnalyticsService = require('../service/AnalyticsService')
 const SmError = require('../utils/error.js')
+const { hasElevatedPermission } = require('../utils/authz')
 
 module.exports.postEvents = async function (req, res, next) {
   try {
@@ -17,7 +18,7 @@ module.exports.postEvents = async function (req, res, next) {
 
 module.exports.getSummary = async function (req, res, next) {
   try {
-    if (!req.userObject.privileges?.admin) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'app:admin', req)) throw new SmError.PrivilegeError()
     const { from, to, userId } = req.query
     const summary = await AnalyticsService.getSummary({ from, to, userId })
     res.json(summary)

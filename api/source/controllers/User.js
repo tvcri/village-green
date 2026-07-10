@@ -6,30 +6,45 @@ const VillageService = require(`../service/VillageService`)
 const SmError = require('../utils/error')
 const dbUtils = require('../service/utils')
 const KeycloakService = require('../service/KeycloakService')
+const { hasElevatedPermission, holdsAnyElevatable } = require('../utils/authz')
 
-async function validateVillageGrants(villageGrants, {elevate}) {
-  if (villageGrants?.length) {
-    // Verify each grant for a valid villageId
-    let requestedIds = villageGrants.map( g => g.villageId )
-    let availableVillages = await VillageService.queryVillages({allVillages: !!elevate})
-    let availableIds = availableVillages.map( c => c.villageId)
-    if (! requestedIds.every( id => availableIds.includes(id) ) ) {
-      throw new SmError.UnprocessableError('One or more villageIds are invalid.')
+// Also used by controllers/Village.js to validate village-grant writes
+// (villageId there comes from the URL path, not the grant body — the caller
+// maps each grant to {roleId, villageId} before calling in).
+async function validateRoleGrants(roleGrants) {
+  if (!roleGrants?.length) return
+  const [roles] = await dbUtils.pool.query('SELECT roleId, scope FROM role')
+  const scopeById = new Map(roles.map(r => [String(r.roleId), r.scope]))
+  const villages = await VillageService.queryVillages({ allVillages: true })
+  const villageIds = new Set(villages.map(v => String(v.villageId)))
+  for (const g of roleGrants) {
+    const scope = scopeById.get(String(g.roleId))
+    if (!scope) throw new SmError.UnprocessableError(`Unknown roleId ${g.roleId}`)
+    if (scope === 'village' && (g.villageId === null || g.villageId === undefined)) {
+      throw new SmError.UnprocessableError('village-scoped role requires villageId')
+    }
+    if (scope === 'federation' && g.villageId != null) {
+      throw new SmError.UnprocessableError('federation-scoped role must not have villageId')
+    }
+    if (g.villageId != null && !villageIds.has(String(g.villageId))) {
+      throw new SmError.UnprocessableError(`Unknown villageId ${g.villageId}`)
     }
   }
 }
+module.exports.validateRoleGrants = validateRoleGrants
 
 /*  */
 module.exports.createUser = async function createUser (req, res, next) {
   try {
-    const elevate = req.query.elevate
-    if (!elevate) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
     let body = req.body
     let projection = req.query.projection
     const createInKeycloak = req.query.keycloak !== false
 
-    if (body.villageGrants?.length) {
-      await validateVillageGrants(body.villageGrants, {elevate})
+    if (body.roleGrants?.length) {
+      await validateRoleGrants(body.roleGrants)
     }
 
     if (createInKeycloak) {
@@ -52,7 +67,7 @@ module.exports.createUser = async function createUser (req, res, next) {
     const { firstName, lastName, ...userDataBody } = body
     userDataBody.status = 'available'
     try {
-      let response = await UserService.createUser(userDataBody, projection, elevate, req.userObject, res.svcStatus)
+      let response = await UserService.createUser(userDataBody, projection, req.userObject, res.svcStatus)
       res.status(201).json(response)
     }
     catch (err) {
@@ -72,35 +87,32 @@ module.exports.createUser = async function createUser (req, res, next) {
 
 module.exports.deleteUser = async function deleteUser (req, res, next) {
   try {
-    let elevate = req.query.elevate
-    if (elevate) {
-      let userId = req.params.userId
-      let projection = req.query.projection
-      let userData = await UserService.getUserByUserId(userId, [], elevate, req.userObject)
-      if (userData) {
-        await KeycloakService.deleteUser({ username: userData.username })
-      }
-      let response
-      if (userData?.lastAccess) {
-        // User has accessed the system: preserve the user_data row (foreign
-        // key references elsewhere depend on it) and soft-delete by setting
-        // status to unavailable instead of removing the row.
-        response = await UserService.replaceUser(userId, {
-          status: 'unavailable',
-          statusUser: req.userObject.userId,
-          statusDate: new Date(),
-          villageGrants: [],
-          userGroups: []
-        }, projection, elevate, req.userObject, res.svcStatus)
-      }
-      else {
-        response = await UserService.deleteUser(userId, projection, elevate, req.userObject)
-      }
-      res.json(response)
-    }
-    else {
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
       throw new SmError.PrivilegeError()
     }
+    let userId = req.params.userId
+    let projection = req.query.projection
+    let userData = await UserService.getUserByUserId(userId, [], req.userObject)
+    if (userData) {
+      await KeycloakService.deleteUser({ username: userData.username })
+    }
+    let response
+    if (userData?.lastAccess) {
+      // User has accessed the system: preserve the user_data row (foreign
+      // key references elsewhere depend on it) and soft-delete by setting
+      // status to unavailable instead of removing the row.
+      response = await UserService.replaceUser(userId, {
+        status: 'unavailable',
+        statusUser: req.userObject.userId,
+        statusDate: new Date(),
+        roleGrants: [],
+        userGroups: []
+      }, projection, req.userObject, res.svcStatus)
+    }
+    else {
+      response = await UserService.deleteUser(userId, projection, req.userObject)
+    }
+    res.json(response)
   }
   catch(err) {
     next(err)
@@ -109,12 +121,12 @@ module.exports.deleteUser = async function deleteUser (req, res, next) {
 
 module.exports.exportUsers = async function exportUsers (projection, elevate, userObject) {
   if (elevate) {
-    return await UserService.getUsers(null, null, projection, elevate, userObject )
+    return await UserService.getUsers(null, null, null, projection, userObject )
   }
   else {
-    throw new SmError.PrivilegeError()    
+    throw new SmError.PrivilegeError()
   }
-} 
+}
 
 module.exports.exportUserGroups = async function exportUserGroups (projections, elevate) {
 
@@ -131,13 +143,13 @@ module.exports.getUser = async function getUser (req, res, next) {
     // privacyStatus is always included (not opt-in): the privacy-ack gate
     // allowlists this endpoint specifically so bootstrap can read it while
     // blocked, and the client has no other way to learn its own ack status.
-    const projection = ['villageGrants', 'statistics', 'privacyStatus']
+    const projection = ['grants', 'statistics', 'privacyStatus']
     if (req.query.projection) {
       projection.push(...req.query.projection)
     }
 
     let response = await UserService.getUserByUserId(req.userObject.userId, projection)
-    response.privileges = req.userObject.privileges
+    response.canElevate = holdsAnyElevatable(req.userObject)
     res.json(response)
 }
   catch(err) {
@@ -147,19 +159,16 @@ module.exports.getUser = async function getUser (req, res, next) {
 
 module.exports.getUserByUserId = async function getUserByUserId (req, res, next) {
   try {
-    let elevate = req.query.elevate
-    if ( elevate ) {
-      let userId = req.params.userId
-      let projection = req.query.projection
-      let response = await UserService.getUserByUserId(userId, projection, elevate, req.userObject)
-      if(!response) {
-        throw new SmError.NotFoundError()
-      }
-      res.json(response)
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
+      throw new SmError.PrivilegeError()
     }
-    else {
-      throw new SmError.PrivilegeError()    
+    let userId = req.params.userId
+    let projection = req.query.projection
+    let response = await UserService.getUserByUserId(userId, projection, req.userObject)
+    if(!response) {
+      throw new SmError.NotFoundError()
     }
+    res.json(response)
   }
   catch(err) {
     next(err)
@@ -168,16 +177,14 @@ module.exports.getUserByUserId = async function getUserByUserId (req, res, next)
 
 module.exports.getUsers = async function getUsers (req, res, next) {
   try {
-    let elevate = req.query.elevate
-    let username = req.query.username
-    let usernameMatch = req.query['username-match']
-    let privilege = req.query['privilege']
-    let status = req.query.status
-    let projection = req.query.projection
-    if ( !elevate && projection?.length > 0) {
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
       throw new SmError.PrivilegeError()
     }
-    let response = await UserService.getUsers( username, usernameMatch, privilege, status, projection, elevate, req.userObject)
+    let username = req.query.username
+    let usernameMatch = req.query['username-match']
+    let status = req.query.status
+    let projection = req.query.projection
+    let response = await UserService.getUsers( username, usernameMatch, status, projection, req.userObject)
     res.json(response)
   }
   catch(err) {
@@ -187,9 +194,10 @@ module.exports.getUsers = async function getUsers (req, res, next) {
 
 module.exports.replaceUser = async function replaceUser (req, res, next) {
   try {
-    let elevate = req.query.elevate
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
     let userId = req.params.userId
-    if (!elevate) throw new SmError.PrivilegeError() 
     let body = req.body
     let projection = req.query.projection
 
@@ -200,20 +208,20 @@ module.exports.replaceUser = async function replaceUser (req, res, next) {
 
     const intendedStatus = body.status || userData.status
     if (intendedStatus === 'unavailable') {
-      if (body.villageGrants?.length || body.userGroups?.length) {
+      if (body.roleGrants?.length || body.userGroups?.length) {
         throw new SmError.UserInconsistentError()
       }
     }
     if (body.status) {
       body.statusUser = req.userObject.userId
       body.statusDate = new Date()
-    } 
-
-    if (body.villageGrants?.length) {
-      await validateVillageGrants(body.villageGrants, {elevate})
     }
 
-    let response = await UserService.replaceUser(userId, body, projection, elevate, req.userObject, res.svcStatus)
+    if (body.roleGrants?.length) {
+      await validateRoleGrants(body.roleGrants)
+    }
+
+    let response = await UserService.replaceUser(userId, body, projection, req.userObject, res.svcStatus)
     res.json(response)
   }
   catch(err) {
@@ -223,8 +231,9 @@ module.exports.replaceUser = async function replaceUser (req, res, next) {
 
 module.exports.updateUser = async function updateUser (req, res, next) {
   try {
-    let elevate = req.query.elevate
-    if (!elevate) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
     let userId = req.params.userId
     let body = req.body
     let projection = req.query.projection
@@ -237,22 +246,22 @@ module.exports.updateUser = async function updateUser (req, res, next) {
     // Determine intended status: body.status or current status
     const intendedStatus = body.status || userData.status
     if (intendedStatus === 'unavailable') {
-      if (body.villageGrants?.length || body.userGroups?.length) {
+      if (body.roleGrants?.length || body.userGroups?.length) {
         throw new SmError.UserInconsistentError()
       }
-      body.villageGrants = []
+      body.roleGrants = []
       body.userGroups = []
     }
     if (body.status) {
       body.statusUser = req.userObject.userId
       body.statusDate = new Date()
-    } 
-
-    if (body.villageGrants?.length) {
-      await validateVillageGrants(body.villageGrants, {elevate})
     }
 
-    let response = await UserService.replaceUser(userId, body, projection, elevate, req.userObject, res.svcStatus)
+    if (body.roleGrants?.length) {
+      await validateRoleGrants(body.roleGrants)
+    }
+
+    let response = await UserService.replaceUser(userId, body, projection, req.userObject, res.svcStatus)
     res.json(response)
   }
   catch(err) {
@@ -274,14 +283,16 @@ module.exports.setUserData = async function setUserData (username, fields) {
 /* c8 ignore end */
 module.exports.createUserGroup = async (req, res, next) => {
   try {
-    if (!req.query.elevate) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
     const {userIds, villageGrants, ...userGroupFields} = req.body
     const invalidUserIds = await dbUtils.selectInvalidUserIds(userIds)
     if (invalidUserIds.length) {
       throw new SmError.UserInconsistentError()
     }
 
-    await validateVillageGrants(villageGrants, {elevate: req.query.elevate})
+    await validateRoleGrants(villageGrants)
 
     let userGroupId
     try{
@@ -309,7 +320,7 @@ module.exports.createUserGroup = async (req, res, next) => {
 
 module.exports.getUserGroups = async (req, res, next) => {
   try {
-    if (req.query.projection?.includes('villages') && !req.query.elevate) {
+    if (req.query.projection?.includes('villages') && !hasElevatedPermission(req.userObject, 'user:admin', req)) {
       throw new SmError.PrivilegeError('villages projection requires elevation')
     }
     const response = await UserService.queryUserGroups({
@@ -324,7 +335,7 @@ module.exports.getUserGroups = async (req, res, next) => {
 
 module.exports.getUserGroup = async (req, res, next) => {
   try {
-    if (req.query.projection?.includes('villages') && !req.query.elevate) {
+    if (req.query.projection?.includes('villages') && !hasElevatedPermission(req.userObject, 'user:admin', req)) {
       throw new SmError.PrivilegeError('villages projection requires elevation')
     }
     const response = await UserService.queryUserGroups({
@@ -341,14 +352,16 @@ module.exports.getUserGroup = async (req, res, next) => {
 
 async function putOrPatchUserGroup (req, res, next) {
   try {
-    if (!req.query.elevate) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
     const {userIds, villageGrants, ...userGroupFields} = req.body
     const invalidUserIds = await dbUtils.selectInvalidUserIds(userIds)
     if (invalidUserIds.length) {
       throw new SmError.UserInconsistentError()
     }
 
-    await validateVillageGrants(villageGrants, {elevate: req.query.elevate})
+    await validateRoleGrants(villageGrants)
 
     const userGroup = await UserService.queryUserGroups({
       projections: [],
@@ -378,7 +391,9 @@ module.exports.putUserGroup = putOrPatchUserGroup
 
 module.exports.deleteUserGroup = async (req, res, next) => {
   try{
-    if (!req.query.elevate) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
     const response = await UserService.queryUserGroups({
       projections: req.query.projection,
       filters: {userGroupId: req.params.userGroupId}
@@ -418,9 +433,8 @@ module.exports.patchUserWebPreferences = async (req, res, next) => {
 module.exports.getUserGrants = async function getUserGrants (req, res, next) {
   try {
     const userId = req.params.userId
-    const elevate = req.query.elevate
 
-    if (!elevate) {
+    if (!hasElevatedPermission(req.userObject, 'grant:admin', req)) {
       throw new SmError.PrivilegeError()
     }
 
@@ -441,9 +455,8 @@ module.exports.createUserGrant = async function createUserGrant (req, res, next)
   try {
     const userId = req.params.userId
     const body = req.body
-    const elevate = req.query.elevate
 
-    if (!elevate) {
+    if (!hasElevatedPermission(req.userObject, 'grant:admin', req)) {
       throw new SmError.PrivilegeError()
     }
 
@@ -452,7 +465,7 @@ module.exports.createUserGrant = async function createUserGrant (req, res, next)
       throw new SmError.NotFoundError()
     }
 
-    await validateVillageGrants(body, {elevate})
+    await validateRoleGrants(body)
 
     const response = await UserService.createUserGrant(userId, body)
     res.status(201).json(response)
@@ -466,9 +479,8 @@ module.exports.deleteUserGrant = async function deleteUserGrant (req, res, next)
   try {
     const userId = req.params.userId
     const grantId = req.params.grantId
-    const elevate = req.query.elevate
 
-    if (!elevate) {
+    if (!hasElevatedPermission(req.userObject, 'grant:admin', req)) {
       throw new SmError.PrivilegeError()
     }
 

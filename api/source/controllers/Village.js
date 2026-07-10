@@ -3,6 +3,7 @@
 const VillageService = require('../service/VillageService')
 const SmError = require('../utils/error')
 const { hasPermission, hasElevatedPermission } = require('../utils/authz')
+const { validateRoleGrants } = require('./User')
 
 module.exports.getVillages = async function getVillages (req, res, next) {
   try {
@@ -246,6 +247,12 @@ module.exports.createVillageGrant = async function createVillageGrant (req, res,
       throw new SmError.NotFoundError()
     }
 
+    // A grant written under /villages/{villageId}/grants always carries this
+    // villageId — reuse validateRoleGrants by pairing each grant's roleId
+    // with the path's villageId (the grant body itself has no villageId
+    // field; it's implied by the URL).
+    await validateRoleGrants(body.map(grant => ({ roleId: grant.roleId, villageId })))
+
     const response = await VillageService.createVillageGrant(villageId, body)
     res.status(201).json(response)
   }
@@ -266,6 +273,9 @@ module.exports.replaceVillageGrants = async function replaceVillageGrants (req, 
     if (!existing) {
       throw new SmError.NotFoundError()
     }
+
+    // See createVillageGrant: villageId comes from the path, not the body.
+    await validateRoleGrants(body.map(grant => ({ roleId: grant.roleId, villageId })))
 
     const response = await VillageService.replaceVillageGrants(villageId, body)
     res.json(response)
