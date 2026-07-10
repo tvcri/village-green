@@ -3458,13 +3458,19 @@ components:
           type: string
           maxLength: 255
           nullable: true
-        startAt:
+        serviceDate:
           type: string
-          format: date-time
+          format: date
           nullable: true
-        finishAt:
+        timesFlexible:
+          type: boolean
+        startTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         instructions:
           type: string
@@ -3492,11 +3498,11 @@ components:
           nullable: true
         apptTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         returnTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
           type: string
@@ -3570,13 +3576,19 @@ components:
           type: string
           format: date-time
           nullable: true
-        startAt:
+        serviceDate:
           type: string
-          format: date-time
+          format: date
           nullable: true
-        finishAt:
+        timesFlexible:
+          type: boolean
+        startTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         instructions:
           type: string
@@ -3604,11 +3616,11 @@ components:
           nullable: true
         apptTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         returnTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
           type: string
@@ -3656,13 +3668,19 @@ components:
           type: string
           format: date-time
           nullable: true
-        startAt:
+        serviceDate:
           type: string
-          format: date-time
+          format: date
           nullable: true
-        finishAt:
+        timesFlexible:
+          type: boolean
+        startTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         instructions:
           type: string
@@ -3690,11 +3708,11 @@ components:
           nullable: true
         apptTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         returnTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
           type: string
