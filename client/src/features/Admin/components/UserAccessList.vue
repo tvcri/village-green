@@ -123,7 +123,7 @@ const handleSaveGrant = async () => {
 
 const grantedVillageIds = computed(() => {
   if (!grants.value) return new Set()
-  return new Set(grants.value.map(g => g.village.villageId))
+  return new Set(grants.value.filter(g => g.village).map(g => g.village.villageId))
 })
 
 const availableVillages = computed(() => {
@@ -137,8 +137,8 @@ const displayGrants = computed(() => {
     grantId: grant.grantId,
     roleId: grant.roleId,
     roleLabel: getRoleLabel(grant.roleId),
-    villageName: grant.village.name,
-    villageId: grant.village.villageId
+    villageName: grant.village ? grant.village.name : 'Federation',
+    villageId: grant.village ? grant.village.villageId : null
   }))
 
   const sorted = [...mapped].sort((a, b) => {
