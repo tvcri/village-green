@@ -2,7 +2,7 @@
 
 const dbUtils = require('./utils')
 
-module.exports.getFriends = async function ({ villageIdsGranted, elevate, villageId, volunteerPersonId, memberPersonId, dateStart, dateEnd, contactType, activityType, volunteerName, memberName }) {
+module.exports.getFriends = async function ({ villageIdsGranted, villageId, volunteerPersonId, memberPersonId, dateStart, dateEnd, contactType, activityType, volunteerName, memberName }) {
   const columns = [
     'CAST(fcv.id AS CHAR) AS friendId',
     "DATE_FORMAT(fcv.visitDate, '%Y-%m-%d') AS visitDate",
@@ -33,14 +33,17 @@ module.exports.getFriends = async function ({ villageIdsGranted, elevate, villag
   ])
   const predicates = { statements: [], binds: [] }
 
-  if (!elevate) {
+  if (villageIdsGranted !== null) {
+    // Non-federation caller: restrict to the villages they were granted
+    // friend:read in. villageIdsGranted === null means a federation-wide
+    // read, which is unrestricted here.
     if (!villageIdsGranted.length) return []
     predicates.statements.push('fcv.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)
   }
   if (villageId && villageId.length > 0) {
     predicates.statements.push('fcv.villageId IN (?)')
-    predicates.binds.push([villageId])
+    predicates.binds.push(villageId)
   }
   if (volunteerPersonId) {
     predicates.statements.push('fcv.volunteerPersonId = ?')
