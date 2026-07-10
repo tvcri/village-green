@@ -9,9 +9,10 @@ import { getVillages } from '../api/villageGrantApi.js'
 import { createUser } from '../../../shared/api/userApi.js'
 import { extractApiErrorMessage } from '../lib/userAdminHelpers.js'
 import VillageGrantsEditor from './VillageGrantsEditor.vue'
+import FederationRoleSelect from './FederationRoleSelect.vue'
 
 const router = useRouter()
-const { roles, getRoleLabel, fetchRoles } = useRoles()
+const { getRoleLabel, fetchRoles } = useRoles()
 fetchRoles()
 
 const { state: villages } = useAsyncState(() => getVillages(), { immediate: true })
@@ -20,6 +21,7 @@ const username = ref('')
 const firstName = ref('')
 const lastName = ref('')
 const grants = ref([])
+const hubRoleId = ref(null) // string roleId or null = None
 
 const isSubmitting = ref(false)
 const usernameError = ref('')
@@ -35,6 +37,14 @@ const handleAddGrant = ({ villageId, roleId }) => {
 
 const handleDeleteGrant = (grantId) => {
   grants.value = grants.value.filter(g => g.grantId !== grantId)
+}
+
+const stagedHubGrants = computed(() =>
+  hubRoleId.value ? [{ grantId: '__staged__', roleId: hubRoleId.value }] : []
+)
+
+const handleHubRoleChange = (newRoleId) => {
+  hubRoleId.value = newRoleId
 }
 
 const villageNameById = computed(() => {
@@ -75,7 +85,10 @@ async function handleSubmit() {
       username: username.value.trim(),
       firstName: firstName.value.trim() || undefined,
       lastName: lastName.value.trim() || undefined,
-      roleGrants: grants.value.map(g => ({ roleId: g.roleId, villageId: g.villageId })),
+      roleGrants: [
+        ...grants.value.map(g => ({ roleId: g.roleId, villageId: g.villageId })),
+        ...(hubRoleId.value ? [{ roleId: parseInt(hubRoleId.value, 10), villageId: null }] : []),
+      ],
     })
     router.push({ name: 'admin-user-access' })
   }
@@ -131,6 +144,12 @@ function handleCancel() {
       </div>
 
       <small class="field-error" v-if="formError">{{ formError }}</small>
+
+      <FederationRoleSelect
+        :hub-grants="stagedHubGrants"
+        :disabled="isSubmitting"
+        @change="handleHubRoleChange"
+      />
 
       <VillageGrantsEditor
         ref="editor"
