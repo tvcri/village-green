@@ -265,64 +265,6 @@ const formattedCreatedAt = computed(() => {
 })
 
 
-// When the user changes a time field, seed the NEXT field to val+15 minutes.
-// seedDepth tracks programmatic writes: a watcher only cascades when depth=0
-// (user-driven), so one user pick fills exactly one downstream field.
-// Round Trip: Start -> Arrival -> Return -> Finish.
-// One Way:    Start -> Finish (Arrival/Return are hidden).
-let seedDepth = 0
-const seedNext = (field, val, delta = 15) => {
-  seedDepth++
-  form.value[field] = Math.min(val + delta, 23 * 60 + 45)
-  seedDepth--
-}
-
-const cascadeFromStart = (val) => {
-  if (val == null) {
-    seedDepth++
-    form.value.apptTime = null
-    form.value.returnTime = null
-    form.value.finishTime = null
-    seedDepth--
-    return
-  }
-  seedNext(form.value.transportationType === 'Round Trip' ? 'apptTime' : 'finishTime', val)
-}
-
-const cascadeFromAppt = (val) => {
-  if (val == null) return
-  seedNext('returnTime', val)
-}
-
-const cascadeFromReturn = (val) => {
-  if (val == null) return
-  // Seed finish using the same duration as start→arrival, so the ride home
-  // mirrors the outbound leg. Fall back to +15 if start/arrival aren't set.
-  const start = form.value.startTime
-  const appt = form.value.apptTime
-  const delta = (start != null && appt != null) ? (appt - start) : 15
-  seedNext('finishTime', val, delta)
-}
-
-watch(() => form.value.startTime, (val) => {
-  if (seedDepth > 0 || !formLoaded.value) return
-  cascadeFromStart(val)
-}, { flush: 'sync' })
-
-watch(() => form.value.apptTime, (val) => {
-  if (seedDepth > 0 || !formLoaded.value) return
-  cascadeFromAppt(val)
-}, { flush: 'sync' })
-
-watch(() => form.value.returnTime, (val) => {
-  if (seedDepth > 0 || !formLoaded.value) return
-  cascadeFromReturn(val)
-}, { flush: 'sync' })
-
-const onStartHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromStart(form.value.startTime) }
-const onApptHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromAppt(form.value.apptTime) }
-const onReturnHide = () => { if (formLoaded.value && seedDepth === 0) cascadeFromReturn(form.value.returnTime) }
-
 const serviceNameOptions = [
   'Ride: Medical Appnt',
   'Ride: Shopping',
@@ -388,6 +330,35 @@ const finishOptions = computed(() =>
   )
 )
 
+// When an earlier time field changes, it narrows the option list of later
+// fields (see slotsAfter above). If a later field's current value falls
+// outside its new option list, clear it rather than leaving a selected value
+// that's no longer valid. This never writes a new value into another field —
+// only clears ones that became invalid. Clearing the earlier field itself
+// (val == null) also clears its dependent, since slotsAfter(null, ...)
+// otherwise treats "no earlier value" as "nothing is filtered out".
+const clearIfInvalid = (field, upstreamVal, options) => {
+  const val = form.value[field]
+  if (val == null) return
+  if (upstreamVal == null || !options.some(o => o.value === val)) form.value[field] = null
+}
+
+watch(() => form.value.startTime, (val) => {
+  if (!formLoaded.value) return
+  clearIfInvalid('apptTime', val, apptOptions.value)
+}, { flush: 'sync' })
+
+watch(() => form.value.apptTime, (val) => {
+  if (!formLoaded.value) return
+  clearIfInvalid('returnTime', val, returnOptions.value)
+}, { flush: 'sync' })
+
+watch([() => form.value.returnTime, () => form.value.startTime, () => form.value.transportationType], ([returnVal, startVal, transportationType]) => {
+  if (!formLoaded.value) return
+  const upstreamVal = transportationType === 'Round Trip' ? returnVal : startVal
+  clearIfInvalid('finishTime', upstreamVal, finishOptions.value)
+}, { flush: 'sync' })
+
 const isRideService = computed(() => form.value.serviceName?.startsWith('Ride:'))
 
 const noLocationServices = ['Tech Support', 'Household Chores/Handy Help']
@@ -417,6 +388,22 @@ const isFormValid = computed(() => {
     if (!['Round Trip', 'One Way'].includes(f.transportationType)) return false
   }
 
+  return true
+})
+
+// Same pairwise relationships slotsAfter uses to filter each field's option
+// list, re-checked at submit time by handleSubmit (not gated here in
+// isFormValid, since a disabled Save button can't be clicked to explain
+// itself). clearIfInvalid (above) only runs once the form is loaded, so a
+// request edited from stored data with an already inconsistent time
+// sequence (e.g. written before this validation existed, or imported) can
+// render without being auto-cleared — this is what handleSubmit catches.
+const timesInOrder = computed(() => {
+  const f = form.value
+  if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) return false
+  if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) return false
+  const finishAfter = f.transportationType === 'Round Trip' ? f.returnTime : f.startTime
+  if (f.finishTime != null && finishAfter != null && f.finishTime <= finishAfter) return false
   return true
 })
 
@@ -490,6 +477,47 @@ const handleSubmit = async (notify = false) => {
           toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
           return
         }
+
+        if (form.value.transportationType === 'Round Trip') {
+          if (form.value.startTime == null) {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Start time is required for Round Trip', life: 3000 })
+            return
+          }
+          if (form.value.apptTime == null) {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time is required for Round Trip', life: 3000 })
+            return
+          }
+          if (form.value.returnTime == null) {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Return time is required for Round Trip', life: 3000 })
+            return
+          }
+          if (form.value.finishTime == null) {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Finish time is required for Round Trip', life: 3000 })
+            return
+          }
+        } else if (form.value.transportationType === 'One Way') {
+          if (form.value.startTime == null) {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Start time is required for One Way', life: 3000 })
+            return
+          }
+          if (form.value.finishTime == null) {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Finish time is required for One Way', life: 3000 })
+            return
+          }
+        }
+      }
+
+      if (!timesInOrder.value) {
+        const f = form.value
+        if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time must be after Start time', life: 3000 })
+        } else if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Return time must be after Arrival time', life: 3000 })
+        } else {
+          const finishAfterLabel = f.transportationType === 'Round Trip' ? 'Return' : 'Start'
+          toast.add({ severity: 'error', summary: 'Error', detail: `Finish time must be after ${finishAfterLabel} time`, life: 3000 })
+        }
+        return
       }
     }
 
@@ -920,7 +948,6 @@ const openPersonDialog = (personId) => {
                 placeholder="Start time"
                 show-clear
                 style="width: 100%;"
-                @hide="onStartHide"
               />
             </div>
 
@@ -934,7 +961,6 @@ const openPersonDialog = (personId) => {
                 placeholder="Arrival time"
                 show-clear
                 style="width: 100%;"
-                @hide="onApptHide"
               />
             </div>
 
@@ -948,7 +974,6 @@ const openPersonDialog = (personId) => {
                 placeholder="Return time"
                 show-clear
                 style="width: 100%;"
-                @hide="onReturnHide"
               />
             </div>
 
