@@ -23,6 +23,10 @@ import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
+import {
+  minutesToTimeString, timeStringToMinutes,
+  dateToServiceDate, serviceDateToDate
+} from '../lib/timeFields.js'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
 
@@ -68,6 +72,7 @@ const form = ref({
   transportationType: '',
   createdAt: '',
   serviceDate: '',
+  timesFlexible: false,
   startTime: null,
   finishTime: null,
   apptTime: null,
@@ -98,13 +103,6 @@ watch(existingRequest, async (val) => {
     formLoaded.value = false
     isDraft.value = val.status === 'Draft'
     wasLoadedAsDraft.value = val.status === 'Draft'
-    const extractTimeAsMinutes = (dateStr) => {
-      if (!dateStr) return null
-      const date = new Date(dateStr)
-      const raw = date.getHours() * 60 + date.getMinutes()
-      // Snap to the nearest 15-minute slot so it matches a Select option.
-      return Math.round(raw / 15) * 15
-    }
     const extractDate = (dateStr) => {
       if (!dateStr) return ''
       return new Date(dateStr)
@@ -121,11 +119,12 @@ watch(existingRequest, async (val) => {
       serviceName: val.serviceName || '',
       transportationType: val.transportationType || '',
       createdAt: extractDate(val.createdAt),
-      serviceDate: extractDate(val.startAt),
-      startTime: extractTimeAsMinutes(val.startAt),
-      finishTime: extractTimeAsMinutes(val.finishAt),
-      apptTime: extractTimeAsMinutes(val.apptTime),
-      returnTime: extractTimeAsMinutes(val.returnTime),
+      serviceDate: serviceDateToDate(val.serviceDate),
+      timesFlexible: !!val.timesFlexible,
+      startTime: timeStringToMinutes(val.startTime),
+      finishTime: timeStringToMinutes(val.finishTime),
+      apptTime: timeStringToMinutes(val.apptTime),
+      returnTime: timeStringToMinutes(val.returnTime),
       state: val.state || '',
       city: val.city || '',
       zip: val.zip || '',
@@ -359,6 +358,14 @@ watch([() => form.value.returnTime, () => form.value.startTime, () => form.value
   clearIfInvalid('finishTime', upstreamVal, finishOptions.value)
 }, { flush: 'sync' })
 
+watch(() => form.value.timesFlexible, (flex) => {
+  if (!formLoaded.value || !flex) return
+  form.value.startTime = null
+  form.value.apptTime = null
+  form.value.returnTime = null
+  form.value.finishTime = null
+})
+
 const isRideService = computed(() => form.value.serviceName?.startsWith('Ride:'))
 
 const noLocationServices = ['Tech Support', 'Household Chores/Handy Help']
@@ -423,6 +430,7 @@ const resetForNewRequest = () => {
     transportationType: '',
     createdAt: '',
     serviceDate: '',
+    timesFlexible: false,
     startTime: null,
     finishTime: null,
     apptTime: null,
@@ -478,36 +486,38 @@ const handleSubmit = async (notify = false) => {
           return
         }
 
-        if (form.value.transportationType === 'Round Trip') {
-          if (form.value.startTime == null) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Start time is required for Round Trip', life: 3000 })
-            return
-          }
-          if (form.value.apptTime == null) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time is required for Round Trip', life: 3000 })
-            return
-          }
-          if (form.value.returnTime == null) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Return time is required for Round Trip', life: 3000 })
-            return
-          }
-          if (form.value.finishTime == null) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Finish time is required for Round Trip', life: 3000 })
-            return
-          }
-        } else if (form.value.transportationType === 'One Way') {
-          if (form.value.startTime == null) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Start time is required for One Way', life: 3000 })
-            return
-          }
-          if (form.value.finishTime == null) {
-            toast.add({ severity: 'error', summary: 'Error', detail: 'Finish time is required for One Way', life: 3000 })
-            return
+        if (!form.value.timesFlexible) {
+          if (form.value.transportationType === 'Round Trip') {
+            if (form.value.startTime == null) {
+              toast.add({ severity: 'error', summary: 'Error', detail: 'Start time is required for Round Trip', life: 3000 })
+              return
+            }
+            if (form.value.apptTime == null) {
+              toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time is required for Round Trip', life: 3000 })
+              return
+            }
+            if (form.value.returnTime == null) {
+              toast.add({ severity: 'error', summary: 'Error', detail: 'Return time is required for Round Trip', life: 3000 })
+              return
+            }
+            if (form.value.finishTime == null) {
+              toast.add({ severity: 'error', summary: 'Error', detail: 'Finish time is required for Round Trip', life: 3000 })
+              return
+            }
+          } else if (form.value.transportationType === 'One Way') {
+            if (form.value.startTime == null) {
+              toast.add({ severity: 'error', summary: 'Error', detail: 'Start time is required for One Way', life: 3000 })
+              return
+            }
+            if (form.value.finishTime == null) {
+              toast.add({ severity: 'error', summary: 'Error', detail: 'Finish time is required for One Way', life: 3000 })
+              return
+            }
           }
         }
       }
 
-      if (!timesInOrder.value) {
+      if (!form.value.timesFlexible && !timesInOrder.value) {
         const f = form.value
         if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
           toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time must be after Start time', life: 3000 })
@@ -523,27 +533,6 @@ const handleSubmit = async (notify = false) => {
 
     isSubmitting.value = true
 
-    const combineDateAndTime = (date, minutes) => {
-      if (!date || minutes == null) return null
-      const d = new Date(date)
-      d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
-      return d.toISOString()
-    }
-
-    const getStartOfDay = (date) => {
-      if (!date) return null
-      const d = new Date(date)
-      d.setHours(0, 0, 0, 0)
-      return d.toISOString()
-    }
-
-    const getEndOfDay = (date) => {
-      if (!date) return null
-      const d = new Date(date)
-      d.setHours(23, 59, 59, 999)
-      return d.toISOString()
-    }
-
     const payload = {
       villageId: form.value.villageId,
       memberPersonId: form.value.memberPersonId?.trim() || null,
@@ -551,29 +540,14 @@ const handleSubmit = async (notify = false) => {
       notify,
       serviceName: form.value.serviceName || null,
       transportationType: form.value.transportationType || null,
-      // The date must always be preserved, since there is no standalone date
-      // column — start_at/finish_at carry it. When a specific time is given we
-      // use it; otherwise we anchor to start-of-day / end-of-day (local → UTC)
-      // so the chosen date is never lost. This holds for all service types:
-      // non-ride requests have no times and always anchor to the full day, and
-      // rides with optional/missing times fall back to the same anchors.
-      // TODO: post-CE, split the schema into a DATE column + nullable TIME
-      // columns so the date is no longer overloaded onto start_at/finish_at.
-      // That removes this anchoring, the local→UTC conversion, and the
-      // 12:00 AM / 11:45 PM anchor artifacts on re-edit. Touches: migration
-      // (backfill from start_at/finish_at; mind legacy CE rows), OAS schemas,
-      // ServiceRequestService SQL + finish_at DESC ordering, and the client
-      // (this builder, the edit read-back watcher, list "Date" column, detail).
-      startAt: combineDateAndTime(form.value.serviceDate, form.value.startTime)
-        ?? getStartOfDay(form.value.serviceDate),
-      finishAt: combineDateAndTime(form.value.serviceDate, form.value.finishTime)
-        ?? getEndOfDay(form.value.serviceDate),
-      apptTime: isRideService.value && form.value.transportationType === 'Round Trip'
-        ? combineDateAndTime(form.value.serviceDate, form.value.apptTime)
-        : null,
-      returnTime: isRideService.value && form.value.transportationType === 'Round Trip'
-        ? combineDateAndTime(form.value.serviceDate, form.value.returnTime)
-        : null,
+      serviceDate: dateToServiceDate(form.value.serviceDate),
+      timesFlexible: isRideService.value ? form.value.timesFlexible : true,
+      startTime: form.value.timesFlexible ? null : minutesToTimeString(form.value.startTime),
+      finishTime: form.value.timesFlexible ? null : minutesToTimeString(form.value.finishTime),
+      apptTime: (!form.value.timesFlexible && isRideService.value && form.value.transportationType === 'Round Trip')
+        ? minutesToTimeString(form.value.apptTime) : null,
+      returnTime: (!form.value.timesFlexible && isRideService.value && form.value.transportationType === 'Round Trip')
+        ? minutesToTimeString(form.value.returnTime) : null,
       state: form.value.state || null,
       city: form.value.city || null,
       zip: form.value.zip || null,
@@ -933,9 +907,14 @@ const openPersonDialog = (personId) => {
             />
           </div>
 
+          <div v-if="isRideService" style="display: flex; align-items: center; gap: 0.5rem;">
+            <Checkbox v-model="form.timesFlexible" input-id="timesFlexible" binary />
+            <label for="timesFlexible">Times flexible</label>
+          </div>
+
           <!-- Time Row -->
           <div
-            v-if="isRideService"
+            v-if="isRideService && !form.timesFlexible"
             style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;"
           >
             <div>
