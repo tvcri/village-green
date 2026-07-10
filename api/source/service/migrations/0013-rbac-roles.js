@@ -40,7 +40,7 @@ const upMigration = [
     userGroupId int DEFAULT NULL,
     roleId int NOT NULL,
     villageId int DEFAULT NULL,
-    villageKey int GENERATED ALWAYS AS (IFNULL(villageId, 0)) STORED,
+    villageKey int GENERATED ALWAYS AS (IFNULL(villageId, 0)) VIRTUAL,
     PRIMARY KEY (grantId),
     UNIQUE KEY idx_rg_user (userId, roleId, villageKey),
     UNIQUE KEY idx_rg_group (userGroupId, roleId, villageKey),
