@@ -84,14 +84,20 @@ const upMigration = [
     WHERE JSON_CONTAINS(lastClaims->'$.realm_access.roles', '"admin"')`,
 
   // Deployment-specific cleanup: on this app's one real deployment, the old
-  // way to fake federation-wide access was granting a village-scoped role
-  // (Steering Committee, LSC, etc.) on every single village. Any admin-claim
-  // user who did this no longer needs those grants once they hold Admin
-  // federation-wide (above) - fold them into Staff (real operational access,
-  // distinct from Admin's pure escalation role) and drop the redundant
-  // per-village rows. Scoped strictly to admin-claim users so it doesn't
-  // touch other users who happen to also hold all-village grants for
-  // unrelated reasons.
+  // village_grant UI let anyone assign ANY of the three village-scoped
+  // roles (Steering Committee / LSC / Village Lead) with no real
+  // authorization behind it - the pre-redesign system never actually
+  // gated on roleId, so people picked whichever level, essentially at
+  // random. The ONLY meaningful signal in that legacy data is the
+  // *pattern* "granted on every single village" (a manual stand-in for
+  // real federation-wide access); the specific legacy roleId carries no
+  // intent and must not be used to infer anything. Detection below is
+  // deliberately role-agnostic: ANY village-scoped role, count of
+  // distinct villages == total village count.
+  //
+  // Admin-claim users who did this no longer need those grants once they
+  // hold Admin federation-wide (above) - fold them into Staff (real
+  // operational access, distinct from Admin's pure escalation role).
   `INSERT IGNORE INTO role_grant (userId, roleId, villageId)
     SELECT rg.userId, 5, NULL
     FROM role_grant rg
@@ -101,11 +107,27 @@ const upMigration = [
     GROUP BY rg.userId
     HAVING COUNT(DISTINCT rg.villageId) = (SELECT COUNT(*) FROM village)`,
 
+  // Non-admin-claim users with the same all-village pattern are federation
+  // Service Coordinators (per the deployment owner) - fold them the same
+  // way, into roleId 7 instead of Staff. Includes users who were
+  // provisioned this way but have never logged in (lastClaims is '{}',
+  // so JSON_CONTAINS(...) is NULL, not FALSE - the NOT/OR below is
+  // required to still catch them; a plain "NOT JSON_CONTAINS(...)" alone
+  // would silently skip NULL rows).
+  `INSERT IGNORE INTO role_grant (userId, roleId, villageId)
+    SELECT rg.userId, 7, NULL
+    FROM role_grant rg
+    JOIN role r ON rg.roleId = r.roleId AND r.scope = 'village'
+    JOIN user_data ud ON ud.userId = rg.userId
+    WHERE NOT JSON_CONTAINS(ud.lastClaims->'$.realm_access.roles', '"admin"')
+       OR JSON_CONTAINS(ud.lastClaims->'$.realm_access.roles', '"admin"') IS NULL
+    GROUP BY rg.userId
+    HAVING COUNT(DISTINCT rg.villageId) = (SELECT COUNT(*) FROM village)`,
+
   `DELETE rg FROM role_grant rg
     JOIN role r ON rg.roleId = r.roleId AND r.scope = 'village'
     JOIN user_data ud ON ud.userId = rg.userId
-    WHERE JSON_CONTAINS(ud.lastClaims->'$.realm_access.roles', '"admin"')
-      AND rg.userId IN (
+    WHERE rg.userId IN (
         SELECT userId FROM (
           SELECT rg2.userId
           FROM role_grant rg2
