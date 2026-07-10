@@ -14,7 +14,9 @@ const config = {
     },
     settings: {
         lastAccessResolution: 60,
-        // Supported VG_DEV_RESPONSE_VALIDATION values: 
+        // Server-side only. Never expose via getClientEnv().
+        bootstrapAdmin: process.env.VG_BOOTSTRAP_ADMIN,
+        // Supported VG_DEV_RESPONSE_VALIDATION values:
         // "logOnly" (logs failing response, but still sends them) 
         // "none"(no validation performed)
         responseValidation: process.env.VG_DEV_RESPONSE_VALIDATION || "none",

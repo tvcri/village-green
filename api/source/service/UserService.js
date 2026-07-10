@@ -692,6 +692,21 @@ exports.createUserGrant = async function (userId, body) {
   return grants
 }
 
+exports.ensureBootstrapAdmin = async function (username) {
+  // Create a shell user row if this username has never logged in.
+  await dbUtils.pool.query(
+    'INSERT INTO user_data (username) VALUES (?) ON DUPLICATE KEY UPDATE username = username',
+    [username]
+  )
+  // Admin is seeded roleId 4; villageId NULL = federation scope.
+  await dbUtils.pool.query(
+    `INSERT INTO role_grant (userId, roleId, villageId)
+     SELECT userId, 4, NULL FROM user_data WHERE username = ?
+     ON DUPLICATE KEY UPDATE roleId = role_grant.roleId`,
+    [username]
+  )
+}
+
 exports.deleteUserGrant = async function (userId, grantId) {
   const [existing] = await dbUtils.pool.query(
     'SELECT * FROM village_grant WHERE grantId = ? AND userId = ?',
