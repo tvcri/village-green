@@ -184,3 +184,10 @@ module.exports.ceDumpUpdated = async function ceDumpUpdated (req, res, next) {
     next(err)
   }
 }
+
+module.exports.getRoles = async function getRoles (req, res, next) {
+  try {
+    res.json(await OperationService.getRoles())
+  }
+  catch (e) { next(e) }
+}
