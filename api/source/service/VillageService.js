@@ -5,9 +5,9 @@ const config = require('../utils/config')
 
 const _this = this
 
-module.exports.queryVillages = async function  ({projections = [], filter = {}, elevate = false, grants = {}, userId = ''}) {  
+module.exports.queryVillages = async function  ({projections = [], filter = {}, allVillages = false, grants = {}, userId = ''}) {
     const villageIdsGranted = Object.keys(grants)
-    if (!villageIdsGranted.length && !elevate) {
+    if (!villageIdsGranted.length && !allVillages) {
       return []
     }
 
@@ -26,7 +26,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
     let requireCteGrantees = false
     let requesterGrantIds = []
 
-    if (!elevate) {
+    if (!allVillages) {
       for (const villageId in grants) {
         requesterGrantIds.push(grants[villageId].grantIds)
       }
@@ -51,7 +51,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
         from role_grant inner join user_group using (userGroupId) where villageId = v.id and roleId = 4) o) as owners`)
     }
     if (projections.includes('statistics')) {
-      if (!elevate) {
+      if (!allVillages) {
         requireCteGrantees = true
         columns.push(`(select
           json_object(
@@ -162,7 +162,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
         v2.id = v.id) as srStatusCounts`)
     }
 
-    if (!elevate) {
+    if (!allVillages) {
       predicates.statements.push('v.id IN (?)')
       predicates.binds.push( villageIdsGranted )
     }
@@ -172,7 +172,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
     }
 
     if (requireCteGrantees) {
-      const cteGranteesParams = elevate ? {returnCte: true} : {villageIds: villageIdsGranted, returnCte: true}
+      const cteGranteesParams = allVillages ? {returnCte: true} : {villageIds: villageIdsGranted, returnCte: true}
       ctes.push(dbUtils.sqlGrantees(cteGranteesParams))
     }
 
@@ -182,11 +182,11 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
 }
 
 module.exports.getVillages = async function () {
-  return await module.exports.queryVillages({})
+  return await module.exports.queryVillages({allVillages: true})
 }
 
 module.exports.getVillage = async function (villageId) {
-  const rows = await module.exports.queryVillages({villageId})
+  const rows = await module.exports.queryVillages({filter: {villageId}, allVillages: true})
   return rows[0] ?? null
 }
 
@@ -201,7 +201,7 @@ module.exports.createVillage = async function (body) {
     },
     statusObj: undefined
   })
-  return await queryVillages({villageId: insertId})
+  return await module.exports.queryVillages({filter: {villageId: insertId}, allVillages: true})
 }
 
 module.exports.patchVillage = async function (villageId, body) {
@@ -216,7 +216,7 @@ module.exports.patchVillage = async function (villageId, body) {
     },
     statusObj: undefined
   })
-  return await queryVillages({villageId})
+  return await module.exports.queryVillages({filter: {villageId}, allVillages: true})
 }
 
 module.exports.deleteVillage = async function (villageId) {
@@ -267,7 +267,7 @@ module.exports.getVillageVolunteers = async function (villageId) {
   return rows
 }
 
-module.exports.getVolunteers = async function ({ villageIdsGranted, elevate }) {
+module.exports.getVolunteers = async function ({ villageIdsGranted, allVillages }) {
   const columns = [
     'p.fullName',
     'CAST(vol.id AS CHAR) AS volunteerId',
@@ -283,7 +283,7 @@ module.exports.getVolunteers = async function ({ villageIdsGranted, elevate }) {
     'LEFT JOIN capability c ON c.id = vc.capabilityId'
   ])
   const predicates = { statements: [], binds: [] }
-  if (!elevate) {
+  if (!allVillages) {
     if (!villageIdsGranted.length) return []
     predicates.statements.push('p.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)

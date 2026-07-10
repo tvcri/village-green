@@ -11,7 +11,7 @@ async function validateVillageGrants(villageGrants, {elevate}) {
   if (villageGrants?.length) {
     // Verify each grant for a valid villageId
     let requestedIds = villageGrants.map( g => g.villageId )
-    let availableVillages = await VillageService.queryVillages({elevate})
+    let availableVillages = await VillageService.queryVillages({allVillages: !!elevate})
     let availableIds = availableVillages.map( c => c.villageId)
     if (! requestedIds.every( id => availableIds.includes(id) ) ) {
       throw new SmError.UnprocessableError('One or more villageIds are invalid.')
