@@ -8,13 +8,22 @@ import { useRoles } from '../../../shared/composables/useRoles.js'
 import { getVillages } from '../api/villageGrantApi.js'
 import { getUsers, getUserGrants, deleteUserGrant, createUserGrant } from '../api/userGrantApi.js'
 import { updateUser } from '../../../shared/api/userApi.js'
+import { useConfirm } from 'primevue/useconfirm'
 import { extractApiErrorMessage } from '../lib/userAdminHelpers.js'
-import { splitGrants, toVillageGrantRows } from '../lib/grantDisplayHelpers.js'
+import { splitGrants, toVillageGrantRows, computeHubRoleOps } from '../lib/grantDisplayHelpers.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import VillageGrantsEditor from './VillageGrantsEditor.vue'
+import FederationRoleSelect from './FederationRoleSelect.vue'
 
 const route = useRoute()
 const { getRoleLabel, fetchRoles } = useRoles()
 fetchRoles()
+
+const confirm = useConfirm()
+const { user: currentUser } = useCurrentUser()
+
+const isSavingHubRole = ref(false)
+const hubRoleError = ref('')
 
 const selectedUserId = ref(null)
 const isSavingGrant = ref(false)
@@ -52,6 +61,7 @@ const selectedUser = computed(() => {
 
 const split = computed(() => splitGrants(grants.value))
 const villageGrantRows = computed(() => toVillageGrantRows(split.value.villageGrants, getRoleLabel))
+const hubGrants = computed(() => split.value.hubGrants)
 
 const availableVillages = computed(() => {
   const grantedIds = new Set(villageGrantRows.value.map(r => r.villageId))
@@ -82,6 +92,50 @@ const handleDeleteGrant = async (grantId) => {
     grantError.value = extractApiErrorMessage(err, 'Failed to delete grant.')
   } finally {
     isSavingGrant.value = false
+  }
+}
+
+const applyHubRoleChange = async (newRoleId) => {
+  const { createRoleId, deleteGrantIds } = computeHubRoleOps(hubGrants.value, newRoleId)
+  if (!createRoleId && deleteGrantIds.length === 0) return // no-op (re-selected current role)
+
+  isSavingHubRole.value = true
+  hubRoleError.value = ''
+  try {
+    // Create before delete: a mid-operation failure leaves the user with
+    // extra access, never none. Recovery from partial state is re-selecting.
+    if (createRoleId) {
+      await createUserGrant(selectedUserId.value, [{ roleId: parseInt(createRoleId, 10), villageId: null }])
+    }
+    for (const grantId of deleteGrantIds) {
+      await deleteUserGrant(selectedUserId.value, grantId)
+    }
+  } catch (err) {
+    hubRoleError.value = extractApiErrorMessage(err, 'Failed to change Hub role.')
+  } finally {
+    isSavingHubRole.value = false
+    await refetchGrants() // always: display must match reality, incl. partial failure
+  }
+}
+
+const handleHubRoleChange = (newRoleId) => {
+  const { createRoleId, deleteGrantIds } = computeHubRoleOps(hubGrants.value, newRoleId)
+  if (!createRoleId && deleteGrantIds.length === 0) return
+
+  const isSelf = String(selectedUserId.value) === String(currentUser.value?.userId)
+  if (isSelf) {
+    confirm.require({
+      header: 'Change your own Hub role',
+      message: 'You are changing your own Hub role. If you remove Admin you will lose access to this screen. Continue?',
+      acceptLabel: 'Continue',
+      rejectLabel: 'Cancel',
+      acceptProps: { severity: 'danger' },
+      accept: () => applyHubRoleChange(newRoleId),
+      // Reject: refetch so the Select snaps back to the real value.
+      reject: () => refetchGrants(),
+    })
+  } else {
+    applyHubRoleChange(newRoleId)
   }
 }
 
@@ -161,6 +215,12 @@ const handleSaveUsername = async () => {
             title="Edit username"
           />
         </h2>
+        <FederationRoleSelect
+          :hub-grants="hubGrants"
+          :disabled="isSavingHubRole || grantsLoading"
+          :error="hubRoleError"
+          @change="handleHubRoleChange"
+        />
       </div>
 
       <small v-if="grantError" class="field-error">{{ grantError }}</small>
