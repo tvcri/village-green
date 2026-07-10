@@ -148,7 +148,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     columns.push(`(SELECT JSON_OBJECT(
       'memberId', CAST(id AS CHAR),
       'memberNumber', memberNumber,
-      ${financial ? `'memberLevel', memberLevel,` : ''}
+      'memberLevel', memberLevel,
       'primaryPerson', (
         SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
         FROM person pp WHERE pp.id = active_member.primaryPersonId
@@ -163,8 +163,8 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       'memberId', CAST(m2.id AS CHAR),
       'personId', CAST(m2.personId AS CHAR),
       'memberNumber', m2.memberNumber,
-      ${financial ? `'memberLevel', m2.memberLevel,
-      'householdDues', m2.householdDues,` : ''}
+      'memberLevel', m2.memberLevel,
+      ${financial ? `'householdDues', m2.householdDues,` : ''}
       'memberType', m2.memberType,
       'primaryPerson', (
         SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
