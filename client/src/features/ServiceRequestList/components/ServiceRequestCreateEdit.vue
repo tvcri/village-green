@@ -897,19 +897,21 @@ const openPersonDialog = (personId) => {
           </div>
 
           <!-- Date Row -->
-          <div>
-            <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Date<span class="req">*</span></label>
-            <DatePicker
-              v-model="form.serviceDate"
-              dateFormat="mm/dd/yy"
-              placeholder="Select date"
-              style="max-width: 16rem;"
-            />
-          </div>
+          <div style="display: flex; align-items: flex-end; gap: 1.5rem;">
+            <div>
+              <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Date<span class="req">*</span></label>
+              <DatePicker
+                v-model="form.serviceDate"
+                dateFormat="mm/dd/yy"
+                placeholder="Select date"
+                style="max-width: 16rem;"
+              />
+            </div>
 
-          <div v-if="isRideService" style="display: flex; align-items: center; gap: 0.5rem;">
-            <Checkbox v-model="form.timesFlexible" input-id="timesFlexible" binary />
-            <label for="timesFlexible">Times flexible</label>
+            <div v-if="isRideService" style="display: flex; align-items: center; gap: 0.5rem; height: 2.5rem;">
+              <Checkbox v-model="form.timesFlexible" input-id="timesFlexible" binary />
+              <label for="timesFlexible">Times flexible</label>
+            </div>
           </div>
 
           <!-- Time Row -->
