@@ -106,6 +106,20 @@ module.exports = {
         DROP COLUMN returnTime,
         RENAME COLUMN apptTimeLocal TO apptTime,
         RENAME COLUMN returnTimeLocal TO returnTime`)
+
+      await connection.query(`DROP EVENT IF EXISTS evt_auto_complete_service_requests`)
+      await connection.query(`
+        CREATE EVENT evt_auto_complete_service_requests
+          ON SCHEDULE EVERY 1 DAY STARTS '2026-07-07 05:01:00'
+          ON COMPLETION NOT PRESERVE ENABLE
+        DO BEGIN
+          UPDATE service_request SET \`status\` = 'Completed'
+          WHERE \`status\` = 'Confirmed' AND serviceDate <= CURDATE() - INTERVAL 1 DAY;
+
+          UPDATE service_request SET \`status\` = 'Unmatched'
+          WHERE \`status\` = 'Open' AND serviceDate <= CURDATE() - INTERVAL 1 DAY;
+        END
+      `)
     } catch (e) {
       logger.writeError('mysql', 'migration', { status: 'error', name: migrationName, message: e.message })
       throw e
@@ -142,6 +156,28 @@ module.exports = {
         DROP COLUMN returnTime,
         RENAME COLUMN apptTimeOld TO apptTime,
         RENAME COLUMN returnTimeOld TO returnTime`)
+
+      // Best-effort reversal of the event too: restores the pre-migration
+      // finishAt-based body now that finishAt exists again above. Like the
+      // rest of down(), this is for the dev dump-restore workflow, not a
+      // guaranteed exact inverse — notably the recreated event is vg@%-owned
+      // (this runs as the app account), NOT the original root@% definer.
+      // That's fine: down() only needs the old body back for the dev
+      // workflow; it deliberately does not resurrect the root ownership that
+      // caused the problem in the first place.
+      await connection.query(`DROP EVENT IF EXISTS evt_auto_complete_service_requests`)
+      await connection.query(`
+        CREATE EVENT evt_auto_complete_service_requests
+          ON SCHEDULE EVERY 1 DAY STARTS '2026-07-07 05:01:00'
+          ON COMPLETION NOT PRESERVE ENABLE
+        DO BEGIN
+          UPDATE service_request SET \`status\` = 'Completed'
+          WHERE \`status\` = 'Confirmed' AND finishAt < NOW();
+
+          UPDATE service_request SET \`status\` = 'Unmatched'
+          WHERE \`status\` = 'Open' AND finishAt < NOW();
+        END
+      `)
     } catch (e) {
       logger.writeError('mysql', 'migration', { status: 'error', name: migrationName, message: e.message })
       throw e
