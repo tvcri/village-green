@@ -3,9 +3,16 @@
 const SmError = require('../utils/error')
 const VillageService = require('../service/VillageService')
 const ApplicationImportService = require('../service/ApplicationImportService')
+const { hasPermission } = require('../utils/authz')
 
 module.exports.extractApplication = async function extractApplication (req, res, next) {
   try {
+    // Extraction feeds the person-import flow and each call bills Anthropic
+    // tokens — gate before any file handling. Federation-scoped: import has
+    // no village context until the operator resolves one from the PDF.
+    if (!hasPermission(req.userObject, 'person:write')) {
+      throw new SmError.PrivilegeError()
+    }
     if (!req.file) {
       throw new SmError.ClientError('No file provided. Attach a PDF as the importFile field.')
     }

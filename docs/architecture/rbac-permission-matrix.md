@@ -62,8 +62,8 @@ fetches, evaluated against the seed matrix.
 | `meta-person-detail` | (fed check) | getPerson → person:read; deletePerson → person:write | OK — Delete v-if person:write matches gate |
 | `meta-person-create` | person:write | createPerson → person:write; getCommunities/getDisabilities/getVillages → ungated ref data | EXACT (+ self-guard) |
 | `meta-person-edit` | person:write | getPerson → person:read; patchPerson → person:write | EXACT (+ self-guard) |
-| `meta-person-import` | person:write | extractApplication → **UNGATED (F2)**; createPerson → person:write; putPersonMember → **UNGATED (F1)** | client-only for extract/member (+ self-guard) |
-| `meta-person-member` | member:write | getPerson → person:read; put/patch/deletePersonMember → **UNGATED (F1)** | client-only enforcement (+ self-guard) |
+| `meta-person-import` | person:write | extractApplication → person:write (federation, fixed F2); createPerson → person:write; putPersonMember → member:write (fixed F1) | EXACT (+ self-guard) |
+| `meta-person-member` | member:write | getPerson → person:read; put/patch/deletePersonMember → member:write (fixed F1) | EXACT (+ self-guard) |
 | `meta-person-volunteer` | volunteer:write | getPerson → person:read; put/patch/deletePersonVolunteer → volunteer:write | EXACT (+ self-guard) |
 | `meta-service-requests` | (fed check) | getServiceRequests → sr:read; patchServiceRequest (notify) → sr:write | OK — New/Edit/Send gated sr:write, matches |
 | `meta-service-request-create` | sr:write | createServiceRequest → sr:write; getVillages ungated; getVillageMembers → member:read; getVillageVolunteers/getVolunteers → volunteer:read | EXACT + cross-key (note N1) (+ self-guard) |
@@ -79,21 +79,21 @@ required API-side. No findings.
 
 ## 3. Findings
 
-**F1 — Member write endpoints have NO API permission gates.**
-`Member.js` (`putPersonMember`, `patchPersonMember`, `deletePersonMember`)
-performs existence/home-village checks only — no `hasPermission` call at
-all. `member:write` appears zero times in any controller. Enforcement is
-client-only (route meta + MemberEdit self-guard). Any authenticated user
-can write/delete member roles by calling the API directly. Per the
-2026-07-11 stance ("RBAC is immature" is no longer an acceptable dodge)
-this is a defect to fix or ticket: add `member:write` gates scoped to the
-person's home village, mirroring `Volunteer.js` lines 31/49/63.
+**F1 — FIXED 2026-07-11. Member write endpoints had NO API permission
+gates.** `Member.js` (`putPersonMember`, `patchPersonMember`,
+`deletePersonMember`) performed existence/home-village checks only — no
+`hasPermission` call at all; enforcement was client-only, so any
+authenticated user could write/delete member roles by calling the API
+directly. Fixed by adding `member:write` gates scoped to the person's
+home village, mirroring the `volunteer:write` gates in `Volunteer.js`.
 
-**F2 — `extractApplication` is ungated.** `Application.js` checks only
-file presence/type/size. Any authenticated user can invoke the
-Anthropic-billed PDF extraction (cost exposure, not just data exposure).
-The wizard behind it is gated `person:write` client-side; the endpoint
-should gate the same key.
+**F2 — FIXED 2026-07-11. `extractApplication` was ungated.**
+`Application.js` checked only file presence/type/size, so any
+authenticated user could invoke the Anthropic-billed PDF extraction
+(cost exposure, not just data exposure). Fixed with a federation-scoped
+`person:write` gate before any file handling — matching the wizard's
+client-side key; federation-scoped because import has no village context
+until the operator resolves one from the PDF.
 
 **N1 — Cross-key page fetches (latent, benign today).** Several pages
 fetch under more keys than their route meta names: members/volunteers
