@@ -377,7 +377,7 @@ const timeDisplay = computed(() => {
 .section {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1rem 1.5rem;
+  gap: 0rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;
 }
@@ -394,7 +394,7 @@ const timeDisplay = computed(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: start;
-  gap: 1rem 1.5rem;
+  gap: 2rem 1.5rem;
   margin-top: 1rem;
   margin-bottom: 2rem;
 }
@@ -521,7 +521,7 @@ const timeDisplay = computed(() => {
 
   .section {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 0rem;
   }
 
   .section-half {
