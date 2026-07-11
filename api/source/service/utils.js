@@ -343,32 +343,6 @@ module.exports.parseRevisionStr = function (revisionStr) {
   return ro
 }
 
-module.exports.selectCollectionByAssetId = async function (assetId) {
-  const [rows] = await _this.pool.query(`SELECT c.* from enabled_asset a left join enabled_collection c using (collectionId) where a.assetId = ?`, [assetId])
-  return rows[0]
-}
-
-module.exports.getGrantByAssetId = async function (assetId, grants) {
-  const row = await _this.selectCollectionByAssetId(assetId)
-  return row ? grants[row.collectionId] : null
-}
-
-module.exports.getUserAssetStigAccess = async function ({assetId, benchmarkId, grants}) {
-  const grant = await _this.getGrantByAssetId(assetId, grants)
-  if (!grant) return 'none'
-  const binds = [assetId, benchmarkId]
-  const sql = `with ${_this.cteAclEffective({grantIds: grant.grantIds})} select
-    coalesce(ae.access, 'rw') as access
-  from
-	  stig_asset_map sa
-    inner join enabled_asset a on sa.assetId = a.assetId
-    ${grant.roleId === 1 ? 'inner' : 'left'} join cteAclEffective ae using (saId)
-  where
-	  sa.assetId = ? and sa.benchmarkId = ?`
-    const [rows] = await _this.pool.query(sql, binds)
-    return rows[0]?.access ?? 'none'
-}
-
 /**
  * updateStatsAssetStig
  * @param {PoolConnection} connection 
@@ -792,13 +766,14 @@ module.exports.sqlGrantees = function ({villageId, villageIds, userId, username,
     predicates.binds.push(username)
   }
 
-  // final query will be a UNION of sqlDirectGrants and sqlGroupGrants
-  const sqlDirectGrants = `select 
+  // Effective grants are the plain union of direct and group-derived rows.
+  // VG roles are capabilities, not ranks: no source shadows another and there
+  // is no role precedence (see 2026-07-11 effective-grants design spec).
+  const sqlDirectGrants = `select
   ${includeColumnVillageId ? 'cg.villageId,' : ''}
   cast(cg.userId as char) as userId,
   cg.roleId,
-  json_array(json_object('userId', cast(ud.userId as char),'username', ud.username)) as grantees,
-  json_array(cg.grantId) as grantIds
+  cg.grantId
 from
   role_grant cg
   inner join village v on (cg.villageId = v.id)
@@ -810,82 +785,23 @@ where
   const sqlFormattedDirectGrants = mysql.format(sqlDirectGrants, predicates.binds)
 
   const sqlGroupGrants = `select
-  ${includeColumnVillageId ? 'villageId,' : ''}
-  userId,
-  roleId,
-  grantees,
-  grantIds
+  ${includeColumnVillageId ? 'cg.villageId,' : ''}
+  cast(ugu.userId as char) as userId,
+  cg.roleId,
+  cg.grantId
 from
-  (select
-    ROW_NUMBER() OVER(PARTITION BY ugu.userId, cg.villageId ORDER BY cg.roleId desc) as rn,
-    ${includeColumnVillageId ? 'cg.villageId,' : ''} 
-    cast(ugu.userId as char) as userId, 
-    cg.roleId,
-    json_arrayagg(json_object('userGroupId', cast(cg.userGroupId as char),'name', ug.name)) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantees,
-    json_arrayagg(cg.grantId) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantIds
-from
-    role_grant cg
-    inner join village v on cg.villageId = v.id
-    left join user_group_user_map ugu on cg.userGroupId = ugu.userGroupId
-    left join user_group ug on ugu.userGroupId = ug.userGroupId
-    left join user_data ud on ugu.userId = ud.userId
-    left join role_grant cgDirect on (cg.villageId = cgDirect.villageId and ugu.userId = cgDirect.userId)
-  where
+  role_grant cg
+  inner join village v on (cg.villageId = v.id)
+  inner join user_group_user_map ugu on cg.userGroupId = ugu.userGroupId
+  left join user_data ud on ugu.userId = ud.userId
+where
     cg.userGroupId is not null
     and cg.villageId is not null
-    and cgDirect.userId is null
-    ${predicates.statements.length ? `and ${predicates.statements.join(' and ')}` : ''}
-  ) dt
-where
-  dt.rn = 1`
+    ${predicates.statements.length ? `and ${predicates.statements.join(' and ')}` : ''}`
   const sqlFormattedGroupGrants = mysql.format(sqlGroupGrants, predicates.binds)
 
   const sqlFormatted = `${sqlFormattedDirectGrants} union ${sqlFormattedGroupGrants}`
   return returnCte ? `cteGrantees as (${sqlFormatted})` : sqlFormatted
-}
-
-module.exports.cteAclEffective = function ({grantIds = [], includeColumnCollectionId = true, inClauseTable = 'cteGrantees', inClauseColumn = 'grantIds', inClauseUserId = ''}) {
-  const inClause = grantIds.length ? '?' : `select jt.grantId from ${inClauseTable} left join json_table (${inClauseTable}.${inClauseColumn}, '$[*]' COLUMNS (grantId INT PATH '$')) jt on true${inClauseUserId ? ` where ${inClauseTable}.userId = ${inClauseUserId}` : ''}`
-  const sql = `cteAclRules as (select${includeColumnCollectionId ? ' a.collectionId,' : ''}
-	sa.saId,
-	cga.access,
-	case when cga.benchmarkId is not null then 1 else 0 end +
-	  case when cga.assetId is not null then 1 else 0 end +
-	  case when cga.assetId is not null and cga.benchmarkId is not null then 1 else 0 end +
-	  case when cga.clId is not null then 1 else 0 end as specificity
-from
-	collection_grant_acl cga
-  left join collection_grant cg on cga.grantId = cg.grantId
-	left join collection_label_asset_map cla on cga.clId = cla.clId
-  left join collection_label cl on cla.clId = cl.clId
-	inner join stig_asset_map sa on (
-	  case when cga.assetId is not null 
-		then cga.assetId = sa.assetId 
-		else true
-	  end and 
-	  case when cga.benchmarkId is not null 
-		then cga.benchmarkId = sa.benchmarkId
-		else true
-	  end and
-	  case when cga.clId is not null 
-		then cla.assetId = sa.assetId
-		else true
-	  end)
-	inner join enabled_asset a on sa.assetId = a.assetId and cg.collectionId = a.collectionId
-where
-	cga.grantId in (${inClause})
-),
-cteAclRulesRanked as (
-    select /*+ NO_MERGE() */ ${includeColumnCollectionId ? ' collectionId,' : ''}
-		saId,
-    access,
-		row_number() over (partition by saId order by specificity desc, access asc) as rn
-	from 
-		cteAclRules),
-cteAclEffective as (select${includeColumnCollectionId ? ' collectionId,' : ''} saId, access from cteAclRulesRanked where rn = 1 and access != 'none')`
-
-  const sqlFormatted = mysql.format(sql, [grantIds])
-  return sqlFormatted
 }
 
 module.exports.selectInvalidUserIds = async function (userIds) {

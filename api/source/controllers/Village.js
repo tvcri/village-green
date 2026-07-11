@@ -12,8 +12,7 @@ module.exports.getVillages = async function getVillages (req, res, next) {
     const response = await VillageService.queryVillages({
       projections,
       allVillages,
-      grants: req.userObject.grants,
-      userId: req.userObject.userId
+      grants: req.userObject.grants
     })
     res.json(response)
   }
@@ -56,8 +55,7 @@ module.exports.getVillage = async function getVillage (req, res, next) {
     const response = await VillageService.queryVillages({
       filter: {villageId},
       projections,
-      allVillages: true,
-      userId: req.userObject.userId
+      allVillages: true
     })
     if (!response[0]) {
       throw new SmError.NotFoundError()

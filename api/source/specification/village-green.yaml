@@ -4152,6 +4152,8 @@ components:
           $ref: '#/components/schemas/CapabilityCounts'
         srStatusCounts:
           $ref: '#/components/schemas/ServiceRequestStatusCounts'
+        statistics:
+          $ref: '#/components/schemas/VillageStatistics'
       required:
       - villageId
       - name
@@ -4184,6 +4186,15 @@ components:
           $ref: '#/components/schemas/VillageName'
       required:
       - name
+    VillageStatistics:
+      additionalProperties: false
+      type: object
+      properties:
+        userCount:
+          type: integer
+          minimum: 0
+      required:
+      - userCount
     VillageUserGrantRead:
       additionalProperties: false
       type: object

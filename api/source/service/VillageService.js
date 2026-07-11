@@ -5,7 +5,7 @@ const config = require('../utils/config')
 
 const _this = this
 
-module.exports.queryVillages = async function  ({projections = [], filter = {}, allVillages = false, grants = {}, userId = ''}) {
+module.exports.queryVillages = async function  ({projections = [], filter = {}, allVillages = false, grants = {}}) {
     const villageIdsGranted = Object.keys(grants)
     if (!villageIdsGranted.length && !allVillages) {
       return []
@@ -51,34 +51,10 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
         from role_grant inner join user_group using (userGroupId) where villageId = v.id and roleId = 4) o) as owners`)
     }
     if (projections.includes('statistics')) {
-      if (!allVillages) {
-        requireCteGrantees = true
-        columns.push(`(select
-          json_object(
-          'created', DATE_FORMAT(c.created, '%Y-%m-%dT%TZ'),
-          'userCount', dt4.userCount,
-          )
-          from
-            (SELECT
-            (select max(cg.roleId) from cteGrantees cg where cg.villageId = v.id and cg.userId = ?) as roleId,
-            (select count(distinct userId) from cteGrantees where villageId = v.id) as userCount,
-          ) dt4
-        ) as statistics`)
-        predicates.binds.push(userId)
-      }
-      else {
-        requireCteGrantees = true
-        columns.push(`(select
-          json_object(
-          'created', DATE_FORMAT(c.created, '%Y-%m-%dT%TZ'),
-          'userCount', dt4.userCount,
-          )
-          from
-            (SELECT
-            (select count(distinct userId) from cteGrantees where villageId = v.id) as userCount,
-          ) dt4
-        ) as statistics`)
-      }
+      requireCteGrantees = true
+      columns.push(`json_object(
+        'userCount', (select count(distinct userId) from cteGrantees where villageId = v.id)
+      ) as statistics`)
     }
     // This projection is not exposed in the OAS, only used by Operation.getAppData()
     if (projections.includes('grants')) { 
