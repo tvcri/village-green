@@ -1,7 +1,7 @@
 'use strict'
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { computeEffective, hasPermission, hasElevatedPermission, holdsAnyElevatable } = require('../utils/authz')
+const { computeEffective, groupRoleDataByUser, hasPermission, hasElevatedPermission, holdsAnyElevatable } = require('../utils/authz')
 
 const rows = [
   // Village Lead on village 3 (direct)
@@ -27,6 +27,26 @@ test('computeEffective handles empty input', () => {
   assert.deepEqual(eff.permissions, { federation: [], byVillage: {} })
   assert.deepEqual(eff.federationGrants, [])
   assert.deepEqual(eff.grants, {})
+})
+
+test('groupRoleDataByUser groups batch rows by forUserId and strips forUserId', () => {
+  const batchRows = [
+    { forUserId: 1, ...rows[0] },
+    { forUserId: 1, ...rows[1] },
+    { forUserId: 2, ...rows[2] },
+  ]
+  const grouped = groupRoleDataByUser(batchRows)
+  assert.deepEqual(grouped.get('1'), [rows[0], rows[1]])
+  assert.deepEqual(grouped.get('2'), [rows[2]])
+  // stripped rows feed computeEffective identically to the per-user query
+  const eff = computeEffective(grouped.get('1'))
+  assert.deepEqual(eff.grants['3'].grantIds, ['10'])
+})
+
+test('groupRoleDataByUser handles empty input and missing users', () => {
+  const grouped = groupRoleDataByUser([])
+  assert.equal(grouped.size, 0)
+  assert.equal(grouped.get('99'), undefined)
 })
 
 function user(federation, byVillage = {}) {

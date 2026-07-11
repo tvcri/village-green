@@ -41,6 +41,19 @@ function computeEffective(rows) {
   }
 }
 
+// Group batched role-data rows (UserService.getUsersRoleData) by their
+// forUserId, stripping that key so each group matches getUserRoleData()'s
+// row shape exactly before it reaches computeEffective().
+function groupRoleDataByUser(batchRows) {
+  const byUser = new Map()
+  for (const { forUserId, ...row } of batchRows) {
+    const uid = String(forUserId)
+    if (!byUser.has(uid)) byUser.set(uid, [])
+    byUser.get(uid).push(row)
+  }
+  return byUser
+}
+
 function hasPermission(userObject, permission, { villageId } = {}) {
   const p = userObject?.permissions
   if (!p) return false
@@ -65,4 +78,4 @@ function holdsAnyElevatable(userObject) {
   return federation.includes(WILDCARD) || federation.some(p => elevatable.has(p))
 }
 
-module.exports = { computeEffective, hasPermission, hasElevatedPermission, holdsAnyElevatable }
+module.exports = { computeEffective, groupRoleDataByUser, hasPermission, hasElevatedPermission, holdsAnyElevatable }

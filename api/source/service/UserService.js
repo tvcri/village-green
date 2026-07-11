@@ -35,9 +35,10 @@ exports.queryUsers = async function (inProjection, inPredicates, userObject) {
 
   // PROJECTIONS
   // 'grants' (UserProjected.grants/federationGrants/permissions) is computed
-  // in JS after the row fetch below via getUserRoleData()/computeEffective(),
-  // the same helper setupUser() uses at auth time — reusing it here keeps a
-  // single source of truth for the shape instead of duplicating it in SQL.
+  // in JS after the row fetch below via one batched getUsersRoleData() query
+  // and computeEffective() — the same shaping helper setupUser() uses at auth
+  // time, keeping a single source of truth for the shape instead of
+  // duplicating it in SQL.
   const needsRoleData = inProjection?.includes('grants')
 
   if (inProjection?.includes('statistics')) {
@@ -146,10 +147,12 @@ exports.queryUsers = async function (inProjection, inPredicates, userObject) {
   const sql = dbUtils.makeQueryString({ctes, columns, joins, predicates, groupBy, orderBy, format: true})
   let [rows] = await dbUtils.pool.query(sql)
 
-  if (needsRoleData) {
-    const { computeEffective } = require('../utils/authz')
+  if (needsRoleData && rows.length) {
+    const { computeEffective, groupRoleDataByUser } = require('../utils/authz')
+    const batchRows = await _this.getUsersRoleData(rows.map(row => row.userId))
+    const byUser = groupRoleDataByUser(batchRows)
     for (const row of rows) {
-      const roleData = await _this.getUserRoleData(row.userId)
+      const roleData = byUser.get(String(row.userId)) ?? []
       Object.assign(row, computeEffective(roleData))  // grants, federationGrants, permissions
     }
   }
@@ -552,6 +555,36 @@ exports.getUserRoleData = async function (userId) {
     rg.userId = ?
     or rg.userGroupId in (select userGroupId from user_group_user_map where userId = ?)`
   const [rows] = await dbUtils.pool.query(sql, [userId, userId])
+  return rows
+}
+
+// Batched variant of getUserRoleData for list responses: one query for all
+// requested users instead of one per user. forUserId identifies which user
+// each grant row applies to — a direct grant carries rg.userId; a group
+// grant fans out to one row per group member via user_group_user_map,
+// reproducing getUserRoleData's `userId = ? OR userGroupId IN (...)`
+// semantics.
+exports.getUsersRoleData = async function (userIds) {
+  const sql = `
+  select
+    target.userId as forUserId,
+    rg.grantId,
+    rg.roleId,
+    r.name as roleName,
+    r.scope,
+    rg.villageId,
+    v.name as villageName,
+    rp.permission
+  from
+    role_grant rg
+    inner join role r on rg.roleId = r.roleId
+    left join role_permission rp on r.roleId = rp.roleId
+    left join village v on rg.villageId = v.id
+    left join user_group_user_map ugum on rg.userGroupId = ugum.userGroupId
+    inner join user_data target on target.userId = coalesce(rg.userId, ugum.userId)
+  where
+    target.userId in (?)`
+  const [rows] = await dbUtils.pool.query(sql, [userIds])
   return rows
 }
 
