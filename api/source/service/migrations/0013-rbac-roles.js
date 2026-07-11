@@ -1,7 +1,7 @@
 // api/source/service/migrations/0013-rbac-roles.js
 const MigrationHandler = require('./lib/MigrationHandler')
 
-const villageReads = ['person:read', 'member:read', 'volunteer:read', 'sr:read', 'friend:read']
+const villageReads = ['person:read', 'member:read', 'volunteer:read', 'sr:read', 'friend:read', 'village:read']
 const staffPerms = [
   'person:read', 'person:write', 'person:read_confidential',
   'member:read', 'member:write', 'member:read_financial',
