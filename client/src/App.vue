@@ -24,7 +24,7 @@ onMounted(() => {
 <template>
   <div v-if="isDev" class="dev-instance" aria-hidden="true">FOR DEMONSTRATION ONLY -- DOES NOT MANAGE PRODUCTION DATA</div>
   <div class="app-container">
-    <Toast />
+    <Toast position="top-center" />
     <ConfirmDialog />
     <GlobalErrorModal />
     <PrivacyAckModal />

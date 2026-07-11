@@ -177,7 +177,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       'status', m2.status,
       'dropReason', m2.dropReason,
       'householdSize', m2.householdSize,
-      'quickbooksKey', m2.quickbooksKey,
+      ${financial ? `'quickbooksKey', m2.quickbooksKey,` : ''}
       'printedNewsletter', m2.printedNewsletter != 0,
       ${confidential ? `'confidentialNotes', m2.confidentialNotes,` : ''}
       'statusChangeNotes', m2.statusChangeNotes,

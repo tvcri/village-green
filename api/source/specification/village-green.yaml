@@ -4107,7 +4107,7 @@ components:
       type: object
       properties:
         villageId:
-          $ref: '#/components/schemas/VillageId'
+          $ref: '#/components/schemas/VillageIdNullable'
         roleId:
           $ref: '#/components/schemas/RoleId'
       required:
@@ -4165,6 +4165,8 @@ components:
         - $ref: '#/components/schemas/VillageUserGroupGrantWrite'
     VillageId:
       $ref: '#/components/schemas/StringIntId'
+    VillageIdNullable:
+      $ref: '#/components/schemas/StringIntIdNullable'
     VillageName:
       $ref: '#/components/schemas/String45'
     VillagePatch:
