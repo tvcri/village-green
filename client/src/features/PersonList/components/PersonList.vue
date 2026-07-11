@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
@@ -18,6 +19,8 @@ import { getVillages } from '../../VillageList/api/villageApi.js'
 defineOptions({ name: 'PersonList' })
 
 const router = useRouter()
+const { hasPermission } = useCurrentUser()
+const canWritePerson = computed(() => hasPermission('person:write'))
 
 useScrollRestore('meta-persons', 'meta-person-detail')
 
@@ -117,8 +120,8 @@ function onSearch() {
         <span v-if="filteredPersons !== null && !isLoading" class="result-count">
           {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
         </span>
-        <Button label="New Person" icon="pi pi-plus" @click="$router.push({ name: 'meta-person-create' })" />
-        <Button label="Import Application" icon="pi pi-file-import" severity="secondary"
+        <Button v-if="canWritePerson" label="New Person" icon="pi pi-plus" @click="$router.push({ name: 'meta-person-create' })" />
+        <Button v-if="canWritePerson" label="Import Application" icon="pi pi-file-import" severity="secondary"
           @click="$router.push({ name: 'meta-person-import' })" />
       </div>
     </div>

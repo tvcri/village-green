@@ -9,8 +9,10 @@ import PersonStep from './PersonStep.vue'
 import MemberStep from './MemberStep.vue'
 import VolunteerStep from './VolunteerStep.vue'
 import DoneStep from './DoneStep.vue'
+import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
+useRequirePermission('person:write')
 
 const extraction = ref(null)
 const stepIndex = ref(0)

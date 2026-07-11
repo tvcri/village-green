@@ -8,10 +8,12 @@ import { getPerson, getCapabilities, getVettingTypes } from '../api/personApi.js
 import { putVolunteer, patchVolunteer, deleteVolunteer } from '../api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import VolunteerFormFields from './VolunteerFormFields.vue'
+import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
+useRequirePermission('volunteer:write')
 const personId = computed(() => route.params.personId)
 
 const person = ref(null)

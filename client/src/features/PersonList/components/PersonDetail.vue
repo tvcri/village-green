@@ -7,10 +7,15 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
 import { deletePerson } from '../api/personApi.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { hasPermission } = useCurrentUser()
+const canWritePerson = computed(() => hasPermission('person:write'))
+const canWriteMember = computed(() => hasPermission('member:write'))
+const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const personId = computed(() => route.params.personId)
 
 const { state: person } = useAsyncState(
@@ -61,10 +66,10 @@ async function removePerson () {
 <template>
   <div class="person-detail">
     <div class="actions" style="display:flex;gap:0.5rem;margin-bottom:1rem;">
-      <Button label="Edit Person" icon="pi pi-pencil" @click="goEdit" />
-      <Button label="Member" icon="pi pi-id-card" :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
-      <Button label="Volunteer" icon="pi pi-users" :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
-      <span style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
+      <Button v-if="canWritePerson" label="Edit Person" icon="pi pi-pencil" @click="goEdit" />
+      <Button v-if="canWriteMember" label="Member" icon="pi pi-id-card" :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
+      <Button v-if="canWriteVolunteer" label="Volunteer" icon="pi pi-users" :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
+      <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
         <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="!canDelete" @click="removePerson" />
       </span>
     </div>

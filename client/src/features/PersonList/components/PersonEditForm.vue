@@ -11,10 +11,12 @@ import {
   getCommunities, getDisabilities,
 } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
+useRequirePermission('person:write')
 
 const isEdit = computed(() => !!route.params.personId)
 const personId = computed(() => route.params.personId)

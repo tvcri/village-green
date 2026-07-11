@@ -7,10 +7,12 @@ import Button from 'primevue/button'
 import MemberFormFields from './MemberFormFields.vue'
 import { getPerson } from '../api/personApi.js'
 import { putMember, patchMember, deleteMember } from '../api/roleApi.js'
+import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
+useRequirePermission('member:write')
 const personId = computed(() => route.params.personId)
 
 const person = ref(null)
