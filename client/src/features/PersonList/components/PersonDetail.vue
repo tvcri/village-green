@@ -19,7 +19,7 @@ const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const personId = computed(() => route.params.personId)
 
 const { state: person } = useAsyncState(
-  () => apiCall('getPerson', { personId: personId.value, projection: ['memberDetail', 'volunteerDetail'] }),
+  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] }),
   { immediate: true }
 )
 
@@ -35,15 +35,15 @@ const personType = computed(() => {
 // Section visibility should reflect whether the detail data exists, not
 // whether the role is currently active (a volunteer can be inactive but
 // still have vettings/capabilities on record).
-const hasMemberDetail = computed(() => !!person.value?.memberDetail)
-const hasVolunteerDetail = computed(() => !!person.value?.volunteerDetail)
+const hasMemberDetail = computed(() => !!person.value?.member)
+const hasVolunteerDetail = computed(() => !!person.value?.volunteer)
 
 const canDelete = computed(() => !(person.value?.roles ?? []).length)
 
 const flatPerson = computed(() => {
   if (!person.value) return null
-  const { memberDetail, volunteerDetail, ...rest } = person.value
-  return { ...rest, ...memberDetail, ...volunteerDetail }
+  const { member, volunteer, ...rest } = person.value
+  return { ...rest, ...member, ...volunteer }
 })
 
 function goEdit () { router.push({ name: 'meta-person-edit', params: { personId: personId.value } }) }

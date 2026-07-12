@@ -38,12 +38,12 @@ onMounted(async () => {
     capabilityOptions.value = capabilities
     vettingTypeOptions.value = vettingTypes
     villageOptions.value = villages
-    const p = await getPerson(personId.value, ['volunteerDetail'])
+    const p = await getPerson(personId.value, ['volunteer'])
     person.value = p
-    if (p.volunteerDetail) {
+    if (p.volunteer) {
       hasVolunteer.value = true
-      const d = p.volunteerDetail
-      // volunteerDetail.capabilities are names; map to ids via capabilityOptions
+      const d = p.volunteer
+      // volunteer.capabilities are names; map to ids via capabilityOptions
       const nameToId = new Map(capabilityOptions.value.map(c => [c.name, c.capabilityId]))
       selectedCapabilityIds.value = (d.capabilities ?? []).map(n => nameToId.get(n)).filter(Boolean)
       selectedAssociateVillageIds.value = (d.associateVillages ?? []).map(v => v.villageId)

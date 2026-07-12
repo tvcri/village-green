@@ -25,7 +25,7 @@ const props = defineProps({
   },
   // Explicit override for section visibility, independent of personType
   // (which reflects only *active* roles). Pass when the caller knows
-  // memberDetail/volunteerDetail data exists even if the role is inactive.
+  // member/volunteer payload data exists even if the role is inactive.
   // Defaults (null) fall back to personType so single-role pages are unaffected.
   hasMemberDetail: {
     type: Boolean,

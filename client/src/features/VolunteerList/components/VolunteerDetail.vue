@@ -10,17 +10,18 @@ const route = useRoute()
 const personId = computed(() => route.params.personId)
 
 // getPerson returns the full person (flat phone/cell) plus volunteer data via
-// the volunteerInfo projection. Flatten volunteerInfo so PersonDetailCard can
-// read capabilities directly.
+// the volunteer projection. Flatten it so PersonDetailCard can read
+// capabilities directly — but only when the volunteer role is active (see
+// MemberDetail.vue for the read_inactive rationale).
 const { state: person } = useAsyncState(
-  () => getPerson(personId.value, ['volunteerInfo']),
+  () => getPerson(personId.value, ['volunteer']),
   { immediate: true, onError: null }
 )
 
 const volunteer = computed(() => {
   if (!person.value) return null
-  const { volunteerInfo, ...rest } = person.value
-  return { ...rest, ...volunteerInfo }
+  const { volunteer: volunteerData, ...rest } = person.value
+  return { ...rest, ...((person.value.roles ?? []).includes('volunteer') ? volunteerData : null) }
 })
 </script>
 

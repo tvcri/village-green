@@ -42,10 +42,10 @@ onMounted(async () => {
   try {
     // A chosen existing person may already hold a member role: load it and
     // switch to patch semantics, keeping only the notes dump from the import.
-    const p = await getPerson(props.personId, ['memberDetail'])
-    if (p.memberDetail) {
+    const p = await getPerson(props.personId, ['member'])
+    if (p.member) {
       hasMember.value = true
-      const d = p.memberDetail
+      const d = p.member
       Object.keys(form).forEach(k => {
         if (k === 'primaryPersonId') form.primaryPersonId = d.primaryPerson?.personId ?? ''
         else if (d[k] != null) form[k] = d[k]
