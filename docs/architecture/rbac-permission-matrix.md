@@ -17,7 +17,7 @@ check that caught the missing `village:read`.
 | person:read_confidential | — | — | — | * | ✓ | — | ✓ |
 | member:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
 | member:write | — | — | — | * | ✓ | — | — |
-| member:read_financial | — | — | — | * | ✓ | — | — |
+| member:read_financial | — | — | ✓ | * | ✓ | — | — |
 | member:read_inactive | — | — | — | * | ✓ | — | — |
 | volunteer:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
 | volunteer:write | — | — | — | * | ✓ | — | — |

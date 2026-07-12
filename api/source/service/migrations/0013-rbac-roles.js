@@ -2,6 +2,7 @@
 const MigrationHandler = require('./lib/MigrationHandler')
 
 const villageReads = ['person:read', 'member:read', 'volunteer:read', 'sr:read', 'friend:read', 'village:read']
+const villageLeadPerms = [...villageReads, 'member:read_financial']
 const staffPerms = [
   'person:read', 'person:write', 'person:read_confidential',
   'member:read', 'member:write', 'member:read_financial', 'member:read_inactive',
@@ -63,7 +64,7 @@ const upMigration = [
   `INSERT INTO role_permission (roleId, permission) VALUES
     ${permValues(1, villageReads)},
     ${permValues(2, villageReads)},
-    ${permValues(3, villageReads)},
+    ${permValues(3, villageLeadPerms)},
     (4, '*'),
     ${permValues(5, staffPerms)},
     ${permValues(6, boardPerms)},
