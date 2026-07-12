@@ -24,7 +24,6 @@ const { state: user, isLoading } = useAsyncState(
 
 const displayName = computed(() => user.value?.displayName || user.value?.username || 'User')
 const email = computed(() => user.value?.email)
-const status = computed(() => user.value?.status)
 
 const isInAdmin = computed(() => {
   return route.name && route.name.startsWith('admin')
@@ -89,10 +88,6 @@ const toggleMenu = (event) => {
         <div class="menu-user-section">
           <div class="menu-user-name">{{ user.displayName || user.username }}</div>
           <div v-if="email" class="menu-user-email">{{ email }}</div>
-          <div v-if="status" class="menu-user-status">
-            <span class="status-label">Status:</span>
-            <span class="status-badge">{{ status }}</span>
-          </div>
         </div>
         <MyAccessSummary :user="user" />
       </template>
@@ -128,26 +123,6 @@ const toggleMenu = (event) => {
   color: var(--color-text-dim);
   margin-bottom: 0.5rem;
   word-break: break-word;
-}
-
-.menu-user-status {
-  font-size: 0.85rem;
-  color: var(--color-text-dim);
-  display: flex;
-  gap: 0.5rem;
-}
-
-.status-label {
-  color: var(--color-text-dim);
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 0.2rem 0.4rem;
-  background-color: var(--color-background-dark);
-  border-radius: 3px;
-  font-weight: 500;
-  text-transform: capitalize;
 }
 
 .menu-version-section {
