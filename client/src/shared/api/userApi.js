@@ -1,44 +1,41 @@
 import { apiCall } from './apiClient.js'
+import { useElevate } from '../composables/useElevate.js'
 
 export const getUser = () => apiCall('getUser')
 
-export const getUsers = () => apiCall('getUsers', { elevate: true })
+export const getUsers = () => {
+  const { elevate } = useElevate()
+  return apiCall('getUsers', { elevate: elevate.value ?? true })
+}
 
-export const getUsersWithGrantCount = () =>
-  apiCall('getUsers', { elevate: true, projection: ['statistics'] })
+export const getUsersWithGrants = () => {
+  const { elevate } = useElevate()
+  return apiCall('getUsers', { elevate: elevate.value ?? true, projection: ['grants'] })
+}
 
-export const createUser = (body) =>
-  apiCall('createUser', { elevate: true }, body)
+export const createUser = (body) => {
+  const { elevate } = useElevate()
+  return apiCall('createUser', { elevate: elevate.value ?? true }, body)
+}
 
-export const updateUser = (userId, body) =>
-  apiCall('updateUser', { userId, elevate: true }, body)
+export const updateUser = (userId, body) => {
+  const { elevate } = useElevate()
+  return apiCall('updateUser', { userId, elevate: elevate.value ?? true }, body)
+}
 
-export const deleteUser = (userId) =>
-  apiCall('deleteUser', { userId, elevate: true, projection: ['statistics'] })
+export const deleteUser = (userId) => {
+  const { elevate } = useElevate()
+  return apiCall('deleteUser', { userId, elevate: elevate.value ?? true, projection: ['statistics'] })
+}
+
+export const getRoles = () => apiCall('getRoles')
 
 /**
  * Fetches the current user data from the API
- * @returns {Promise<object>} The user object with sorted collectionGrants
+ * @returns {Promise<object>} The user object
  */
 export async function fetchCurrentUser() {
-  const user = await apiCall('getUser', { projection: 'webPreferences' })
-
-  // Sort collectionGrants by collection name (matching original SM.GetUserObject logic)
-  if (user.collectionGrants && Array.isArray(user.collectionGrants)) {
-    user.collectionGrants.sort((a, b) => {
-      const nameA = a.collection.name
-      const nameB = b.collection.name
-      if (nameA < nameB) {
-        return -1
-      }
-      if (nameA > nameB) {
-        return 1
-      }
-      return 0
-    })
-  }
-
-  return user
+  return apiCall('getUser', { projection: 'webPreferences' })
 }
 
 export function fetchUsers({ status } = {}) {

@@ -11,10 +11,12 @@ import {
   getCommunities, getDisabilities,
 } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
+useRequirePermission('person:write')
 
 const isEdit = computed(() => !!route.params.personId)
 const personId = computed(() => route.params.personId)
@@ -41,7 +43,7 @@ const communityNames = ref(new Set())     // Set<'Pride'|'Veteran'>
 const disabilities = ref(new Map())       // Map<'Vision'|'Walker'|'Hearing'|'Wheelchair'|'Cane', note>
 
 async function loadVillages () {
-  villages.value = await getVillages(true)
+  villages.value = await getVillages()
 }
 
 onMounted(async () => {

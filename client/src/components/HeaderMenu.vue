@@ -6,6 +6,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useCurrentUser } from '../shared/composables/useCurrentUser.js'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getUser } from '../shared/api/userApi.js'
+import MyAccessSummary from './MyAccessSummary.vue'
 
 defineProps({
   version: String
@@ -14,7 +15,7 @@ defineProps({
 const router = useRouter()
 const route = useRoute()
 const menuRef = ref()
-const { isAdmin } = useCurrentUser()
+const { hasPermission } = useCurrentUser()
 
 const { state: user, isLoading } = useAsyncState(
   () => getUser(),
@@ -23,7 +24,6 @@ const { state: user, isLoading } = useAsyncState(
 
 const displayName = computed(() => user.value?.displayName || user.value?.username || 'User')
 const email = computed(() => user.value?.email)
-const status = computed(() => user.value?.status)
 
 const isInAdmin = computed(() => {
   return route.name && route.name.startsWith('admin')
@@ -36,7 +36,7 @@ const adminLabel = computed(() => {
 const menuItems = computed(() => {
   const items = []
 
-  if (isAdmin.value) {
+  if (hasPermission('user:admin')) {
     items.push({
       label: adminLabel.value,
       icon: isInAdmin.value ? 'pi pi-home' : 'pi pi-cog',
@@ -88,11 +88,8 @@ const toggleMenu = (event) => {
         <div class="menu-user-section">
           <div class="menu-user-name">{{ user.displayName || user.username }}</div>
           <div v-if="email" class="menu-user-email">{{ email }}</div>
-          <div v-if="status" class="menu-user-status">
-            <span class="status-label">Status:</span>
-            <span class="status-badge">{{ status }}</span>
-          </div>
         </div>
+        <MyAccessSummary :user="user" />
       </template>
       <template #end>
         <div v-if="version" class="menu-version-section">
@@ -126,26 +123,6 @@ const toggleMenu = (event) => {
   color: var(--color-text-dim);
   margin-bottom: 0.5rem;
   word-break: break-word;
-}
-
-.menu-user-status {
-  font-size: 0.85rem;
-  color: var(--color-text-dim);
-  display: flex;
-  gap: 0.5rem;
-}
-
-.status-label {
-  color: var(--color-text-dim);
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 0.2rem 0.4rem;
-  background-color: var(--color-background-dark);
-  border-radius: 3px;
-  font-weight: 500;
-  text-transform: capitalize;
 }
 
 .menu-version-section {

@@ -556,6 +556,7 @@ paths:
       summary: Get analytics summary (admin only)
       operationId: getSummary
       parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       - name: from
         in: query
         required: false
@@ -591,6 +592,23 @@ paths:
       security:
       - oauth:
         - vg:read
+      x-elevation-required: true
+  /op/roles:
+    get:
+      summary: List roles and their permissions
+      tags: [Operation]
+      operationId: getRoles
+      responses:
+        '200':
+          description: Role list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Role' }
+      security:
+      - oauth:
+        - vg:op:read
   /user:
     parameters:
     - $ref: '#/components/parameters/UserPreferenceQuery'
@@ -691,6 +709,8 @@ paths:
       - Privacy
       summary: Publish a new version of privacy rules
       operationId: publishPrivacyRules
+      parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       requestBody:
         required: true
         content:
@@ -713,12 +733,15 @@ paths:
       security:
       - oauth:
         - vg:user:read
+      x-elevation-required: true
   /privacy/rules/current:
     patch:
       tags:
       - Privacy
       summary: Correct the current published privacy rules without creating a new version
       operationId: patchPrivacyRulesCurrent
+      parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       requestBody:
         required: true
         content:
@@ -747,6 +770,7 @@ paths:
       security:
       - oauth:
         - vg:user:read
+      x-elevation-required: true
   /privacy/acknowledgements:
     post:
       tags:
@@ -786,7 +810,6 @@ paths:
       operationId: getUsers
       parameters:
       - $ref: '#/components/parameters/UsernameQuery'
-      - $ref: '#/components/parameters/PrivilegeQuery'
       - $ref: '#/components/parameters/UsernameMatchQuery'
       - $ref: '#/components/parameters/UserStatusQuery'
       responses:
@@ -1215,7 +1238,6 @@ paths:
       - Person
       operationId: getPersons
       parameters:
-        - $ref: '#/components/parameters/ElevateQuery'
         - name: villageId
           in: query
           description: Filter to specific villages (omit for all granted villages)
@@ -1245,15 +1267,6 @@ paths:
           description: Filter by email (contains, case-insensitive)
           schema:
             type: string
-        - name: role
-          in: query
-          description: Filter to persons holding a specific role
-          schema:
-            type: string
-            enum:
-            - member
-            - volunteer
-            - community
       responses:
         '200':
           description: List of persons
@@ -1382,8 +1395,6 @@ paths:
       tags:
       - Volunteer
       operationId: getVolunteers
-      parameters:
-        - $ref: '#/components/parameters/ElevateQuery'
       responses:
         '200':
           description: List of volunteers
@@ -1551,7 +1562,6 @@ paths:
       - ServiceRequest
       operationId: getServiceRequests
       parameters:
-        - $ref: '#/components/parameters/ElevateQuery'
         - $ref: '#/components/parameters/ServiceRequestStatusQuery'
         - $ref: '#/components/parameters/HasNotificationsQuery'
         - name: villageId
@@ -1693,7 +1703,6 @@ paths:
       - Friend
       operationId: getFriends
       parameters:
-        - $ref: '#/components/parameters/ElevateQuery'
         - name: villageId
           in: query
           description: Filter to specific villages (omit for all granted villages)
@@ -1770,7 +1779,6 @@ paths:
       - Village
       operationId: getVillages
       parameters:
-      - $ref: '#/components/parameters/ElevateQuery'
       - $ref: '#/components/parameters/VillageProjectionQuery'
       responses:
         '200':
@@ -1795,6 +1803,8 @@ paths:
       tags:
       - Village
       operationId: createVillage
+      parameters:
+      - $ref: '#/components/parameters/ElevateQuery'
       requestBody:
         required: true
         content:
@@ -3081,18 +3091,12 @@ components:
           nullable: true
         village:
           $ref: '#/components/schemas/Village'
-        roles:
-          $ref: '#/components/schemas/PersonRoles'
-        memberInfo:
-          $ref: '#/components/schemas/Member'
-          nullable: true
-        memberDetail:
+        activeAs:
+          $ref: '#/components/schemas/ActiveAs'
+        member:
           $ref: '#/components/schemas/MemberDetail'
           nullable: true
-        volunteerInfo:
-          $ref: '#/components/schemas/Volunteer'
-          nullable: true
-        volunteerDetail:
+        volunteer:
           $ref: '#/components/schemas/VolunteerDetail'
           nullable: true
         communities:
@@ -3121,8 +3125,8 @@ components:
               $ref: '#/components/schemas/VillageId'
             name:
               type: string
-        roles:
-          $ref: '#/components/schemas/PersonRoles'
+        activeAs:
+          $ref: '#/components/schemas/ActiveAs'
         phone:
           type: object
           nullable: true
@@ -3289,34 +3293,54 @@ components:
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisabilityPatch' }
-    PersonRoles:
+    ActiveAs:
       type: array
       items:
         type: string
         enum:
         - member
         - volunteer
-    RoleCounts:
+    PersonCounts:
       additionalProperties: false
       type: object
       properties:
-        members:
+        member:
           type: integer
           minimum: 0
-        volunteers:
+        volunteer:
           type: integer
           minimum: 0
         both:
           type: integer
           minimum: 0
       required:
-      - members
-      - volunteers
+      - member
+      - volunteer
       - both
     RoleId:
-      maximum: 4
+      maximum: 7
       minimum: 1
       type: integer
+    Role:
+      type: object
+      additionalProperties: false
+      required: [roleId, name, scope, isSystem, permissions]
+      properties:
+        roleId: { type: string }
+        name: { type: string }
+        scope: { type: string, enum: [federation, village] }
+        description: { type: string, nullable: true }
+        isSystem: { type: boolean }
+        permissions:
+          type: array
+          items: { type: string }
+    RoleGrantAssign:
+      type: object
+      additionalProperties: false
+      required: [roleId]
+      properties:
+        roleId: { $ref: '#/components/schemas/RoleId' }
+        villageId: { type: string, nullable: true }
     PersonAddress:
       additionalProperties: false
       type: object
@@ -3927,20 +3951,12 @@ components:
           type: string
         lastName:
           type: string
-        villageGrants:
+        roleGrants:
           type: array
           items:
-            $ref: '#/components/schemas/UserVillageGrantWrite'
+            $ref: '#/components/schemas/RoleGrantAssign'
       required:
       - username
-    UserPrivileges:
-      type: object
-      additionalProperties: false
-      properties:
-        admin:
-          type: boolean
-        create_village:
-          type: boolean
     UserProjected:
       additionalProperties: false
       type: object
@@ -3952,8 +3968,55 @@ components:
           type: string
         lastAccess:
           $ref: '#/components/schemas/UserLastAccess'
-        privileges:
-          $ref: '#/components/schemas/UserPrivileges'
+        permissions:
+          type: object
+          additionalProperties: false
+          properties:
+            federation:
+              type: array
+              items: { type: string }
+            byVillage:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+        grants:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            properties:
+              villageId:
+                type: string
+              name:
+                type: string
+              roles:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    roleId:
+                      type: string
+                    name:
+                      type: string
+              grantIds:
+                type: array
+                items: { type: string }
+        federationGrants:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              grantId:
+                type: string
+              roleId:
+                type: string
+              name:
+                type: string
+        canElevate:
+          type: boolean
         statistics:
           $ref: '#/components/schemas/UserStatistics'
         status:
@@ -3974,10 +4037,6 @@ components:
           $ref: '#/components/schemas/WebPreferences'
         privacyStatus:
           $ref: '#/components/schemas/PrivacyStatus'
-        villageGrants:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserVillageGrantRead'
       required:
       - userId
       - username
@@ -3997,9 +4056,13 @@ components:
           $ref: '#/components/schemas/Username'
         status:
           $ref: '#/components/schemas/UserStatus'
+        roleGrants:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleGrantAssign'
       required:
       - username
-      - villageGrants
+      - roleGrants
     UserStatistics:
       additionalProperties: false
       type: object
@@ -4029,7 +4092,7 @@ components:
       type: object
       properties:
         villageId:
-          $ref: '#/components/schemas/VillageId'
+          $ref: '#/components/schemas/VillageIdNullable'
         roleId:
           $ref: '#/components/schemas/RoleId'
       required:
@@ -4039,10 +4102,13 @@ components:
       additionalProperties: false
       type: object
       properties:
+        grantId:
+          $ref: '#/components/schemas/GrantId'
         roleId:
           $ref: '#/components/schemas/RoleId'
         village:
           type: object
+          nullable: true
           properties:
             villageId:
               $ref: '#/components/schemas/VillageId'
@@ -4068,12 +4134,15 @@ components:
           $ref: '#/components/schemas/VillageId'
         name:
           $ref: '#/components/schemas/VillageName'
-        roleCounts:
-          $ref: '#/components/schemas/RoleCounts'
+        personCounts:
+          $ref: '#/components/schemas/PersonCounts'
+          nullable: true
         capabilityCounts:
           $ref: '#/components/schemas/CapabilityCounts'
         srStatusCounts:
           $ref: '#/components/schemas/ServiceRequestStatusCounts'
+        statistics:
+          $ref: '#/components/schemas/VillageStatistics'
       required:
       - villageId
       - name
@@ -4087,6 +4156,8 @@ components:
         - $ref: '#/components/schemas/VillageUserGroupGrantWrite'
     VillageId:
       $ref: '#/components/schemas/StringIntId'
+    VillageIdNullable:
+      $ref: '#/components/schemas/StringIntIdNullable'
     VillageName:
       $ref: '#/components/schemas/String45'
     VillagePatch:
@@ -4104,6 +4175,15 @@ components:
           $ref: '#/components/schemas/VillageName'
       required:
       - name
+    VillageStatistics:
+      additionalProperties: false
+      type: object
+      properties:
+        userCount:
+          type: integer
+          minimum: 0
+      required:
+      - userCount
     VillageUserGrantRead:
       additionalProperties: false
       type: object
@@ -4508,19 +4588,8 @@ components:
         items:
           type: string
           enum:
-          - memberInfo
-          - memberDetail
-          - volunteerInfo
-          - volunteerDetail
-    PrivilegeQuery:
-      name: privilege
-      in: query
-      description: Selects Users with the specified privilege
-      schema:
-        type: string
-        enum:
-        - admin
-        - create_village
+          - member
+          - volunteer
     RunSequenceQuery:
       name: after-seq
       in: query
@@ -4628,7 +4697,7 @@ components:
         items:
           type: string
           enum:
-          - villageGrants
+          - grants
           - statistics
           - privacyStatus
           - userGroups
@@ -4678,7 +4747,6 @@ components:
           type: string
           enum:
           - statistics
-          - owners
           - grants
           - personCounts
           - capabilityCounts

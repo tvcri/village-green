@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
-import { getVillages as getAdminVillages } from '../features/Admin/api/villageGrantApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
 import { setPendingHighlight } from '../shared/lib/pendingHighlight.js'
@@ -41,13 +40,6 @@ const { state: villages, execute: fetchVillages } = useAsyncState(
   { immediate: false, onError: null }
 )
 
-// Elevated-privilege lookups: only needed on the admin create-grant routes,
-// so fetch lazily and on-demand rather than for every user on every page.
-const { state: adminVillages, execute: fetchAdminVillages } = useAsyncState(
-  () => getAdminVillages(),
-  { immediate: false, onError: null }
-)
-
 const { state: adminUsers, execute: fetchAdminUsers } = useAsyncState(
   () => getAdminUsers(),
   { immediate: false, onError: null }
@@ -56,9 +48,7 @@ const { state: adminUsers, execute: fetchAdminUsers } = useAsyncState(
 watch(() => route.name, (routeName) => {
   if (!routeName) return
 
-  if (routeName === 'admin-create-grant' && adminVillages.value === null) {
-    fetchAdminVillages()
-  } else if (routeName === 'admin-user-grants' && adminUsers.value === null) {
+  if (routeName === 'admin-user-grants' && adminUsers.value === null) {
     fetchAdminUsers()
   } else if (!routeName.startsWith('admin') && (route.params.villageId || routeName.startsWith('meta')) && villages.value === null) {
     fetchVillages()
@@ -75,16 +65,12 @@ const breadcrumbs = computed(() => {
     crumbs[0] = { label: 'Admin', route: { name: 'admin' } }
 
     switch (route.name) {
-      case 'admin-village-access':
-        crumbs.push({ label: 'Village Access', siblings: getSiblings('admin-village-access', {}) })
-        break
       case 'admin-user-access':
-        crumbs.push({ label: 'Users', siblings: getSiblings('admin-user-access', {}) })
+        crumbs.push({ label: 'Users' })
         break
       case 'admin-user-create':
         crumbs.push({
           label: 'Users',
-          siblings: getSiblings('admin-user-access', {}, 'admin-user-access'),
           route: { name: 'admin-user-access' }
         })
         crumbs.push({ label: 'New User' })
@@ -98,21 +84,6 @@ const breadcrumbs = computed(() => {
           route: { name: 'admin-user-access' }
         })
         crumbs.push({ label: userName })
-        break
-      }
-      case 'admin-create-grant': {
-        const villageId = route.params.villageId
-        const village = adminVillages.value?.find(v => v.villageId === villageId)
-        const villageName = village?.name || `Village ${villageId}`
-        crumbs.push({
-          label: 'Village Access',
-          route: { name: 'admin-village-access', query: { villageId } }
-        })
-        crumbs.push({
-          label: villageName,
-          route: { name: 'admin-village-access', query: { villageId } }
-        })
-        crumbs.push({ label: 'Create Grant' })
         break
       }
     }
