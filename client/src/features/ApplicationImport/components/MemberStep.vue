@@ -83,7 +83,7 @@ async function submit () {
   catch (err) {
     if (err?.status === 422) {
       needsVillage.value = true
-      if (!villages.value.length) villages.value = await getVillages(true)
+      if (!villages.value.length) villages.value = await getVillages()
     }
     else {
       toast.add({

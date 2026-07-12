@@ -33,7 +33,7 @@ const vettings = ref([])
 onMounted(async () => {
   try {
     const [capabilities, vettingTypes, villages] = await Promise.all([
-      getCapabilities(), getVettingTypes(), getVillages(true),
+      getCapabilities(), getVettingTypes(), getVillages(),
     ])
     capabilityOptions.value = capabilities
     vettingTypeOptions.value = vettingTypes

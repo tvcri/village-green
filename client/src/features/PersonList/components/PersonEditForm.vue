@@ -43,7 +43,7 @@ const communityNames = ref(new Set())     // Set<'Pride'|'Veteran'>
 const disabilities = ref(new Map())       // Map<'Vision'|'Walker'|'Hearing'|'Wheelchair'|'Cane', note>
 
 async function loadVillages () {
-  villages.value = await getVillages(true)
+  villages.value = await getVillages()
 }
 
 onMounted(async () => {
