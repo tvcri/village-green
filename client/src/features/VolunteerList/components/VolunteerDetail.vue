@@ -21,7 +21,7 @@ const { state: person } = useAsyncState(
 const volunteer = computed(() => {
   if (!person.value) return null
   const { volunteer: volunteerData, ...rest } = person.value
-  return { ...rest, ...((person.value.roles ?? []).includes('volunteer') ? volunteerData : null) }
+  return { ...rest, ...((person.value.activeAs ?? []).includes('volunteer') ? volunteerData : null) }
 })
 </script>
 

@@ -22,7 +22,7 @@ const { state: person } = useAsyncState(
 const member = computed(() => {
   if (!person.value) return null
   const { member: memberData, ...rest } = person.value
-  return { ...rest, ...((person.value.roles ?? []).includes('member') ? memberData : null) }
+  return { ...rest, ...((person.value.activeAs ?? []).includes('member') ? memberData : null) }
 })
 </script>
 

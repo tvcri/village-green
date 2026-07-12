@@ -66,9 +66,9 @@ const filteredPersons = computed(() => {
   if (!persons.value) return null
   if (!showMembers.value && !showVolunteers.value) return persons.value
   return persons.value.filter(p => {
-    const roles = parseJson(p.roles)
-    if (showMembers.value && roles.includes('member')) return true
-    if (showVolunteers.value && roles.includes('volunteer')) return true
+    const activeAs = parseJson(p.activeAs)
+    if (showMembers.value && activeAs.includes('member')) return true
+    if (showVolunteers.value && activeAs.includes('volunteer')) return true
     return false
   })
 })
@@ -203,7 +203,7 @@ function onSearch() {
         <template #body="{ data }">
           <div class="role-tags">
             <Tag
-              v-for="role in parseJson(data.roles)"
+              v-for="role in parseJson(data.activeAs)"
               :key="role"
               :value="role"
               :severity="getRoleSeverity(role)"

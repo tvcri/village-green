@@ -1267,15 +1267,6 @@ paths:
           description: Filter by email (contains, case-insensitive)
           schema:
             type: string
-        - name: role
-          in: query
-          description: Filter to persons holding a specific role
-          schema:
-            type: string
-            enum:
-            - member
-            - volunteer
-            - community
       responses:
         '200':
           description: List of persons
@@ -3100,8 +3091,8 @@ components:
           nullable: true
         village:
           $ref: '#/components/schemas/Village'
-        roles:
-          $ref: '#/components/schemas/PersonRoles'
+        activeAs:
+          $ref: '#/components/schemas/ActiveAs'
         member:
           $ref: '#/components/schemas/MemberDetail'
           nullable: true
@@ -3134,8 +3125,8 @@ components:
               $ref: '#/components/schemas/VillageId'
             name:
               type: string
-        roles:
-          $ref: '#/components/schemas/PersonRoles'
+        activeAs:
+          $ref: '#/components/schemas/ActiveAs'
         phone:
           type: object
           nullable: true
@@ -3302,7 +3293,7 @@ components:
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisabilityPatch' }
-    PersonRoles:
+    ActiveAs:
       type: array
       items:
         type: string

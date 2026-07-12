@@ -32,7 +32,7 @@ async function queryPersons (inPredicates = {}) {
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
       WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
-    END AS roles`
+    END AS activeAs`
   ]
   const joins = new Set([
     'person p',
@@ -123,7 +123,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
       WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
-    END AS roles`
+    END AS activeAs`
   ]
   const joins = new Set([
     'person p',
@@ -298,7 +298,7 @@ module.exports.deletePerson = async function (personId) {
   await dbUtils.pool.query('DELETE FROM person WHERE id = ?', [personId])
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, role }) {
+module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email }) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
     'p.fullName',
@@ -308,7 +308,7 @@ module.exports.getPersons = async function ({ villageIdsGranted, villageId, firs
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
       WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
-    END AS roles`,
+    END AS activeAs`,
     `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,
     'p.email'
   ]
@@ -347,19 +347,6 @@ module.exports.getPersons = async function ({ villageIdsGranted, villageId, firs
   if (email) {
     predicates.statements.push('p.email LIKE ?')
     predicates.binds.push(`%${email}%`)
-  }
-
-  if (role === 'member') {
-    predicates.statements.push('m.id IS NOT NULL')
-  }
-  else if (role === 'volunteer') {
-    predicates.statements.push('vol.id IS NOT NULL')
-  }
-  else if (role === 'community') {
-    // EXISTS rather than a JOIN: a person with N community memberships would
-    // otherwise produce N duplicate rows (community is M:N, unlike the 1:1
-    // member/volunteer roles).
-    predicates.statements.push('EXISTS (SELECT 1 FROM person_community pc WHERE pc.personId = p.id)')
   }
 
   const orderBy = ['p.fullName']

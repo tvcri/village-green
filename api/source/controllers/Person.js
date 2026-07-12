@@ -6,7 +6,7 @@ const { hasPermission } = require('../utils/authz')
 
 module.exports.getPersons = async function getPersons (req, res, next) {
   try {
-    const { villageId, firstName, lastName, phone, email, role } = req.query
+    const { villageId, firstName, lastName, phone, email } = req.query
     if (villageId?.length) {
       if (!villageId.every(vid => hasPermission(req.userObject, 'person:read', { villageId: vid }))) {
         throw new SmError.PrivilegeError()
@@ -22,7 +22,7 @@ module.exports.getPersons = async function getPersons (req, res, next) {
           vid => hasPermission(req.userObject, 'person:read', { villageId: vid })
         )
     const response = await PersonService.getPersons({
-      villageIdsGranted, villageId, firstName, lastName, phone, email, role,
+      villageIdsGranted, villageId, firstName, lastName, phone, email,
     })
     res.json(response)
   }

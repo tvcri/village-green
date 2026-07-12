@@ -23,8 +23,8 @@ const { state: person } = useAsyncState(
   { immediate: true }
 )
 
-const isMember = computed(() => (person.value?.roles ?? []).includes('member'))
-const isVolunteer = computed(() => (person.value?.roles ?? []).includes('volunteer'))
+const isMember = computed(() => (person.value?.activeAs ?? []).includes('member'))
+const isVolunteer = computed(() => (person.value?.activeAs ?? []).includes('volunteer'))
 
 const personType = computed(() => {
   if (isMember.value && isVolunteer.value) return 'member, volunteer'
@@ -38,7 +38,7 @@ const personType = computed(() => {
 const hasMemberDetail = computed(() => !!person.value?.member)
 const hasVolunteerDetail = computed(() => !!person.value?.volunteer)
 
-const canDelete = computed(() => !(person.value?.roles ?? []).length)
+const canDelete = computed(() => !(person.value?.activeAs ?? []).length)
 
 const flatPerson = computed(() => {
   if (!person.value) return null

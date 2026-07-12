@@ -38,7 +38,7 @@ watch(
 )
 
 const personType = computed(() => {
-  const roles = person.value?.roles ?? []
+  const roles = person.value?.activeAs ?? []
   const isMember = roles.includes('member')
   const isVolunteer = roles.includes('volunteer')
   if (isMember && isVolunteer) return 'member, volunteer'
@@ -52,11 +52,11 @@ const flatPerson = computed(() => {
   // inactive-role data (read_inactive), but this shared view shows current
   // roles only. The admin PersonDetail page is where inactive roles appear.
   const { member, volunteer, ...rest } = person.value
-  const roles = person.value.roles ?? []
+  const active = person.value.activeAs ?? []
   return {
     ...rest,
-    ...(roles.includes('member') ? member : null),
-    ...(roles.includes('volunteer') ? volunteer : null),
+    ...(active.includes('member') ? member : null),
+    ...(active.includes('volunteer') ? volunteer : null),
   }
 })
 </script>
