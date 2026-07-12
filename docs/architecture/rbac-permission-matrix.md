@@ -18,8 +18,10 @@ check that caught the missing `village:read`.
 | member:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
 | member:write | — | — | — | * | ✓ | — | — |
 | member:read_financial | — | — | — | * | ✓ | — | — |
+| member:read_inactive | — | — | — | * | ✓ | — | — |
 | volunteer:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
 | volunteer:write | — | — | — | * | ✓ | — | — |
+| volunteer:read_inactive | — | — | — | * | ✓ | — | — |
 | sr:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
 | sr:write | — | — | — | * | ✓ | — | ✓ |
 | friend:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |

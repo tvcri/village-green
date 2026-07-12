@@ -4,8 +4,8 @@ const MigrationHandler = require('./lib/MigrationHandler')
 const villageReads = ['person:read', 'member:read', 'volunteer:read', 'sr:read', 'friend:read', 'village:read']
 const staffPerms = [
   'person:read', 'person:write', 'person:read_confidential',
-  'member:read', 'member:write', 'member:read_financial',
-  'volunteer:read', 'volunteer:write',
+  'member:read', 'member:write', 'member:read_financial', 'member:read_inactive',
+  'volunteer:read', 'volunteer:write', 'volunteer:read_inactive',
   'sr:read', 'sr:write', 'friend:read', 'friend:write',
   'village:read', 'village:write',
 ]
@@ -138,6 +138,13 @@ const upMigration = [
       )`,
 
   `DROP TABLE village_grant`,
+
+  // The unified getPerson volunteer projection swaps FROM between the base
+  // table and this view; the column sets must match the JSON template.
+  // 0010 defined the view without notes — widen it here.
+  `CREATE OR REPLACE VIEW active_volunteer AS
+     SELECT id, personId, providerType, notes, active
+     FROM volunteer WHERE active = 1`,
 ]
 
 const downMigration = [
@@ -166,6 +173,10 @@ const downMigration = [
   `DROP TABLE role_grant`,
   `DROP TABLE role_permission`,
   `DROP TABLE role`,
+
+  `CREATE OR REPLACE VIEW active_volunteer AS
+     SELECT id, personId, providerType, active
+     FROM volunteer WHERE active = 1`,
 ]
 
 const migrationHandler = new MigrationHandler(upMigration, downMigration)
