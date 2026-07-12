@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import Tag from 'primevue/tag'
-import { buildAccessTags } from '../lib/accessTagHelpers.js'
+import { buildAccessTags } from '../shared/lib/accessTagHelpers.js'
 
 const props = defineProps({
   user: { type: Object, required: true },
@@ -17,7 +17,7 @@ const tags = computed(() => buildAccessTags(props.user))
       v-for="tag in tags"
       :key="tag.key"
       :value="tag.text"
-      :severity="tag.scopeType === 'hub' ? 'contrast' : 'success'"
+      :severity="tag.scopeType === 'hub' ? 'info' : 'success'"
       :title="tag.title"
       :aria-label="tag.title"
     />

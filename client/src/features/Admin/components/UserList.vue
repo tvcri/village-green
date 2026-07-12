@@ -13,8 +13,8 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
 import { getUsersWithGrants, deleteUser } from '../../../shared/api/userApi.js'
 import { getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
-import AccessTags from './AccessTags.vue'
-import { accessSortString, matchesScopeFilter, HUB_FILTER } from '../lib/accessTagHelpers.js'
+import AccessTags from '../../../components/AccessTags.vue'
+import { accessSortString, matchesScopeFilter, HUB_FILTER } from '../../../shared/lib/accessTagHelpers.js'
 import { getVillages } from '../api/villageGrantApi.js'
 
 defineOptions({ name: 'UserList' })
