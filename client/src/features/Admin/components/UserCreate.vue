@@ -8,8 +8,7 @@ import { useRoles } from '../../../shared/composables/useRoles.js'
 import { getVillages } from '../api/villageGrantApi.js'
 import { createUser } from '../../../shared/api/userApi.js'
 import { extractApiErrorMessage } from '../lib/userAdminHelpers.js'
-import VillageGrantsEditor from './VillageGrantsEditor.vue'
-import FederationRoleSelect from './FederationRoleSelect.vue'
+import GrantsEditor from './GrantsEditor.vue'
 
 const router = useRouter()
 const { getRoleLabel, fetchRoles } = useRoles()
@@ -20,32 +19,16 @@ const { state: villages } = useAsyncState(() => getVillages(), { immediate: true
 const username = ref('')
 const firstName = ref('')
 const lastName = ref('')
-const grants = ref([])
-const hubRoleId = ref(null) // string roleId or null = None
 
 const isSubmitting = ref(false)
 const usernameError = ref('')
 const formError = ref('')
 
 const editorRef = useTemplateRef('editor')
+
+// Staged grants, not yet persisted; grantId is a local key only.
+const stagedGrants = ref([])
 let nextGrantId = 0
-
-const handleAddGrant = ({ villageId, roleId }) => {
-  grants.value.push({ grantId: nextGrantId++, villageId, roleId })
-  editorRef.value?.clearPending()
-}
-
-const handleDeleteGrant = (grantId) => {
-  grants.value = grants.value.filter(g => g.grantId !== grantId)
-}
-
-const stagedHubGrants = computed(() =>
-  hubRoleId.value ? [{ grantId: '__staged__', roleId: hubRoleId.value }] : []
-)
-
-const handleHubRoleChange = (newRoleId) => {
-  hubRoleId.value = newRoleId
-}
 
 const villageNameById = computed(() => {
   const map = new Map()
@@ -53,18 +36,25 @@ const villageNameById = computed(() => {
   return map
 })
 
-const villageGrantRows = computed(() => grants.value.map(g => ({
+const grantRows = computed(() => stagedGrants.value.map(g => ({
   grantId: g.grantId,
   villageId: g.villageId,
-  villageName: villageNameById.value.get(g.villageId) || '',
+  scopeLabel: g.villageId == null ? 'Hub' : (villageNameById.value.get(g.villageId) || ''),
+  isHub: g.villageId == null,
   roleId: g.roleId,
   roleLabel: getRoleLabel(g.roleId),
 })))
 
-const availableVillages = computed(() => {
-  const grantedIds = new Set(grants.value.map(g => g.villageId))
-  return (villages.value || []).filter(v => !grantedIds.has(v.villageId))
-})
+const handleAddGrant = ({ villageId, roleIds }) => {
+  for (const roleId of roleIds) {
+    stagedGrants.value.push({ grantId: `staged-${nextGrantId++}`, villageId, roleId })
+  }
+  editorRef.value?.clearPending()
+}
+
+const handleDeleteGrant = (row) => {
+  stagedGrants.value = stagedGrants.value.filter(g => g.grantId !== row.grantId)
+}
 
 const isFormValid = computed(() => {
   return !!username.value.trim()
@@ -85,10 +75,7 @@ async function handleSubmit() {
       username: username.value.trim(),
       firstName: firstName.value.trim() || undefined,
       lastName: lastName.value.trim() || undefined,
-      roleGrants: [
-        ...grants.value.map(g => ({ roleId: g.roleId, villageId: g.villageId })),
-        ...(hubRoleId.value ? [{ roleId: parseInt(hubRoleId.value, 10), villageId: null }] : []),
-      ],
+      roleGrants: stagedGrants.value.map(g => ({ roleId: g.roleId, villageId: g.villageId })),
     })
     router.push({ name: 'admin-user-access' })
   }
@@ -145,16 +132,10 @@ function handleCancel() {
 
       <small class="field-error" v-if="formError">{{ formError }}</small>
 
-      <FederationRoleSelect
-        :hub-grants="stagedHubGrants"
-        :disabled="isSubmitting"
-        @change="handleHubRoleChange"
-      />
-
-      <VillageGrantsEditor
+      <GrantsEditor
         ref="editor"
-        :rows="villageGrantRows"
-        :available-villages="availableVillages"
+        :rows="grantRows"
+        :villages="villages || []"
         :busy="isSubmitting"
         @add="handleAddGrant"
         @delete="handleDeleteGrant"
