@@ -17,7 +17,7 @@ const tags = computed(() => buildAccessTags(props.user))
       v-for="tag in tags"
       :key="tag.key"
       :value="tag.text"
-      :severity="tag.scopeType === 'hub' ? 'warn' : 'info'"
+      :severity="tag.scopeType === 'hub' ? 'contrast' : 'success'"
       :title="tag.title"
       :aria-label="tag.title"
     />
