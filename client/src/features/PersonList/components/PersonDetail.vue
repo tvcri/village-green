@@ -79,7 +79,6 @@ async function removePerson () {
       :person-type="personType"
       :has-member-detail="hasMemberDetail"
       :has-volunteer-detail="hasVolunteerDetail"
-      detail-level="full"
     />
   </div>
 </template>
