@@ -83,7 +83,7 @@ const routes = [
   {
     path: '/admin/users/:userId/grants',
     name: 'admin-user-grants',
-    component: () => import('../features/Admin/components/UserAccessList.vue'),
+    component: () => import('../features/Admin/components/UserAccessDetail.vue'),
     meta: { requiresPermission: 'user:admin' },
   },
   {
