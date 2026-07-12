@@ -17,7 +17,7 @@ module.exports.putPersonMember = async function putPersonMember (req, res, next)
     if (!(await MemberService.personHasHomeVillage(personId))) {
       throw new SmError.UnprocessableError('Person must have a home village to hold a member role.')
     }
-    const response = await MemberService.putMember(personId, req.body)
+    const response = await MemberService.putMember(personId, req.body, req.userObject)
     res.json(response)
   }
   catch (err) { next(err) }
@@ -32,7 +32,7 @@ module.exports.patchPersonMember = async function patchPersonMember (req, res, n
     if (!hasPermission(req.userObject, 'member:write', { villageId: person.village?.villageId })) {
       throw new SmError.PrivilegeError()
     }
-    const response = await MemberService.patchMember(personId, req.body)
+    const response = await MemberService.patchMember(personId, req.body, req.userObject)
     res.json(response)
   }
   catch (err) { next(err) }

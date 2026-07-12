@@ -3102,16 +3102,10 @@ components:
           $ref: '#/components/schemas/Village'
         roles:
           $ref: '#/components/schemas/PersonRoles'
-        memberInfo:
-          $ref: '#/components/schemas/Member'
-          nullable: true
-        memberDetail:
+        member:
           $ref: '#/components/schemas/MemberDetail'
           nullable: true
-        volunteerInfo:
-          $ref: '#/components/schemas/Volunteer'
-          nullable: true
-        volunteerDetail:
+        volunteer:
           $ref: '#/components/schemas/VolunteerDetail'
           nullable: true
         communities:
@@ -4599,10 +4593,8 @@ components:
         items:
           type: string
           enum:
-          - memberInfo
-          - memberDetail
-          - volunteerInfo
-          - volunteerDetail
+          - member
+          - volunteer
     RunSequenceQuery:
       name: after-seq
       in: query
