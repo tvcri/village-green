@@ -2,6 +2,7 @@
 import { computed, ref, watch, onMounted, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
@@ -22,6 +23,8 @@ defineOptions({ name: 'MetaServiceRequestList' })
 
 const router = useRouter()
 const route = useRoute()
+const { hasPermission } = useCurrentUser()
+const canWriteSr = computed(() => hasPermission('sr:write'))
 
 let toast = null
 onMounted(() => { toast = useToast() })
@@ -252,7 +255,7 @@ const clearFilters = () => {
         <h1>Service Requests</h1>
       </div>
       <div class="header-actions">
-        <Button label="New Request" icon="pi pi-plus" @click="navigateToCreateRequest" />
+        <Button v-if="canWriteSr" label="New Request" icon="pi pi-plus" @click="navigateToCreateRequest" />
         <ExportButton
           :disabled="isLoading || isCreatingSheet"
           @download="handleDownloadCsv"
@@ -360,6 +363,7 @@ const clearFilters = () => {
           <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
         <Button
+          v-if="canWriteSr"
           icon="pi pi-pencil"
           v-tooltip="'Edit Request'"
           class="p-button-rounded p-button-text p-button-sm"
@@ -372,7 +376,7 @@ const clearFilters = () => {
       v-model:visible="historyDialogVisible"
       :service-request-id="historyRequestId"
       :display-label="historyRequestLabel"
-      :allow-send-button="true"
+      :allow-send-button="canWriteSr"
       :status="historyRequestStatus"
       @notified="onNotified"
     />

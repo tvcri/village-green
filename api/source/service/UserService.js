@@ -9,7 +9,7 @@ const _this = this
 /**
 Generalized queries for users
 **/
-exports.queryUsers = async function (inProjection, inPredicates, elevate, userObject) {
+exports.queryUsers = async function (inProjection, inPredicates, userObject) {
   const ctes = []
   let needsCollectionGrantees = false
   const columns = [
@@ -22,10 +22,6 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
     `COALESCE(json_unquote(json_extract(
       ud.lastClaims, ?
     )), ud.username) as displayName`,
-    `json_object(
-      'create_village', 'create_village' member of(JSON_VALUE(ud.lastClaims, ? default '[]' on empty)),
-      'admin', 'admin' member of(JSON_VALUE(ud.lastClaims, ? default '[]' on empty))
-    ) as 'privileges'`,
     'ud.status',
     "date_format(ud.statusDate, '%Y-%m-%dT%TZ') as statusDate",
     'CAST(ud.statusUser as char) as statusUser'
@@ -38,23 +34,12 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
   const orderBy = ['displayName']
 
   // PROJECTIONS
-  if (inProjection?.includes('villageGrants')) {
-    needsCollectionGrantees = true
-    joins.add('left join cteGrantees cgs on ud.userId = cgs.userId')
-    joins.add('left join village v on cgs.villageId = v.id')
-    columns.push(`case when count(cgs.villageId) > 0
-    then 
-      ${dbUtils.jsonArrayAggDistinct(`json_object(
-        'village', json_object(
-          'villageId', CAST(cgs.villageId as char),
-          'name', v.name
-        ),
-        'roleId', cgs.roleId,
-        'grantees', cgs.grantees
-      )`)}
-    else json_array() 
-    end as villageGrants`)
-  }
+  // 'grants' (UserProjected.grants/federationGrants/permissions) is computed
+  // in JS after the row fetch below via one batched getUsersRoleData() query
+  // and computeEffective() — the same shaping helper setupUser() uses at auth
+  // time, keeping a single source of truth for the shape instead of
+  // duplicating it in SQL.
+  const needsRoleData = inProjection?.includes('grants')
 
   if (inProjection?.includes('statistics')) {
     if (!needsCollectionGrantees) {
@@ -96,15 +81,18 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
     columns.push(`(
       select json_object(
         'needsAck',
+          -- CAST('true'/'false' AS JSON) yields a real JSON boolean. Bare
+          -- true/false are integer 1/0 literals in MySQL, which JSON_OBJECT
+          -- would serialize as 0/1 rather than the boolean the schema requires.
           case
-            when (select id from privacy_rules order by id desc limit 1) is null then false
+            when (select id from privacy_rules order by id desc limit 1) is null then cast('false' as json)
             when exists (
               select 1 from privacy_acknowledgement pa
               where pa.userId = ud.userId
                 and pa.rulesId = (select id from privacy_rules order by id desc limit 1)
                 and pa.acknowledgedAt > (UTC_TIMESTAMP() - INTERVAL ${intervalDays} DAY)
-            ) then false
-            else true
+            ) then cast('false' as json)
+            else cast('true' as json)
           end,
         'pendingRulesId', (select id from privacy_rules order by id desc limit 1),
         'lastAckedRulesId',
@@ -122,9 +110,7 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
     statements: [],
     binds: [
       `$.${config.oauth.claims.email}`,
-      `$.${config.oauth.claims.name}`,
-      `$.${config.oauth.claims.privileges}`,
-      `$.${config.oauth.claims.privileges}`
+      `$.${config.oauth.claims.name}`
     ]
   }
   if (inPredicates.userId) {
@@ -151,13 +137,6 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
     predicates.binds.push(inPredicates.username)
   }
   
-  if (inPredicates.privilege) {
-    predicates.statements.push(
-      `JSON_CONTAINS(JSON_EXTRACT(ud.lastClaims, ?), ?) `
-    )
-    predicates.binds.push(`$.${config.oauth.claims.privileges}`, JSON.stringify([inPredicates.privilege]))
-  }
-  
   if (inPredicates.status) {
     predicates.statements.push('ud.status = ?')
     predicates.binds.push(inPredicates.status)
@@ -170,17 +149,28 @@ exports.queryUsers = async function (inProjection, inPredicates, elevate, userOb
   // CONSTRUCT MAIN QUERY
   const sql = dbUtils.makeQueryString({ctes, columns, joins, predicates, groupBy, orderBy, format: true})
   let [rows] = await dbUtils.pool.query(sql)
+
+  if (needsRoleData && rows.length) {
+    const { computeEffective, groupRoleDataByUser } = require('../utils/authz')
+    const batchRows = await _this.getUsersRoleData(rows.map(row => row.userId))
+    const byUser = groupRoleDataByUser(batchRows)
+    for (const row of rows) {
+      const roleData = byUser.get(String(row.userId)) ?? []
+      Object.assign(row, computeEffective(roleData))  // grants, federationGrants, permissions
+    }
+  }
+
   return (rows)
 }
 
-exports.addOrUpdateUser = async function (writeAction, userId, body, projection, elevate, userObject, svcStatus = {}) {
+exports.addOrUpdateUser = async function (writeAction, userId, body, projection, userObject, svcStatus = {}) {
   let connection
   try {
     // CREATE: userId will be null
     // REPLACE/UPDATE: userId is not null
 
     // Extract or initialize non-scalar properties to separate variables
-    let { villageGrants, userGroups, ...userFields } = body
+    let { roleGrants, userGroups, ...userFields } = body
 
     // If username is being changed on an existing user, Keycloak must be
     // updated first (before the local UPDATE commits), so the two systems
@@ -233,30 +223,33 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
         throw new Error('Invalid writeAction')
       }
   
-      // Process grants if present
-      if (villageGrants) {
+      // Process grants if present. role_grant's unique key is
+      // (userId, roleId, villageKey) where villageKey collapses NULL
+      // villageId (federation scope) to 0, so a grant is identified by the
+      // (roleId, villageId) pair, not villageId alone.
+      if (roleGrants) {
         if ( writeAction !== dbUtils.WRITE_ACTION.CREATE ) {
-          // DELETE from village_grant
+          // DELETE from role_grant
           const deleteBinds = [userId]
-          let sqlDeleteCollGrant = 'DELETE FROM village_grant where userId = ?'
-          if (villageGrants.length > 0) {
-            const villageIds = villageGrants.map(grant => grant.villageId)
-            sqlDeleteCollGrant += ' and villageId NOT IN (?)'
-            deleteBinds.push(villageIds)
+          let sqlDeleteRoleGrant = 'DELETE FROM role_grant where userId = ?'
+          if (roleGrants.length > 0) {
+            const pairs = roleGrants.map(grant => [grant.roleId, grant.villageId ?? null])
+            sqlDeleteRoleGrant += ' and (roleId, IFNULL(villageId, 0)) NOT IN (?)'
+            deleteBinds.push(pairs.map(([roleId, villageId]) => [roleId, villageId ?? 0]))
           }
-          await connection.query(sqlDeleteCollGrant, deleteBinds)
+          await connection.query(sqlDeleteRoleGrant, deleteBinds)
         }
-        if (villageGrants.length > 0) {
-          let sqlInsertCollGrant = `
+        if (roleGrants.length > 0) {
+          let sqlInsertRoleGrant = `
             INSERT INTO
-              village_grant (userId, villageId, roleId)
+              role_grant (userId, villageId, roleId)
             VALUES
               ? as new
             ON DUPLICATE KEY UPDATE
               roleId = new.roleId`
-          const insertBinds = villageGrants.map( grant => [userId, grant.villageId, grant.roleId])
-          // INSERT into village_grant
-          await connection.query(sqlInsertCollGrant, [insertBinds] )
+          const insertBinds = roleGrants.map( grant => [userId, grant.villageId ?? null, grant.roleId])
+          // INSERT into role_grant
+          await connection.query(sqlInsertRoleGrant, [insertBinds] )
         }
       }
       if (userGroups) {
@@ -289,7 +282,7 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
 
   // Fetch the new or updated User for the response
   try {
-    let row = await _this.getUserByUserId(userId, projection, elevate, userObject)
+    let row = await _this.getUserByUserId(userId, projection, userObject)
     return row
   }
   catch (err) {
@@ -305,8 +298,8 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
  * projection List Additional properties to include in the response.  (optional)
  * returns List
  **/
-exports.createUser = async function(body, projection, elevate, userObject, svcStatus = {}) {
-  let row = await _this.addOrUpdateUser(dbUtils.WRITE_ACTION.CREATE, null, body, projection, elevate, userObject, svcStatus)
+exports.createUser = async function(body, projection, userObject, svcStatus = {}) {
+  let row = await _this.addOrUpdateUser(dbUtils.WRITE_ACTION.CREATE, null, body, projection, userObject, svcStatus)
   return (row)
 }
 
@@ -317,9 +310,9 @@ exports.createUser = async function(body, projection, elevate, userObject, svcSt
  * projection List Additional properties to include in the response.  (optional)
  * returns UserProjected
  **/
-exports.deleteUser = async function(userId, projection, elevate, userObject) {
+exports.deleteUser = async function(userId, projection, userObject) {
   try {
-    let row = await _this.queryUsers(projection, { userId: userId }, elevate, userObject)
+    let row = await _this.queryUsers(projection, { userId: userId }, userObject)
     let sqlDelete = `DELETE FROM user_data where userId = ?`
     await dbUtils.pool.query(sqlDelete, [userId])
     return (row[0])
@@ -337,11 +330,11 @@ exports.deleteUser = async function(userId, projection, elevate, userObject) {
  * projection List Additional properties to include in the response.  (optional)
  * returns UserProjected
  **/
-exports.getUserByUserId = async function(userId, projection, elevate, userObject) {
+exports.getUserByUserId = async function(userId, projection, userObject) {
   try {
     let rows = await _this.queryUsers( projection, {
       userId: userId
-    }, elevate, userObject)
+    }, userObject)
     return (rows[0])
   }
   catch(err) {
@@ -349,11 +342,11 @@ exports.getUserByUserId = async function(userId, projection, elevate, userObject
   }
 }
 
-exports.getUserByUsername = async function(username, projection, elevate, userObject) {
+exports.getUserByUsername = async function(username, projection, userObject) {
   try {
     let rows = await _this.queryUsers( projection, {
       username: username
-    }, elevate, userObject)
+    }, userObject)
     return (rows[0])
   }
   catch(err) {
@@ -361,14 +354,13 @@ exports.getUserByUsername = async function(username, projection, elevate, userOb
   }
 }
 
-exports.getUsers = async function(username, usernameMatch, privilege, status, projection, elevate, userObject) {
+exports.getUsers = async function(username, usernameMatch, status, projection, userObject) {
   try {
     let rows = await _this.queryUsers( projection, {
       username,
       usernameMatch,
-      privilege,
       status
-    }, elevate, userObject)
+    }, userObject)
     return (rows)
   }
   catch(err) {
@@ -376,16 +368,16 @@ exports.getUsers = async function(username, usernameMatch, privilege, status, pr
   }
 }
 
-exports.replaceUser = async function( userId, body, projection, elevate, userObject, svcStatus = {} ) {
-  const row = await _this.addOrUpdateUser(dbUtils.WRITE_ACTION.REPLACE, userId, body, projection, elevate, userObject, svcStatus)
+exports.replaceUser = async function( userId, body, projection, userObject, svcStatus = {} ) {
+  const row = await _this.addOrUpdateUser(dbUtils.WRITE_ACTION.REPLACE, userId, body, projection, userObject, svcStatus)
   return (row)
 }
 
-exports.updateUser = async function( userId, body, projection, elevate, userObject, svcStatus = {} ) {
-  if (body.status === 'unavailable' && (body.villageGrants?.length || body.userGroups?.length)) {
+exports.updateUser = async function( userId, body, projection, userObject, svcStatus = {} ) {
+  if (body.status === 'unavailable' && (body.roleGrants?.length || body.userGroups?.length)) {
     throw new SmError.UserInconsistentError()
-  } 
-  let row = await _this.addOrUpdateUser(dbUtils.WRITE_ACTION.UPDATE, userId, body, projection, elevate, userObject, svcStatus)
+  }
+  let row = await _this.addOrUpdateUser(dbUtils.WRITE_ACTION.UPDATE, userId, body, projection, userObject, svcStatus)
   return (row)
 }
 
@@ -429,30 +421,33 @@ exports.addOrUpdateUserGroup = async function ({userGroupId, userGroupFields, us
         ) 
       }
     }
-    // Process grants if present
+    // Process grants if present. role_grant's unique key is
+    // (userGroupId, roleId, villageKey) where villageKey collapses NULL
+    // villageId (federation scope) to 0, so a grant is identified by the
+    // (roleId, villageId) pair, not villageId alone.
     if (villageGrants) {
       if (isUpdate) {
-        // DELETE from village_grant
+        // DELETE from role_grant
         const binds = [userGroupId]
-        let sqlDeleteCollGrant = 'DELETE FROM village_grant where userGroupId = ?'
+        let sqlDeleteRoleGrant = 'DELETE FROM role_grant where userGroupId = ?'
         if (villageGrants.length > 0) {
-          const villageIds = villageGrants.map(grant => grant.villageId)
-          sqlDeleteCollGrant += ' and villageId NOT IN (?)'
-          binds.push(villageIds)
+          const pairs = villageGrants.map(grant => [grant.roleId, grant.villageId ?? 0])
+          sqlDeleteRoleGrant += ' and (roleId, IFNULL(villageId, 0)) NOT IN (?)'
+          binds.push(pairs)
         }
-        await connection.query(sqlDeleteCollGrant, binds)
+        await connection.query(sqlDeleteRoleGrant, binds)
       }
       if (villageGrants.length > 0) {
-        let sqlInsertCollGrant = `
-          INSERT INTO 
-            village_grant (userGroupId, villageId, roleId)
+        let sqlInsertRoleGrant = `
+          INSERT INTO
+            role_grant (userGroupId, villageId, roleId)
           VALUES
             ? as new
           ON DUPLICATE KEY UPDATE
-            roleId = new.roleId`      
-        const binds = villageGrants.map( grant => [userGroupId, grant.villageId, grant.roleId])
-        // INSERT into village_grant
-        await connection.query(sqlInsertCollGrant, [binds] )
+            roleId = new.roleId`
+        const binds = villageGrants.map( grant => [userGroupId, grant.villageId ?? null, grant.roleId])
+        // INSERT into role_grant
+        await connection.query(sqlInsertRoleGrant, [binds] )
       }
     }
     return userGroupId
@@ -519,7 +514,7 @@ exports.queryUserGroups = async function ({projections = [], filters = {}, eleva
     END as users`)
   }
   if (projections.includes('villages') || projections.includes('villageGrants')) {
-    joins.add('left join village_grant cgg using (userGroupId)')
+    joins.add('left join role_grant cgg using (userGroupId)')
     joins.add('left join village on cgg.villageId = village.id')
     groupBy.add('ug.userGroupId')
     columns.push(`CASE WHEN count(cgg.villageId)=0 
@@ -544,6 +539,58 @@ exports.deleteUserGroup = async function({userGroupId}) {
     return userGroupId
 }
 
+exports.getUserRoleData = async function (userId) {
+  const sql = `
+  select
+    rg.grantId,
+    rg.roleId,
+    r.name as roleName,
+    r.scope,
+    rg.villageId,
+    v.name as villageName,
+    rp.permission
+  from
+    role_grant rg
+    inner join role r on rg.roleId = r.roleId
+    left join role_permission rp on r.roleId = rp.roleId
+    left join village v on rg.villageId = v.id
+  where
+    rg.userId = ?
+    or rg.userGroupId in (select userGroupId from user_group_user_map where userId = ?)`
+  const [rows] = await dbUtils.pool.query(sql, [userId, userId])
+  return rows
+}
+
+// Batched variant of getUserRoleData for list responses: one query for all
+// requested users instead of one per user. forUserId identifies which user
+// each grant row applies to — a direct grant carries rg.userId; a group
+// grant fans out to one row per group member via user_group_user_map,
+// reproducing getUserRoleData's `userId = ? OR userGroupId IN (...)`
+// semantics.
+exports.getUsersRoleData = async function (userIds) {
+  const sql = `
+  select
+    target.userId as forUserId,
+    rg.grantId,
+    rg.roleId,
+    r.name as roleName,
+    r.scope,
+    rg.villageId,
+    v.name as villageName,
+    rp.permission
+  from
+    role_grant rg
+    inner join role r on rg.roleId = r.roleId
+    left join role_permission rp on r.roleId = rp.roleId
+    left join village v on rg.villageId = v.id
+    left join user_group_user_map ugum on rg.userGroupId = ugum.userGroupId
+    inner join user_data target on target.userId = coalesce(rg.userId, ugum.userId)
+  where
+    target.userId in (?)`
+  const [rows] = await dbUtils.pool.query(sql, [userIds])
+  return rows
+}
+
 exports.getUserObject = async function (username) {
   const sql = `
   select
@@ -552,51 +599,6 @@ exports.getUserObject = async function (username) {
     lastAccess,
     lastClaims,
     status,
-    (select
-      coalesce(json_objectagg(
-        dt2.villageId, json_object(
-          'villageId', dt2.villageId,
-          'name', dt2.name,
-          'roleId', dt2.roleId, 
-          'grantIds', dt2.grantIds)), json_object())
-      from   
-      (select 
-        cg.villageId,
-        v.name,
-        cg.roleId,
-        json_array(cg.grantId) as grantIds
-      from
-        village_grant cg
-        inner join village v on (cg.villageId = v.id)
-        left join user_data ud2 on cg.userId = ud2.userId
-      where
-        ud2.userId = ud.userId
-      union 
-      select
-        villageId,
-        name,
-        roleId,
-        grantIds
-      from
-        (select
-          ROW_NUMBER() OVER(PARTITION BY ugu.userId, cg.villageId ORDER BY cg.roleId desc) as rn,
-          cg.villageId,
-          v.name, 
-          cg.roleId,
-          json_arrayagg(cg.grantId) OVER (PARTITION BY ugu.userId, cg.villageId, cg.roleId) as grantIds
-        from 
-          village_grant cg
-          inner join village v on (cg.villageId = v.id)
-          left join user_group_user_map ugu on cg.userGroupId = ugu.userGroupId
-          left join user_group ug on ugu.userGroupId = ug.userGroupId
-          left join user_data ud3 on ugu.userId = ud3.userId
-          left join village_grant cgDirect on (cg.villageId = cgDirect.villageId and ugu.userId = cgDirect.userId)
-        where
-        cg.userGroupId is not null
-        and cgDirect.userId is null
-        and ud3.userId = ud.userId) dt
-    where
-      dt.rn = 1) dt2) as grants,
     -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
     -- published and the user has no acknowledgement of the current version within
     -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
@@ -621,6 +623,9 @@ exports.getUserObject = async function (username) {
   const row = rows[0]
   if (row) {
     row.privacyAckRequired = row.privacyAckRequired === 1
+    const { computeEffective } = require('../utils/authz')
+    const roleData = await _this.getUserRoleData(row.userId)
+    Object.assign(row, computeEffective(roleData))  // grants, federationGrants, permissions
   }
   return row
 }
@@ -638,11 +643,12 @@ exports.patchUserWebPreferences = async function (userId, preferences) {
 }
 
 exports.getUserGrants = async function (userId) {
-  const config = require('../utils/config')
   const sql = `
     SELECT
       CAST(vg.grantId AS CHAR) AS grantId,
       vg.roleId,
+      r.name AS roleName,
+      r.scope AS roleScope,
       CAST(vg.villageId AS CHAR) AS villageId,
       v.name AS village_name,
       CAST(vg.userId AS CHAR) AS userId,
@@ -653,14 +659,11 @@ exports.getUserGrants = async function (userId) {
       END AS granteeType,
       CAST(ud.userId AS CHAR) AS grantee_userId,
       ud.username AS grantee_username,
-      COALESCE(
-        JSON_UNQUOTE(JSON_EXTRACT(ud.lastClaims, "$.${config.oauth.claims.name}")),
-        ud.username
-      ) AS grantee_displayName,
       CAST(ug.userGroupId AS CHAR) AS grantee_userGroupId,
       ug.name AS grantee_name
-    FROM village_grant vg
-    JOIN village v ON vg.villageId = v.id
+    FROM role_grant vg
+    INNER JOIN role r ON vg.roleId = r.roleId
+    LEFT JOIN village v ON vg.villageId = v.id
     LEFT JOIN user_data ud ON vg.userId = ud.userId
     LEFT JOIN user_group ug ON vg.userGroupId = ug.userGroupId
     WHERE vg.userId = ? OR vg.userGroupId IN (SELECT userGroupId FROM user_group_user_map WHERE userId = ?)
@@ -670,9 +673,11 @@ exports.getUserGrants = async function (userId) {
 
   return rows.map(row => {
     const grantee = row.granteeType === 'user' ? {
+      // UserBasic carries userId + username only; no consumer renders a
+      // grantee displayName here, so it is not projected (would fail the
+      // additionalProperties:false Grantee/UserBasic schema otherwise).
       userId: row.grantee_userId,
-      username: row.grantee_username,
-      displayName: row.grantee_displayName
+      username: row.grantee_username
     } : {
       userGroupId: row.grantee_userGroupId,
       name: row.grantee_name
@@ -681,7 +686,9 @@ exports.getUserGrants = async function (userId) {
     return {
       grantId: row.grantId,
       roleId: row.roleId,
-      village: {
+      // Federation-scoped roles have no villageId; village stays null rather
+      // than an empty object.
+      village: row.roleScope === 'federation' ? null : {
         villageId: row.villageId,
         name: row.village_name
       },
@@ -698,11 +705,11 @@ exports.createUserGrant = async function (userId, body) {
       for (const grant of grantsArray) {
         const mappedFields = {
           userId,
-          villageId: grant.villageId,
+          villageId: grant.villageId ?? null,
           roleId: grant.roleId
         }
 
-        await connection.query('INSERT INTO village_grant SET ?', mappedFields)
+        await connection.query('INSERT INTO role_grant SET ?', mappedFields)
       }
     },
     statusObj: undefined
@@ -712,9 +719,24 @@ exports.createUserGrant = async function (userId, body) {
   return grants
 }
 
+exports.ensureBootstrapAdmin = async function (username) {
+  // Create a shell user row if this username has never logged in.
+  await dbUtils.pool.query(
+    'INSERT INTO user_data (username) VALUES (?) ON DUPLICATE KEY UPDATE username = username',
+    [username]
+  )
+  // Admin is seeded roleId 4; villageId NULL = federation scope.
+  await dbUtils.pool.query(
+    `INSERT INTO role_grant (userId, roleId, villageId)
+     SELECT userId, 4, NULL FROM user_data WHERE username = ?
+     ON DUPLICATE KEY UPDATE roleId = role_grant.roleId`,
+    [username]
+  )
+}
+
 exports.deleteUserGrant = async function (userId, grantId) {
   const [existing] = await dbUtils.pool.query(
-    'SELECT * FROM village_grant WHERE grantId = ? AND userId = ?',
+    'SELECT * FROM role_grant WHERE grantId = ? AND userId = ?',
     [grantId, userId]
   )
 
@@ -722,7 +744,7 @@ exports.deleteUserGrant = async function (userId, grantId) {
     throw new SmError.NotFoundError()
   }
 
-  await dbUtils.pool.query('DELETE FROM village_grant WHERE grantId = ? AND userId = ?', [grantId, userId])
+  await dbUtils.pool.query('DELETE FROM role_grant WHERE grantId = ? AND userId = ?', [grantId, userId])
 
   const grants = await exports.getUserGrants(userId)
   return grants[0] || { grantId }

@@ -27,6 +27,7 @@ import {
   minutesToTimeString, timeStringToMinutes,
   dateToServiceDate, serviceDateToDate
 } from '../lib/timeFields.js'
+import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
 
@@ -34,6 +35,7 @@ const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 const confirm = useConfirm()
+useRequirePermission('sr:write')
 
 const isEdit = computed(() => !!route.params.id)
 const serviceRequestId = computed(() => route.params.id)

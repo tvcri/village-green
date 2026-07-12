@@ -2,16 +2,17 @@
 
 const VillageService = require('../service/VillageService')
 const SmError = require('../utils/error')
+const { hasPermission, hasElevatedPermission } = require('../utils/authz')
+const { validateRoleGrants } = require('./User')
 
 module.exports.getVillages = async function getVillages (req, res, next) {
   try {
     const projections = req.query.projection
-    const elevate = req.query.elevate
+    const allVillages = hasPermission(req.userObject, 'village:read')
     const response = await VillageService.queryVillages({
       projections,
-      elevate,
-      grants: req.userObject.grants,
-      userId: req.userObject.userId
+      allVillages,
+      grants: req.userObject.grants
     })
     res.json(response)
   }
@@ -22,6 +23,9 @@ module.exports.getVillages = async function getVillages (req, res, next) {
 
 module.exports.createVillage = async function createVillage (req, res, next) {
   try {
+    if (!hasElevatedPermission(req.userObject, 'village:create', req)) {
+      throw new SmError.PrivilegeError()
+    }
     const body = req.body
     try {
       const response = await VillageService.createVillage(body)
@@ -44,12 +48,14 @@ module.exports.createVillage = async function createVillage (req, res, next) {
 module.exports.getVillage = async function getVillage (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'village:read', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
     const projections = req.query.projection
     const response = await VillageService.queryVillages({
       filter: {villageId},
       projections,
-      grants: req.userObject.grants,
-      userId: req.userObject.userId
+      allVillages: true
     })
     if (!response[0]) {
       throw new SmError.NotFoundError()
@@ -64,6 +70,9 @@ module.exports.getVillage = async function getVillage (req, res, next) {
 module.exports.patchVillage = async function patchVillage (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'village:write', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
     const body = req.body
 
     const existing = await VillageService.getVillage(villageId)
@@ -82,6 +91,9 @@ module.exports.patchVillage = async function patchVillage (req, res, next) {
 module.exports.deleteVillage = async function deleteVillage (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'village:write', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
 
     const existing = await VillageService.getVillage(villageId)
     if (!existing) {
@@ -99,13 +111,12 @@ module.exports.deleteVillage = async function deleteVillage (req, res, next) {
 module.exports.getVillageMembers = async function getVillageMembers (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'member:read', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
 
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      grants: req.userObject.grants,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
 
@@ -120,13 +131,12 @@ module.exports.getVillageMembers = async function getVillageMembers (req, res, n
 module.exports.getVillageVolunteers = async function getVillageVolunteers (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'volunteer:read', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
 
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      grants: req.userObject.grants,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
 
@@ -141,13 +151,12 @@ module.exports.getVillageVolunteers = async function getVillageVolunteers (req, 
 module.exports.getVillagePersons = async function getVillagePersons (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'person:read', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
 
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      grants: req.userObject.grants,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
 
@@ -163,13 +172,12 @@ module.exports.getVillagePerson = async function getVillagePerson (req, res, nex
   try {
     const villageId = req.params.villageId
     const personId = req.params.personId
+    if (!hasPermission(req.userObject, 'person:read', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
 
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      grants: req.userObject.grants,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
 
@@ -187,13 +195,12 @@ module.exports.getVillagePerson = async function getVillagePerson (req, res, nex
 module.exports.getVillageServiceRequests = async function getVillageServiceRequests (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'sr:read', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
     const status = req.query.status
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      grants: req.userObject.grants,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
 
@@ -208,13 +215,12 @@ module.exports.getVillageServiceRequests = async function getVillageServiceReque
 module.exports.getVillageGrants = async function getVillageGrants (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasElevatedPermission(req.userObject, 'grant:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
 
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      elevate: true,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
 
@@ -229,16 +235,21 @@ module.exports.getVillageGrants = async function getVillageGrants (req, res, nex
 module.exports.createVillageGrant = async function createVillageGrant (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasElevatedPermission(req.userObject, 'grant:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
     const body = req.body
 
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      elevate: true,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
+
+    // A grant written under /villages/{villageId}/grants always carries this
+    // villageId — reuse validateRoleGrants by pairing each grant's roleId
+    // with the path's villageId (the grant body itself has no villageId
+    // field; it's implied by the URL).
+    await validateRoleGrants(body.map(grant => ({ roleId: grant.roleId, villageId })))
 
     const response = await VillageService.createVillageGrant(villageId, body)
     res.status(201).json(response)
@@ -251,16 +262,18 @@ module.exports.createVillageGrant = async function createVillageGrant (req, res,
 module.exports.replaceVillageGrants = async function replaceVillageGrants (req, res, next) {
   try {
     const villageId = req.params.villageId
+    if (!hasElevatedPermission(req.userObject, 'grant:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
     const body = req.body
 
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      elevate: true,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
+
+    // See createVillageGrant: villageId comes from the path, not the body.
+    await validateRoleGrants(body.map(grant => ({ roleId: grant.roleId, villageId })))
 
     const response = await VillageService.replaceVillageGrants(villageId, body)
     res.json(response)
@@ -274,13 +287,12 @@ module.exports.deleteVillageGrant = async function deleteVillageGrant (req, res,
   try {
     const villageId = req.params.villageId
     const grantId = req.params.grantId
+    if (!hasElevatedPermission(req.userObject, 'grant:admin', req)) {
+      throw new SmError.PrivilegeError()
+    }
 
-    const existing = await VillageService.queryVillages({
-      filter: {villageId},
-      elevate: true,
-      userId: req.userObject.userId
-    })
-    if (!existing[0]) {
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
       throw new SmError.NotFoundError()
     }
 

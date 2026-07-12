@@ -3,6 +3,7 @@
 const SmError = require('../utils/error')
 const PrivacyService = require('../service/PrivacyService')
 const config = require('../utils/config')
+const { hasElevatedPermission } = require('../utils/authz')
 
 function filterTokenClaims(tokenPayload) {
   const { sub, iss, iat, exp } = tokenPayload
@@ -27,7 +28,7 @@ module.exports.getPrivacyRules = async function getPrivacyRules(req, res, next) 
 
 module.exports.publishPrivacyRules = async function publishPrivacyRules(req, res, next) {
   try {
-    if (!req.userObject.privileges?.admin) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'app:admin', req)) throw new SmError.PrivilegeError()
     const tokenClaims = filterTokenClaims(req.access_token)
     const rules = await PrivacyService.publishPrivacyRules(req.body.content, req.userObject.userId, tokenClaims)
     res.status(201).json(rules)
@@ -39,7 +40,7 @@ module.exports.publishPrivacyRules = async function publishPrivacyRules(req, res
 
 module.exports.patchPrivacyRulesCurrent = async function patchPrivacyRulesCurrent(req, res, next) {
   try {
-    if (!req.userObject.privileges?.admin) throw new SmError.PrivilegeError()
+    if (!hasElevatedPermission(req.userObject, 'app:admin', req)) throw new SmError.PrivilegeError()
     const rules = await PrivacyService.patchPrivacyRulesCurrent(req.body.content, req.userObject.userId)
     if (!rules) throw new SmError.NotFoundError()
     res.json(rules)

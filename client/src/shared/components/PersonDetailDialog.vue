@@ -24,7 +24,7 @@ const dialogVisible = computed({
 // opens, so the person data is always fresh. onError is null so a failure
 // shows our inline message instead of the global error modal.
 const { state: person, isLoading, error, execute: fetchPerson } = useAsyncState(
-  () => apiCall('getPerson', { personId: props.personId, projection: ['memberInfo', 'volunteerInfo'] }),
+  () => apiCall('getPerson', { personId: props.personId, projection: ['member', 'volunteer'] }),
   { immediate: false, onError: null },
 )
 
@@ -38,7 +38,7 @@ watch(
 )
 
 const personType = computed(() => {
-  const roles = person.value?.roles ?? []
+  const roles = person.value?.activeAs ?? []
   const isMember = roles.includes('member')
   const isVolunteer = roles.includes('volunteer')
   if (isMember && isVolunteer) return 'member, volunteer'
@@ -48,8 +48,16 @@ const personType = computed(() => {
 
 const flatPerson = computed(() => {
   if (!person.value) return null
-  const { memberInfo, volunteerInfo, ...rest } = person.value
-  return { ...rest, ...memberInfo, ...volunteerInfo }
+  // Spread role payloads only for *active* roles: staff callers may receive
+  // inactive-role data (read_inactive), but this shared view shows current
+  // roles only. The admin PersonDetail page is where inactive roles appear.
+  const { member, volunteer, ...rest } = person.value
+  const active = person.value.activeAs ?? []
+  return {
+    ...rest,
+    ...(active.includes('member') ? member : null),
+    ...(active.includes('volunteer') ? volunteer : null),
+  }
 })
 </script>
 

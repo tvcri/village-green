@@ -141,7 +141,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   return rows[0] ?? null
 }
 
-module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate, status, villageId, hasNotifications }) {
+module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications }) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.requestNumber',
@@ -196,14 +196,17 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
   ])
   const predicates = { statements: [], binds: [] }
 
-  if (!elevate) {
+  if (villageIdsGranted !== null) {
+    // Non-federation caller: restrict to the villages they were granted
+    // sr:read in. villageIdsGranted === null means a federation-wide read,
+    // which is unrestricted here.
     if (!villageIdsGranted.length) return []
     predicates.statements.push('sr.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)
   }
   if (villageId && villageId.length > 0) {
     predicates.statements.push('sr.villageId IN (?)')
-    predicates.binds.push([villageId])
+    predicates.binds.push(villageId)
   }
   if (status && status.length > 0) {
     const dbStatuses = []

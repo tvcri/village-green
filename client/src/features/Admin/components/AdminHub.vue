@@ -4,10 +4,6 @@ import Button from 'primevue/button'
 
 const router = useRouter()
 
-const navigateToVillageAccess = () => {
-  router.push({ name: 'admin-village-access' })
-}
-
 const navigateToUserAccess = () => {
   router.push({ name: 'admin-user-access' })
 }
@@ -27,7 +23,6 @@ const navigateToPrivacy = () => {
     <p class="subtitle">Manage access and grants for the Village Green system</p>
 
     <div class="button-group">
-      <Button label="Village Access List" @click="navigateToVillageAccess" />
       <Button label="Users" @click="navigateToUserAccess" />
       <Button label="Analytics" @click="navigateToAnalytics" />
       <Button label="Privacy Agreement" @click="navigateToPrivacy" />

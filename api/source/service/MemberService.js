@@ -17,7 +17,7 @@ module.exports.memberExists = async function (personId) {
 }
 
 // Grant or fully replace the member role.
-module.exports.putMember = async function (personId, body) {
+module.exports.putMember = async function (personId, body, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [existing] = await connection.query(
@@ -37,11 +37,11 @@ module.exports.putMember = async function (personId, body) {
     },
     statusObj: undefined
   })
-  return await PersonService.getPerson(personId, ['memberDetail'])
+  return await PersonService.getPerson(personId, ['member'], userObject)
 }
 
 // Partially update an existing member role.
-module.exports.patchMember = async function (personId, body) {
+module.exports.patchMember = async function (personId, body, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       if (Object.keys(body).length) {
@@ -50,7 +50,7 @@ module.exports.patchMember = async function (personId, body) {
     },
     statusObj: undefined
   })
-  return await PersonService.getPerson(personId, ['memberDetail'])
+  return await PersonService.getPerson(personId, ['member'], userObject)
 }
 
 module.exports.deleteMember = async function (personId) {
