@@ -63,12 +63,6 @@ const routes = [
     meta: { requiresPermission: 'user:admin' },
   },
   {
-    path: '/admin/villages',
-    name: 'admin-village-access',
-    component: () => import('../features/Admin/components/VillageAccessList.vue'),
-    meta: { requiresPermission: 'user:admin' },
-  },
-  {
     path: '/admin/users',
     name: 'admin-user-access',
     component: () => import('../features/Admin/components/UserList.vue'),
@@ -84,12 +78,6 @@ const routes = [
     path: '/admin/users/:userId/grants',
     name: 'admin-user-grants',
     component: () => import('../features/Admin/components/UserAccessDetail.vue'),
-    meta: { requiresPermission: 'user:admin' },
-  },
-  {
-    path: '/admin/villages/grants/:villageId',
-    name: 'admin-create-grant',
-    component: () => import('../features/Admin/components/CreateGrant.vue'),
     meta: { requiresPermission: 'user:admin' },
   },
   {
