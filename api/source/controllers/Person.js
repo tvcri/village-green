@@ -76,9 +76,16 @@ module.exports.patchPerson = async function patchPerson (req, res, next) {
     if (!existing) {
       throw new SmError.NotFoundError()
     }
-    // Gate on the existing record's village, not the patch body's — the
-    // resource being mutated is what determines the required grant.
+    // Gate on the existing record's village — the resource being mutated is
+    // what determines the required grant.
     if (!hasPermission(req.userObject, 'person:write', { villageId: existing.village?.villageId })) {
+      throw new SmError.PrivilegeError()
+    }
+    // A villageId in the body moves the record. Also require write on the
+    // destination so a village-scoped caller can't relocate a person into a
+    // village where they hold no write (mirrors the createPerson gate).
+    if (Object.hasOwn(body, 'villageId') && body.villageId !== existing.village?.villageId
+        && !hasPermission(req.userObject, 'person:write', { villageId: body.villageId })) {
       throw new SmError.PrivilegeError()
     }
 

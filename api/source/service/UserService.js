@@ -81,15 +81,18 @@ exports.queryUsers = async function (inProjection, inPredicates, userObject) {
     columns.push(`(
       select json_object(
         'needsAck',
+          -- CAST('true'/'false' AS JSON) yields a real JSON boolean. Bare
+          -- true/false are integer 1/0 literals in MySQL, which JSON_OBJECT
+          -- would serialize as 0/1 rather than the boolean the schema requires.
           case
-            when (select id from privacy_rules order by id desc limit 1) is null then false
+            when (select id from privacy_rules order by id desc limit 1) is null then cast('false' as json)
             when exists (
               select 1 from privacy_acknowledgement pa
               where pa.userId = ud.userId
                 and pa.rulesId = (select id from privacy_rules order by id desc limit 1)
                 and pa.acknowledgedAt > (UTC_TIMESTAMP() - INTERVAL ${intervalDays} DAY)
-            ) then false
-            else true
+            ) then cast('false' as json)
+            else cast('true' as json)
           end,
         'pendingRulesId', (select id from privacy_rules order by id desc limit 1),
         'lastAckedRulesId',
@@ -640,7 +643,6 @@ exports.patchUserWebPreferences = async function (userId, preferences) {
 }
 
 exports.getUserGrants = async function (userId) {
-  const config = require('../utils/config')
   const sql = `
     SELECT
       CAST(vg.grantId AS CHAR) AS grantId,
@@ -657,10 +659,6 @@ exports.getUserGrants = async function (userId) {
       END AS granteeType,
       CAST(ud.userId AS CHAR) AS grantee_userId,
       ud.username AS grantee_username,
-      COALESCE(
-        JSON_UNQUOTE(JSON_EXTRACT(ud.lastClaims, "$.${config.oauth.claims.name}")),
-        ud.username
-      ) AS grantee_displayName,
       CAST(ug.userGroupId AS CHAR) AS grantee_userGroupId,
       ug.name AS grantee_name
     FROM role_grant vg
@@ -675,9 +673,11 @@ exports.getUserGrants = async function (userId) {
 
   return rows.map(row => {
     const grantee = row.granteeType === 'user' ? {
+      // UserBasic carries userId + username only; no consumer renders a
+      // grantee displayName here, so it is not projected (would fail the
+      // additionalProperties:false Grantee/UserBasic schema otherwise).
       userId: row.grantee_userId,
-      username: row.grantee_username,
-      displayName: row.grantee_displayName
+      username: row.grantee_username
     } : {
       userGroupId: row.grantee_userGroupId,
       name: row.grantee_name

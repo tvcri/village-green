@@ -4102,10 +4102,13 @@ components:
       additionalProperties: false
       type: object
       properties:
+        grantId:
+          $ref: '#/components/schemas/GrantId'
         roleId:
           $ref: '#/components/schemas/RoleId'
         village:
           type: object
+          nullable: true
           properties:
             villageId:
               $ref: '#/components/schemas/VillageId'
@@ -4744,7 +4747,6 @@ components:
           type: string
           enum:
           - statistics
-          - owners
           - grants
           - personCounts
           - capabilityCounts

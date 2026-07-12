@@ -19,7 +19,7 @@ async function initializeDependencies() {
       }
   }
   catch (e) {
-    logger.writeError('dependencies', 'fail', {message:'Unable to setup dependencies'})
+    logger.writeError('dependencies', 'fail', {message:'Unable to setup dependencies', error: serializeError(e)})
     state.setState('fail')
   }
 }

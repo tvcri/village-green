@@ -22,6 +22,18 @@ test('computeEffective shapes federation and village sets', () => {
   assert.equal(eff.grants['3'].name, 'Elm')
 })
 
+test('computeEffective dedups the same role held via two distinct grants', () => {
+  // Same (roleId 3, villageId 3) reachable both directly (grant 10) and via a
+  // group (grant 11). grantIds must union; roles must not duplicate.
+  const dupRows = [
+    { grantId: 10, roleId: 3, roleName: 'Village Lead', scope: 'village', villageId: 3, villageName: 'Elm', permission: 'member:read' },
+    { grantId: 11, roleId: 3, roleName: 'Village Lead', scope: 'village', villageId: 3, villageName: 'Elm', permission: 'member:read' },
+  ]
+  const eff = computeEffective(dupRows)
+  assert.deepEqual(eff.grants['3'].roles, [{ roleId: '3', name: 'Village Lead' }])
+  assert.deepEqual(eff.grants['3'].grantIds, ['10', '11'])
+})
+
 test('computeEffective handles empty input', () => {
   const eff = computeEffective([])
   assert.deepEqual(eff.permissions, { federation: [], byVillage: {} })

@@ -22,10 +22,14 @@ function computeEffective(rows) {
       const vid = String(r.villageId)
       byVillage[vid] ??= new Set()
       if (r.permission) byVillage[vid].add(r.permission)
-      grants[vid] ??= { villageId: vid, name: r.villageName, roles: [], grantIds: [] }
+      grants[vid] ??= { villageId: vid, name: r.villageName, roles: [], grantIds: [], seenRoleIds: new Set() }
       if (!grants[vid].grantIds.includes(String(r.grantId))) {
         grants[vid].grantIds.push(String(r.grantId))
-        grants[vid].roles.push({ roleId: String(r.roleId), name: r.roleName })
+      }
+      const rid = String(r.roleId)
+      if (!grants[vid].seenRoleIds.has(rid)) {
+        grants[vid].seenRoleIds.add(rid)
+        grants[vid].roles.push({ roleId: rid, name: r.roleName })
       }
     }
   }
@@ -37,7 +41,9 @@ function computeEffective(rows) {
       ),
     },
     federationGrants: [...federationGrants.values()],
-    grants,
+    grants: Object.fromEntries(
+      Object.entries(grants).map(([vid, { seenRoleIds, ...g }]) => [vid, g])
+    ),
   }
 }
 

@@ -33,23 +33,6 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
       requesterGrantIds = requesterGrantIds.flat()
     }
 
-    if (projections.includes('owners')) {
-      columns.push(`(select coalesce(json_arrayagg(grantJson),json_array()) from
-        (select json_object(
-          'userId', CAST(user_data.userId as char),
-          'username', user_data.username,
-          'displayName', JSON_UNQUOTE(JSON_EXTRACT(user_data.lastClaims, "$.${config.oauth.claims.name}"))
-          ) as grantJson
-        from
-          role_grant inner join user_data using (userId) where villageId = v.id and roleId = 4
-        UNION
-        select json_object(
-          'userGroupId', CAST(user_group.userGroupId as char),
-          'name', user_group.name,
-          'description', user_group.description
-        ) as grantJson
-        from role_grant inner join user_group using (userGroupId) where villageId = v.id and roleId = 4) o) as owners`)
-    }
     if (projections.includes('statistics')) {
       requireCteGrantees = true
       columns.push(`json_object(
