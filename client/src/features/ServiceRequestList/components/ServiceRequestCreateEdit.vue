@@ -489,32 +489,12 @@ const handleSubmit = async (notify = false) => {
         }
 
         if (!form.value.timesFlexible) {
-          if (form.value.transportationType === 'Round Trip') {
-            if (form.value.startTime == null) {
-              toast.add({ severity: 'error', summary: 'Error', detail: 'Start time is required for Round Trip', life: 3000 })
-              return
-            }
-            if (form.value.apptTime == null) {
-              toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time is required for Round Trip', life: 3000 })
-              return
-            }
-            if (form.value.returnTime == null) {
-              toast.add({ severity: 'error', summary: 'Error', detail: 'Return time is required for Round Trip', life: 3000 })
-              return
-            }
-            if (form.value.finishTime == null) {
-              toast.add({ severity: 'error', summary: 'Error', detail: 'Finish time is required for Round Trip', life: 3000 })
-              return
-            }
-          } else if (form.value.transportationType === 'One Way') {
-            if (form.value.startTime == null) {
-              toast.add({ severity: 'error', summary: 'Error', detail: 'Start time is required for One Way', life: 3000 })
-              return
-            }
-            if (form.value.finishTime == null) {
-              toast.add({ severity: 'error', summary: 'Error', detail: 'Finish time is required for One Way', life: 3000 })
-              return
-            }
+          const requiredTimes = form.value.transportationType === 'Round Trip'
+            ? [form.value.startTime, form.value.apptTime, form.value.returnTime, form.value.finishTime]
+            : [form.value.startTime, form.value.finishTime]
+          if (requiredTimes.some((t) => t == null)) {
+            toast.add({ severity: 'error', summary: 'Error', detail: `Enter all times for ${form.value.transportationType}, or check "Times flexible"`, life: 3000 })
+            return
           }
         }
       }
