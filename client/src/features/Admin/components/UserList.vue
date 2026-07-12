@@ -9,11 +9,13 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
 import { getUsersWithGrants, deleteUser } from '../../../shared/api/userApi.js'
 import { getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
+import AccessTags from './AccessTags.vue'
+import { accessSortString, matchesScopeFilter, HUB_FILTER } from '../lib/accessTagHelpers.js'
+import { getVillages } from '../api/villageGrantApi.js'
 
 defineOptions({ name: 'UserList' })
 
@@ -28,14 +30,17 @@ const { state: users, isLoading, execute: refetchUsers } = useAsyncState(
   { immediate: true }
 )
 
-// Hub role wins when present (a hub grant implies federation-wide access);
-// otherwise the user's village role names, de-duplicated across villages.
-function roleLabel(user) {
-  const hubNames = (user.federationGrants ?? []).map(g => g.name)
-  if (hubNames.length) return [...new Set(hubNames)].join(', ')
-  const villageNames = Object.values(user.grants ?? {}).flatMap(g => (g.roles ?? []).map(r => r.name))
-  return villageNames.length ? [...new Set(villageNames)].join(', ') : '—'
-}
+const scopeFilter = ref(null) // null = all; HUB_FILTER or a villageId
+
+const { state: villages } = useAsyncState(
+  () => getVillages(),
+  { immediate: true }
+)
+
+const scopeFilterOptions = computed(() => [
+  { label: 'Hub', value: HUB_FILTER },
+  ...(villages.value || []).map(v => ({ label: v.name, value: v.villageId })),
+])
 
 let hasActivatedOnce = false
 onActivated(() => {
@@ -49,12 +54,17 @@ onActivated(() => {
 const filteredUsers = computed(() => {
   if (!users.value) return []
   const q = searchText.value.trim().toLowerCase()
-  if (!q) return users.value
   return users.value.filter(u =>
-    u.username.toLowerCase().includes(q) ||
-    (u.displayName || '').toLowerCase().includes(q)
+    matchesScopeFilter(u, scopeFilter.value) &&
+    (!q ||
+      u.username.toLowerCase().includes(q) ||
+      (u.displayName || '').toLowerCase().includes(q))
   )
 })
+
+// Unavailable = soft-deleted (username retained). The dimmed row IS the
+// status indicator; there is no Status column.
+const rowClass = (data) => (data.status === 'available' ? '' : 'row-unavailable')
 
 function goToCreate() {
   router.push({ name: 'admin-user-create' })
@@ -94,6 +104,15 @@ async function onDeleteUser(user) {
     <div class="list-header">
       <h1>Users</h1>
       <div class="header-actions">
+        <Select
+          v-model="scopeFilter"
+          :options="scopeFilterOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="All scopes"
+          show-clear
+          class="scope-filter"
+        />
         <IconField>
           <InputText v-model="searchText" placeholder="Search username or name" />
           <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click="searchText = ''" />
@@ -115,6 +134,7 @@ async function onDeleteUser(user) {
       paginator
       :rows="pageRows"
       class="users-table-responsive users-table-clickable-rows"
+      :row-class="rowClass"
       @row-click="onRowClick"
     >
       <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
@@ -130,13 +150,8 @@ async function onDeleteUser(user) {
       <Column field="displayName" header="Display Name" sortable>
         <template #body="{ data }">{{ data.displayName === data.username ? '—' : data.displayName }}</template>
       </Column>
-      <Column field="status" header="Status" sortable alignHeader="center" style="text-align: center;">
-        <template #body="{ data }">
-          <Tag :value="data.status" :severity="data.status === 'available' ? 'success' : 'danger'" />
-        </template>
-      </Column>
-      <Column header="Role" sortable :sort-field="row => roleLabel(row)">
-        <template #body="{ data }">{{ roleLabel(data) }}</template>
+      <Column header="Access" sortable :sort-field="row => accessSortString(row)">
+        <template #body="{ data }"><AccessTags :user="data" /></template>
       </Column>
       <Column field="lastAccess" header="Last Access" sortable>
         <template #body="{ data }">{{ data.lastAccess ? formatLocalDateTime(data.lastAccess * 1000) : '—' }}</template>
@@ -202,6 +217,14 @@ h1 {
 
 .users-table-clickable-rows :deep(.p-datatable-tbody > tr) {
   cursor: pointer;
+}
+
+.scope-filter {
+  min-width: 160px;
+}
+
+.users-table-responsive :deep(tr.row-unavailable) {
+  opacity: 0.55;
 }
 
 
