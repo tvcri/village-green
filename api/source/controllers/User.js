@@ -508,34 +508,3 @@ module.exports.deleteUserGrant = async function deleteUserGrant (req, res, next)
   }
 }
 
-module.exports.setUserPersonLink = async function setUserPersonLink (req, res, next) {
-  try {
-    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
-      throw new SmError.PrivilegeError()
-    }
-    const userId = req.params.userId
-    const personId = req.body.personId
-    const found = await UserService.setUserPersonLink(userId, personId)
-    if (!found) throw new SmError.NotFoundError()
-    res.json({ userId, personId })
-  }
-  catch (err) {
-    next(err)
-  }
-}
-
-module.exports.deleteUserPersonLink = async function deleteUserPersonLink (req, res, next) {
-  try {
-    if (!hasElevatedPermission(req.userObject, 'user:admin', req)) {
-      throw new SmError.PrivilegeError()
-    }
-    const userId = req.params.userId
-    const found = await UserService.deleteUserPersonLink(userId)
-    if (!found) throw new SmError.NotFoundError()
-    res.json({})
-  }
-  catch (err) {
-    next(err)
-  }
-}
-
