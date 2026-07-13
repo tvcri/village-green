@@ -53,8 +53,8 @@ const requireVolunteerAccess = async function (req, res, next) {
   try {
     if (!req.userObject?.userId) return next()
     if (!req.userObject.personId) throw new SmError.PrivilegeError()
-    const villages = await UserService.getVolunteerVillages(req.userObject.personId)
-    if (!villages.length) throw new SmError.PrivilegeError()
+    // Existence check only — the gate needs a boolean, not the village list.
+    if (!await UserService.isActiveVolunteer(req.userObject.personId)) throw new SmError.PrivilegeError()
     next()
   } catch (e) {
     next(e)

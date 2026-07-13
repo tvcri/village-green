@@ -7,8 +7,13 @@ const mockHasVillageAccess = vi.fn(() => false)
 const mockHasFederationAccess = { value: false }
 const mockIsGrantless = { value: false }
 
+// Mirror the real composable: user is computed(() => VG.curUser), so expose
+// a live getter that reads whatever each test sets on globalThis.VG.
+const mockUser = { get value() { return globalThis.VG?.curUser } }
+
 vi.mock('../shared/composables/useCurrentUser.js', () => ({
   useCurrentUser: () => ({
+    user: mockUser,
     hasPermission: mockHasPermission,
     hasVillageAccess: mockHasVillageAccess,
     hasFederationAccess: mockHasFederationAccess,

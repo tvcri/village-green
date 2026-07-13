@@ -773,3 +773,15 @@ exports.getVolunteerVillages = async function (personId) {
   )
   return rows
 }
+
+// Existence-only check for the volunteer access gate, which runs on every
+// /volunteer-requests request and needs only a boolean — not the village
+// list getVolunteerVillages builds. active_volunteer is the authorization
+// source: an inactive volunteer must lose the surface.
+exports.isActiveVolunteer = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    'SELECT 1 FROM active_volunteer WHERE personId = ? LIMIT 1',
+    [personId]
+  )
+  return rows.length > 0
+}
