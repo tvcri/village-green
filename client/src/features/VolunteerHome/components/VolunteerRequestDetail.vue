@@ -21,6 +21,13 @@ const { getStatusSeverity } = useStatusSeverity()
 
 const serviceRequestId = computed(() => route.params.id)
 
+// Volunteer self-cancel (Release) is hidden until the customer works out
+// back-office support for it. The button below is gated on this flag; the
+// release plumbing (confirmRelease/doRelease and the API endpoint) stays
+// intact, so flipping this to true re-enables the feature with no other
+// change. The API accepts release regardless — this is a UI hide only.
+const RELEASE_ENABLED = false
+
 const { state: request, isLoading, execute: fetchRequest } = useAsyncState(
   () => getVolunteerRequest(serviceRequestId.value),
   {
@@ -290,7 +297,7 @@ async function doRelease() {
             @click="confirmSignUp"
           />
           <Button
-            v-if="request.status === 'Confirmed'"
+            v-if="RELEASE_ENABLED && request.status === 'Confirmed'"
             label="Release"
             icon="pi pi-times"
             severity="danger"
