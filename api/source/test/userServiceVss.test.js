@@ -5,18 +5,15 @@ const path = require('node:path')
 
 const UserService = require(path.join('..', 'service', 'UserService'))
 
-test('decideAutoMatch links only on exactly one candidate', () => {
-  assert.equal(UserService.decideAutoMatch([{ id: 7 }]), 7)
-  assert.equal(UserService.decideAutoMatch([]), null)
-  assert.equal(UserService.decideAutoMatch([{ id: 7 }, { id: 8 }]), null)
-})
-
-test('VSS identity functions are exported', () => {
-  assert.equal(typeof UserService.attemptPersonAutoMatch, 'function')
+test('getVolunteerVillages is exported', () => {
   assert.equal(typeof UserService.getVolunteerVillages, 'function')
 })
 
-test('person-link admin functions are exported', () => {
-  assert.equal(typeof UserService.setUserPersonLink, 'function')
-  assert.equal(typeof UserService.deleteUserPersonLink, 'function')
+// Runtime identity (spec §1-AMENDED): personId is computed in getUserObject's
+// SELECT; nothing is stored, so the stored-link machinery must not survive.
+test('stored-link functions are removed', () => {
+  assert.equal(UserService.decideAutoMatch, undefined)
+  assert.equal(UserService.attemptPersonAutoMatch, undefined)
+  assert.equal(UserService.setUserPersonLink, undefined)
+  assert.equal(UserService.deleteUserPersonLink, undefined)
 })

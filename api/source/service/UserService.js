@@ -599,7 +599,13 @@ exports.getUserObject = async function (username) {
     lastAccess,
     lastClaims,
     status,
-    personId,
+    -- Runtime identity (VSS spec §1-AMENDED): exactly one person whose email
+    -- matches the username → that person, else null. Case-insensitivity comes
+    -- from the utf8mb4_0900_ai_ci collation; no LOWER(), it would defeat
+    -- person INDEX_email.
+    (select if(count(*) = 1, min(p.id), null)
+     from person p
+     where p.email = ud.username) as personId,
     -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
     -- published and the user has no acknowledgement of the current version within
     -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
@@ -753,35 +759,6 @@ exports.deleteUserGrant = async function (userId, grantId) {
 
 // ─── VSS identity link ──────────────────────────────────────────────────────
 
-// Pure decision: link only on an unambiguous single-candidate match.
-exports.decideAutoMatch = function (rows) {
-  return rows.length === 1 ? rows[0].id : null
-}
-
-// Called by auth.setupUser when the authenticated user has no linked person.
-// Every outcome other than a clean single match is silent (stays unlinked):
-// zero matches, multiple matches, person already claimed, concurrent loser.
-exports.attemptPersonAutoMatch = async function (userObject) {
-  const [rows] = await dbUtils.pool.query(
-    'SELECT id FROM person WHERE LOWER(email) = LOWER(?) LIMIT 2',
-    [userObject.username]
-  )
-  const personId = exports.decideAutoMatch(rows)
-  if (personId === null) return null
-  try {
-    const [result] = await dbUtils.pool.query(
-      'UPDATE user_data SET personId = ? WHERE userId = ? AND personId IS NULL',
-      [personId, userObject.userId]
-    )
-    return result.affectedRows === 1 ? personId : null
-  } catch (e) {
-    // ER_DUP_ENTRY: the person is already linked to another user, or a
-    // concurrent request won the race. Never fail authentication over it.
-    if (e.code === 'ER_DUP_ENTRY') return null
-    throw e
-  }
-}
-
 // A volunteer's village is their person's village. active_volunteer is the
 // correct source here: this feeds authorization, and inactive volunteers
 // must lose the surface.
@@ -795,39 +772,4 @@ exports.getVolunteerVillages = async function (personId) {
     [personId]
   )
   return rows
-}
-
-// Admin fallback for auto-match misses/collisions (VSS design spec §1).
-exports.setUserPersonLink = async function (userId, personId) {
-  const [existing] = await dbUtils.pool.query('SELECT userId FROM user_data WHERE userId = ?', [userId])
-  if (existing.length === 0) {
-    return false
-  }
-  try {
-    await dbUtils.pool.query(
-      'UPDATE user_data SET personId = ? WHERE userId = ?',
-      [personId, userId]
-    )
-    return true
-  } catch (e) {
-    if (e.code === 'ER_DUP_ENTRY') {
-      throw new SmError.ConflictError('Person is already linked to another user.')
-    }
-    if (e.code === 'ER_NO_REFERENCED_ROW_2') {
-      throw new SmError.UnprocessableError('Invalid personId.')
-    }
-    throw e
-  }
-}
-
-exports.deleteUserPersonLink = async function (userId) {
-  const [existing] = await dbUtils.pool.query('SELECT userId FROM user_data WHERE userId = ?', [userId])
-  if (existing.length === 0) {
-    return false
-  }
-  await dbUtils.pool.query(
-    'UPDATE user_data SET personId = NULL WHERE userId = ?',
-    [userId]
-  )
-  return true
 }

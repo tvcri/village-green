@@ -148,10 +148,6 @@ const setupUser = async function (req, res, next) {
                 }
             }
 
-            if (userObject.userId && userObject.personId == null) {
-                userObject.personId = await UserService.attemptPersonAutoMatch(userObject)
-            }
-
             // Effective permissions were computed by getUserObject. Reject an elevate
             // request up-front unless the user holds an elevation-flagged permission —
             // preserves the historical "you can't even ask" behavior.
