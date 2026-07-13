@@ -183,14 +183,14 @@ const columnsForCsv = [
 const DATE_TIME_CSV_KEYS = ['createdAt']
 
 const handleDownloadCsv = async () => {
-  const csv = toCsv(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv)
+  const csv = toCsv(withLocalDateTimeColumns(filteredRequests.value, DATE_TIME_CSV_KEYS), columnsForCsv)
   downloadCsv(csv, 'service-requests.csv')
 }
 
 async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
-    const result = await createSheet(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv, 'Village Green Service Requests')
+    const result = await createSheet(withLocalDateTimeColumns(filteredRequests.value, DATE_TIME_CSV_KEYS), columnsForCsv, 'Village Green Service Requests')
     const sheetUrl = result.url || result
     if (result.popupBlocked) {
       if (toast) {

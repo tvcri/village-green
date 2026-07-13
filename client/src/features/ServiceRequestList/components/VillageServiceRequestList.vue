@@ -210,7 +210,7 @@ const DATE_TIME_CSV_KEYS = ['createdAt']
 
 const handleDownloadCsv = async () => {
   if (!village.value && villageId.value) await fetchVillage()
-  const csv = toCsv(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv)
+  const csv = toCsv(withLocalDateTimeColumns(filteredRequests.value, DATE_TIME_CSV_KEYS), columnsForCsv)
   const villageName = village.value?.name || 'village'
   downloadCsv(csv, `${villageName}-service-requests.csv`)
 }
@@ -220,7 +220,7 @@ async function handleCreateSheet() {
     isCreatingSheet.value = true
     if (!village.value && villageId.value) await fetchVillage()
     const villageName = village.value?.name || 'Village Green'
-    const result = await createSheet(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv, `${villageName} Service Requests`)
+    const result = await createSheet(withLocalDateTimeColumns(filteredRequests.value, DATE_TIME_CSV_KEYS), columnsForCsv, `${villageName} Service Requests`)
     const sheetUrl = result.url || result
     if (result.popupBlocked) {
       if (toast) {
