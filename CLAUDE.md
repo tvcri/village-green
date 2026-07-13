@@ -16,3 +16,14 @@ The board's backlog originates from `.claude/todo.md`. Adding a draft issue via
 the command affects the **board only**; it does not edit `todo.md`. Keep
 `todo.md` as the human-maintained backlog and add items there separately when
 the user wants them tracked in the file too.
+
+## Service request dates & times
+
+`service_request.serviceDate` (DATE) and the four TIME columns
+(`startTime`, `finishTime`, `apptTime`, `returnTime`) are **wall-clock
+civil values**, not instants. They pass through API and client as plain
+strings (`YYYY-MM-DD`, `HH:MM:SS`). Never construct a JS `Date` from
+them and never timezone-convert them — use the helpers in
+`client/src/features/ServiceRequestList/lib/timeFields.js`.
+`timesFlexible` records "no specific times" explicitly. `createdAt`
+and other event timestamps remain UTC instants.

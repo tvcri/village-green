@@ -8,6 +8,7 @@ import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
 import NotificationHistoryList from './NotificationHistoryList.vue'
+import { formatServiceDate, timeStringToLabel } from '../lib/timeFields.js'
 
 const route = useRoute()
 const { getStatusSeverity } = useStatusSeverity()
@@ -56,39 +57,20 @@ function formatDate(dateStr) {
   return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function formatDateOnly(dateStr) {
-  if (!dateStr) return null
-  const date = new Date(dateStr)
-  return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
-}
-
-function formatTimeOnly(dateStr) {
-  if (!dateStr) return null
-  const date = new Date(dateStr)
-  return date.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatTimeRange(startStr, finishStr) {
-  const start = formatTimeOnly(startStr)
-  const finish = formatTimeOnly(finishStr)
-  if (!start || !finish) return null
-  return `${start} - ${finish}`
-}
-
 const timeDisplay = computed(() => {
-  if (!request.value?.startAt) return null
   const r = request.value
-  const start = formatTimeOnly(r.startAt)
-  const finish = formatTimeOnly(r.finishAt)
+  if (!r) return null
+  if (r.timesFlexible) return [{ label: 'Times', value: 'Flexible' }]
+  if (!r.startTime && !r.finishTime) return null
+  const start = timeStringToLabel(r.startTime)
+  const finish = timeStringToLabel(r.finishTime)
   if (r.requestNumber == null && r.transportationType === 'Round Trip') {
     return [
-      { label: 'Start / Arrive', value: [start, formatTimeOnly(r.apptTime)].map(t => t ?? '—').join(' - ') },
-      { label: 'Return / Finish', value: [formatTimeOnly(r.returnTime), finish].map(t => t ?? '—').join(' - ') }
+      { label: 'Start / Arrive', value: [start, timeStringToLabel(r.apptTime)].map(t => t ?? '—').join(' - ') },
+      { label: 'Return / Finish', value: [timeStringToLabel(r.returnTime), finish].map(t => t ?? '—').join(' - ') }
     ]
   }
-  return [
-    { label: 'Start / Finish', value: [start, finish].map(t => t ?? '—').join(' / ') }
-  ]
+  return [{ label: 'Start / Finish', value: [start, finish].map(t => t ?? '—').join(' / ') }]
 })
 
 </script>
@@ -214,9 +196,9 @@ const timeDisplay = computed(() => {
         <!-- Request Section -->
         <div class="section">
           <h3 class="section-header">Request</h3>
-          <div v-if="request.startAt" class="detail-field">
+          <div v-if="request.serviceDate" class="detail-field">
             <span class="label">Date:</span>
-            <span class="value">{{ formatDateOnly(request.startAt) }}</span>
+            <span class="value">{{ formatServiceDate(request.serviceDate) }}</span>
           </div>
 
           <div v-for="row in timeDisplay" :key="row.label" class="detail-field">
@@ -395,7 +377,7 @@ const timeDisplay = computed(() => {
 .section {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1rem 1.5rem;
+  gap: 0rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;
 }
@@ -412,7 +394,7 @@ const timeDisplay = computed(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: start;
-  gap: 1rem 1.5rem;
+  gap: 2rem 1.5rem;
   margin-top: 1rem;
   margin-bottom: 2rem;
 }
@@ -539,7 +521,7 @@ const timeDisplay = computed(() => {
 
   .section {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 0rem;
   }
 
   .section-half {
