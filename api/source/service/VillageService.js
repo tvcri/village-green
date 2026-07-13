@@ -278,10 +278,16 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
     'sr.serviceName',
     'sr.transportationType',
     "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
-    "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
-    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
-    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
-    "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
+    // serviceDate as a string: mysql2 would otherwise hydrate DATE into a
+    // JS Date at server-local midnight, reintroducing tz ambiguity.
+    "DATE_FORMAT(sr.serviceDate, '%Y-%m-%d') AS serviceDate",
+    // TIME columns come back from mysql2 as 'HH:MM:SS' strings natively.
+    'sr.startTime',
+    'sr.finishTime',
+    'sr.apptTime',
+    'sr.returnTime',
+    // JSON boolean (0/1 tinyint would fail the OAS boolean type).
+    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.destination AS destination',
@@ -319,10 +325,92 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
       predicates.binds.push([dbStatuses])
     }
   }
-  const orderBy = ['sr.finishAt DESC']
+  const orderBy = ['sr.serviceDate DESC', 'sr.startTime DESC']
   const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
   let [rows] = await dbUtils.pool.query(sql)
   return rows
+}
+
+module.exports.getVillageMetrics = async function (villageId, start, end) {
+  // Business rule: 'Hub cancelled' requests are treated as if they never
+  // existed — excluded from every section. Breakdown sections count
+  // Completed requests only; the full status mix appears only in byStatus.
+  // Breakdown arrays are ordered in SQL (jsonArrayAgg orderBy): byServiceType
+  // by count desc then name; person lists by fullName.
+  const sql = `
+    SELECT
+      CAST(v.id AS CHAR) AS villageId,
+      v.name AS villageName,
+      (SELECT JSON_OBJECT(
+          'draft',              COALESCE(SUM(sr.status = 'Draft'), 0),
+          'open',               COALESCE(SUM(sr.status = 'Open'), 0),
+          'confirmed',          COALESCE(SUM(sr.status = 'Confirmed'), 0),
+          'completed',          COALESCE(SUM(sr.status = 'Completed'), 0),
+          'unmatched',          COALESCE(SUM(sr.status = 'Unmatched'), 0),
+          'memberCancelled',    COALESCE(SUM(sr.status = 'Member cancelled'), 0),
+          'volunteerCancelled', COALESCE(SUM(sr.status = 'Volunteer cancelled'), 0)
+        )
+        FROM service_request sr
+        WHERE sr.villageId = v.id
+          AND sr.status != 'Hub cancelled'
+          AND sr.serviceDate BETWEEN ? AND ?) AS byStatus,
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('serviceName', t.serviceName, 'count', t.cnt)`,
+            orderBy: 't.cnt desc, t.serviceName'
+          })}, JSON_ARRAY())
+        FROM (SELECT sr.serviceName, COUNT(*) AS cnt
+              FROM service_request sr
+              WHERE sr.villageId = v.id
+                AND sr.status = 'Completed'
+                AND sr.serviceName IS NOT NULL
+                AND sr.serviceDate BETWEEN ? AND ?
+              GROUP BY sr.serviceName) t) AS byServiceType,
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            orderBy: 'p.fullName'
+          })}, JSON_ARRAY())
+        FROM (SELECT sr.memberPersonId AS pid, COUNT(*) AS cnt
+              FROM service_request sr
+              WHERE sr.villageId = v.id
+                AND sr.status = 'Completed'
+                AND sr.memberPersonId IS NOT NULL
+                AND sr.serviceDate BETWEEN ? AND ?
+              GROUP BY sr.memberPersonId) t
+        JOIN person p ON p.id = t.pid) AS byMember,
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            orderBy: 'p.fullName'
+          })}, JSON_ARRAY())
+        FROM (SELECT sr.volunteerPersonId AS pid, COUNT(*) AS cnt
+              FROM service_request sr
+              WHERE sr.villageId = v.id
+                AND sr.status = 'Completed'
+                AND sr.volunteerPersonId IS NOT NULL
+                AND sr.serviceDate BETWEEN ? AND ?
+              GROUP BY sr.volunteerPersonId) t
+        JOIN person p ON p.id = t.pid) AS byVolunteer
+    FROM village v
+    WHERE v.id = ?
+  `
+  const binds = [start, end, start, end, start, end, start, end, villageId]
+  const [rows] = await dbUtils.pool.query(sql, binds)
+  if (!rows[0]) return null
+  const row = rows[0]
+  // mysql2 hydrates the JSON columns into JS objects/arrays with numeric
+  // counts already (JSON numbers), so no coercion is needed here.
+  const totalRequests = Object.values(row.byStatus).reduce((a, b) => a + b, 0)
+  return {
+    villageId: row.villageId,
+    villageName: row.villageName,
+    range: { start, end },
+    totals: { totalRequests, byStatus: row.byStatus },
+    byServiceType: row.byServiceType,
+    byMember: row.byMember,
+    byVolunteer: row.byVolunteer
+  }
 }
 
 module.exports.getVillageGrants = async function (villageId) {

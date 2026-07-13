@@ -125,8 +125,8 @@ const filteredVolunteers = computed(() => {
 const isEmpty = computed(() => !isLoading.value && filteredVolunteers.value.length === 0)
 
 const volunteersForCsv = computed(() => {
-  if (!Array.isArray(volunteers.value) || !Array.isArray(persons.value)) return []
-  return volunteers.value.map(v => {
+  if (!Array.isArray(persons.value)) return []
+  return filteredVolunteers.value.map(v => {
     const p = persons.value?.find(p => p.personId === v.personId) ?? {}
     return { ...p, ...v, capabilities: v.capabilities?.join('; ') ?? '' }
   })

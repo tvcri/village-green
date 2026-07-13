@@ -4,6 +4,8 @@ const VillageService = require('../service/VillageService')
 const SmError = require('../utils/error')
 const { hasPermission, hasElevatedPermission } = require('../utils/authz')
 const { validateRoleGrants } = require('./User')
+const { resolveMetricsRange, todayCivil } = require('../utils/metricsRange')
+const config = require('../utils/config')
 
 module.exports.getVillages = async function getVillages (req, res, next) {
   try {
@@ -205,6 +207,29 @@ module.exports.getVillageServiceRequests = async function getVillageServiceReque
     }
 
     const response = await VillageService.getVillageServiceRequests(villageId, status)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.getVillageMetrics = async function getVillageMetrics (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'sr:read', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
+    // Default the range end to today in the deployment's civil timezone, so
+    // an Eastern user near midnight doesn't get metrics that run through the
+    // server's (UTC) tomorrow.
+    const today = todayCivil(config.settings.civilTimeZone)
+    const { start, end } = resolveMetricsRange(req.query.start, req.query.end, today)
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
+      throw new SmError.NotFoundError()
+    }
+    const response = await VillageService.getVillageMetrics(villageId, start, end)
     res.json(response)
   }
   catch (err) {

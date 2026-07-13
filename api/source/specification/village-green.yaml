@@ -2166,6 +2166,32 @@ paths:
       security:
       - oauth:
         - vg:village:read
+  /villages/{villageId}/metrics:
+    get:
+      summary: Service-engagement metrics for a village over a serviceDate range
+      tags:
+      - Village
+      operationId: getVillageMetrics
+      parameters:
+      - $ref: '#/components/parameters/VillageIdPath'
+      - $ref: '#/components/parameters/MetricsStartQuery'
+      - $ref: '#/components/parameters/MetricsEndQuery'
+      responses:
+        '200':
+          description: Village metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VillageMetrics'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
   /villages/{villageId}/grants:
     get:
       summary: List all grants for a village
@@ -3614,13 +3640,19 @@ components:
           type: string
           maxLength: 255
           nullable: true
-        startAt:
+        serviceDate:
           type: string
-          format: date-time
+          format: date
           nullable: true
-        finishAt:
+        timesFlexible:
+          type: boolean
+        startTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         instructions:
           type: string
@@ -3648,11 +3680,11 @@ components:
           nullable: true
         apptTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         returnTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
           type: string
@@ -3726,13 +3758,19 @@ components:
           type: string
           format: date-time
           nullable: true
-        startAt:
+        serviceDate:
           type: string
-          format: date-time
+          format: date
           nullable: true
-        finishAt:
+        timesFlexible:
+          type: boolean
+        startTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         instructions:
           type: string
@@ -3760,11 +3798,11 @@ components:
           nullable: true
         apptTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         returnTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
           type: string
@@ -3812,13 +3850,19 @@ components:
           type: string
           format: date-time
           nullable: true
-        startAt:
+        serviceDate:
           type: string
-          format: date-time
+          format: date
           nullable: true
-        finishAt:
+        timesFlexible:
+          type: boolean
+        startTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         instructions:
           type: string
@@ -3846,11 +3890,11 @@ components:
           nullable: true
         apptTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         returnTime:
           type: string
-          format: date-time
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
           type: string
@@ -4309,6 +4353,107 @@ components:
       $ref: '#/components/schemas/StringIntIdNullable'
     VillageName:
       $ref: '#/components/schemas/String45'
+    VillageMetrics:
+      type: object
+      additionalProperties: false
+      required:
+      - villageId
+      - villageName
+      - range
+      - totals
+      - byServiceType
+      - byMember
+      - byVolunteer
+      properties:
+        villageId:
+          $ref: '#/components/schemas/VillageId'
+        villageName:
+          $ref: '#/components/schemas/VillageName'
+        range:
+          type: object
+          additionalProperties: false
+          required:
+          - start
+          - end
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+        totals:
+          type: object
+          additionalProperties: false
+          required:
+          - totalRequests
+          - byStatus
+          properties:
+            totalRequests:
+              type: integer
+            byStatus:
+              type: object
+              additionalProperties: false
+              required:
+              - draft
+              - open
+              - confirmed
+              - completed
+              - unmatched
+              - memberCancelled
+              - volunteerCancelled
+              properties:
+                draft:
+                  type: integer
+                open:
+                  type: integer
+                confirmed:
+                  type: integer
+                completed:
+                  type: integer
+                unmatched:
+                  type: integer
+                memberCancelled:
+                  type: integer
+                volunteerCancelled:
+                  type: integer
+        byServiceType:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - serviceName
+            - count
+            properties:
+              serviceName:
+                type: string
+                maxLength: 200
+              count:
+                type: integer
+        byMember:
+          type: array
+          items:
+            $ref: '#/components/schemas/VillageMetricsPersonCount'
+        byVolunteer:
+          type: array
+          items:
+            $ref: '#/components/schemas/VillageMetricsPersonCount'
+    VillageMetricsPersonCount:
+      type: object
+      additionalProperties: false
+      required:
+      - personId
+      - fullName
+      - count
+      properties:
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        fullName:
+          type: string
+          maxLength: 200
+        count:
+          type: integer
     VillagePatch:
       additionalProperties: false
       type: object
@@ -4856,6 +5001,23 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/MemberId'
+    MetricsEndQuery:
+      name: end
+      in: query
+      required: false
+      description: Inclusive upper bound on serviceDate; defaults to the current
+        date when omitted.
+      schema:
+        type: string
+        format: date
+    MetricsStartQuery:
+      name: start
+      in: query
+      required: true
+      description: Inclusive lower bound on serviceDate.
+      schema:
+        type: string
+        format: date
     PersonIdPath:
       name: personId
       in: path
