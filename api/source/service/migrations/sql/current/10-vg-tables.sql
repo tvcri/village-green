@@ -60,6 +60,7 @@ DROP TABLE IF EXISTS `active_volunteer`;
  1 AS `id`,
  1 AS `personId`,
  1 AS `providerType`,
+ 1 AS `notes`,
  1 AS `active`*/;
 
 --
@@ -318,6 +319,56 @@ CREATE TABLE `privacy_rules` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `role`
+--
+
+DROP TABLE IF EXISTS `role`;
+CREATE TABLE `role` (
+  `roleId` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `scope` enum('federation','village') NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `isSystem` tinyint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`roleId`),
+  UNIQUE KEY `idx_role_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `role_grant`
+--
+
+DROP TABLE IF EXISTS `role_grant`;
+CREATE TABLE `role_grant` (
+  `grantId` int NOT NULL AUTO_INCREMENT,
+  `userId` int DEFAULT NULL,
+  `userGroupId` int DEFAULT NULL,
+  `roleId` int NOT NULL,
+  `villageId` int DEFAULT NULL,
+  `villageKey` int GENERATED ALWAYS AS (ifnull(`villageId`,0)) VIRTUAL,
+  PRIMARY KEY (`grantId`),
+  UNIQUE KEY `idx_rg_user` (`userId`,`roleId`,`villageKey`),
+  UNIQUE KEY `idx_rg_group` (`userGroupId`,`roleId`,`villageKey`),
+  KEY `idx_rg_village` (`villageId`,`roleId`),
+  KEY `fk_role_grant_role` (`roleId`),
+  CONSTRAINT `fk_role_grant_group` FOREIGN KEY (`userGroupId`) REFERENCES `user_group` (`userGroupId`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_role_grant_role` FOREIGN KEY (`roleId`) REFERENCES `role` (`roleId`),
+  CONSTRAINT `fk_role_grant_user` FOREIGN KEY (`userId`) REFERENCES `user_data` (`userId`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_role_grant_village` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `role_permission`
+--
+
+DROP TABLE IF EXISTS `role_permission`;
+CREATE TABLE `role_permission` (
+  `roleId` int NOT NULL,
+  `permission` varchar(100) NOT NULL,
+  PRIMARY KEY (`roleId`,`permission`),
+  CONSTRAINT `fk_role_permission_role` FOREIGN KEY (`roleId`) REFERENCES `role` (`roleId`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `service_request`
 --
 
@@ -440,26 +491,6 @@ CREATE TABLE `village` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Table structure for table `village_grant`
---
-
-DROP TABLE IF EXISTS `village_grant`;
-CREATE TABLE `village_grant` (
-  `grantId` int NOT NULL AUTO_INCREMENT,
-  `villageId` int NOT NULL,
-  `userId` int DEFAULT NULL,
-  `userGroupId` int DEFAULT NULL,
-  `roleId` int NOT NULL,
-  PRIMARY KEY (`grantId`),
-  UNIQUE KEY `INDEX_USER` (`userId`,`villageId`),
-  UNIQUE KEY `INDEX_USER_GROUP` (`userGroupId`,`villageId`),
-  KEY `INDEX_VILLAGE` (`villageId`,`roleId`),
-  CONSTRAINT `fk_village_grant_1` FOREIGN KEY (`userId`) REFERENCES `user_data` (`userId`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_village_grant_2` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_village_grant_3` FOREIGN KEY (`userGroupId`) REFERENCES `user_group` (`userGroupId`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
 -- Table structure for table `volunteer`
 --
 
@@ -575,7 +606,7 @@ DELIMITER ;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50001 VIEW `active_volunteer` AS select `volunteer`.`id` AS `id`,`volunteer`.`personId` AS `personId`,`volunteer`.`providerType` AS `providerType`,`volunteer`.`active` AS `active` from `volunteer` where (`volunteer`.`active` = 1) */;
+/*!50001 VIEW `active_volunteer` AS select `volunteer`.`id` AS `id`,`volunteer`.`personId` AS `personId`,`volunteer`.`providerType` AS `providerType`,`volunteer`.`notes` AS `notes`,`volunteer`.`active` AS `active` from `volunteer` where (`volunteer`.`active` = 1) */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -585,4 +616,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-11  2:14:07
+-- Dump completed on 2026-07-13  3:34:39
