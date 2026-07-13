@@ -20,6 +20,31 @@ module.exports.buildCapabilityPrefixCase = function () {
     ` ELSE NULL END`
 }
 
+// The capability boundary as reusable, bind-free SQL pieces, shared by every
+// volunteer-request read/write path (list, single GET, pickup). `cte` resolves
+// the caller's ACTIVE-volunteer capabilities to serviceName prefixes; `join`
+// restricts service_request `sr` to rows matching one of those prefixes. A
+// request outside the caller's capabilities simply doesn't join — invisible on
+// reads, un-pickable on writes.
+//
+// personId is escaped inline (not a `?` bind) so callers can drop these strings
+// into makeQueryString or connection.query without disturbing their bind arrays
+// — same rationale as the ownership literal in getVolunteerRequest. personId is
+// always an integer resolved by the volunteer gate from our own DB; the escape
+// is defensive belt-and-suspenders, not a user-input boundary.
+module.exports.capabilityGateSql = function (personId) {
+  return {
+    cte: `cteCapability AS (
+      SELECT DISTINCT ${module.exports.buildCapabilityPrefixCase()} AS prefix
+      FROM active_volunteer av
+      JOIN volunteer_capability vc ON vc.volunteerId = av.id
+      JOIN capability c ON c.id = vc.capabilityId
+      WHERE av.personId = ${mysql.escape(personId)}
+    )`,
+    join: `JOIN cteCapability cc ON cc.prefix IS NOT NULL AND sr.serviceName LIKE concat(cc.prefix, '%')`,
+  }
+}
+
 // The volunteer-facing read shape. The disclosure ceiling for the member
 // block is what the open-broadcast emails already send (VSS design spec §3).
 function baseColumns() {
@@ -134,20 +159,10 @@ module.exports.getVolunteerRequests = async function ({ scope, personId }) {
 
   if (scope === 'open') {
     // Capability boundary: an Open request is visible only if its serviceName
-    // matches a prefix for a capability the caller holds. Capabilities are
-    // resolved from the caller's ACTIVE volunteer rows (active_volunteer), so a
-    // deactivated volunteer row's capabilities never count. personId binds
-    // through predicates.binds (makeQueryString formats binds linearly, CTE
-    // first), so it is UNSHIFTED ahead of any predicate binds below.
-    ctes.push(`cteCapability AS (
-      SELECT DISTINCT ${module.exports.buildCapabilityPrefixCase()} AS prefix
-      FROM active_volunteer av
-      JOIN volunteer_capability vc ON vc.volunteerId = av.id
-      JOIN capability c ON c.id = vc.capabilityId
-      WHERE av.personId = ?
-    )`)
-    predicates.binds.unshift(personId)
-    joins.add(`JOIN cteCapability cc ON cc.prefix IS NOT NULL AND sr.serviceName LIKE concat(cc.prefix, '%')`)
+    // matches a prefix for a capability the caller holds (see capabilityGateSql).
+    const gate = module.exports.capabilityGateSql(personId)
+    ctes.push(gate.cte)
+    joins.add(gate.join)
     predicates.statements.push("sr.status = 'Open'")
   } else {
     // Ownership expressed as an inline-escaped literal (not a `?` bind) so it
@@ -185,14 +200,23 @@ module.exports.getVolunteerRequest = async function ({ serviceRequestId, personI
   columns.push(emergencyContactColumn(ownershipSql))
   columns.push(volunteerAddressColumn(ownershipSql))
   const joins = baseJoins()
+  // Capability gate applies ONLY to the Open leg: a volunteer may see an Open
+  // request just when it matches their capabilities. The ownership leg is
+  // unconditional — a request the caller already owns stays visible for
+  // read-back even if their capability is later revoked. Expressed as EXISTS
+  // (not a JOIN) so it scopes to the Open leg without filtering owned rows.
+  const gate = module.exports.capabilityGateSql(personId)
+  const ctes = [gate.cte]
+  const openMatchesCapability =
+    `sr.status = 'Open' AND EXISTS (SELECT 1 FROM cteCapability cc WHERE cc.prefix IS NOT NULL AND sr.serviceName LIKE concat(cc.prefix, '%'))`
   const predicates = {
     statements: [
       'sr.id = ?',
-      `(sr.status = 'Open' OR (sr.volunteerPersonId = ? AND sr.status IN ('Confirmed', 'Completed')))`,
+      `((${openMatchesCapability}) OR (sr.volunteerPersonId = ? AND sr.status IN ('Confirmed', 'Completed')))`,
     ],
     binds: [serviceRequestId, personId],
   }
-  const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
+  const sql = dbUtils.makeQueryString({ ctes, columns, joins, predicates, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows[0] ?? null
 }
@@ -200,6 +224,28 @@ module.exports.getVolunteerRequest = async function ({ serviceRequestId, personI
 module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, personId, userId }) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      // Capability gate (pre-check, short-circuit). A volunteer may only pick up
+      // a request whose serviceName matches one of their capabilities. Checked
+      // BEFORE the atomic UPDATE so a capability denial returns a distinct
+      // outcome (notPermitted -> 403, surfaces in logs) rather than collapsing
+      // into the generic 0-row conflict. The capability part cannot change mid
+      // request, so no race is introduced: if the row exists and is outside the
+      // caller's capabilities, deny; otherwise fall through to first-wins.
+      const gate = module.exports.capabilityGateSql(personId)
+      const [gateRows] = await connection.query(
+        `WITH ${gate.cte}
+         SELECT EXISTS (
+           SELECT 1 FROM service_request sr
+           ${gate.join}
+           WHERE sr.id = ?
+         ) AS matchesCapability,
+         EXISTS (SELECT 1 FROM service_request WHERE id = ?) AS requestExists`,
+        [serviceRequestId, serviceRequestId]
+      )
+      if (gateRows[0].requestExists && !gateRows[0].matchesCapability) {
+        return { outcome: 'notPermitted' }
+      }
+
       // Atomic first-wins: any unassigned Open request, any village.
       const [result] = await connection.query(
         `UPDATE service_request

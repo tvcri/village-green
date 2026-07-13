@@ -52,3 +52,26 @@ test('buildCapabilityPrefixCase maps each capability to its serviceName prefix',
   assert.match(sql, /^CASE c\.name/)
   assert.match(sql, /END$/)
 })
+
+test('capabilityGateSql returns bind-free CTE + join with the personId escaped inline', () => {
+  const gate = svc.capabilityGateSql(42)
+  // CTE resolves the caller's ACTIVE-volunteer capabilities to prefixes.
+  assert.match(gate.cte, /cteCapability AS/)
+  assert.match(gate.cte, /FROM active_volunteer av/)
+  assert.match(gate.cte, /JOIN volunteer_capability vc ON vc\.volunteerId = av\.id/)
+  assert.match(gate.cte, /JOIN capability c ON c\.id = vc\.capabilityId/)
+  // personId is escaped inline (bind-free), so the CTE carries no `?`.
+  assert.match(gate.cte, /WHERE av\.personId = 42/)
+  assert.doesNotMatch(gate.cte, /\?/)
+  // The prefix CASE is embedded.
+  assert.match(gate.cte, /CASE c\.name/)
+  // The join enforces the boundary and excludes prefix-less capabilities.
+  assert.match(gate.join, /JOIN cteCapability cc ON cc\.prefix IS NOT NULL/)
+  assert.match(gate.join, /sr\.serviceName LIKE concat\(cc\.prefix, '%'\)/)
+})
+
+test('capabilityGateSql escapes personId (defensive, integer from our own DB)', () => {
+  // mysql.escape wraps strings in quotes; integers pass through unquoted.
+  const gate = svc.capabilityGateSql("1 OR 1=1")
+  assert.match(gate.cte, /WHERE av\.personId = '1 OR 1=1'/)
+})
