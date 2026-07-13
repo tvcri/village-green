@@ -4,6 +4,22 @@ const mysql = require('mysql2/promise')
 const dbUtils = require('./utils')
 const ServiceRequestService = require('./ServiceRequestService')
 
+// The fixed capability -> serviceName-prefix map. The serviceName vocabulary
+// is a closed, developer-controlled set; a request is pickable under a
+// capability iff its serviceName starts with that capability's prefix. The
+// colon-terminated prefixes ('Ride:', 'Errand:') cover every subtype AND absorb
+// the legacy whitespace-after-colon variants (Errand:Shopping / Errand: Shopping),
+// since the match cut is at the colon. Capabilities with no service type
+// (Friends, Steering Committee) derive to NULL and match nothing.
+module.exports.buildCapabilityPrefixCase = function () {
+  return `CASE c.name` +
+    ` WHEN 'Rides'        THEN 'Ride:'` +
+    ` WHEN 'Errands'      THEN 'Errand:'` +
+    ` WHEN 'Home Help'    THEN 'Household Chores/Handy Help'` +
+    ` WHEN 'Tech Support' THEN 'Tech Support'` +
+    ` ELSE NULL END`
+}
+
 // The volunteer-facing read shape. The disclosure ceiling for the member
 // block is what the open-broadcast emails already send (VSS design spec §3).
 function baseColumns() {
@@ -114,8 +130,24 @@ module.exports.getVolunteerRequests = async function ({ scope, personId }) {
   const columns = baseColumns()
   const joins = baseJoins()
   const predicates = { statements: [], binds: [] }
+  const ctes = []
 
   if (scope === 'open') {
+    // Capability boundary: an Open request is visible only if its serviceName
+    // matches a prefix for a capability the caller holds. Capabilities are
+    // resolved from the caller's ACTIVE volunteer rows (active_volunteer), so a
+    // deactivated volunteer row's capabilities never count. personId binds
+    // through predicates.binds (makeQueryString formats binds linearly, CTE
+    // first), so it is UNSHIFTED ahead of any predicate binds below.
+    ctes.push(`cteCapability AS (
+      SELECT DISTINCT ${module.exports.buildCapabilityPrefixCase()} AS prefix
+      FROM active_volunteer av
+      JOIN volunteer_capability vc ON vc.volunteerId = av.id
+      JOIN capability c ON c.id = vc.capabilityId
+      WHERE av.personId = ?
+    )`)
+    predicates.binds.unshift(personId)
+    joins.add(`JOIN cteCapability cc ON cc.prefix IS NOT NULL AND sr.serviceName LIKE concat(cc.prefix, '%')`)
     predicates.statements.push("sr.status = 'Open'")
   } else {
     // Ownership expressed as an inline-escaped literal (not a `?` bind) so it
@@ -133,7 +165,7 @@ module.exports.getVolunteerRequests = async function ({ scope, personId }) {
   // NULLs (undated requests) sort last. serviceDate + startTime are the
   // wall-clock civil columns (migration 0014); startAt/finishAt are gone.
   const orderBy = ['sr.serviceDate IS NULL ASC', 'sr.serviceDate ASC', 'sr.startTime ASC']
-  const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
+  const sql = dbUtils.makeQueryString({ ctes, columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows
 }

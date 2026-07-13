@@ -38,3 +38,17 @@ test('service exports the request functions', () => {
   assert.equal(typeof svc.signUpVolunteerRequest, 'function')
   assert.equal(typeof svc.releaseVolunteerRequest, 'function')
 })
+
+test('buildCapabilityPrefixCase maps each capability to its serviceName prefix', () => {
+  const sql = svc.buildCapabilityPrefixCase()
+  // The four real service capabilities map to their prefixes...
+  assert.match(sql, /WHEN 'Rides'\s+THEN 'Ride:'/)
+  assert.match(sql, /WHEN 'Errands'\s+THEN 'Errand:'/)
+  assert.match(sql, /WHEN 'Home Help'\s+THEN 'Household Chores\/Handy Help'/)
+  assert.match(sql, /WHEN 'Tech Support'\s+THEN 'Tech Support'/)
+  // ...and everything else derives to NULL (no pickable service type).
+  assert.match(sql, /ELSE NULL/)
+  // It is a single CASE expression.
+  assert.match(sql, /^CASE c\.name/)
+  assert.match(sql, /END$/)
+})
