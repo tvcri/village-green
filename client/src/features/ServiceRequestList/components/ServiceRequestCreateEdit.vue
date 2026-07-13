@@ -314,19 +314,35 @@ const slotsAfter = (after, current) => {
   return timeSlotOptions.filter(o => o.value > after || o.value === current)
 }
 
-const startOptions = computed(() => [
-  ...timeSlotOptions.filter(o => o.value >= START_OF_DAY),
-  ...timeSlotOptions.filter(o => o.value < START_OF_DAY)
-])
+// The 15-minute grid is a data-entry aid, not a storage constraint: legacy
+// or imported rows can hold off-grid minutes (e.g. 577 = '9:37 AM'). A
+// Select only displays a value that matches an option by value equality, so
+// without this an off-grid current value renders blank despite being set.
+// Insert it in time order so the dropdown stays scannable.
+const withCurrentValue = (options, current) => {
+  if (current == null || options.some(o => o.value === current)) return options
+  const injected = { label: minutesToLabel(current), value: current }
+  const idx = options.findIndex(o => o.value > current)
+  return idx === -1
+    ? [...options, injected]
+    : [...options.slice(0, idx), injected, ...options.slice(idx)]
+}
 
 const START_OF_DAY = 7 * 60 // 7:00 AM — open position for start time dropdown
-const apptOptions = computed(() => slotsAfter(form.value.startTime, form.value.apptTime))
-const returnOptions = computed(() => slotsAfter(form.value.apptTime, form.value.returnTime))
+const startOptions = computed(() => withCurrentValue([
+  ...timeSlotOptions.filter(o => o.value >= START_OF_DAY),
+  ...timeSlotOptions.filter(o => o.value < START_OF_DAY)
+], form.value.startTime))
+const apptOptions = computed(() => withCurrentValue(slotsAfter(form.value.startTime, form.value.apptTime), form.value.apptTime))
+const returnOptions = computed(() => withCurrentValue(slotsAfter(form.value.apptTime, form.value.returnTime), form.value.returnTime))
 const finishOptions = computed(() =>
-  slotsAfter(
-    form.value.transportationType === 'Round Trip'
-      ? form.value.returnTime
-      : form.value.startTime,
+  withCurrentValue(
+    slotsAfter(
+      form.value.transportationType === 'Round Trip'
+        ? form.value.returnTime
+        : form.value.startTime,
+      form.value.finishTime
+    ),
     form.value.finishTime
   )
 )
