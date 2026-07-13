@@ -278,10 +278,16 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
     'sr.serviceName',
     'sr.transportationType',
     "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
-    "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
-    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
-    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
-    "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
+    // serviceDate as a string: mysql2 would otherwise hydrate DATE into a
+    // JS Date at server-local midnight, reintroducing tz ambiguity.
+    "DATE_FORMAT(sr.serviceDate, '%Y-%m-%d') AS serviceDate",
+    // TIME columns come back from mysql2 as 'HH:MM:SS' strings natively.
+    'sr.startTime',
+    'sr.finishTime',
+    'sr.apptTime',
+    'sr.returnTime',
+    // JSON boolean (0/1 tinyint would fail the OAS boolean type).
+    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.destination AS destination',
@@ -319,7 +325,7 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
       predicates.binds.push([dbStatuses])
     }
   }
-  const orderBy = ['sr.finishAt DESC']
+  const orderBy = ['sr.serviceDate DESC', 'sr.startTime DESC']
   const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
   let [rows] = await dbUtils.pool.query(sql)
   return rows
