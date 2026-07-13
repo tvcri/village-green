@@ -1,13 +1,10 @@
 const MigrationHandler = require('./lib/MigrationHandler')
 
+// VSS support schema. The stored user_data.personId link originally created
+// here was reversed 2026-07-12 (spec §1-AMENDED): user→person identity is
+// resolved at runtime from person.email = user_data.username, so nothing is
+// persisted. The email index serves that runtime lookup.
 const upMigration = [
-  // Unique: a person links to at most one user account. A duplicate link is
-  // an identity error we want loud, not silent (see VSS design spec §1).
-  `ALTER TABLE user_data
-    ADD COLUMN personId INT NULL,
-    ADD UNIQUE KEY INDEX_personId (personId),
-    ADD CONSTRAINT fk_user_data_person
-      FOREIGN KEY (personId) REFERENCES person (id) ON DELETE SET NULL`,
   `ALTER TABLE person
     ADD INDEX INDEX_email (email)`,
   // Attribution for volunteer sign-up/release (SR history is out of scope).
@@ -25,10 +22,6 @@ const downMigration = [
     DROP COLUMN modifiedAt`,
   `ALTER TABLE person
     DROP INDEX INDEX_email`,
-  `ALTER TABLE user_data
-    DROP FOREIGN KEY fk_user_data_person,
-    DROP INDEX INDEX_personId,
-    DROP COLUMN personId`,
 ]
 
 const migrationHandler = new MigrationHandler(upMigration, downMigration)
