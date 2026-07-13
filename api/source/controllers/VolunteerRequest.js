@@ -49,7 +49,6 @@ module.exports.signUpVolunteerRequest = async function signUpVolunteerRequest (r
       userId: req.userObject.userId,
     })
     if (outcome === 'notFound') throw new SmError.NotFoundError()
-    if (outcome === 'notPermitted') throw new SmError.PrivilegeError('Service request is outside your volunteer capabilities.')
     if (outcome === 'conflict') throw new SmError.ConflictError('Service request is not open for sign-up.')
     // 'confirmed' | 'alreadyOwn': read back after commit (transaction
     // read-back convention).

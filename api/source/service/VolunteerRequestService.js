@@ -226,11 +226,10 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
     transactionFn: async (connection) => {
       // Capability gate (pre-check, short-circuit). A volunteer may only pick up
       // a request whose serviceName matches one of their capabilities. Checked
-      // BEFORE the atomic UPDATE so a capability denial returns a distinct
-      // outcome (notPermitted -> 403, surfaces in logs) rather than collapsing
-      // into the generic 0-row conflict. The capability part cannot change mid
-      // request, so no race is introduced: if the row exists and is outside the
-      // caller's capabilities, deny; otherwise fall through to first-wins.
+      // BEFORE the atomic UPDATE. A request outside the caller's capabilities is
+      // treated as if it does not exist — outcome 'notFound' -> 404, no existence
+      // leak — indistinguishable from a truly missing request. The capability
+      // part cannot change mid-request, so no race is introduced.
       const gate = module.exports.capabilityGateSql(personId)
       const [gateRows] = await connection.query(
         `WITH ${gate.cte}
@@ -238,12 +237,11 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
            SELECT 1 FROM service_request sr
            ${gate.join}
            WHERE sr.id = ?
-         ) AS matchesCapability,
-         EXISTS (SELECT 1 FROM service_request WHERE id = ?) AS requestExists`,
-        [serviceRequestId, serviceRequestId]
+         ) AS matchesCapability`,
+        [serviceRequestId]
       )
-      if (gateRows[0].requestExists && !gateRows[0].matchesCapability) {
-        return { outcome: 'notPermitted' }
+      if (!gateRows[0].matchesCapability) {
+        return { outcome: 'notFound' }
       }
 
       // Atomic first-wins: any unassigned Open request, any village.
