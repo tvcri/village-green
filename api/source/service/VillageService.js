@@ -335,8 +335,8 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
   // Business rule: 'Hub cancelled' requests are treated as if they never
   // existed — excluded from every section. Breakdown sections count
   // Completed requests only; the full status mix appears only in byStatus.
-  // JSON_ARRAYAGG does not guarantee element order, so arrays are sorted
-  // in JS below.
+  // Breakdown arrays are ordered in SQL (jsonArrayAgg orderBy): byServiceType
+  // by count desc then name; person lists by fullName.
   const sql = `
     SELECT
       CAST(v.id AS CHAR) AS villageId,
@@ -354,7 +354,11 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
         WHERE sr.villageId = v.id
           AND sr.status != 'Hub cancelled'
           AND sr.serviceDate BETWEEN ? AND ?) AS byStatus,
-      (SELECT COALESCE(JSON_ARRAYAGG(JSON_OBJECT('serviceName', t.serviceName, 'count', t.cnt)), JSON_ARRAY())
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('serviceName', t.serviceName, 'count', t.cnt)`,
+            orderBy: 't.cnt desc, t.serviceName'
+          })}, JSON_ARRAY())
         FROM (SELECT sr.serviceName, COUNT(*) AS cnt
               FROM service_request sr
               WHERE sr.villageId = v.id
@@ -362,7 +366,11 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
                 AND sr.serviceName IS NOT NULL
                 AND sr.serviceDate BETWEEN ? AND ?
               GROUP BY sr.serviceName) t) AS byServiceType,
-      (SELECT COALESCE(JSON_ARRAYAGG(JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)), JSON_ARRAY())
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            orderBy: 'p.fullName'
+          })}, JSON_ARRAY())
         FROM (SELECT sr.memberPersonId AS pid, COUNT(*) AS cnt
               FROM service_request sr
               WHERE sr.villageId = v.id
@@ -371,7 +379,11 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
                 AND sr.serviceDate BETWEEN ? AND ?
               GROUP BY sr.memberPersonId) t
         JOIN person p ON p.id = t.pid) AS byMember,
-      (SELECT COALESCE(JSON_ARRAYAGG(JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)), JSON_ARRAY())
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            orderBy: 'p.fullName'
+          })}, JSON_ARRAY())
         FROM (SELECT sr.volunteerPersonId AS pid, COUNT(*) AS cnt
               FROM service_request sr
               WHERE sr.villageId = v.id
@@ -387,28 +399,17 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
   const [rows] = await dbUtils.pool.query(sql, binds)
   if (!rows[0]) return null
   const row = rows[0]
-  // mysql2 hydrates JSON-typed columns into JS objects/arrays. SUM() of a
-  // boolean yields a DECIMAL that serializes as a JSON number; coerce to
-  // integer so the OAS integer type validates.
-  const byStatus = {}
-  for (const [k, val] of Object.entries(row.byStatus)) {
-    byStatus[k] = Number(val)
-  }
-  const totalRequests = Object.values(byStatus).reduce((a, b) => a + b, 0)
-  const byServiceType = row.byServiceType
-    .map(e => ({ ...e, count: Number(e.count) }))
-    .sort((a, b) => b.count - a.count || a.serviceName.localeCompare(b.serviceName))
-  const personSort = (a, b) => a.fullName.localeCompare(b.fullName)
-  const byMember = row.byMember.map(e => ({ ...e, count: Number(e.count) })).sort(personSort)
-  const byVolunteer = row.byVolunteer.map(e => ({ ...e, count: Number(e.count) })).sort(personSort)
+  // mysql2 hydrates the JSON columns into JS objects/arrays with numeric
+  // counts already (JSON numbers), so no coercion is needed here.
+  const totalRequests = Object.values(row.byStatus).reduce((a, b) => a + b, 0)
   return {
     villageId: row.villageId,
     villageName: row.villageName,
     range: { start, end },
-    totals: { totalRequests, byStatus },
-    byServiceType,
-    byMember,
-    byVolunteer
+    totals: { totalRequests, byStatus: row.byStatus },
+    byServiceType: row.byServiceType,
+    byMember: row.byMember,
+    byVolunteer: row.byVolunteer
   }
 }
 

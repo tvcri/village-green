@@ -4,7 +4,8 @@ const VillageService = require('../service/VillageService')
 const SmError = require('../utils/error')
 const { hasPermission, hasElevatedPermission } = require('../utils/authz')
 const { validateRoleGrants } = require('./User')
-const { resolveMetricsRange } = require('../utils/metricsRange')
+const { resolveMetricsRange, todayCivil } = require('../utils/metricsRange')
+const config = require('../utils/config')
 
 module.exports.getVillages = async function getVillages (req, res, next) {
   try {
@@ -219,9 +220,10 @@ module.exports.getVillageMetrics = async function getVillageMetrics (req, res, n
     if (!hasPermission(req.userObject, 'sr:read', { villageId })) {
       throw new SmError.PrivilegeError()
     }
-    // 'en-CA' locale formats as YYYY-MM-DD; reads the clock only (wall-clock
-    // rule forbids hydrating stored serviceDate values, not asking for today).
-    const today = new Date().toLocaleDateString('en-CA')
+    // Default the range end to today in the deployment's civil timezone, so
+    // an Eastern user near midnight doesn't get metrics that run through the
+    // server's (UTC) tomorrow.
+    const today = todayCivil(config.settings.civilTimeZone)
     const { start, end } = resolveMetricsRange(req.query.start, req.query.end, today)
     const existing = await VillageService.getVillage(villageId)
     if (!existing) {

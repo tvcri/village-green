@@ -20,6 +20,10 @@ const config = {
         // "logOnly" (logs failing response, but still sends them) 
         // "none"(no validation performed)
         responseValidation: process.env.VG_DEV_RESPONSE_VALIDATION || "none",
+        // The deployment's civil timezone. serviceDate values are wall-clock
+        // civil dates in this zone; used to resolve "today" for date-range
+        // defaults so boundaries match the users' calendar, not the server's.
+        civilTimeZone: process.env.VG_CIVIL_TZ || "America/New_York",
         dependencyRetries: process.env.VG_DEPENDENCY_RETRIES || 24
     },
     client: {
