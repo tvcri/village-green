@@ -8,6 +8,7 @@ import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
+import { formatServiceDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
 import { getHttpStatus, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getVolunteerRequest, signUpVolunteerRequest, releaseVolunteerRequest } from '../api/volunteerRequestApi.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
@@ -70,30 +71,29 @@ const mapWaypoint = computed(() => {
   return [mem.address, mem.city, mem.state, mem.zip].filter(Boolean).join(', ')
 })
 
-function formatDateOnly(dateStr) {
-  if (!dateStr) return null
-  return new Date(dateStr).toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit' })
-}
-
-function formatTimeOnly(dateStr) {
-  if (!dateStr) return null
-  return new Date(dateStr).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit' })
+// serviceDate is a 'YYYY-MM-DD' civil string; formatServiceDate renders it
+// without ever building a UTC-midnight Date.
+function formatDateOnly(serviceDate) {
+  return formatServiceDate(serviceDate) || null
 }
 
 // Round Trip requests have four distinct legs (start, arrive/apptTime,
 // return, finish); everything else is a single start/finish span. Ported
-// from ServiceRequestDetail.vue's timeDisplay — that version also guards on
-// requestNumber == null (CE-imported vs VG-native), but VolunteerServiceRequest
-// never carries requestNumber, so that half of the condition is always true here.
+// from ServiceRequestDetail.vue's timeDisplay. Times are 'HH:MM:SS' civil
+// strings rendered via timeStringToLabel — never new Date(). timesFlexible
+// means no specific times were set. VolunteerServiceRequest never carries
+// requestNumber, so the CE-vs-native guard main uses is always-true here.
 const timeDisplay = computed(() => {
-  if (!request.value?.startAt) return null
   const r = request.value
-  const start = formatTimeOnly(r.startAt)
-  const finish = formatTimeOnly(r.finishAt)
+  if (!r) return null
+  if (r.timesFlexible) return [{ label: 'Times', value: 'Flexible' }]
+  if (!r.startTime && !r.finishTime) return null
+  const start = timeStringToLabel(r.startTime)
+  const finish = timeStringToLabel(r.finishTime)
   if (r.transportationType === 'Round Trip') {
     return [
-      { label: 'Start / Arrive', value: [start, formatTimeOnly(r.apptTime)].map(t => t ?? '—').join(' - ') },
-      { label: 'Return / Finish', value: [formatTimeOnly(r.returnTime), finish].map(t => t ?? '—').join(' - ') }
+      { label: 'Start / Arrive', value: [start, timeStringToLabel(r.apptTime)].map(t => t ?? '—').join(' - ') },
+      { label: 'Return / Finish', value: [timeStringToLabel(r.returnTime), finish].map(t => t ?? '—').join(' - ') }
     ]
   }
   return [
@@ -235,9 +235,9 @@ async function doRelease() {
 
         <div class="section">
           <h3 class="section-header">Request</h3>
-          <div v-if="request.startAt" class="detail-field">
+          <div v-if="request.serviceDate" class="detail-field">
             <span class="label">Date:</span>
-            <span class="value">{{ formatDateOnly(request.startAt) }}</span>
+            <span class="value">{{ formatDateOnly(request.serviceDate) }}</span>
           </div>
           <div v-for="row in timeDisplay" :key="row.label" class="detail-field">
             <span class="label">{{ row.label }}:</span>

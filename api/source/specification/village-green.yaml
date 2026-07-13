@@ -4769,17 +4769,27 @@ components:
         createdAt:
           type: string
           nullable: true
-        startAt:
+        serviceDate:
           type: string
+          format: date
           nullable: true
-        finishAt:
+        timesFlexible:
+          type: boolean
+        startTime:
           type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         apptTime:
           type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         returnTime:
           type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         destination:
           type: string

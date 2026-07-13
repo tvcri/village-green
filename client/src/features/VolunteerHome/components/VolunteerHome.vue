@@ -12,6 +12,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
+import { formatServiceDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
 import { getVolunteerRequests, getVolunteerRequestVillages } from '../api/volunteerRequestApi.js'
 
 const router = useRouter()
@@ -81,16 +82,16 @@ const filteredOpenRequests = computed(() => {
   return openRequests.value.filter(r => selectedVillageIds.value.includes(r.villageId))
 })
 
-function formatDateTime(value) {
-  if (!value) return ''
-  return new Date(value).toLocaleString([], {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+// Wall-clock civil values: serviceDate ('YYYY-MM-DD') and startTime
+// ('HH:MM:SS') are never instants — render them via timeFields helpers,
+// never new Date(value) (which would timezone-shift them). timesFlexible
+// means "no specific time was set".
+function formatWhen(row) {
+  const date = formatServiceDate(row.serviceDate)
+  if (!date) return ''
+  if (row.timesFlexible) return `${date} · Flexible`
+  const time = timeStringToLabel(row.startTime)
+  return time ? `${date} · ${time}` : date
 }
 
 function memberLabel(row) {
@@ -150,8 +151,8 @@ function goToDetail(row) {
             <Column header="Member">
               <template #body="{ data }">{{ memberLabel(data) }}</template>
             </Column>
-            <Column field="startAt" header="When" sortable>
-              <template #body="{ data }">{{ formatDateTime(data.startAt) }}</template>
+            <Column field="serviceDate" header="When" sortable>
+              <template #body="{ data }">{{ formatWhen(data) }}</template>
             </Column>
             <Column field="destination" header="Destination" />
           </DataTable>
@@ -181,8 +182,8 @@ function goToDetail(row) {
             <Column header="Member">
               <template #body="{ data }">{{ memberLabel(data) }}</template>
             </Column>
-            <Column field="startAt" header="When" sortable>
-              <template #body="{ data }">{{ formatDateTime(data.startAt) }}</template>
+            <Column field="serviceDate" header="When" sortable>
+              <template #body="{ data }">{{ formatWhen(data) }}</template>
             </Column>
           </DataTable>
         </TabPanel>
@@ -211,8 +212,8 @@ function goToDetail(row) {
             <Column header="Member">
               <template #body="{ data }">{{ memberLabel(data) }}</template>
             </Column>
-            <Column field="startAt" header="When" sortable>
-              <template #body="{ data }">{{ formatDateTime(data.startAt) }}</template>
+            <Column field="serviceDate" header="When" sortable>
+              <template #body="{ data }">{{ formatWhen(data) }}</template>
             </Column>
           </DataTable>
         </TabPanel>

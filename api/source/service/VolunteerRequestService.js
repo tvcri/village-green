@@ -15,10 +15,16 @@ function baseColumns() {
     'sr.serviceName',
     'sr.transportationType',
     "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
-    "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
-    "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
-    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
-    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
+    // Wall-clock civil values (VG serviceDate/TIME split, migration 0014):
+    // serviceDate is a 'YYYY-MM-DD' string, the four TIME columns are 'HH:MM:SS'
+    // strings. Never instants — mysql2 returns TIME natively as strings, and
+    // serviceDate is formatted here so it never hydrates into a JS Date.
+    "DATE_FORMAT(sr.serviceDate, '%Y-%m-%d') AS serviceDate",
+    'sr.startTime',
+    'sr.finishTime',
+    'sr.apptTime',
+    'sr.returnTime',
+    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.destination AS destination',
@@ -123,7 +129,10 @@ module.exports.getVolunteerRequests = async function ({ scope, personId }) {
     predicates.binds.push(personId)
   }
 
-  const orderBy = ['sr.startAt ASC']
+  // Soonest-first: volunteers browse upcoming/open work by when it happens.
+  // NULLs (undated requests) sort last. serviceDate + startTime are the
+  // wall-clock civil columns (migration 0014); startAt/finishAt are gone.
+  const orderBy = ['sr.serviceDate IS NULL ASC', 'sr.serviceDate ASC', 'sr.startTime ASC']
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows
