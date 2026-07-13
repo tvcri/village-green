@@ -7,10 +7,12 @@ import Button from 'primevue/button'
 import MemberFormFields from './MemberFormFields.vue'
 import { getPerson } from '../api/personApi.js'
 import { putMember, patchMember, deleteMember } from '../api/roleApi.js'
+import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
+useRequirePermission('member:write')
 const personId = computed(() => route.params.personId)
 
 const person = ref(null)
@@ -30,11 +32,11 @@ const canSave = computed(() => form.memberLevel !== 'Secondary' || !!form.primar
 
 onMounted(async () => {
   try {
-    const p = await getPerson(personId.value, ['memberDetail'])
+    const p = await getPerson(personId.value, ['member'])
     person.value = p
-    if (p.memberDetail) {
+    if (p.member) {
       hasMember.value = true
-      const d = p.memberDetail
+      const d = p.member
       Object.keys(form).forEach(k => {
         if (k === 'primaryPersonId') {
           form.primaryPersonId = d.primaryPerson?.personId ?? ''

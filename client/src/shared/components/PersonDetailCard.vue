@@ -18,14 +18,9 @@ const props = defineProps({
     type: Number,
     default: 4
   },
-  detailLevel: {
-    type: String,
-    enum: ['info', 'full'],
-    default: 'info'
-  },
   // Explicit override for section visibility, independent of personType
   // (which reflects only *active* roles). Pass when the caller knows
-  // memberDetail/volunteerDetail data exists even if the role is inactive.
+  // member/volunteer payload data exists even if the role is inactive.
   // Defaults (null) fall back to personType so single-role pages are unaffected.
   hasMemberDetail: {
     type: Boolean,
@@ -55,7 +50,6 @@ const mapAddress = computed(() => {
 
 const isMember = computed(() => props.hasMemberDetail ?? (props.personType === 'member' || props.personType === 'member, volunteer'))
 const isVolunteer = computed(() => props.hasVolunteerDetail ?? (props.personType === 'volunteer' || props.personType === 'member, volunteer'))
-const isFullDetail = computed(() => props.detailLevel === 'full')
 
 const serviceNotesSpan = computed(() => Math.min(props.columnCount, 2))
 
@@ -187,51 +181,49 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.joinDate }}</span>
         </div>
 
-        <template v-if="isFullDetail">
-          <div v-if="person.memberType" class="detail-field">
-            <span class="label">Member Type:</span>
-            <span class="value">{{ person.memberType }}</span>
-          </div>
+        <div v-if="person.memberType" class="detail-field">
+          <span class="label">Member Type:</span>
+          <span class="value">{{ person.memberType }}</span>
+        </div>
 
-          <div v-if="person.secondaryType" class="detail-field">
-            <span class="label">Secondary Type:</span>
-            <span class="value">{{ person.secondaryType }}</span>
-          </div>
+        <div v-if="person.secondaryType" class="detail-field">
+          <span class="label">Secondary Type:</span>
+          <span class="value">{{ person.secondaryType }}</span>
+        </div>
 
-          <div v-if="person.status" class="detail-field">
-            <span class="label">Status:</span>
-            <span class="value">{{ person.status }}</span>
-          </div>
+        <div v-if="person.status" class="detail-field">
+          <span class="label">Status:</span>
+          <span class="value">{{ person.status }}</span>
+        </div>
 
-          <div v-if="person.status === 'Dropped' && person.dropReason" class="detail-field">
-            <span class="label">Drop Reason:</span>
-            <span class="value">{{ person.dropReason }}</span>
-          </div>
+        <div v-if="person.status === 'Dropped' && person.dropReason" class="detail-field">
+          <span class="label">Drop Reason:</span>
+          <span class="value">{{ person.dropReason }}</span>
+        </div>
 
-          <div v-if="person.householdSize != null" class="detail-field">
-            <span class="label">Household Size:</span>
-            <span class="value">{{ person.householdSize }}</span>
-          </div>
+        <div v-if="person.householdSize != null" class="detail-field">
+          <span class="label">Household Size:</span>
+          <span class="value">{{ person.householdSize }}</span>
+        </div>
 
-          <div v-if="person.householdDues != null" class="detail-field">
-            <span class="label">Household Dues:</span>
-            <span class="value">{{ Number(person.householdDues).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) }}</span>
-          </div>
+        <div v-if="person.householdDues != null" class="detail-field">
+          <span class="label">Household Dues:</span>
+          <span class="value">{{ Number(person.householdDues).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) }}</span>
+        </div>
 
-          <div v-if="person.quickbooksKey" class="detail-field">
-            <span class="label">Quickbooks Key:</span>
-            <span class="value">{{ person.quickbooksKey }}</span>
-          </div>
+        <div v-if="person.quickbooksKey" class="detail-field">
+          <span class="label">Quickbooks Key:</span>
+          <span class="value">{{ person.quickbooksKey }}</span>
+        </div>
 
-          <div v-if="person.printedNewsletter != null" class="detail-field">
-            <span class="label">Printed Newsletter:</span>
-            <span class="value">{{ person.printedNewsletter ? 'Yes' : 'No' }}</span>
-          </div>
-        </template>
+        <div v-if="person.printedNewsletter != null" class="detail-field">
+          <span class="label">Printed Newsletter:</span>
+          <span class="value">{{ person.printedNewsletter ? 'Yes' : 'No' }}</span>
+        </div>
       </div>
 
-      <!-- Member Notes Section (full detail only) -->
-      <div v-if="isFullDetail && (person.confidentialNotes || person.statusChangeNotes || person.miscNotes)" class="section">
+      <!-- Member Notes Section -->
+      <div v-if="person.confidentialNotes || person.statusChangeNotes || person.miscNotes" class="section">
         <h3 class="section-header">Member Notes</h3>
         <div v-if="person.confidentialNotes" class="detail-field notes-field">
           <span class="label">Confidential Notes:</span>
@@ -284,20 +276,17 @@ const copyEmail = async (email) => {
           </div>
         </div>
 
-        <template v-if="isFullDetail">
-
-          <div v-if="person.active != null" class="detail-field">
-            <span class="label">Active:</span>
-            <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
+        <div v-if="person.active != null" class="detail-field">
+          <span class="label">Active:</span>
+          <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
+        </div>
+        <template v-if="person.vettings?.length">
+          <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
+            <span class="label">{{ vetting.name }}:</span>
+            <span class="value">
+              {{ vetting.dateEntered || 'Unknown' }}<template v-if="vetting.dateExpired"> – {{ vetting.dateExpired }}</template>
+            </span>
           </div>
-          <template v-if="person.vettings?.length">
-            <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
-              <span class="label">{{ vetting.name }}:</span>
-              <span class="value">
-                {{ vetting.dateEntered || 'Unknown' }}<template v-if="vetting.dateExpired"> – {{ vetting.dateExpired }}</template>
-              </span>
-            </div>
-          </template>
         </template>
       </div>
 

@@ -1017,3 +1017,24 @@ exports.getAppInfo = async function(options = {}) {
   }
 }
 
+exports.getRoles = async function () {
+  const sql = `
+  select
+    cast(r.roleId as char) as roleId,
+    r.name,
+    r.scope,
+    r.description,
+    r.isSystem = 1 as isSystem,
+    coalesce(json_arrayagg(rp.permission), json_array()) as permissions
+  from role r
+    left join role_permission rp on r.roleId = rp.roleId
+  group by r.roleId
+  order by r.roleId`
+  const [rows] = await dbUtils.pool.query(sql)
+  for (const row of rows) {
+    row.isSystem = !!row.isSystem
+    row.permissions = row.permissions.filter(p => p !== null)
+  }
+  return rows
+}
+

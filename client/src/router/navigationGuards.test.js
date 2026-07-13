@@ -1,15 +1,18 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRouter, createWebHashHistory } from 'vue-router'
 
-const mockIsAdmin = { value: false }
-const mockHasCollectionAccess = vi.fn(() => false)
-const mockGetCollectionRoleId = vi.fn(() => null)
+const mockHasPermission = vi.fn(() => false)
+const mockHasVillageAccess = vi.fn(() => false)
+const mockHasFederationAccess = { value: false }
+const mockIsGrantless = { value: false }
 
 vi.mock('../shared/composables/useCurrentUser.js', () => ({
   useCurrentUser: () => ({
-    isAdmin: mockIsAdmin,
-    hasCollectionAccess: mockHasCollectionAccess,
-    getCollectionRoleId: mockGetCollectionRoleId,
+    hasPermission: mockHasPermission,
+    hasVillageAccess: mockHasVillageAccess,
+    hasFederationAccess: mockHasFederationAccess,
+    isGrantless: mockIsGrantless,
   }),
 }))
 
@@ -22,36 +25,28 @@ function createTestRouter() {
     history: createWebHashHistory(),
     routes: [
       { path: '/', name: 'home', component: Stub },
+      { path: '/villages', name: 'villages', component: Stub },
       {
-        path: '/collection/:collectionId',
+        path: '/villages/:villageId/members',
+        name: 'members',
         component: Stub,
-        meta: { requiresCollectionGrant: true },
-        children: [
-          {
-            path: '',
-            name: 'collection',
-            component: Stub,
-            redirect: to => ({ name: 'collection-stigs', params: { collectionId: to.params.collectionId } }),
-          },
-          {
-            path: 'stigs',
-            name: 'collection-stigs',
-            component: Stub,
-          },
-        ],
       },
-      {
-        path: '/collection/:collectionId/manage',
-        name: 'collection-manage',
-        component: Stub,
-        meta: { requiresCollectionGrant: true, minRoleId: 3 },
-      },
-      { path: '/collections', name: 'collections', component: Stub },
       {
         path: '/admin/users',
         name: 'admin-users',
         component: Stub,
-        meta: { requiresAdmin: true },
+        meta: { requiresPermission: 'user:admin' },
+      },
+      {
+        path: '/villages/:villageId/service-requests',
+        name: 'service-requests',
+        component: Stub,
+        meta: { requiresPermission: 'sr:read', villageScoped: true },
+      },
+      {
+        path: '/meta',
+        name: 'meta',
+        component: Stub,
       },
       { path: '/:pathMatch(.*)*', name: 'not-found', component: Stub },
     ],
@@ -64,64 +59,85 @@ function createTestRouter() {
 
 describe('navigation guards', () => {
   beforeEach(() => {
-    mockIsAdmin.value = false
-    mockHasCollectionAccess.mockReturnValue(false)
-    mockGetCollectionRoleId.mockReturnValue(null)
+    mockHasPermission.mockReturnValue(false)
+    mockHasVillageAccess.mockReturnValue(false)
+    mockHasFederationAccess.value = false
+    mockIsGrantless.value = false
+    globalThis.VG = { curUser: null }
   })
 
-  describe('admin routes', () => {
-    it('redirects non-admin to home', async () => {
+  describe('requiresPermission (federation)', () => {
+    it('redirects to villages when user lacks the permission', async () => {
       const router = createTestRouter()
-      mockIsAdmin.value = false
+      mockHasPermission.mockReturnValue(false)
       await router.push('/admin/users')
       await router.isReady()
-      expect(router.currentRoute.value.name).toBe('home')
+      expect(router.currentRoute.value.name).toBe('villages')
     })
 
-    it('allows admin to access admin routes', async () => {
+    it('allows access when user has the permission', async () => {
       const router = createTestRouter()
-      mockIsAdmin.value = true
+      mockHasPermission.mockReturnValue(true)
       await router.push('/admin/users')
       await router.isReady()
       expect(router.currentRoute.value.name).toBe('admin-users')
+      expect(mockHasPermission).toHaveBeenCalledWith('user:admin', undefined)
     })
   })
 
-  describe('collection routes', () => {
-    it('redirects to collections when user has no grant', async () => {
+  describe('requiresPermission (villageScoped)', () => {
+    it('checks the permission against the route villageId', async () => {
       const router = createTestRouter()
-      mockHasCollectionAccess.mockReturnValue(false)
-      await router.push('/collection/123/stigs')
+      mockHasPermission.mockReturnValue(true)
+      await router.push('/villages/3/service-requests')
       await router.isReady()
-      expect(router.currentRoute.value.name).toBe('collections')
+      expect(router.currentRoute.value.name).toBe('service-requests')
+      expect(mockHasPermission).toHaveBeenCalledWith('sr:read', '3')
     })
 
-    it('allows access when user has a grant', async () => {
+    it('redirects to villages when permission missing for that village', async () => {
       const router = createTestRouter()
-      mockHasCollectionAccess.mockReturnValue(true)
-      await router.push('/collection/123/stigs')
+      mockHasPermission.mockReturnValue(false)
+      await router.push('/villages/3/service-requests')
       await router.isReady()
-      expect(router.currentRoute.value.name).toBe('collection-stigs')
+      expect(router.currentRoute.value.name).toBe('villages')
     })
   })
 
-  describe('collection manage (minRoleId)', () => {
-    it('redirects to collection dashboard when roleId is too low', async () => {
+  describe('meta section', () => {
+    it('redirects to villages when user has no federation access', async () => {
       const router = createTestRouter()
-      mockHasCollectionAccess.mockReturnValue(true)
-      mockGetCollectionRoleId.mockReturnValue(2)
-      await router.push('/collection/123/manage')
+      mockHasFederationAccess.value = false
+      await router.push('/meta')
       await router.isReady()
-      expect(router.currentRoute.value.name).toBe('collection-stigs')
+      expect(router.currentRoute.value.name).toBe('villages')
     })
 
-    it('allows access when roleId meets minimum', async () => {
+    it('allows access when user has federation access', async () => {
       const router = createTestRouter()
-      mockHasCollectionAccess.mockReturnValue(true)
-      mockGetCollectionRoleId.mockReturnValue(3)
-      await router.push('/collection/123/manage')
+      mockHasFederationAccess.value = true
+      await router.push('/meta')
       await router.isReady()
-      expect(router.currentRoute.value.name).toBe('collection-manage')
+      expect(router.currentRoute.value.name).toBe('meta')
+    })
+  })
+
+  describe('village-scoped routes without requiresPermission', () => {
+    it('redirects to villages when user has no grant on that village', async () => {
+      const router = createTestRouter()
+      mockHasVillageAccess.mockReturnValue(false)
+      await router.push('/villages/3/members')
+      await router.isReady()
+      expect(router.currentRoute.value.name).toBe('villages')
+    })
+
+    it('allows access when user has a grant on that village', async () => {
+      const router = createTestRouter()
+      mockHasVillageAccess.mockReturnValue(true)
+      await router.push('/villages/3/members')
+      await router.isReady()
+      expect(router.currentRoute.value.name).toBe('members')
+      expect(mockHasVillageAccess).toHaveBeenCalledWith('3')
     })
   })
 
@@ -137,36 +153,43 @@ describe('navigation guards', () => {
 
 describe('volunteer surface', () => {
   beforeEach(() => {
-    mockIsAdmin.value = false
+    mockHasPermission.mockReturnValue(false)
+    mockHasVillageAccess.mockReturnValue(false)
+    mockHasFederationAccess.value = false
+    mockIsGrantless.value = false
     globalThis.VG = { curUser: null }
   })
 
   it('blocks /volunteer for users without a volunteer block', () => {
-    globalThis.VG = { curUser: { volunteer: null, villageGrants: [{ village: { villageId: '3' } }] } }
+    globalThis.VG = { curUser: { volunteer: null } }
     const result = navigationGuard({ name: 'volunteer', path: '/volunteer', params: {}, meta: { requiresVolunteer: true } })
     expect(result).toEqual({ name: 'villages' })
   })
 
   it('allows /volunteer for users with a volunteer block', () => {
-    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] }, villageGrants: [] } }
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    mockIsGrantless.value = true
     const result = navigationGuard({ name: 'volunteer', path: '/volunteer', params: {}, meta: { requiresVolunteer: true } })
     expect(result).toBeUndefined()
   })
 
-  it('redirects volunteer-only users to /volunteer from anywhere else', () => {
-    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] }, villageGrants: [] } }
+  it('redirects volunteer-only (grantless) users to /volunteer from anywhere else', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    mockIsGrantless.value = true
     const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
     expect(result).toEqual({ name: 'volunteer' })
   })
 
-  it('does not redirect staff who also volunteer', () => {
-    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] }, villageGrants: [{ village: { villageId: '3' } }] } }
+  it('does not redirect grant-holding staff who also volunteer', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    mockIsGrantless.value = false
     const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
     expect(result).toBeUndefined()
   })
 
   it('allows volunteer-only users onto the request detail deep link', () => {
-    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] }, villageGrants: [] } }
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    mockIsGrantless.value = true
     const result = navigationGuard({ name: 'volunteer-request-detail', path: '/volunteer/requests/2303', params: { id: '2303' }, meta: { requiresVolunteer: true } })
     expect(result).toBeUndefined()
   })

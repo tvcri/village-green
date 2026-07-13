@@ -27,10 +27,10 @@ test('isStaffGateExempt matches exact prefixes and their subpaths only', () => {
   assert.equal(gates.isStaffGateExempt('/villages/3/members'), false)
 })
 
-test('hasStaffAccess requires a grant or the admin privilege', () => {
-  assert.equal(gates.hasStaffAccess({ privileges: { admin: true }, grants: {} }), true)
-  assert.equal(gates.hasStaffAccess({ privileges: { admin: false }, grants: { 3: {} } }), true)
-  assert.equal(gates.hasStaffAccess({ privileges: { admin: false }, grants: {} }), false)
+test('hasStaffAccess requires a village or federation role grant', () => {
+  assert.equal(gates.hasStaffAccess({ federationGrants: [{ grantId: '1' }], grants: {} }), true)
+  assert.equal(gates.hasStaffAccess({ federationGrants: [], grants: { 3: {} } }), true)
+  assert.equal(gates.hasStaffAccess({ federationGrants: [], grants: {} }), false)
   assert.equal(gates.hasStaffAccess({}), false)
   assert.equal(gates.hasStaffAccess(undefined), false)
 })

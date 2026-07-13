@@ -10,17 +10,19 @@ const route = useRoute()
 const personId = computed(() => route.params.personId)
 
 // getPerson returns the full person (flat phone/cell) plus member attributes
-// via the memberInfo projection. Flatten memberInfo so PersonDetailCard can
-// read memberNumber/memberLevel/etc. directly.
+// via the member projection. Flatten it so PersonDetailCard can read
+// memberNumber/memberLevel/etc. directly — but only when the member role is
+// active: staff callers may receive inactive-role data (read_inactive), and
+// this village-context view shows current members only.
 const { state: person } = useAsyncState(
-  () => getPerson(personId.value, ['memberInfo']),
+  () => getPerson(personId.value, ['member']),
   { immediate: true, onError: null }
 )
 
 const member = computed(() => {
   if (!person.value) return null
-  const { memberInfo, ...rest } = person.value
-  return { ...rest, ...memberInfo }
+  const { member: memberData, ...rest } = person.value
+  return { ...rest, ...((person.value.activeAs ?? []).includes('member') ? memberData : null) }
 })
 </script>
 

@@ -61,7 +61,7 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [] } = {}) {
+module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [] } = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const volunteerId = await ensureVolunteer(connection, personId)
@@ -74,11 +74,11 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
     },
     statusObj: undefined
   })
-  return await PersonService.getPerson(personId, ['volunteerDetail'])
+  return await PersonService.getPerson(personId, ['volunteer'], userObject)
 }
 
 // Partial update: replace only the fields/arrays that are present.
-module.exports.patchVolunteer = async function (personId, body = {}) {
+module.exports.patchVolunteer = async function (personId, body = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const volunteerId = await ensureVolunteer(connection, personId)
@@ -101,7 +101,7 @@ module.exports.patchVolunteer = async function (personId, body = {}) {
     },
     statusObj: undefined
   })
-  return await PersonService.getPerson(personId, ['volunteerDetail'])
+  return await PersonService.getPerson(personId, ['volunteer'], userObject)
 }
 
 module.exports.deleteVolunteer = async function (personId) {

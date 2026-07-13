@@ -6,7 +6,8 @@ import { useCurrentUser } from '../shared/composables/useCurrentUser.js'
 
 const router = useRouter()
 const route = useRoute()
-const { isAdmin } = useCurrentUser()
+const { hasPermission } = useCurrentUser()
+const isAdmin = computed(() => hasPermission('user:admin'))
 
 const isInAdmin = computed(() => {
   return route.name && route.name.startsWith('admin')

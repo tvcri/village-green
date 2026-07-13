@@ -9,10 +9,6 @@ export const siblingGroups = {
     { name: 'members', label: 'Members' },
     { name: 'volunteers', label: 'Volunteers' },
     { name: 'service-requests', label: 'Service Requests' }
-  ],
-  'admin-sections': [
-    { name: 'admin-village-access', label: 'Village Access' },
-    { name: 'admin-user-access', label: 'Users' }
   ]
 }
 

@@ -1,22 +1,20 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
-import { useElevate } from '../../../shared/composables/useElevate.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { getVillages } from '../api/villageApi.js'
 
 const router = useRouter()
-const { user } = useCurrentUser()
-const { elevateEnabled, elevate } = useElevate()
+const { hasFederationAccess } = useCurrentUser()
 const { getStatusSeverity } = useStatusSeverity()
 
-const { state: villages, isLoading, error, execute } = useAsyncState(
-  () => getVillages(elevate.value, ['personCounts', 'srStatusCounts']),
+const { state: villages, isLoading, error } = useAsyncState(
+  () => getVillages(['personCounts', 'srStatusCounts']),
   // A 403 here means the user has no village access at all (no grants, not
   // admin, not a volunteer) — an expected outcome, not a bug. Show it inline
   // instead of the global crash-style error modal.
@@ -24,11 +22,6 @@ const { state: villages, isLoading, error, execute } = useAsyncState(
 )
 
 const isAccessDenied = computed(() => getHttpStatus(error.value) === 403)
-
-// Refetch when elevate is toggled
-watch(elevateEnabled, () => {
-  execute()
-})
 
 const isEmpty = computed(() => !isLoading.value && Array.isArray(villages.value) && villages.value.length === 0)
 
@@ -52,8 +45,8 @@ const metaVillageCounts = computed(() => {
   )
 })
 
-// Temporary: Meta Village is limited to users with exactly 13 village grants
-const showMetaVillage = computed(() => user.value?.villageGrants?.length === 13)
+// Meta Village is visible to users holding any federation-scoped role grant.
+const showMetaVillage = computed(() => hasFederationAccess.value)
 
 const navigateToVillage = (villageId) => {
   router.push({ name: 'village-detail', params: { villageId } })
