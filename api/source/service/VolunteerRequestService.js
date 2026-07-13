@@ -50,6 +50,10 @@ module.exports.capabilityGateSql = function (personId) {
 function baseColumns() {
   return [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
+    // requestNumber is the CE-legacy human number; NULL for VG-native requests.
+    // Surfaced so the detail page can show `requestNumber ?? serviceRequestId`,
+    // mirroring the staff ServiceRequestDetail.
+    'sr.requestNumber',
     'CAST(sr.villageId AS CHAR) AS villageId',
     'v.name AS villageName',
     'sr.status AS status',

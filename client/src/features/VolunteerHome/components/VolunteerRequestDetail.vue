@@ -88,8 +88,7 @@ function formatDateOnly(serviceDate) {
 // return, finish); everything else is a single start/finish span. Ported
 // from ServiceRequestDetail.vue's timeDisplay. Times are 'HH:MM:SS' civil
 // strings rendered via timeStringToLabel — never new Date(). timesFlexible
-// means no specific times were set. VolunteerServiceRequest never carries
-// requestNumber, so the CE-vs-native guard main uses is always-true here.
+// means no specific times were set.
 const timeDisplay = computed(() => {
   const r = request.value
   if (!r) return null
@@ -167,7 +166,7 @@ async function doRelease() {
     <Card v-if="request" class="detail-card">
       <template #header>
         <div class="card-header-wrapper">
-          <h2 class="card-title">{{ request.serviceName ?? 'Service Request' }}</h2>
+          <h2 class="card-title">{{ `${request.serviceName ?? 'Service Request'} (#${request.requestNumber ?? request.serviceRequestId})` }}</h2>
           <div class="header-tags">
             <Tag v-if="request.villageName" :value="request.villageName" severity="secondary" />
             <Tag v-if="request.status" :value="request.status" :severity="getStatusSeverity(request.status)" />
