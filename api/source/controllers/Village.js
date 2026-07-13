@@ -4,6 +4,7 @@ const VillageService = require('../service/VillageService')
 const SmError = require('../utils/error')
 const { hasPermission, hasElevatedPermission } = require('../utils/authz')
 const { validateRoleGrants } = require('./User')
+const { resolveMetricsRange } = require('../utils/metricsRange')
 
 module.exports.getVillages = async function getVillages (req, res, next) {
   try {
@@ -205,6 +206,28 @@ module.exports.getVillageServiceRequests = async function getVillageServiceReque
     }
 
     const response = await VillageService.getVillageServiceRequests(villageId, status)
+    res.json(response)
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.getVillageMetrics = async function getVillageMetrics (req, res, next) {
+  try {
+    const villageId = req.params.villageId
+    if (!hasPermission(req.userObject, 'sr:read', { villageId })) {
+      throw new SmError.PrivilegeError()
+    }
+    // 'en-CA' locale formats as YYYY-MM-DD; reads the clock only (wall-clock
+    // rule forbids hydrating stored serviceDate values, not asking for today).
+    const today = new Date().toLocaleDateString('en-CA')
+    const { start, end } = resolveMetricsRange(req.query.start, req.query.end, today)
+    const existing = await VillageService.getVillage(villageId)
+    if (!existing) {
+      throw new SmError.NotFoundError()
+    }
+    const response = await VillageService.getVillageMetrics(villageId, start, end)
     res.json(response)
   }
   catch (err) {
