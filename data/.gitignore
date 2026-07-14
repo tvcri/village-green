@@ -1,0 +1,4 @@
+node_modules/
+demo-appdata.jsonl
+content/_pack-*.json
+content/_merge.mjs

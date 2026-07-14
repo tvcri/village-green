@@ -4,10 +4,7 @@ import { useCurrentUser } from './useCurrentUser.js'
 const elevateEnabled = ref(false)
 
 export function useElevate() {
-  const { isAdmin } = useCurrentUser()
-
-  // Only admins can use elevate
-  const canElevate = computed(() => isAdmin.value)
+  const { canElevate } = useCurrentUser()
 
   // Return elevate value for API calls (true/false or undefined)
   const elevate = computed(() => elevateEnabled.value ? true : undefined)

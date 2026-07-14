@@ -115,8 +115,8 @@ const filteredMembers = computed(() => {
 const isEmpty = computed(() => !isLoading.value && filteredMembers.value.length === 0)
 
 const membersForCsv = computed(() => {
-  if (!Array.isArray(members.value) || !Array.isArray(persons.value)) return []
-  return members.value.map(m => {
+  if (!Array.isArray(persons.value)) return []
+  return filteredMembers.value.map(m => {
     const p = persons.value?.find(p => p.personId === m.personId) ?? {}
     return { ...p, ...m }
   })

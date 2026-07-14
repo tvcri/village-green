@@ -2,6 +2,7 @@
 import { computed, ref, watch, onMounted, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
@@ -22,6 +23,8 @@ defineOptions({ name: 'MetaServiceRequestList' })
 
 const router = useRouter()
 const route = useRoute()
+const { hasPermission } = useCurrentUser()
+const canWriteSr = computed(() => hasPermission('sr:write'))
 
 let toast = null
 onMounted(() => { toast = useToast() })
@@ -164,10 +167,12 @@ const columnsForCsv = [
   { header: 'Member', key: 'memberFullName' },
   { header: 'Volunteer', key: 'volunteerFullName' },
   { header: 'Description', key: 'description' },
-  { header: 'Start At', key: 'startAt' },
-  { header: 'Arrive At', key: 'apptTime' },
-  { header: 'Return At', key: 'returnTime' },
-  { header: 'Finish At', key: 'finishAt' },
+  { header: 'Date', key: 'serviceDate' },
+  { header: 'Start', key: 'startTime' },
+  { header: 'Arrive', key: 'apptTime' },
+  { header: 'Return', key: 'returnTime' },
+  { header: 'Finish', key: 'finishTime' },
+  { header: 'Times Flexible', key: 'timesFlexible' },
   { header: 'Destination', key: 'destination' },
   { header: 'Address', key: 'address' },
   { header: 'City', key: 'city' },
@@ -175,17 +180,17 @@ const columnsForCsv = [
   { header: 'Created At', key: 'createdAt' }
 ]
 
-const DATE_TIME_CSV_KEYS = ['startAt', 'apptTime', 'returnTime', 'finishAt', 'createdAt']
+const DATE_TIME_CSV_KEYS = ['createdAt']
 
 const handleDownloadCsv = async () => {
-  const csv = toCsv(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv)
+  const csv = toCsv(withLocalDateTimeColumns(filteredRequests.value, DATE_TIME_CSV_KEYS), columnsForCsv)
   downloadCsv(csv, 'service-requests.csv')
 }
 
 async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
-    const result = await createSheet(withLocalDateTimeColumns(requests.value || [], DATE_TIME_CSV_KEYS), columnsForCsv, 'Village Green Service Requests')
+    const result = await createSheet(withLocalDateTimeColumns(filteredRequests.value, DATE_TIME_CSV_KEYS), columnsForCsv, 'Village Green Service Requests')
     const sheetUrl = result.url || result
     if (result.popupBlocked) {
       if (toast) {
@@ -250,7 +255,7 @@ const clearFilters = () => {
         <h1>Service Requests</h1>
       </div>
       <div class="header-actions">
-        <Button label="New Request" icon="pi pi-plus" @click="navigateToCreateRequest" />
+        <Button v-if="canWriteSr" label="New Request" icon="pi pi-plus" @click="navigateToCreateRequest" />
         <ExportButton
           :disabled="isLoading || isCreatingSheet"
           @download="handleDownloadCsv"
@@ -358,6 +363,7 @@ const clearFilters = () => {
           <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
         <Button
+          v-if="canWriteSr"
           icon="pi pi-pencil"
           v-tooltip="'Edit Request'"
           class="p-button-rounded p-button-text p-button-sm"
@@ -370,7 +376,7 @@ const clearFilters = () => {
       v-model:visible="historyDialogVisible"
       :service-request-id="historyRequestId"
       :display-label="historyRequestLabel"
-      :allow-send-button="true"
+      :allow-send-button="canWriteSr"
       :status="historyRequestStatus"
       @notified="onNotified"
     />

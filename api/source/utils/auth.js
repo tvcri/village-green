@@ -6,6 +6,7 @@ const UserService = require(`../service/UserService`)
 const SmError = require('./error')
 const state = require('./state')
 const JWKSCache = require('./jwksCache')
+const { holdsAnyElevatable } = require('./authz')
 const { Agent, fetch } = require('undici');
 const fs = require('node:fs');
 const path = require('node:path')
@@ -147,14 +148,11 @@ const setupUser = async function (req, res, next) {
                 }
             }
 
-            // Get privileges and check elevate param  
-            userObject.privileges = {
-                create_village: getClaimByPath(tokenPayload).includes('create_village'),
-                admin: getClaimByPath(tokenPayload).includes('admin')
-            }
-
-            if ('elevate' in req.query && (req.query.elevate === 'true' && !userObject.privileges.admin)) {
-                throw new SmError.InvalidElevationError() 
+            // Effective permissions were computed by getUserObject. Reject an elevate
+            // request up-front unless the user holds an elevation-flagged permission —
+            // preserves the historical "you can't even ask" behavior.
+            if (req.query.elevate === 'true' && !holdsAnyElevatable(userObject)) {
+                throw new SmError.InvalidElevationError()
             }
 
             req.userObject = userObject

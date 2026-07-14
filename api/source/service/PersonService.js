@@ -1,5 +1,6 @@
 'use strict';
 const dbUtils = require('./utils')
+const { hasPermission } = require('../utils/authz')
 
 const _this = this
 
@@ -31,7 +32,7 @@ async function queryPersons (inPredicates = {}) {
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
       WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
-    END AS roles`
+    END AS activeAs`
   ]
   const joins = new Set([
     'person p',
@@ -57,7 +58,44 @@ async function queryPersons (inPredicates = {}) {
   return rows
 }
 
-module.exports.getPerson = async function (personId, projections = []) {
+module.exports.getPerson = async function (personId, projections = [], userObject = null) {
+  // The member/volunteer projections carry village-scoped gated content:
+  // sensitive fields (financial/confidential) and inactive-row visibility
+  // (read_inactive). Gates must be evaluated against *this* person's
+  // village. getPerson is single-row (predicated on p.id), so that village
+  // is a query-level constant — a cheap pre-fetch resolves it before the
+  // main query is built. Federation-level grants are covered without the
+  // lookup running at all: hasPermission short-circuits on federation
+  // membership regardless of villageId.
+  const wantsMember = projections.includes('member')
+  const wantsVolunteer = projections.includes('volunteer')
+  let financial = false
+  let confidential = false
+  let memberInactive = false
+  let volunteerInactive = false
+  if (wantsMember) {
+    financial = hasPermission(userObject, 'member:read_financial')
+    confidential = hasPermission(userObject, 'person:read_confidential')
+    memberInactive = hasPermission(userObject, 'member:read_inactive')
+  }
+  if (wantsVolunteer) {
+    volunteerInactive = hasPermission(userObject, 'volunteer:read_inactive')
+  }
+  const unresolved =
+    (wantsMember && !(financial && confidential && memberInactive)) ||
+    (wantsVolunteer && !volunteerInactive)
+  if (unresolved) {
+    const [[personVillage]] = await dbUtils.pool.query('SELECT villageId FROM person WHERE id = ?', [personId])
+    const villageId = personVillage?.villageId
+    if (wantsMember) {
+      financial ||= hasPermission(userObject, 'member:read_financial', { villageId })
+      confidential ||= hasPermission(userObject, 'person:read_confidential', { villageId })
+      memberInactive ||= hasPermission(userObject, 'member:read_inactive', { villageId })
+    }
+    if (wantsVolunteer) {
+      volunteerInactive ||= hasPermission(userObject, 'volunteer:read_inactive', { villageId })
+    }
+  }
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
     'p.fullName',
@@ -85,7 +123,7 @@ module.exports.getPerson = async function (personId, projections = []) {
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
       WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
-    END AS roles`
+    END AS activeAs`
   ]
   const joins = new Set([
     'person p',
@@ -122,26 +160,16 @@ module.exports.getPerson = async function (personId, projections = []) {
       AND d.name IN ('Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane')
   ) AS disabilities`)
 
-  if (projections.includes('memberInfo')) {
-    columns.push(`(SELECT JSON_OBJECT(
-      'memberId', CAST(id AS CHAR),
-      'memberNumber', memberNumber,
-      'memberLevel', memberLevel,
-      'primaryPerson', (
-        SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
-        FROM person pp WHERE pp.id = active_member.primaryPersonId
-      ),
-      'serviceNotes', serviceNotes,
-      'joinDate', DATE_FORMAT(joinDate, '%Y-%m-%d')
-    ) FROM active_member WHERE personId = p.id) AS memberInfo`)
-  }
-
-  if (projections.includes('memberDetail')) {
+  if (wantsMember) {
+    // Row gating: without member:read_inactive the source is the
+    // active_member view, so a dropped/deceased member yields NULL here.
+    const memberSource = memberInactive ? 'member' : 'active_member'
     columns.push(`(SELECT JSON_OBJECT(
       'memberId', CAST(m2.id AS CHAR),
       'personId', CAST(m2.personId AS CHAR),
       'memberNumber', m2.memberNumber,
       'memberLevel', m2.memberLevel,
+      ${financial ? `'householdDues', m2.householdDues,` : ''}
       'memberType', m2.memberType,
       'primaryPerson', (
         SELECT JSON_OBJECT('personId', CAST(pp.id AS CHAR), 'fullName', pp.fullName)
@@ -154,42 +182,16 @@ module.exports.getPerson = async function (personId, projections = []) {
       'status', m2.status,
       'dropReason', m2.dropReason,
       'householdSize', m2.householdSize,
-      'householdDues', m2.householdDues,
-      'quickbooksKey', m2.quickbooksKey,
+      ${financial ? `'quickbooksKey', m2.quickbooksKey,` : ''}
       'printedNewsletter', m2.printedNewsletter != 0,
-      'confidentialNotes', m2.confidentialNotes,
+      ${confidential ? `'confidentialNotes', m2.confidentialNotes,` : ''}
       'statusChangeNotes', m2.statusChangeNotes,
       'miscNotes', m2.miscNotes
-    ) FROM member m2 WHERE m2.personId = p.id) AS memberDetail`)
+    ) FROM ${memberSource} m2 WHERE m2.personId = p.id) AS \`member\``)
   }
 
-  if (projections.includes('volunteerInfo')) {
-    columns.push(`(SELECT JSON_OBJECT(
-      'volunteerId', CAST(vol2.id AS CHAR),
-      'capabilities', (
-        SELECT COALESCE(
-          CAST(CONCAT('[', GROUP_CONCAT(CONCAT('"', c.name, '"') ORDER BY c.name), ']') AS JSON),
-          JSON_ARRAY()
-        )
-        FROM volunteer_capability vc
-        JOIN capability c ON c.id = vc.capabilityId
-        WHERE vc.volunteerId = vol2.id
-      ),
-      'associateVillages', (
-        SELECT COALESCE(
-          CAST(CONCAT('[', GROUP_CONCAT(
-            JSON_OBJECT('villageId', CAST(vva.villageId AS CHAR), 'name', av.name) ORDER BY av.name
-          ), ']') AS JSON),
-          JSON_ARRAY()
-        )
-        FROM volunteer_village_associate vva
-        JOIN village av ON av.id = vva.villageId
-        WHERE vva.volunteerId = vol2.id
-      )
-    ) FROM active_volunteer vol2 WHERE vol2.personId = p.id) AS volunteerInfo`)
-  }
-
-  if (projections.includes('volunteerDetail')) {
+  if (wantsVolunteer) {
+    const volunteerSource = volunteerInactive ? 'volunteer' : 'active_volunteer'
     columns.push(`(SELECT JSON_OBJECT(
       'volunteerId', CAST(vol3.id AS CHAR),
       'personId', CAST(vol3.personId AS CHAR),
@@ -232,7 +234,7 @@ module.exports.getPerson = async function (personId, projections = []) {
         JOIN vetting_type vt ON vt.id = vv.vettingTypeId
         WHERE vv.volunteerId = vol3.id
       )
-    ) FROM volunteer vol3 WHERE vol3.personId = p.id) AS volunteerDetail`)
+    ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``)
   }
 
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
@@ -296,7 +298,7 @@ module.exports.deletePerson = async function (personId) {
   await dbUtils.pool.query('DELETE FROM person WHERE id = ?', [personId])
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, elevate, villageId, firstName, lastName, phone, email, role }) {
+module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email }) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
     'p.fullName',
@@ -306,7 +308,7 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
       WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
-    END AS roles`,
+    END AS activeAs`,
     `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,
     'p.email'
   ]
@@ -318,7 +320,10 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   ])
   const predicates = { statements: [], binds: [] }
 
-  if (!elevate) {
+  if (villageIdsGranted !== null) {
+    // Non-federation caller: restrict to the villages they were granted
+    // person:read in. villageIdsGranted === null means a federation-wide
+    // read, which is unrestricted here.
     if (!villageIdsGranted.length) return []
     predicates.statements.push('p.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)
@@ -342,19 +347,6 @@ module.exports.getPersons = async function ({ villageIdsGranted, elevate, villag
   if (email) {
     predicates.statements.push('p.email LIKE ?')
     predicates.binds.push(`%${email}%`)
-  }
-
-  if (role === 'member') {
-    predicates.statements.push('m.id IS NOT NULL')
-  }
-  else if (role === 'volunteer') {
-    predicates.statements.push('vol.id IS NOT NULL')
-  }
-  else if (role === 'community') {
-    // EXISTS rather than a JOIN: a person with N community memberships would
-    // otherwise produce N duplicate rows (community is M:N, unlike the 1:1
-    // member/volunteer roles).
-    predicates.statements.push('EXISTS (SELECT 1 FROM person_community pc WHERE pc.personId = p.id)')
   }
 
   const orderBy = ['p.fullName']

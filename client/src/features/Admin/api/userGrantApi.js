@@ -1,17 +1,22 @@
 import { apiCall } from '../../../shared/api/apiClient.js'
+import { useElevate } from '../../../shared/composables/useElevate.js'
 
 export const getUsers = () => {
-  return apiCall('getUsers', { elevate: true })
+  const { elevate } = useElevate()
+  return apiCall('getUsers', { elevate: elevate.value ?? true })
 }
 
 export const getUserGrants = (userId) => {
-  return apiCall('getUserGrants', { userId, elevate: true })
+  const { elevate } = useElevate()
+  return apiCall('getUserGrants', { userId, elevate: elevate.value ?? true })
 }
 
 export const deleteUserGrant = (userId, grantId) => {
-  return apiCall('deleteUserGrant', { userId, grantId, elevate: true })
+  const { elevate } = useElevate()
+  return apiCall('deleteUserGrant', { userId, grantId, elevate: elevate.value ?? true })
 }
 
 export const createUserGrant = (userId, grants) => {
-  return apiCall('createUserGrant', { userId, elevate: true }, grants)
+  const { elevate } = useElevate()
+  return apiCall('createUserGrant', { userId, elevate: elevate.value ?? true }, grants)
 }

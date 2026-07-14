@@ -50,7 +50,7 @@ const capabilityNameToId = computed(() =>
 
 onMounted(async () => {
   try {
-    villages.value = await getVillages(true)
+    villages.value = await getVillages()
     allCommunities.value = await getCommunities()
     allDisabilities.value = await getDisabilities()
     allCapabilities.value = await getCapabilities()

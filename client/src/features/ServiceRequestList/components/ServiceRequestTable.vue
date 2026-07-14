@@ -7,6 +7,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
+import { formatServiceDate } from '../lib/timeFields.js'
 
 defineOptions({ name: 'ServiceRequestTable' })
 
@@ -31,10 +32,6 @@ const rowClass = computed(() => {
   return (row) => String(row.serviceRequestId) === String(id) ? 'row-flash' : null
 })
 
-function formatDate(dateStr) {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString()
-}
 </script>
 
 <template>
@@ -55,7 +52,7 @@ function formatDate(dateStr) {
       row-hover
       paginator
       :rows="pageRows"
-      sort-field="startAt"
+      sort-field="serviceDate"
       :sort-order="1"
       class="request-table-responsive desktop-only"
       :row-class="rowClass"
@@ -78,9 +75,9 @@ function formatDate(dateStr) {
         </div>
       </template>
 
-      <Column field="startAt" header="Date" sortable style="width: 12%">
+      <Column field="serviceDate" header="Date" sortable style="width: 12%">
         <template #body="slotProps">
-          {{ slotProps.data.startAt ? formatDate(slotProps.data.startAt) : '—' }}
+          {{ formatServiceDate(slotProps.data.serviceDate) || '—' }}
         </template>
       </Column>
       <Column v-if="showVillageColumn" field="villageName" header="Village" sortable style="width: 15%"></Column>
@@ -121,7 +118,7 @@ function formatDate(dateStr) {
         <div class="card-row"><span class="label">#:</span><span>{{ request.displayNumber ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Member:</span><span>{{ request.memberFullName ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Volunteer:</span><span>{{ request.volunteerFullName ?? '—' }}</span></div>
-        <div class="card-row"><span class="label">Start:</span><span>{{ request.startAt ? formatDate(request.startAt) : '—' }}</span></div>
+        <div class="card-row"><span class="label">Start:</span><span>{{ formatServiceDate(request.serviceDate) || '—' }}</span></div>
         <div class="card-row"><span class="label">City:</span><span>{{ request.city ?? '—' }}</span></div>
       </div>
     </div>

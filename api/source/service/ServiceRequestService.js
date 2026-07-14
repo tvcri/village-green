@@ -55,10 +55,16 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.serviceName',
     'sr.transportationType',
     "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
-    "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
-    "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
-    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
-    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
+    // serviceDate as a string: mysql2 would otherwise hydrate DATE into a
+    // JS Date at server-local midnight, reintroducing tz ambiguity.
+    "DATE_FORMAT(sr.serviceDate, '%Y-%m-%d') AS serviceDate",
+    // TIME columns come back from mysql2 as 'HH:MM:SS' strings natively.
+    'sr.startTime',
+    'sr.finishTime',
+    'sr.apptTime',
+    'sr.returnTime',
+    // JSON boolean (0/1 tinyint would fail the OAS boolean type).
+    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
@@ -135,7 +141,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   return rows[0] ?? null
 }
 
-module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate, status, villageId, hasNotifications }) {
+module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications }) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.requestNumber',
@@ -151,10 +157,16 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     'sr.serviceName',
     'sr.transportationType',
     "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
-    "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
-    "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
-    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
-    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
+    // serviceDate as a string: mysql2 would otherwise hydrate DATE into a
+    // JS Date at server-local midnight, reintroducing tz ambiguity.
+    "DATE_FORMAT(sr.serviceDate, '%Y-%m-%d') AS serviceDate",
+    // TIME columns come back from mysql2 as 'HH:MM:SS' strings natively.
+    'sr.startTime',
+    'sr.finishTime',
+    'sr.apptTime',
+    'sr.returnTime',
+    // JSON boolean (0/1 tinyint would fail the OAS boolean type).
+    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
@@ -184,14 +196,17 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
   ])
   const predicates = { statements: [], binds: [] }
 
-  if (!elevate) {
+  if (villageIdsGranted !== null) {
+    // Non-federation caller: restrict to the villages they were granted
+    // sr:read in. villageIdsGranted === null means a federation-wide read,
+    // which is unrestricted here.
     if (!villageIdsGranted.length) return []
     predicates.statements.push('sr.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)
   }
   if (villageId && villageId.length > 0) {
     predicates.statements.push('sr.villageId IN (?)')
-    predicates.binds.push([villageId])
+    predicates.binds.push(villageId)
   }
   if (status && status.length > 0) {
     const dbStatuses = []
@@ -216,19 +231,13 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, elevate
     )
   }
 
-  const orderBy = ['sr.finishAt DESC']
+  const orderBy = ['sr.serviceDate DESC', 'sr.startTime DESC']
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows
 }
 
 module.exports.createServiceRequest = async function (payload, userId) {
-  const convertToMySQLDateTime = (isoString) => {
-    if (!isoString) return null
-    const date = new Date(isoString)
-    return date.toISOString().slice(0, 19).replace('T', ' ')
-  }
-
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const resolvedStatus = deriveStatus(payload.status, payload.volunteerPersonId)
@@ -241,10 +250,12 @@ module.exports.createServiceRequest = async function (payload, userId) {
         status: resolvedStatus,
         serviceName: payload.serviceName || null,
         transportationType: payload.transportationType || null,
-        startAt: convertToMySQLDateTime(payload.startAt),
-        finishAt: convertToMySQLDateTime(payload.finishAt),
-        apptTime: convertToMySQLDateTime(payload.apptTime),
-        returnTime: convertToMySQLDateTime(payload.returnTime),
+        serviceDate: payload.serviceDate || null,
+        timesFlexible: payload.timesFlexible ? 1 : 0,
+        startTime: payload.startTime || null,
+        finishTime: payload.finishTime || null,
+        apptTime: payload.apptTime || null,
+        returnTime: payload.returnTime || null,
         state: payload.state || null,
         instructions: payload.instructions || null,
         description: payload.description || null,
@@ -275,12 +286,6 @@ module.exports.createServiceRequest = async function (payload, userId) {
 }
 
 module.exports.patchServiceRequest = async function (serviceRequestId, payload) {
-  const convertToMySQLDateTime = (isoString) => {
-    if (!isoString) return null
-    const date = new Date(isoString)
-    return date.toISOString().slice(0, 19).replace('T', ' ')
-  }
-
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [currentRows] = await connection.query(
@@ -295,10 +300,12 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       if (payload.volunteerPersonId !== undefined) updateFields.volunteerPersonId = payload.volunteerPersonId || null
       if (payload.serviceName !== undefined) updateFields.serviceName = payload.serviceName || null
       if (payload.transportationType !== undefined) updateFields.transportationType = payload.transportationType || null
-      if (payload.startAt !== undefined) updateFields.startAt = convertToMySQLDateTime(payload.startAt)
-      if (payload.finishAt !== undefined) updateFields.finishAt = convertToMySQLDateTime(payload.finishAt)
-      if (payload.apptTime !== undefined) updateFields.apptTime = convertToMySQLDateTime(payload.apptTime)
-      if (payload.returnTime !== undefined) updateFields.returnTime = convertToMySQLDateTime(payload.returnTime)
+      if (payload.serviceDate !== undefined) updateFields.serviceDate = payload.serviceDate
+      if (payload.timesFlexible !== undefined) updateFields.timesFlexible = payload.timesFlexible ? 1 : 0
+      if (payload.startTime !== undefined) updateFields.startTime = payload.startTime
+      if (payload.finishTime !== undefined) updateFields.finishTime = payload.finishTime
+      if (payload.apptTime !== undefined) updateFields.apptTime = payload.apptTime
+      if (payload.returnTime !== undefined) updateFields.returnTime = payload.returnTime
       if (payload.state !== undefined) updateFields.state = payload.state || null
       if (payload.city !== undefined) updateFields.city = payload.city || null
       if (payload.zip !== undefined) updateFields.zip = payload.zip || null

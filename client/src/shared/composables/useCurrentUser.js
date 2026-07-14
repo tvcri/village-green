@@ -3,35 +3,26 @@ import { computed } from 'vue'
 export function useCurrentUser() {
   const user = computed(() => VG.curUser)
 
-  const isAdmin = computed(() => !!user.value?.privileges?.admin)
-
-  const canCreateCollection = computed(() => !!user.value?.privileges?.create_collection)
-
-  function getCollectionGrant(collectionId) {
-    if (!user.value?.collectionGrants || !collectionId) {
-      return null
+  function hasPermission(permission, villageId) {
+    const p = user.value?.permissions
+    if (!p) return false
+    if (p.federation.includes('*') || p.federation.includes(permission)) return true
+    if (villageId !== undefined && villageId !== null) {
+      return !!p.byVillage?.[String(villageId)]?.includes(permission)
     }
-    const id = String(collectionId)
-    return user.value.collectionGrants.find(
-      // eslint-disable-next-line antfu/consistent-list-newline
-      g => String(g.collection.collectionId) === id) ?? null
+    return false
   }
 
-  function hasCollectionAccess(collectionId) {
-    return getCollectionGrant(collectionId) !== null
+  function hasVillageAccess(villageId) {
+    return !!user.value?.grants?.[String(villageId)]
   }
 
-  function getCollectionRoleId(collectionId) {
-    const grant = getCollectionGrant(collectionId)
-    return grant?.roleId ?? null
-  }
+  const hasFederationAccess = computed(() => (user.value?.federationGrants?.length ?? 0) > 0)
+  const canElevate = computed(() => !!user.value?.canElevate)
+  const isGrantless = computed(() =>
+    Object.keys(user.value?.grants ?? {}).length === 0
+    && (user.value?.federationGrants?.length ?? 0) === 0,
+  )
 
-  return {
-    user,
-    isAdmin,
-    canCreateCollection,
-    getCollectionGrant,
-    hasCollectionAccess,
-    getCollectionRoleId,
-  }
+  return { user, hasPermission, hasVillageAccess, hasFederationAccess, canElevate, isGrantless }
 }

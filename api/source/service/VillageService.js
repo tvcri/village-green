@@ -5,9 +5,9 @@ const config = require('../utils/config')
 
 const _this = this
 
-module.exports.queryVillages = async function  ({projections = [], filter = {}, elevate = false, grants = {}, userId = ''}) {  
+module.exports.queryVillages = async function  ({projections = [], filter = {}, allVillages = false, grants = {}}) {
     const villageIdsGranted = Object.keys(grants)
-    if (!villageIdsGranted.length && !elevate) {
+    if (!villageIdsGranted.length && !allVillages) {
       return []
     }
 
@@ -26,59 +26,18 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
     let requireCteGrantees = false
     let requesterGrantIds = []
 
-    if (!elevate) {
+    if (!allVillages) {
       for (const villageId in grants) {
         requesterGrantIds.push(grants[villageId].grantIds)
       }
       requesterGrantIds = requesterGrantIds.flat()
     }
 
-    if (projections.includes('owners')) {
-      columns.push(`(select coalesce(json_arrayagg(grantJson),json_array()) from
-        (select json_object(
-          'userId', CAST(user_data.userId as char),
-          'username', user_data.username,
-          'displayName', JSON_UNQUOTE(JSON_EXTRACT(user_data.lastClaims, "$.${config.oauth.claims.name}"))
-          ) as grantJson
-        from
-          village_grant inner join user_data using (userId) where villageId = v.id and roleId = 4
-        UNION
-        select json_object(
-          'userGroupId', CAST(user_group.userGroupId as char),
-          'name', user_group.name,
-          'description', user_group.description
-        ) as grantJson
-        from village_grant inner join user_group using (userGroupId) where villageId = v.id and roleId = 4) o) as owners`)
-    }
     if (projections.includes('statistics')) {
-      if (!elevate) {
-        requireCteGrantees = true
-        columns.push(`(select
-          json_object(
-          'created', DATE_FORMAT(c.created, '%Y-%m-%dT%TZ'),
-          'userCount', dt4.userCount,
-          )
-          from 
-            (SELECT
-            (select roleId from cteGrantees where villageId = v.id and userId = ?) as roleId,
-            (select count(userId) from cteGrantees where villageId = v.id) as userCount,
-          ) dt4
-        ) as statistics`)
-        predicates.binds.push(userId)
-      }
-      else {
-        requireCteGrantees = true
-        columns.push(`(select
-          json_object(
-          'created', DATE_FORMAT(c.created, '%Y-%m-%dT%TZ'),
-          'userCount', dt4.userCount,
-          )
-          from 
-            (SELECT
-            (select count(userId) from cteGrantees where villageId = v.id) as userCount,
-          ) dt4
-        ) as statistics`)
-      }
+      requireCteGrantees = true
+      columns.push(`json_object(
+        'userCount', (select count(distinct userId) from cteGrantees where villageId = v.id)
+      ) as statistics`)
     }
     // This projection is not exposed in the OAS, only used by Operation.getAppData()
     if (projections.includes('grants')) { 
@@ -96,7 +55,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
                   'roleId', roleId)
                 as grantJson
             from
-              village_grant inner join user_data using (userId) where villageId = v.id
+              role_grant inner join user_data using (userId) where villageId = v.id
             UNION
             select
               json_object(
@@ -107,7 +66,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
                   ),
                 'roleId', roleId
               ) as grantJson
-            from village_grant inner join user_group using (userGroupId) where villageId = v.id
+            from role_grant inner join user_group using (userGroupId) where villageId = v.id
           ) as grantJsons)
         , json_array()
         )
@@ -162,7 +121,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
         v2.id = v.id) as srStatusCounts`)
     }
 
-    if (!elevate) {
+    if (!allVillages) {
       predicates.statements.push('v.id IN (?)')
       predicates.binds.push( villageIdsGranted )
     }
@@ -172,7 +131,7 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
     }
 
     if (requireCteGrantees) {
-      const cteGranteesParams = elevate ? {returnCte: true} : {villageIds: villageIdsGranted, returnCte: true}
+      const cteGranteesParams = allVillages ? {returnCte: true} : {villageIds: villageIdsGranted, returnCte: true}
       ctes.push(dbUtils.sqlGrantees(cteGranteesParams))
     }
 
@@ -182,11 +141,11 @@ module.exports.queryVillages = async function  ({projections = [], filter = {}, 
 }
 
 module.exports.getVillages = async function () {
-  return await module.exports.queryVillages({})
+  return await module.exports.queryVillages({allVillages: true})
 }
 
 module.exports.getVillage = async function (villageId) {
-  const rows = await module.exports.queryVillages({villageId})
+  const rows = await module.exports.queryVillages({filter: {villageId}, allVillages: true})
   return rows[0] ?? null
 }
 
@@ -201,7 +160,7 @@ module.exports.createVillage = async function (body) {
     },
     statusObj: undefined
   })
-  return await queryVillages({villageId: insertId})
+  return await module.exports.queryVillages({filter: {villageId: insertId}, allVillages: true})
 }
 
 module.exports.patchVillage = async function (villageId, body) {
@@ -216,7 +175,7 @@ module.exports.patchVillage = async function (villageId, body) {
     },
     statusObj: undefined
   })
-  return await queryVillages({villageId})
+  return await module.exports.queryVillages({filter: {villageId}, allVillages: true})
 }
 
 module.exports.deleteVillage = async function (villageId) {
@@ -267,7 +226,7 @@ module.exports.getVillageVolunteers = async function (villageId) {
   return rows
 }
 
-module.exports.getVolunteers = async function ({ villageIdsGranted, elevate }) {
+module.exports.getVolunteers = async function ({ villageIdsGranted, allVillages }) {
   const columns = [
     'p.fullName',
     'CAST(vol.id AS CHAR) AS volunteerId',
@@ -283,7 +242,7 @@ module.exports.getVolunteers = async function ({ villageIdsGranted, elevate }) {
     'LEFT JOIN capability c ON c.id = vc.capabilityId'
   ])
   const predicates = { statements: [], binds: [] }
-  if (!elevate) {
+  if (!allVillages) {
     if (!villageIdsGranted.length) return []
     predicates.statements.push('p.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)
@@ -319,10 +278,16 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
     'sr.serviceName',
     'sr.transportationType',
     "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
-    "DATE_FORMAT(sr.startAt, '%Y-%m-%dT%TZ') AS startAt",
-    "DATE_FORMAT(sr.apptTime, '%Y-%m-%dT%TZ') AS apptTime",
-    "DATE_FORMAT(sr.returnTime, '%Y-%m-%dT%TZ') AS returnTime",
-    "DATE_FORMAT(sr.finishAt, '%Y-%m-%dT%TZ') AS finishAt",
+    // serviceDate as a string: mysql2 would otherwise hydrate DATE into a
+    // JS Date at server-local midnight, reintroducing tz ambiguity.
+    "DATE_FORMAT(sr.serviceDate, '%Y-%m-%d') AS serviceDate",
+    // TIME columns come back from mysql2 as 'HH:MM:SS' strings natively.
+    'sr.startTime',
+    'sr.finishTime',
+    'sr.apptTime',
+    'sr.returnTime',
+    // JSON boolean (0/1 tinyint would fail the OAS boolean type).
+    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.destination AS destination',
@@ -360,10 +325,92 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
       predicates.binds.push([dbStatuses])
     }
   }
-  const orderBy = ['sr.finishAt DESC']
+  const orderBy = ['sr.serviceDate DESC', 'sr.startTime DESC']
   const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
   let [rows] = await dbUtils.pool.query(sql)
   return rows
+}
+
+module.exports.getVillageMetrics = async function (villageId, start, end) {
+  // Business rule: 'Hub cancelled' requests are treated as if they never
+  // existed — excluded from every section. Breakdown sections count
+  // Completed requests only; the full status mix appears only in byStatus.
+  // Breakdown arrays are ordered in SQL (jsonArrayAgg orderBy): byServiceType
+  // by count desc then name; person lists by fullName.
+  const sql = `
+    SELECT
+      CAST(v.id AS CHAR) AS villageId,
+      v.name AS villageName,
+      (SELECT JSON_OBJECT(
+          'draft',              COALESCE(SUM(sr.status = 'Draft'), 0),
+          'open',               COALESCE(SUM(sr.status = 'Open'), 0),
+          'confirmed',          COALESCE(SUM(sr.status = 'Confirmed'), 0),
+          'completed',          COALESCE(SUM(sr.status = 'Completed'), 0),
+          'unmatched',          COALESCE(SUM(sr.status = 'Unmatched'), 0),
+          'memberCancelled',    COALESCE(SUM(sr.status = 'Member cancelled'), 0),
+          'volunteerCancelled', COALESCE(SUM(sr.status = 'Volunteer cancelled'), 0)
+        )
+        FROM service_request sr
+        WHERE sr.villageId = v.id
+          AND sr.status != 'Hub cancelled'
+          AND sr.serviceDate BETWEEN ? AND ?) AS byStatus,
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('serviceName', t.serviceName, 'count', t.cnt)`,
+            orderBy: 't.cnt desc, t.serviceName'
+          })}, JSON_ARRAY())
+        FROM (SELECT sr.serviceName, COUNT(*) AS cnt
+              FROM service_request sr
+              WHERE sr.villageId = v.id
+                AND sr.status = 'Completed'
+                AND sr.serviceName IS NOT NULL
+                AND sr.serviceDate BETWEEN ? AND ?
+              GROUP BY sr.serviceName) t) AS byServiceType,
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            orderBy: 'p.fullName'
+          })}, JSON_ARRAY())
+        FROM (SELECT sr.memberPersonId AS pid, COUNT(*) AS cnt
+              FROM service_request sr
+              WHERE sr.villageId = v.id
+                AND sr.status = 'Completed'
+                AND sr.memberPersonId IS NOT NULL
+                AND sr.serviceDate BETWEEN ? AND ?
+              GROUP BY sr.memberPersonId) t
+        JOIN person p ON p.id = t.pid) AS byMember,
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            orderBy: 'p.fullName'
+          })}, JSON_ARRAY())
+        FROM (SELECT sr.volunteerPersonId AS pid, COUNT(*) AS cnt
+              FROM service_request sr
+              WHERE sr.villageId = v.id
+                AND sr.status = 'Completed'
+                AND sr.volunteerPersonId IS NOT NULL
+                AND sr.serviceDate BETWEEN ? AND ?
+              GROUP BY sr.volunteerPersonId) t
+        JOIN person p ON p.id = t.pid) AS byVolunteer
+    FROM village v
+    WHERE v.id = ?
+  `
+  const binds = [start, end, start, end, start, end, start, end, villageId]
+  const [rows] = await dbUtils.pool.query(sql, binds)
+  if (!rows[0]) return null
+  const row = rows[0]
+  // mysql2 hydrates the JSON columns into JS objects/arrays with numeric
+  // counts already (JSON numbers), so no coercion is needed here.
+  const totalRequests = Object.values(row.byStatus).reduce((a, b) => a + b, 0)
+  return {
+    villageId: row.villageId,
+    villageName: row.villageName,
+    range: { start, end },
+    totals: { totalRequests, byStatus: row.byStatus },
+    byServiceType: row.byServiceType,
+    byMember: row.byMember,
+    byVolunteer: row.byVolunteer
+  }
 }
 
 module.exports.getVillageGrants = async function (villageId) {
@@ -386,7 +433,7 @@ module.exports.getVillageGrants = async function (villageId) {
       CAST(ug.userGroupId AS CHAR) AS userGroup_userGroupId,
       ug.name AS userGroup_name,
       ug.description AS userGroup_description
-    FROM village_grant vg
+    FROM role_grant vg
     LEFT JOIN user_data ud ON vg.userId = ud.userId
     LEFT JOIN user_group ug ON vg.userGroupId = ug.userGroupId
     WHERE vg.villageId = ?
@@ -436,7 +483,7 @@ module.exports.createVillageGrant = async function (villageId, body) {
           mappedFields.userGroupId = grant.userGroupId
         }
 
-        await connection.query('INSERT INTO village_grant SET ?', mappedFields)
+        await connection.query('INSERT INTO role_grant SET ?', mappedFields)
       }
     },
     statusObj: undefined
@@ -449,7 +496,7 @@ module.exports.createVillageGrant = async function (villageId, body) {
 module.exports.replaceVillageGrants = async function (villageId, body) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      await connection.query('DELETE FROM village_grant WHERE villageId = ?', [villageId])
+      await connection.query('DELETE FROM role_grant WHERE villageId = ?', [villageId])
 
       if (body && body.length > 0) {
         for (const grant of body) {
@@ -464,7 +511,7 @@ module.exports.replaceVillageGrants = async function (villageId, body) {
             mappedFields.userGroupId = grant.userGroupId
           }
 
-          await connection.query('INSERT INTO village_grant SET ?', mappedFields)
+          await connection.query('INSERT INTO role_grant SET ?', mappedFields)
         }
       }
     },
@@ -476,7 +523,7 @@ module.exports.replaceVillageGrants = async function (villageId, body) {
 
 module.exports.deleteVillageGrant = async function (villageId, grantId) {
   const [existing] = await dbUtils.pool.query(
-    'SELECT * FROM village_grant WHERE grantId = ? AND villageId = ?',
+    'SELECT * FROM role_grant WHERE grantId = ? AND villageId = ?',
     [grantId, villageId]
   )
 
@@ -485,7 +532,7 @@ module.exports.deleteVillageGrant = async function (villageId, grantId) {
     throw new SmError.NotFoundError()
   }
 
-  await dbUtils.pool.query('DELETE FROM village_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId])
+  await dbUtils.pool.query('DELETE FROM role_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId])
 
   const sql = `
     SELECT

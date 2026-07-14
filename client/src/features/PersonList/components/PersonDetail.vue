@@ -7,19 +7,24 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
 import { deletePerson } from '../api/personApi.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { hasPermission } = useCurrentUser()
+const canWritePerson = computed(() => hasPermission('person:write'))
+const canWriteMember = computed(() => hasPermission('member:write'))
+const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const personId = computed(() => route.params.personId)
 
 const { state: person } = useAsyncState(
-  () => apiCall('getPerson', { personId: personId.value, projection: ['memberDetail', 'volunteerDetail'] }),
+  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] }),
   { immediate: true }
 )
 
-const isMember = computed(() => (person.value?.roles ?? []).includes('member'))
-const isVolunteer = computed(() => (person.value?.roles ?? []).includes('volunteer'))
+const isMember = computed(() => (person.value?.activeAs ?? []).includes('member'))
+const isVolunteer = computed(() => (person.value?.activeAs ?? []).includes('volunteer'))
 
 const personType = computed(() => {
   if (isMember.value && isVolunteer.value) return 'member, volunteer'
@@ -30,15 +35,15 @@ const personType = computed(() => {
 // Section visibility should reflect whether the detail data exists, not
 // whether the role is currently active (a volunteer can be inactive but
 // still have vettings/capabilities on record).
-const hasMemberDetail = computed(() => !!person.value?.memberDetail)
-const hasVolunteerDetail = computed(() => !!person.value?.volunteerDetail)
+const hasMemberDetail = computed(() => !!person.value?.member)
+const hasVolunteerDetail = computed(() => !!person.value?.volunteer)
 
-const canDelete = computed(() => !(person.value?.roles ?? []).length)
+const canDelete = computed(() => !(person.value?.activeAs ?? []).length)
 
 const flatPerson = computed(() => {
   if (!person.value) return null
-  const { memberDetail, volunteerDetail, ...rest } = person.value
-  return { ...rest, ...memberDetail, ...volunteerDetail }
+  const { member, volunteer, ...rest } = person.value
+  return { ...rest, ...member, ...volunteer }
 })
 
 function goEdit () { router.push({ name: 'meta-person-edit', params: { personId: personId.value } }) }
@@ -61,10 +66,10 @@ async function removePerson () {
 <template>
   <div class="person-detail">
     <div class="actions" style="display:flex;gap:0.5rem;margin-bottom:1rem;">
-      <Button label="Edit Person" icon="pi pi-pencil" @click="goEdit" />
-      <Button label="Member" icon="pi pi-id-card" :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
-      <Button label="Volunteer" icon="pi pi-users" :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
-      <span style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
+      <Button v-if="canWritePerson" label="Edit Person" icon="pi pi-pencil" @click="goEdit" />
+      <Button v-if="canWriteMember" label="Member" icon="pi pi-id-card" :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
+      <Button v-if="canWriteVolunteer" label="Volunteer" icon="pi pi-users" :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
+      <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
         <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="!canDelete" @click="removePerson" />
       </span>
     </div>
@@ -74,7 +79,6 @@ async function removePerson () {
       :person-type="personType"
       :has-member-detail="hasMemberDetail"
       :has-volunteer-detail="hasVolunteerDetail"
-      detail-level="full"
     />
   </div>
 </template>
