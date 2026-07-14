@@ -210,6 +210,8 @@ function goToDetail(row) {
               display="chip"
               placeholder="All villages"
               class="village-filter"
+              :show-toggle-all="false"
+              show-clear
             />
             <template v-if="showServiceFilter">
               <div class="service-filters">
@@ -577,6 +579,15 @@ function goToDetail(row) {
   font-size: 0.9rem;
   margin: 0.5rem 0;
 }
+
+/* Card-style elevation on the tab panel container — matches the box-shadow the
+   app uses on tables/cards elsewhere, but applied to the Tabs surface here. */
+:deep(.p-tabs) {
+  box-shadow: var(--box-shadow-card);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+}
+
 
 @media (max-width: 768px) {
   .desktop-only {

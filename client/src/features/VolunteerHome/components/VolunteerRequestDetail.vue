@@ -123,6 +123,7 @@ async function doSignUp() {
     await signUpVolunteerRequest(serviceRequestId.value)
     toast.add({ severity: 'success', summary: 'Confirmed', detail: 'You are confirmed for this request. Watch your email for details.', life: 5000 })
     fetchRequest()
+    showCallReminder()
   }
   catch (err) {
     if (isPrivacyAckError(err)) return
@@ -134,6 +135,20 @@ async function doSignUp() {
       toast.add({ severity: 'error', summary: 'Sign up failed', detail: 'Please try again or contact the hub.', life: 5000 })
     }
   }
+}
+
+// Post-signup reminder: a single-button acknowledgement modal shown after the
+// PATCH succeeds. Reuses the shared ConfirmDialog; the reject button is hidden
+// (display:none) so only the "Thanks for the reminder" acknowledgement shows.
+function showCallReminder() {
+  confirm.require({
+    header: 'One more thing',
+    message: 'Please remember to call the member as soon as possible to coordinate details of the service.',
+    icon: 'pi pi-phone',
+    acceptLabel: 'Thanks for the reminder',
+    rejectProps: { style: 'display: none' },
+    accept: () => {},
+  })
 }
 
 function confirmRelease() {
