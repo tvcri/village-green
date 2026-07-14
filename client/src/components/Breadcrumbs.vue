@@ -229,6 +229,9 @@ const breadcrumbs = computed(() => {
       }
       crumbs.push({ label: 'Request' })
       break
+    case 'metrics':
+      crumbs.push({ label: 'Metrics', siblings: getSiblings('metrics', { villageId: vId }) })
+      break
   }
 
   return crumbs

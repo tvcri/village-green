@@ -8,7 +8,8 @@ export const siblingGroups = {
   'village-sections': [
     { name: 'members', label: 'Members' },
     { name: 'volunteers', label: 'Volunteers' },
-    { name: 'service-requests', label: 'Service Requests' }
+    { name: 'service-requests', label: 'Service Requests' },
+    { name: 'metrics', label: 'Metrics' }
   ]
 }
 

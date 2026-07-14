@@ -57,6 +57,12 @@ const routes = [
     meta: { requiresPermission: 'friend:read', villageScoped: true },
   },
   {
+    path: '/villages/:villageId/metrics',
+    name: 'metrics',
+    component: () => import('../features/VillageMetrics/components/VillageMetrics.vue'),
+    meta: { requiresPermission: 'sr:read', villageScoped: true },
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('../features/Admin/components/AdminHub.vue'),
