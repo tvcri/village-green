@@ -212,6 +212,8 @@ function goToDetail(row) {
               class="village-filter"
               :show-toggle-all="false"
               show-clear
+              :max-selected-labels="4"
+              selected-items-label="{0} villages selected"
             />
             <template v-if="showServiceFilter">
               <div class="service-filters">
