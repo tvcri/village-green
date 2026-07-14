@@ -774,6 +774,23 @@ exports.getVolunteerVillages = async function (personId) {
   return rows
 }
 
+// The capability names the caller's active volunteer holds. Names (not ids)
+// because the sole consumer — the VSS Service filter — matches serviceName
+// prefixes by capability label. active_volunteer for the same reason as
+// getVolunteerVillages: an inactivated volunteer loses the VSS surface.
+exports.getVolunteerCapabilities = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    `SELECT c.name
+     FROM active_volunteer av
+     JOIN volunteer_capability vc ON vc.volunteerId = av.id
+     JOIN capability c ON c.id = vc.capabilityId
+     WHERE av.personId = ?
+     ORDER BY c.name`,
+    [personId]
+  )
+  return rows.map(r => r.name)
+}
+
 // Existence-only check for the volunteer access gate, which runs on every
 // /volunteer-requests request and needs only a boolean — not the village
 // list getVolunteerVillages builds. active_volunteer is the authorization

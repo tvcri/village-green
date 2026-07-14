@@ -154,8 +154,11 @@ module.exports.getUser = async function getUser (req, res, next) {
     // Volunteer block (VSS): identity-derived from the caller's linked person.
     const personId = req.userObject.personId
     if (personId) {
-      const villages = await UserService.getVolunteerVillages(personId)
-      response.volunteer = { personId: String(personId), villages }
+      const [villages, capabilities] = await Promise.all([
+        UserService.getVolunteerVillages(personId),
+        UserService.getVolunteerCapabilities(personId),
+      ])
+      response.volunteer = { personId: String(personId), villages, capabilities }
     } else {
       response.volunteer = null
     }

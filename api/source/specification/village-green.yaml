@@ -4230,6 +4230,10 @@ components:
                     $ref: '#/components/schemas/StringIntId'
                   name:
                     type: string
+            capabilities:
+              type: array
+              items:
+                type: string
       required:
       - userId
       - username
