@@ -12,7 +12,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { formatServiceDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
+import { serviceDateToDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
 import { getVolunteerRequests, getVolunteerRequestVillages } from '../api/volunteerRequestApi.js'
 
 const router = useRouter()
@@ -87,8 +87,15 @@ const filteredOpenRequests = computed(() => {
 // never new Date(value) (which would timezone-shift them). timesFlexible
 // means "no specific time was set".
 function formatWhen(row) {
-  const date = formatServiceDate(row.serviceDate)
-  if (!date) return ''
+  const d = serviceDateToDate(row.serviceDate)
+  if (!d) return ''
+  // VSS-only: prefix the weekday so volunteers can scan by day of week.
+  const date = d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
   if (row.timesFlexible) return `${date} · Flexible`
   const time = timeStringToLabel(row.startTime)
   return time ? `${date} · ${time}` : date
