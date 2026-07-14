@@ -176,7 +176,7 @@ async function doRelease() {
       <template #content>
         <div v-if="request.status === 'Confirmed'" class="confirmation-banner">
           <i class="pi pi-check-circle"></i>
-          You're confirmed for this request. The member has been notified.
+          You're confirmed for this request. Please call the member to coordinate your service.
         </div>
         <div v-else-if="request.status === 'Completed'" class="confirmation-banner">
           <i class="pi pi-check-circle"></i>
