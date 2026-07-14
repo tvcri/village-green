@@ -190,7 +190,7 @@ function goToDetail(row) {
 
 <template>
   <div class="volunteer-home">
-    <h2>Volunteer Self Signup</h2>
+    <h1>Volunteer Self Signup</h1>
     <Tabs v-model:value="activeTab">
       <TabList>
         <Tab value="open">Available requests</Tab>
@@ -416,7 +416,7 @@ function goToDetail(row) {
 
 <style scoped>
 .volunteer-home {
-  padding: 1rem;
+  padding: 2rem;
 
   /* Single source of truth for the per-category color treatments, shared by the
      Service tags (desktop cell + mobile card headline) and the filter pills.
@@ -432,6 +432,15 @@ function goToDetail(row) {
   --cat-rides-border: color-mix(in srgb, #22c55e 55%, var(--color-background-light));
   --cat-tech-support-bg: color-mix(in srgb, #8b5cf6 26%, var(--color-background-light));
   --cat-tech-support-border: color-mix(in srgb, #8b5cf6 55%, var(--color-background-light));
+}
+
+/* Page title — matches the other list pages (MemberList/VolunteerList): plain
+   h1 at the UA default size, primary text color. Those pages wrap the h1 in a
+   .header-row with margin-bottom:1rem; VolunteerHome has no header controls, so
+   the same 1rem gap sits directly on the h1. */
+h1 {
+  margin: 0 0 1rem 0;
+  color: var(--color-text-primary);
 }
 
 .filter-row {
@@ -590,6 +599,10 @@ function goToDetail(row) {
 
 
 @media (max-width: 768px) {
+  .volunteer-home {
+    padding: 1rem;
+  }
+
   .desktop-only {
     display: none;
   }
