@@ -422,13 +422,13 @@ function goToDetail(row) {
      following the status-bg recipe in style.css: color-mixed into the theme
      background so they adapt to light/dark automatically. --color-background-light
      is the tag/pill surface. */
-  --cat-rides-bg: color-mix(in srgb, #3b82f6 16%, var(--color-background-light));
-  --cat-rides-border: color-mix(in srgb, #3b82f6 55%, var(--color-background-light));
-  --cat-errands-bg: color-mix(in srgb, #f59e0b 16%, var(--color-background-light));
+  --cat-home-help-bg: color-mix(in srgb, #3b82f6 26%, var(--color-background-light));
+  --cat-home-help-border: color-mix(in srgb, #3b82f6 55%, var(--color-background-light));
+  --cat-errands-bg: color-mix(in srgb, #f59e0b 26%, var(--color-background-light));
   --cat-errands-border: color-mix(in srgb, #f59e0b 55%, var(--color-background-light));
-  --cat-home-help-bg: color-mix(in srgb, #22c55e 16%, var(--color-background-light));
-  --cat-home-help-border: color-mix(in srgb, #22c55e 55%, var(--color-background-light));
-  --cat-tech-support-bg: color-mix(in srgb, #8b5cf6 16%, var(--color-background-light));
+  --cat-rides-bg: color-mix(in srgb, #22c55e 26%, var(--color-background-light));
+  --cat-rides-border: color-mix(in srgb, #22c55e 55%, var(--color-background-light));
+  --cat-tech-support-bg: color-mix(in srgb, #8b5cf6 26%, var(--color-background-light));
   --cat-tech-support-border: color-mix(in srgb, #8b5cf6 55%, var(--color-background-light));
 }
 
