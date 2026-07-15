@@ -12,6 +12,7 @@ function serveClient(app) {
     }
     try {
         serveClientEnv(app)
+        serveEnrollment(app)
         serveStaticFiles(app)
         logger.writeDebug('serveClient', 'client', { message: 'succeeded setting up client' })
     }
@@ -74,6 +75,22 @@ function serveClientEnv(app){
     app.get('/Env.js', function (req, res) {
         req.component = 'static'
         writer.writeWithContentType(res, { payload: envJS, contentType: "application/javascript" })
+    })
+}
+
+function serveEnrollment(app){
+    // Public enrollment page (design 2026-07-14-volunteer-enrollment).
+    // Registered before the static catch-all so the clean URL /enroll works.
+    // The env script exposes only apiBase - never the OAuth client config.
+    const staticPath = path.join(__dirname, "../", config.client.directory)
+    const envJS = `const VG = { Env: { apiBase: "${config.client.apiBase}" } }`
+    app.get('/enroll-env.js', function (req, res) {
+        req.component = 'static'
+        writer.writeWithContentType(res, { payload: envJS, contentType: "application/javascript" })
+    })
+    app.get('/enroll', function (req, res) {
+        req.component = 'static'
+        res.sendFile(path.join(staticPath, 'enroll.html'))
     })
 }
 
