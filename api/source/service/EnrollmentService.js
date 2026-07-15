@@ -148,9 +148,13 @@ exports.verifyEnrollment = async function (rawEmail, pin) {
   const match = await bcrypt.compare(String(pin), row.pinHash)
   if (!match) return null
 
-  await dbUtils.pool.query(
-    `UPDATE enrollment_request SET consumedAt = NOW() WHERE id = ?`, [row.id]
+  // Atomic single-use consume: only the caller that flips consumedAt from
+  // NULL wins. A concurrent correct-PIN caller that loses the race gets
+  // affectedRows === 0 and returns null, same as an invalid PIN.
+  const [consumeResult] = await dbUtils.pool.query(
+    `UPDATE enrollment_request SET consumedAt = NOW() WHERE id = ? AND consumedAt IS NULL`, [row.id]
   )
+  if (consumeResult.affectedRows === 0) return null
 
   // Inbox control proven - safe to branch and return truthful state.
   if (row.kind === 'existing_account') {
@@ -162,22 +166,30 @@ exports.verifyEnrollment = async function (rawEmail, pin) {
   )
   const person = persons[0] ?? {}
   const tempPassword = generateTempPassword()
-  let userId
   try {
-    userId = await KeycloakService.createUser({
-      username: email, email, firstName: person.firstName, lastName: person.lastName
-    })
+    let userId
+    try {
+      userId = await KeycloakService.createUser({
+        username: email, email, firstName: person.firstName, lastName: person.lastName
+      })
+    }
+    catch (err) {
+      if (err.status === 409) {
+        // Account appeared between request and verify - treat as recovery.
+        await KeycloakService.setTemporaryPassword({ username: email, password: tempPassword })
+        return { status: 'created', tempPassword, loginUrl: LOGIN_URL }
+      }
+      throw err
+    }
+    await KeycloakService.setTemporaryPassword({ id: userId, password: tempPassword })
+    return { status: 'created', tempPassword, loginUrl: LOGIN_URL }
   }
   catch (err) {
-    if (err.status === 409) {
-      // Account appeared between request and verify - treat as recovery.
-      await KeycloakService.setTemporaryPassword({ username: email, password: tempPassword })
-      return { status: 'created', tempPassword, loginUrl: LOGIN_URL }
-    }
-    throw err
+    // Do not leak raw Keycloak errors (status/body/stack) to the anonymous
+    // caller - log server-side and report as an invalid/expired PIN.
+    logger.writeError('verifyEnrollment', 'enrollment', { message: err.message })
+    return null
   }
-  await KeycloakService.setTemporaryPassword({ id: userId, password: tempPassword })
-  return { status: 'created', tempPassword, loginUrl: LOGIN_URL }
 }
 
 // Recovery for the existing_account choice: the just-consumed row plus the
@@ -199,7 +211,15 @@ exports.resetEnrollmentPassword = async function (rawEmail, pin) {
   if (!match) return null
 
   const tempPassword = generateTempPassword()
-  await KeycloakService.setTemporaryPassword({ username: email, password: tempPassword })
+  try {
+    await KeycloakService.setTemporaryPassword({ username: email, password: tempPassword })
+  }
+  catch (err) {
+    // Do not leak raw Keycloak errors to the anonymous caller, and do not
+    // stamp resetAt - a failed KC call must not consume the single-use reset.
+    logger.writeError('resetEnrollmentPassword', 'enrollment', { message: err.message })
+    return null
+  }
   await dbUtils.pool.query(
     `UPDATE enrollment_request SET resetAt = NOW() WHERE id = ?`, [row.id]
   )
