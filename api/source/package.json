@@ -6,7 +6,26 @@
   "scripts": {
     "prestart": "npm install",
     "start": "node index.js",
-    "test": "node --test 'test/*.test.js'"
+    "test": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=.test-report.tap 'test/*.test.js'",
+    "test:coverage": "c8 node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=.test-report.tap 'test/*.test.js'"
+  },
+  "c8": {
+    "all": true,
+    "src": ".",
+    "exclude": [
+      "test/**",
+      "node_modules/**",
+      "specification/**",
+      "service/migrations/**",
+      "utils/klona.js",
+      "utils/xlsx-template-js-zip-upgrade/**",
+      "coverage/**"
+    ],
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "report-dir": "coverage"
   },
   "keywords": [
     "swagger"
@@ -43,5 +62,8 @@
     "undici": "^6.24.0",
     "ws": "^8.20.1",
     "xlsx-template": "file:utils/xlsx-template-js-zip-upgrade"
+  },
+  "devDependencies": {
+    "c8": "^11.0.0"
   }
 }
