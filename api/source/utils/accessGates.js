@@ -16,6 +16,7 @@ const STAFF_GATE_EXEMPT_PREFIXES = [
   '/privacy',
   '/oauth',
   '/volunteer-requests',
+  '/enrollment',
 ]
 
 function isStaffGateExempt(path) {

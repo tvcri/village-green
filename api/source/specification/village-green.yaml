@@ -799,6 +799,157 @@ paths:
       security:
       - oauth:
         - vg:user:read
+  /enrollment/request:
+    post:
+      tags:
+      - Enrollment
+      summary: Request an enrollment PIN for a registered volunteer email
+      description: >-
+        Public endpoint. Always returns the identical response regardless of
+        whether the email is registered, holds which roles, or already has an
+        account (enumeration defense). Truthful branching happens only after
+        PIN verification.
+      operationId: requestEnrollment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+      responses:
+        '200':
+          description: Uniform acknowledgement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /enrollment/verify:
+    post:
+      tags:
+      - Enrollment
+      summary: Verify an emailed PIN; create the account or report it exists
+      operationId: verifyEnrollment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              - pin
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                pin:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+      responses:
+        '200':
+          description: PIN accepted; truthful account state
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - loginUrl
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - created
+                    - exists
+                  tempPassword:
+                    type: string
+                  loginUrl:
+                    type: string
+        '400':
+          description: Invalid, expired, consumed, or attempt-capped PIN
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - invalid
+  /enrollment/reset-password:
+    post:
+      tags:
+      - Enrollment
+      summary: Re-issue a temporary password to a PIN-verified existing account
+      description: >-
+        Gated by the just-consumed enrollment row: requires the same email and
+        PIN that passed /enrollment/verify within the last 10 minutes, once.
+      operationId: resetEnrollmentPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              - pin
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                pin:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+      responses:
+        '200':
+          description: New temporary password issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - tempPassword
+                - loginUrl
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - reset
+                  tempPassword:
+                    type: string
+                  loginUrl:
+                    type: string
+        '400':
+          description: No eligible consumed row or PIN mismatch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - invalid
   /users:
     parameters:
     - $ref: '#/components/parameters/ElevateQuery'
