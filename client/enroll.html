@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en" class="app-dark">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Village Green — Volunteer Enrollment</title>
+    <link rel="icon" type="image/svg+xml" href="house.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      const _t = localStorage.getItem('vg-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      if (_t !== 'dark') document.documentElement.classList.remove('app-dark')
+    </script>
+    <script type="text/javascript" src="./enroll-env.js"></script>
+    <script type="module" src="/src/enroll/main.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
