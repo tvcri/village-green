@@ -18,9 +18,14 @@ import EnrollFlow from './EnrollFlow.vue'
 
 <style scoped>
 .enroll-page {
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  min-height: 100dvh;
+  margin: 0 auto;
+  max-width: 1200px;
+  width: 100%;
+  border-left: 1px solid var(--color-border-light);
+  border-right: 1px solid var(--color-border-light);
 }
 
 .app-header {
@@ -60,6 +65,7 @@ import EnrollFlow from './EnrollFlow.vue'
   display: flex;
   justify-content: center;
   padding: 2rem 1rem;
+  background-color: var(--color-background-dark);
 }
 
 @media (max-width: 768px) {
