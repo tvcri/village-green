@@ -149,6 +149,11 @@ const config = {
             if (isNaN(val) || val < 1) return 365
             return val
         })(),
+    },
+    enrollment: {
+        // Sidecar webhook for the fire-and-forget PIN fast path.
+        // Server-side only. Never expose via getClientEnv().
+        sidecarUrl: process.env.VG_ENROLL_SIDECAR_URL || 'http://127.0.0.1:8125/internal/send-pin'
     }
 }
 
