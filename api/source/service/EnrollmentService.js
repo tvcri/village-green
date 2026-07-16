@@ -12,9 +12,11 @@ const PIN_TTL_MINUTES = 15
 const ATTEMPT_CAP = 5
 const RESET_WINDOW_MINUTES = 10
 const BCRYPT_ROUNDS = 10
-// Visiting the app root triggers the normal OIDC redirect to Keycloak login,
-// so '/' IS the login URL (design decision #5).
-const LOGIN_URL = '/'
+// The enroll page hands off to the app root, whose OIDC gate redirects to the
+// Keycloak login (design decision #5). Returned relative ('./') so the browser
+// resolves it against the enroll page's own document URL - correct under any
+// reverse-proxy path prefix, which an absolute '/' would silently ignore.
+const LOGIN_URL = './'
 
 function normalizeEmail(raw) {
   return String(raw ?? '').trim().toLowerCase()
