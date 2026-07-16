@@ -73,6 +73,11 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.city AS city',
     'sr.zip AS zip',
     'sr.phone AS phone',
+    'sr.startAddress AS startAddress',
+    'sr.startCity AS startCity',
+    'sr.startState AS startState',
+    'sr.startZip AS startZip',
+    'sr.startPhone AS startPhone',
     'CAST(sr.createdUserId AS CHAR) AS createdUserId',
     'ud.username AS createdByUsername',
     `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`
@@ -175,6 +180,11 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
     'sr.city AS city',
     'sr.zip AS zip',
     'sr.phone AS phone',
+    'sr.startAddress AS startAddress',
+    'sr.startCity AS startCity',
+    'sr.startState AS startState',
+    'sr.startZip AS startZip',
+    'sr.startPhone AS startPhone',
     'CAST(sr.createdUserId AS CHAR) AS createdUserId',
     'ud.username AS createdByUsername',
     `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`,
@@ -264,6 +274,11 @@ module.exports.createServiceRequest = async function (payload, userId) {
         city: payload.city || null,
         zip: payload.zip || null,
         phone: payload.phone || null,
+        startAddress: payload.startAddress || null,
+        startCity: payload.startCity || null,
+        startState: payload.startState || null,
+        startZip: payload.startZip || null,
+        startPhone: payload.startPhone || null,
         createdUserId: userId
       }
 
@@ -311,6 +326,11 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       if (payload.zip !== undefined) updateFields.zip = payload.zip || null
       if (payload.address !== undefined) updateFields.address = payload.address || null
       if (payload.phone !== undefined) updateFields.phone = payload.phone || null
+      if (payload.startAddress !== undefined) updateFields.startAddress = payload.startAddress || null
+      if (payload.startCity !== undefined) updateFields.startCity = payload.startCity || null
+      if (payload.startState !== undefined) updateFields.startState = payload.startState || null
+      if (payload.startZip !== undefined) updateFields.startZip = payload.startZip || null
+      if (payload.startPhone !== undefined) updateFields.startPhone = payload.startPhone || null
       if (payload.instructions !== undefined) updateFields.instructions = payload.instructions || null
       if (payload.description !== undefined) updateFields.description = payload.description || null
       if (payload.destination !== undefined) updateFields.destination = payload.destination || null
