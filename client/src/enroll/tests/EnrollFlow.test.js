@@ -95,4 +95,51 @@ describe('EnrollFlow', () => {
     await waitFor(() => expect(screen.getByText(/not accepted/i)).toBeTruthy())
     expect(screen.getByLabelText('PIN')).toBeTruthy()
   })
+
+  it('writes the email to sessionStorage and navigates same-tab on sign in', async () => {
+    const assignSpy = vi.fn()
+    // jsdom: window.location.assign is not implemented; replace it
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, assign: assignSpy },
+    })
+    sessionStorage.clear()
+
+    renderFlow()
+    await submitEmailAndReachPinStep()
+    verifyPin.mockResolvedValue({
+      ok: true, status: 200,
+      data: { status: 'exists', loginUrl: './' },
+    })
+    await fireEvent.update(screen.getByLabelText('PIN'), '123456')
+    await fireEvent.click(screen.getByRole('button', { name: 'Verify PIN' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Take me to sign in' })).toBeTruthy())
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Take me to sign in' }))
+
+    expect(sessionStorage.getItem('vg-login-hint')).toBe('vol@example.com')
+    expect(assignSpy).toHaveBeenCalledWith('./')
+  })
+
+  it('falls back to ./ when the API omits loginUrl', async () => {
+    const assignSpy = vi.fn()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, assign: assignSpy },
+    })
+    sessionStorage.clear()
+
+    renderFlow()
+    await submitEmailAndReachPinStep()
+    verifyPin.mockResolvedValue({
+      ok: true, status: 200,
+      data: { status: 'exists' },   // no loginUrl
+    })
+    await fireEvent.update(screen.getByLabelText('PIN'), '123456')
+    await fireEvent.click(screen.getByRole('button', { name: 'Verify PIN' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Take me to sign in' })).toBeTruthy())
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Take me to sign in' }))
+    expect(assignSpy).toHaveBeenCalledWith('./')
+  })
 })

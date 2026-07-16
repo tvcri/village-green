@@ -40,8 +40,9 @@
       </p>
       <code class="temp-password" data-testid="temp-password">{{ tempPassword }}</code>
       <p>
-        <a :href="loginUrl" target="_blank" rel="noopener">Open the Village Green sign-in page in a new tab</a>
-        and log in with your email address and this temporary password.
+        <Button label="Take me to sign in" @click="goToLogin" />
+        <br />
+        Sign in with your email address and this temporary password.
       </p>
     </template>
 
@@ -63,7 +64,7 @@ const busy = ref(false)
 const error = ref('')
 const requestMessage = ref('')
 const tempPassword = ref('')
-const loginUrl = ref('/')
+const loginUrl = ref('./')
 
 async function submitEmail() {
   error.value = ''
@@ -91,7 +92,7 @@ async function submitPin() {
       error.value = 'That PIN was not accepted. It may be wrong, expired, or already used. You can start over to request a new one.'
       return
     }
-    loginUrl.value = res.data.loginUrl || '/'
+    loginUrl.value = res.data.loginUrl || './'
     if (res.data.status === 'created') {
       tempPassword.value = res.data.tempPassword
       step.value = 'password'
@@ -114,7 +115,7 @@ async function requestReset() {
       error.value = 'Could not issue a new temporary password. Please start over and request a new PIN.'
       return
     }
-    loginUrl.value = res.data.loginUrl || '/'
+    loginUrl.value = res.data.loginUrl || './'
     tempPassword.value = res.data.tempPassword
     step.value = 'password'
   }
@@ -124,7 +125,13 @@ async function requestReset() {
 }
 
 function goToLogin() {
-  window.open(loginUrl.value, '_blank', 'noopener')
+  try {
+    sessionStorage.setItem('vg-login-hint', email.value)
+  }
+  catch {
+    // Storage unavailable (private mode / disabled): proceed without a hint.
+  }
+  window.location.assign(loginUrl.value)
 }
 
 function startOver() {
