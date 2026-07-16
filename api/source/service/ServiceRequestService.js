@@ -68,6 +68,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
+    'sr.`start` AS `start`',
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
@@ -175,6 +176,7 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
+    'sr.`start` AS `start`',
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
@@ -269,6 +271,7 @@ module.exports.createServiceRequest = async function (payload, userId) {
         state: payload.state || null,
         instructions: payload.instructions || null,
         description: payload.description || null,
+        start: payload.start || null,
         destination: payload.destination || null,
         address: payload.address || null,
         city: payload.city || null,
@@ -333,6 +336,7 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       if (payload.startPhone !== undefined) updateFields.startPhone = payload.startPhone || null
       if (payload.instructions !== undefined) updateFields.instructions = payload.instructions || null
       if (payload.description !== undefined) updateFields.description = payload.description || null
+      if (payload.start !== undefined) updateFields.start = payload.start || null
       if (payload.destination !== undefined) updateFields.destination = payload.destination || null
 
       const newVolunteerPersonId = payload.volunteerPersonId !== undefined

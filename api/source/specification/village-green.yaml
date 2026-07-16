@@ -3528,6 +3528,9 @@ components:
         description:
           type: string
           nullable: true
+        start:
+          type: string
+          nullable: true
         destination:
           type: string
           nullable: true
@@ -3665,6 +3668,9 @@ components:
         description:
           type: string
           nullable: true
+        start:
+          type: string
+          nullable: true
         destination:
           type: string
           nullable: true
@@ -3775,6 +3781,9 @@ components:
           type: string
           nullable: true
         description:
+          type: string
+          nullable: true
+        start:
           type: string
           nullable: true
         destination:
