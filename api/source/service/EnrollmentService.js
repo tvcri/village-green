@@ -78,9 +78,19 @@ async function insertRequest({ email, personId, pinHash, kind, outcome, ttlMinut
 // request path. Errors are logged, never surfaced. The plaintext PIN exists
 // only here and in the sidecar's memory.
 function sendPinWebhook({ email, pin, firstName, kind }) {
+  // Fail closed: without the shared secret we cannot authenticate to the
+  // sidecar, so skip the POST rather than send an unauthenticated PIN. The
+  // caller still returns the uniform 200 (enumeration defense preserved).
+  if (!config.enrollment.sidecarKey) {
+    logger.writeError('sendPinWebhook', 'enrollment', { message: 'VG_ENROLL_SIDECAR_KEY unset; skipping PIN webhook' })
+    return
+  }
   fetch(config.enrollment.sidecarUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.enrollment.sidecarKey}`
+    },
     body: JSON.stringify({ email, pin, firstName, kind })
   }).then(res => {
     if (!res.ok) logger.writeError('sendPinWebhook', 'enrollment', { status: res.status })
@@ -232,3 +242,4 @@ exports.normalizeEmail = normalizeEmail
 exports.generatePin = generatePin
 exports.generateTempPassword = generateTempPassword
 exports.classifyEligibility = classifyEligibility
+exports.sendPinWebhook = sendPinWebhook
