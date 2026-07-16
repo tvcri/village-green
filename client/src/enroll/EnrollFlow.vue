@@ -164,10 +164,15 @@ function startOver() {
 <style scoped>
 .enroll-card {
   width: 100%;
-  max-width: 480px;
+  max-width: 580px;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  background: var(--color-background-light);
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  box-shadow: var(--box-shadow-card);
+  padding: 2rem;
 }
 
 .enroll-form {

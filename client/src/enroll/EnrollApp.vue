@@ -64,6 +64,7 @@ import EnrollFlow from './EnrollFlow.vue'
   flex: 1;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
   padding: 2rem 1rem;
   background-color: var(--color-background-dark);
 }
