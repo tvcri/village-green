@@ -30,7 +30,7 @@ import EnrollFlow from './EnrollFlow.vue'
 
 .app-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding: 1rem 2rem;
   background-color: var(--color-background-light);
@@ -43,7 +43,6 @@ import EnrollFlow from './EnrollFlow.vue'
   display: flex;
   align-items: flex-end;
   gap: 1rem;
-  flex: 1;
 }
 
 .app-logo {
