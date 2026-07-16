@@ -377,7 +377,10 @@ const timeDisplay = computed(() => {
 .section {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0rem 1.5rem;
+  /* Row-gap (not 0) so fields that wrap to a second grid row — e.g. CELL/EMAIL
+     under NAME/ADDRESS, or START ADDRESS/CREATED AT under DATE/START — don't
+     collide vertically. .detail-field carries no margin; the grid owns spacing. */
+  gap: 1.25rem 1.5rem;
   margin-top: 2rem;
   margin-bottom: 2rem;
 }
@@ -421,7 +424,9 @@ const timeDisplay = computed(() => {
 
 .section-header {
   grid-column: 1 / -1;
-  margin: 0 0 0.75rem 0;
+  /* No bottom margin: the section grid's row-gap now provides the space below
+     the header, matching the gap between field rows. */
+  margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -521,7 +526,9 @@ const timeDisplay = computed(() => {
 
   .section {
     grid-template-columns: 1fr;
-    gap: 0rem;
+    /* Single-column on mobile: every field stacks, so a row-gap is what keeps
+       stacked label/value pairs from colliding. Keep column-gap moot at 0. */
+    gap: 1.25rem 0;
   }
 
   .section-half {
