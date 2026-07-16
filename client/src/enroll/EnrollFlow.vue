@@ -4,8 +4,8 @@
 
     <template v-if="step === 'email'">
       <p>
-        Enter the email address you have registered with The Village Common of RI
-        and we'll send you a PIN to set up your Village Green account.
+        Enter the email address you have registered with The Village Common of RI.
+        We'll send you a PIN to set up your Village Green account.
       </p>
       <form class="enroll-form" @submit.prevent="submitEmail">
         <label for="enroll-email">Email address</label>
@@ -167,18 +167,27 @@ function startOver() {
   max-width: 580px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 1rem;
   background: var(--color-background-light);
   border: 1px solid var(--color-border-default);
   border-radius: 8px;
   box-shadow: var(--box-shadow-card);
   padding: 2rem;
+  text-align: center;
 }
 
 .enroll-form {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.75rem;
+  width: 100%;
+  max-width: 22rem;
+}
+
+.enroll-form :deep(.p-inputtext) {
+  width: 100%;
 }
 
 /* Echo the 6-digit code as it appears in the email: narrow, centered, bold,
@@ -205,7 +214,7 @@ function startOver() {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .temp-password-row {

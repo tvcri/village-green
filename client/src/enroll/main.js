@@ -16,6 +16,19 @@ else {
   VG.Env.apiBase = new URL(VG.Env.apiBase || './api', window.location.href).toString()
 }
 
+// This standalone page has no theme toggle and no logged-in user, so it simply
+// follows the device/system setting. Both theme systems (the app CSS variables
+// in style.css and PrimeVue's darkModeSelector below) key off `.app-dark` on
+// <html>. Deliberately does NOT read/write the `vg-theme` localStorage key that
+// useTheme.js uses - a value left by a prior main-app session must not override
+// the visitor's current system preference on this pre-login page.
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)')
+function syncSystemTheme() {
+  document.documentElement.classList.toggle('app-dark', darkQuery.matches)
+}
+syncSystemTheme()
+darkQuery.addEventListener('change', syncSystemTheme)
+
 const app = createApp(EnrollApp)
 app.use(PrimeVue, {
   theme: {
