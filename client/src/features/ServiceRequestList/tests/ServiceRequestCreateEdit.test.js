@@ -110,18 +110,35 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(vm.form.startAddress).toBe('99 Prefilled Ave')
   })
 
-  it('clearStart empties all five start fields', async () => {
+  it('clearStart empties the start name and all five address fields', async () => {
     const vm = await mountAndExpose()
+    vm.form.start = 'Trader Joes'
     vm.form.startAddress = 'a'
     vm.form.startCity = 'b'
     vm.form.startState = 'VA'
     vm.form.startZip = '00000'
     vm.form.startPhone = '555'
     vm.clearStart()
+    expect(vm.form.start).toBe('')
     expect(vm.form.startAddress).toBe('')
     expect(vm.form.startCity).toBe('')
     expect(vm.form.startState).toBe('')
     expect(vm.form.startZip).toBe('')
     expect(vm.form.startPhone).toBe('')
+  })
+
+  it('fill-from-home writes the "Member\'s Home" name label into each leg', async () => {
+    const vm = await mountAndExpose()
+    // Load the member's home first.
+    vm.selectedMember = { label: 'Mabel Member', value: '7' }
+    await waitFor(() => expect(vm.selectedMemberHome).not.toBeNull())
+
+    // Auto-populate on select fills the empty Start leg, name included.
+    await waitFor(() => expect(vm.form.start).toBe("Member's Home"))
+
+    // Explicit destination fill writes the name so the required field is set.
+    vm.applyMemberHomeToDestination()
+    expect(vm.form.destination).toBe("Member's Home")
+    expect(vm.form.address).toBe('1 Home St')
   })
 })

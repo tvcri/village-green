@@ -224,11 +224,22 @@ const timeDisplay = computed(() => {
             <span class="value">{{ request.transportationType }}</span>
           </div>
 
-          <template v-if="request.startAddress || request.startCity">
-            <div class="detail-field">
+          <template v-if="request.start || request.startAddress || request.startCity">
+            <div v-if="request.start" class="detail-field">
               <span class="label">Start:</span>
-              <span class="value">{{ [request.startAddress, request.startCity, request.startState, request.startZip].filter(Boolean).join(', ') }}</span>
+              <span class="value">{{ request.start }}</span>
             </div>
+
+            <div v-if="request.startAddress" class="detail-field">
+              <span class="label">Start Address:</span>
+              <span class="value">{{ request.startAddress }}</span>
+            </div>
+
+            <div v-if="request.startCity || request.startState" class="detail-field">
+              <span class="label">Start City/State:</span>
+              <span class="value">{{ [request.startCity, request.startState].filter(Boolean).join(', ') }}</span>
+            </div>
+
             <div v-if="request.startPhone" class="detail-field">
               <span class="label">Start Phone:</span>
               <div class="phone-numbers">

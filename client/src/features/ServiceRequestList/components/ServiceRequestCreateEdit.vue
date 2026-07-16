@@ -85,6 +85,7 @@ const form = ref({
   zip: '',
   address: '',
   phone: '',
+  start: '',
   startAddress: '',
   startCity: '',
   startState: '',
@@ -138,6 +139,7 @@ watch(existingRequest, async (val) => {
       zip: val.zip || '',
       address: val.address || '',
       phone: val.phone || '',
+      start: val.start || '',
       startAddress: val.startAddress || '',
       startCity: val.startCity || '',
       startState: val.startState || '',
@@ -198,9 +200,15 @@ async function loadMemberHome (personId) {
   }
 }
 
+// The name label written when filling a leg from the member's home. Keeps the
+// required name field populated (an empty name fails ride validation) and reads
+// naturally on the detail view and map.
+const MEMBER_HOME_LABEL = "Member's Home"
+
 function applyMemberHomeToStart () {
   const h = selectedMemberHome.value
   if (!h) return
+  form.value.start = MEMBER_HOME_LABEL
   form.value.startAddress = h.address
   form.value.startCity = h.city
   form.value.startState = h.state
@@ -211,6 +219,7 @@ function applyMemberHomeToStart () {
 function applyMemberHomeToDestination () {
   const h = selectedMemberHome.value
   if (!h) return
+  form.value.destination = MEMBER_HOME_LABEL
   form.value.address = h.address
   form.value.city = h.city
   form.value.state = h.state
@@ -219,6 +228,7 @@ function applyMemberHomeToDestination () {
 }
 
 function clearStart () {
+  form.value.start = ''
   form.value.startAddress = ''
   form.value.startCity = ''
   form.value.startState = ''
@@ -227,6 +237,7 @@ function clearStart () {
 }
 
 function clearDestination () {
+  form.value.destination = ''
   form.value.address = ''
   form.value.city = ''
   form.value.state = ''
@@ -235,7 +246,7 @@ function clearDestination () {
 }
 
 const startIsEmpty = computed(() =>
-  !form.value.startAddress && !form.value.startCity &&
+  !form.value.start && !form.value.startAddress && !form.value.startCity &&
   !form.value.startState && !form.value.startZip && !form.value.startPhone)
 
 const filterMembers = (event) => {
@@ -532,6 +543,7 @@ const resetForNewRequest = () => {
     zip: '',
     address: '',
     phone: '',
+    start: '',
     startAddress: '',
     startCity: '',
     startState: '',
@@ -630,6 +642,7 @@ const handleSubmit = async (notify = false) => {
       zip: form.value.zip || null,
       address: form.value.address || null,
       phone: form.value.phone || null,
+      start: form.value.start || null,
       startAddress: form.value.startAddress || null,
       startCity: form.value.startCity || null,
       startState: form.value.startState || null,
@@ -1067,6 +1080,15 @@ const openPersonDialog = (personId) => {
             <!-- Start / Address Row -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Start</label>
+                <InputText
+                  v-model="form.start"
+                  placeholder="Enter start"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
                 <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Address</label>
                 <InputText
                   v-model="form.startAddress"
@@ -1074,19 +1096,10 @@ const openPersonDialog = (personId) => {
                   style="width: 100%;"
                 />
               </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Phone</label>
-                <InputText
-                  v-model="form.startPhone"
-                  placeholder="Phone"
-                  style="width: 100%;"
-                />
-              </div>
             </div>
 
-            <!-- Start City / State / Zip Row -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem;">
+            <!-- Start City / State / Zip / Phone Row -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr; gap: 1rem;">
               <div>
                 <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">City</label>
                 <InputText
@@ -1113,6 +1126,15 @@ const openPersonDialog = (personId) => {
                 <InputText
                   v-model="form.startZip"
                   placeholder="Zip"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Phone</label>
+                <InputText
+                  v-model="form.startPhone"
+                  placeholder="Phone"
                   style="width: 100%;"
                 />
               </div>
