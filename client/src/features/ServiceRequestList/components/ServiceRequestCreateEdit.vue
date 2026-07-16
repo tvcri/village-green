@@ -1054,10 +1054,77 @@ const openPersonDialog = (personId) => {
             </div>
           </div>
 
-          <!-- Destination Section -->
+          <!-- Start Section -->
           <template v-if="showLocationFields">
-            <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Start</h3>
+              <div style="display: flex; gap: 0.5rem;">
+                <Button type="button" size="small" text label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToStart" />
+                <Button type="button" size="small" text severity="secondary" icon="pi pi-times" aria-label="Clear start" @click="clearStart" />
+              </div>
+            </div>
+
+            <!-- Start / Address Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Address</label>
+                <InputText
+                  v-model="form.startAddress"
+                  placeholder="Enter start address"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Phone</label>
+                <InputText
+                  v-model="form.startPhone"
+                  placeholder="Phone"
+                  style="width: 100%;"
+                />
+              </div>
+            </div>
+
+            <!-- Start City / State / Zip Row -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem;">
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">City</label>
+                <InputText
+                  v-model="form.startCity"
+                  placeholder="City"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">State</label>
+                <Select
+                  v-model="form.startState"
+                  :options="stateOptions.map(s => ({ label: s, value: s }))"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="State"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Zip</label>
+                <InputText
+                  v-model="form.startZip"
+                  placeholder="Zip"
+                  style="width: 100%;"
+                />
+              </div>
+            </div>
+
+            <!-- Destination Section -->
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
+              <div style="display: flex; gap: 0.5rem;">
+                <Button type="button" size="small" text label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
+                <Button type="button" size="small" text severity="secondary" icon="pi pi-times" aria-label="Clear destination" @click="clearDestination" />
+              </div>
             </div>
 
             <!-- Destination / Address Row -->
