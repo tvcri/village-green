@@ -38,7 +38,16 @@
         Here is your temporary password. It is shown only once &mdash; you'll be asked
         to choose your own password when you sign in.
       </p>
-      <code class="temp-password" data-testid="temp-password">{{ tempPassword }}</code>
+      <div class="temp-password-row">
+        <code class="temp-password" data-testid="temp-password">{{ tempPassword }}</code>
+        <Button
+          :label="copied ? 'Copied' : 'Copy'"
+          :icon="copied ? 'pi pi-check' : 'pi pi-copy'"
+          severity="secondary"
+          size="small"
+          @click="copyTempPassword"
+        />
+      </div>
       <p>
         <Button label="Take me to sign in" @click="goToLogin" />
         <br />
@@ -65,6 +74,7 @@ const error = ref('')
 const requestMessage = ref('')
 const tempPassword = ref('')
 const loginUrl = ref('./')
+const copied = ref(false)
 
 async function submitEmail() {
   error.value = ''
@@ -124,6 +134,18 @@ async function requestReset() {
   }
 }
 
+async function copyTempPassword() {
+  try {
+    await navigator.clipboard.writeText(tempPassword.value)
+    copied.value = true
+  }
+  catch {
+    // Clipboard unavailable/denied: the password stays visible and selectable
+    // (user-select: all), so the user can copy it manually.
+    copied.value = false
+  }
+}
+
 function goToLogin() {
   try {
     sessionStorage.setItem('vg-login-hint', email.value)
@@ -162,6 +184,13 @@ function startOver() {
   flex-direction: column;
   gap: 0.75rem;
   align-items: flex-start;
+}
+
+.temp-password-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  align-self: center;
 }
 
 .temp-password {

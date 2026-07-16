@@ -142,4 +142,25 @@ describe('EnrollFlow', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Take me to sign in' }))
     expect(assignSpy).toHaveBeenCalledWith('./')
   })
+
+  it('copies the temp password to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    renderFlow()
+    await submitEmailAndReachPinStep()
+    verifyPin.mockResolvedValue({
+      ok: true, status: 200,
+      data: { status: 'created', tempPassword: 'abc123def456', loginUrl: './' },
+    })
+    await fireEvent.update(screen.getByLabelText('PIN'), '123456')
+    await fireEvent.click(screen.getByRole('button', { name: 'Verify PIN' }))
+    await waitFor(() => expect(screen.getByTestId('temp-password').textContent).toBe('abc123def456'))
+
+    await fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    expect(writeText).toHaveBeenCalledWith('abc123def456')
+  })
 })
