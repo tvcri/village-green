@@ -2,14 +2,13 @@
 
 const EnrollmentService = require('../service/EnrollmentService')
 
-// Constant response for /enrollment/request regardless of branch taken -
-// the enumeration defense. Must not vary by outcome.
-const UNIFORM_MESSAGE = "If your email is registered as a volunteer, we've sent you instructions."
-
 module.exports.requestEnrollment = async function requestEnrollment(req, res, next) {
   try {
     await EnrollmentService.requestEnrollment(req.body.email)
-    res.json({ message: UNIFORM_MESSAGE })
+    // Uniform empty 200 regardless of branch taken - the enumeration defense.
+    // The acknowledgement text the user sees is display-only copy owned by the
+    // client, not the API.
+    res.json({})
   }
   catch (err) {
     next(err)

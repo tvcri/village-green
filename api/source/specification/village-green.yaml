@@ -827,14 +827,15 @@ paths:
                   maxLength: 200
       responses:
         '200':
-          description: Uniform acknowledgement
+          description: >-
+            Uniform empty acknowledgement (enumeration defense). Carries no
+            outcome and no display text - the acknowledgement shown to the user
+            is client-owned copy.
           content:
             application/json:
               schema:
                 type: object
-                properties:
-                  message:
-                    type: string
+                additionalProperties: false
   /enrollment/verify:
     post:
       tags:
