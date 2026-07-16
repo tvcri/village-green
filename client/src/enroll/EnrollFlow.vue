@@ -18,9 +18,8 @@
       <Message severity="info" :closable="false">{{ requestMessage }}</Message>
       <p>Enter the 6-digit PIN from the email. It expires in 15 minutes.</p>
       <form class="enroll-form" @submit.prevent="submitPin">
-        <label for="enroll-pin">PIN</label>
-        <InputText id="enroll-pin" v-model="pin" inputmode="numeric" maxlength="6" required />
-        <Button type="submit" label="Verify PIN" :loading="busy" :disabled="pin.length !== 6" />
+        <InputText id="enroll-pin" v-model="pin" class="pin-input" inputmode="numeric" maxlength="6" required aria-label="PIN" />
+        <Button class="pin-submit" type="submit" label="Verify PIN" :loading="busy" :disabled="pin.length !== 6" />
       </form>
       <Button label="Start over" link @click="startOver" />
     </template>
@@ -48,11 +47,7 @@
           @click="copyTempPassword"
         />
       </div>
-      <p>
-        <Button label="Take me to sign in" @click="goToLogin" />
-        <br />
-        Sign in with your email address and this temporary password.
-      </p>
+      <Button label="Take me to sign in" @click="goToLogin" />
     </template>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
@@ -85,7 +80,9 @@ async function submitEmail() {
       error.value = 'Something went wrong. Please try again.'
       return
     }
-    requestMessage.value = res.data.message || "If your email is registered as a volunteer, we've sent you instructions."
+    // Display-only acknowledgement, owned by the client. The API returns an
+    // empty uniform 200 (enumeration defense) and no display text.
+    requestMessage.value = "If your email is registered as a volunteer, we've sent you a PIN."
     step.value = 'pin'
   }
   finally {
@@ -177,6 +174,26 @@ function startOver() {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* Echo the 6-digit code as it appears in the email: narrow, centered, bold,
+   and spaced out so it reads as a PIN rather than free text. */
+.pin-input {
+  width: 10rem;
+  align-self: center;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.5rem;
+  /* letter-spacing pushes the glyphs right; nudge back so they look centered */
+  text-indent: 0.5rem;
+}
+
+/* Match the PIN input's width so the two read as a centered vertical pair
+   rather than a stranded button. */
+.pin-submit {
+  align-self: center;
+  width: 10rem;
 }
 
 .enroll-choices {
