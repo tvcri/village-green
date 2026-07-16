@@ -20,6 +20,7 @@ import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
+import { getPerson } from '../../PersonList/api/personApi.js'
 import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
@@ -84,6 +85,11 @@ const form = ref({
   zip: '',
   address: '',
   phone: '',
+  startAddress: '',
+  startCity: '',
+  startState: '',
+  startZip: '',
+  startPhone: '',
   instructions: '',
   description: '',
   destination: ''
@@ -132,6 +138,11 @@ watch(existingRequest, async (val) => {
       zip: val.zip || '',
       address: val.address || '',
       phone: val.phone || '',
+      startAddress: val.startAddress || '',
+      startCity: val.startCity || '',
+      startState: val.startState || '',
+      startZip: val.startZip || '',
+      startPhone: val.startPhone || '',
       instructions: val.instructions || '',
       description: val.description || '',
       destination: val.destination || ''
@@ -170,6 +181,63 @@ const volunteerFilteredOptions = ref([])
 const selectedMember = ref(null)
 const selectedVolunteer = ref(null)
 
+// The selected member's home address, fetched on member-select. getVillageMembers
+// omits address fields, so fetch the person to obtain home. "Member's home" is a
+// fill convenience only — never stored as SR state.
+const selectedMemberHome = ref(null)
+
+async function loadMemberHome (personId) {
+  if (!personId) { selectedMemberHome.value = null; return }
+  try {
+    const p = await getPerson(String(personId))
+    selectedMemberHome.value = p
+      ? { address: p.address || '', city: p.city || '', state: p.state || '', zip: p.zip || '', phone: p.phone || '' }
+      : null
+  } catch {
+    selectedMemberHome.value = null
+  }
+}
+
+function applyMemberHomeToStart () {
+  const h = selectedMemberHome.value
+  if (!h) return
+  form.value.startAddress = h.address
+  form.value.startCity = h.city
+  form.value.startState = h.state
+  form.value.startZip = h.zip
+  form.value.startPhone = h.phone
+}
+
+function applyMemberHomeToDestination () {
+  const h = selectedMemberHome.value
+  if (!h) return
+  form.value.address = h.address
+  form.value.city = h.city
+  form.value.state = h.state
+  form.value.zip = h.zip
+  form.value.phone = h.phone
+}
+
+function clearStart () {
+  form.value.startAddress = ''
+  form.value.startCity = ''
+  form.value.startState = ''
+  form.value.startZip = ''
+  form.value.startPhone = ''
+}
+
+function clearDestination () {
+  form.value.address = ''
+  form.value.city = ''
+  form.value.state = ''
+  form.value.zip = ''
+  form.value.phone = ''
+}
+
+const startIsEmpty = computed(() =>
+  !form.value.startAddress && !form.value.startCity &&
+  !form.value.startState && !form.value.startZip && !form.value.startPhone)
+
 const filterMembers = (event) => {
   const query = event.query.toLowerCase()
   memberFilteredOptions.value = allMemberOptions.value.filter(m =>
@@ -188,8 +256,14 @@ watch(selectedMember, (val) => {
   // Only update if it's a complete selected object with both label and value
   if (val && typeof val === 'object' && val.label && val.value) {
     form.value.memberPersonId = String(val.value)
+    // Fetch the member's home and auto-fill Start only when Start is empty,
+    // so an edit-load's saved Start values are never clobbered.
+    loadMemberHome(val.value).then(() => {
+      if (startIsEmpty.value) applyMemberHomeToStart()
+    })
   } else {
     form.value.memberPersonId = null
+    selectedMemberHome.value = null
   }
 })
 
@@ -458,6 +532,11 @@ const resetForNewRequest = () => {
     zip: '',
     address: '',
     phone: '',
+    startAddress: '',
+    startCity: '',
+    startState: '',
+    startZip: '',
+    startPhone: '',
     instructions: '',
     description: '',
     destination: ''
@@ -551,6 +630,11 @@ const handleSubmit = async (notify = false) => {
       zip: form.value.zip || null,
       address: form.value.address || null,
       phone: form.value.phone || null,
+      startAddress: form.value.startAddress || null,
+      startCity: form.value.startCity || null,
+      startState: form.value.startState || null,
+      startZip: form.value.startZip || null,
+      startPhone: form.value.startPhone || null,
       instructions: form.value.instructions || null,
       description: form.value.description || null,
       destination: form.value.destination || null
