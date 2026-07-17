@@ -398,11 +398,18 @@ CREATE TABLE `service_request` (
   `state` varchar(50) DEFAULT NULL,
   `zip` varchar(20) DEFAULT NULL,
   `createdUserId` int DEFAULT NULL,
+  `start` text,
+  `startAddress` text,
+  `startCity` varchar(100) DEFAULT NULL,
+  `startState` varchar(50) DEFAULT NULL,
+  `startZip` varchar(20) DEFAULT NULL,
+  `startPhone` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `village_id` (`villageId`),
   KEY `member_person_id` (`memberPersonId`),
   KEY `volunteer_person_id` (`volunteerPersonId`),
   KEY `fk_service_request_created_user` (`createdUserId`),
+  KEY `idx_sr_village_date_status` (`villageId`,`serviceDate`,`status`),
   CONSTRAINT `fk_service_request_created_user` FOREIGN KEY (`createdUserId`) REFERENCES `user_data` (`userId`),
   CONSTRAINT `service_request_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
   CONSTRAINT `service_request_ibfk_2` FOREIGN KEY (`memberPersonId`) REFERENCES `person` (`id`),
@@ -616,4 +623,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-13  3:34:39
+-- Dump completed on 2026-07-17 11:01:29
