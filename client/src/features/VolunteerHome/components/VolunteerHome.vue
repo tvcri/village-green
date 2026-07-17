@@ -612,5 +612,18 @@ h1 {
   .request-cards.mobile-only {
     display: flex;
   }
+
+  /* On narrow screens the pills wrap to two lines; a 2-column grid keeps the
+     rows aligned (flex-wrap packs each row independently, so label-width pills
+     don't line up). Pills stretch to fill their column for a tidy 2x2 block. */
+  .service-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .service-pill {
+    justify-content: flex-start;
+  }
 }
 </style>
