@@ -469,6 +469,16 @@ watch(() => form.value.timesFlexible, (flex) => {
   form.value.finishTime = null
 })
 
+// Arrive/Return are Round-Trip-only. When the user switches away from Round
+// Trip, clear them so the model doesn't carry stale values a One Way trip
+// never shows. Guarded on formLoaded so loading a stored request doesn't wipe
+// legitimately-stored values.
+watch(() => form.value.transportationType, (type) => {
+  if (!formLoaded.value || type === 'Round Trip') return
+  form.value.apptTime = null
+  form.value.returnTime = null
+})
+
 const isRideService = computed(() => form.value.serviceName?.startsWith('Ride:'))
 
 const noLocationServices = ['Tech Support', 'Household Chores/Handy Help']
@@ -510,8 +520,13 @@ const isFormValid = computed(() => {
 // render without being auto-cleared — this is what handleSubmit catches.
 const timesInOrder = computed(() => {
   const f = form.value
-  if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) return false
-  if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) return false
+  // apptTime/returnTime are Round-Trip-only. Guard on transportationType so a
+  // stale value left over from switching Round Trip -> One Way can't fail a
+  // valid One Way (whose payload nulls them anyway).
+  if (f.transportationType === 'Round Trip') {
+    if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) return false
+    if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) return false
+  }
   const finishAfter = f.transportationType === 'Round Trip' ? f.returnTime : f.startTime
   if (f.finishTime != null && finishAfter != null && f.finishTime <= finishAfter) return false
   return true
@@ -608,9 +623,10 @@ const handleSubmit = async (notify = false) => {
 
       if (!form.value.timesFlexible && !timesInOrder.value) {
         const f = form.value
-        if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
+        const isRoundTrip = f.transportationType === 'Round Trip'
+        if (isRoundTrip && f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
           toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time must be after Start time', life: 3000 })
-        } else if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
+        } else if (isRoundTrip && f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
           toast.add({ severity: 'error', summary: 'Error', detail: 'Return time must be after Arrival time', life: 3000 })
         } else {
           const finishAfterLabel = f.transportationType === 'Round Trip' ? 'Return' : 'Start'

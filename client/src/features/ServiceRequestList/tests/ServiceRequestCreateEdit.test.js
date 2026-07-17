@@ -141,4 +141,35 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(vm.form.destination).toBe("Member's Home")
     expect(vm.form.address).toBe('1 Home St')
   })
+
+  // Regression: a One Way trip carrying a stale apptTime (left over from Round
+  // Trip) must not fail time-ordering validation — Arrive/Return are
+  // Round-Trip-only. Bug reported: "Arrival time must be after start time" on a
+  // valid One Way (start 2pm, finish 2:45pm).
+  it('One Way with a stale early apptTime still passes time-ordering', async () => {
+    const vm = await mountAndExpose()
+    vm.form.transportationType = 'One Way'
+    vm.form.startTime = 840   // 14:00
+    vm.form.finishTime = 885  // 14:45
+    vm.form.apptTime = 0      // stale 00:00, <= startTime — would falsely fail if not gated
+    await waitFor(() => expect(unref(vm.timesInOrder)).toBe(true))
+  })
+
+  it('switching Round Trip -> One Way clears Arrive and Return', async () => {
+    const vm = await mountAndExpose()
+    vm.form.transportationType = 'Round Trip'
+    vm.form.apptTime = 600
+    vm.form.returnTime = 660
+    vm.form.transportationType = 'One Way'
+    await waitFor(() => {
+      expect(vm.form.apptTime).toBeNull()
+      expect(vm.form.returnTime).toBeNull()
+    })
+  })
 })
+
+// Vue unwraps top-level refs on the setupState proxy in most cases, but a
+// computed may surface as a ref — read through this to be safe.
+function unref (v) {
+  return v && typeof v === 'object' && 'value' in v ? v.value : v
+}
