@@ -10,7 +10,7 @@ import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { getVillages } from '../api/villageApi.js'
 
 const router = useRouter()
-const { hasFederationAccess } = useCurrentUser()
+const { user, hasFederationAccess } = useCurrentUser()
 const { getStatusSeverity } = useStatusSeverity()
 
 const { state: villages, isLoading, error } = useAsyncState(
@@ -48,6 +48,10 @@ const metaVillageCounts = computed(() => {
 // Meta Village is visible to users holding any federation-scoped role grant.
 const showMetaVillage = computed(() => hasFederationAccess.value)
 
+// The VSS card uses the same volunteer-identity gate as the header menu item —
+// any volunteer, regardless of role grants, can reach Volunteer Self Signup.
+const isVolunteer = computed(() => !!user.value?.volunteer)
+
 const navigateToVillage = (villageId) => {
   router.push({ name: 'village-detail', params: { villageId } })
 }
@@ -74,6 +78,21 @@ const navigateToVillage = (villageId) => {
     </div>
 
     <div v-else class="village-grid">
+      <Card
+        v-if="isVolunteer"
+        class="village-card vss-card"
+        @click="router.push({ name: 'volunteer' })"
+      >
+        <template #title>
+          <div class="title-header">
+            <i class="pi pi-heart vss-icon" />
+            <span class="village-name">Volunteer<br>Self Signup</span>
+          </div>
+        </template>
+        <template #content>
+          <p class="vss-cta">Volunteer for a service request, or view your commitments and history</p>
+        </template>
+      </Card>
       <Card
         v-if="showMetaVillage && metaVillageCounts"
         class="village-card meta-village-card"
@@ -207,6 +226,22 @@ h1 {
 
 .meta-village-card:hover {
   opacity: 1;
+}
+
+.vss-card {
+  border: 2px solid color-mix(in srgb, var(--color-action-red) 45%, transparent);
+}
+
+.vss-icon {
+  color: var(--color-action-red);
+  font-size: 1.1rem;
+}
+
+.vss-cta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+  line-height: 1.4;
 }
 
 .title-header {
