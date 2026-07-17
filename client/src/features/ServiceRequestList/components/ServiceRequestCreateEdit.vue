@@ -1088,7 +1088,7 @@ const openPersonDialog = (personId) => {
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Starting Location</h3>
               <div style="display: flex; gap: 0.5rem;">
-                <Button type="button" size="small" text label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToStart" />
+                <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToStart" />
                 <Button type="button" size="small" text severity="secondary" icon="pi pi-times" aria-label="Clear start" @click="clearStart" />
               </div>
             </div>
@@ -1160,7 +1160,7 @@ const openPersonDialog = (personId) => {
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
               <div style="display: flex; gap: 0.5rem;">
-                <Button type="button" size="small" text label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
+                <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
                 <Button type="button" size="small" text severity="secondary" icon="pi pi-times" aria-label="Clear destination" @click="clearDestination" />
               </div>
             </div>
@@ -1328,6 +1328,13 @@ const openPersonDialog = (personId) => {
 .req {
   color: var(--color-error);
   margin-left: 0.15rem;
+}
+
+/* Bolder label on the "Use member's home" buttons so they read as prominent
+   without going to a solid fill (which would compete with Save). :deep pierces
+   PrimeVue's scoped button styles to reach the label span. */
+.use-home-btn :deep(.p-button-label) {
+  font-weight: 700;
 }
 
 .person-field-row {
