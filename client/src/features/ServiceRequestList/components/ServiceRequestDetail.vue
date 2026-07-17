@@ -226,7 +226,7 @@ const timeDisplay = computed(() => {
 
           <template v-if="request.start || request.startAddress || request.startCity">
             <div v-if="request.start" class="detail-field">
-              <span class="label">Start:</span>
+              <span class="label">Starting Location:</span>
               <span class="value">{{ request.start }}</span>
             </div>
 

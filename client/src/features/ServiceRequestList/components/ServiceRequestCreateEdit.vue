@@ -1086,20 +1086,20 @@ const openPersonDialog = (personId) => {
           <!-- Start Section -->
           <template v-if="showLocationFields">
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
-              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Start</h3>
+              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Starting Location</h3>
               <div style="display: flex; gap: 0.5rem;">
                 <Button type="button" size="small" text label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToStart" />
                 <Button type="button" size="small" text severity="secondary" icon="pi pi-times" aria-label="Clear start" @click="clearStart" />
               </div>
             </div>
 
-            <!-- Start / Address Row -->
+            <!-- Starting Location / Address Row -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Start</label>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Starting Location</label>
                 <InputText
                   v-model="form.start"
-                  placeholder="Enter start"
+                  placeholder="Enter starting location"
                   style="width: 100%;"
                 />
               </div>

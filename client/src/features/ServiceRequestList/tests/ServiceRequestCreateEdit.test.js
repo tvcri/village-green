@@ -76,16 +76,16 @@ async function mountAndExpose () {
 }
 
 describe('ServiceRequestCreateEdit start section', () => {
-  it('renders a Start section header when location fields are shown', async () => {
+  it('renders a Starting Location section header when location fields are shown', async () => {
     const vm = await mountAndExpose()
-    // Location sections (Start/Destination) only render once a member is
-    // chosen (village + member gate) AND a located service is picked.
+    // Location sections (Starting Location/Destination) only render once a
+    // member is chosen (village + member gate) AND a located service is picked.
     vm.form.villageId = '1'
     vm.form.memberPersonId = '7'
     vm.form.serviceName = 'Ride: Medical'
     await waitFor(() => {
-      const starts = screen.getAllByText(/^Start$/i)
-      expect(starts.length).toBeGreaterThan(0)
+      const headers = screen.getAllByText(/^Starting Location$/i)
+      expect(headers.length).toBeGreaterThan(0)
     })
   })
 
