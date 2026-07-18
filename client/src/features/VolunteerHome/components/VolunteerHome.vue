@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch, watchEffect } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -18,7 +18,13 @@ import { getVolunteerRequests, getVolunteerRequestVillages } from '../api/volunt
 import { getUser } from '../../../shared/api/userApi.js'
 
 const router = useRouter()
-const activeTab = ref('open')
+const route = useRoute()
+
+// The active tab lives in the URL (?tab=) so it survives remount on return
+// from a request detail — restored by both the detail's Back button and
+// native browser back. Falls back to 'open' for absent/unknown values.
+const VALID_TABS = ['open', 'mine', 'history']
+const activeTab = ref(VALID_TABS.includes(route.query.tab) ? route.query.tab : 'open')
 const openPageRows = ref(10)
 const myPageRows = ref(10)
 const historyPageRows = ref(10)
@@ -77,6 +83,13 @@ const selectedVillageIds = ref(storedVillageFilter)
 
 watch(selectedVillageIds, (value) => {
   localStorage.setItem(VILLAGE_FILTER_KEY, JSON.stringify(value))
+})
+
+// Mirror the active tab into the URL. Use replace (not push) so switching
+// tabs never creates browser-history entries; merge into the existing query
+// to preserve any other params.
+watch(activeTab, (tab) => {
+  router.replace({ query: { ...route.query, tab } })
 })
 
 // The VSS service-category vocabulary: each capability the caller may hold,
