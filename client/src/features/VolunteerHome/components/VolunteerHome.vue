@@ -197,7 +197,14 @@ function memberLabel(row) {
 }
 
 function goToDetail(row) {
-  router.push({ name: 'volunteer-request-detail', params: { id: row.serviceRequestId } })
+  // Carry the originating tab so the detail's Back button can return the
+  // volunteer to it. (Native browser back needs nothing extra — it pops
+  // history straight to /volunteer?tab=<tab>, restored on mount.)
+  router.push({
+    name: 'volunteer-request-detail',
+    params: { id: row.serviceRequestId },
+    query: { from: activeTab.value }
+  })
 }
 </script>
 

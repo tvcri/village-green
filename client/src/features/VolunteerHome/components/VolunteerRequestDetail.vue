@@ -318,7 +318,7 @@ async function doRelease() {
             outlined
             @click="confirmRelease"
           />
-          <Button label="Back to List" text @click="router.push({ name: 'volunteer' })" />
+          <Button label="Back to List" text @click="router.push({ name: 'volunteer', query: route.query.from ? { tab: route.query.from } : {} })" />
         </div>
       </template>
     </Card>
