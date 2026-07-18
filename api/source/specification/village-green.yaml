@@ -3792,6 +3792,20 @@ components:
           type: string
           maxLength: 255
           nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        modifiedUserId:
+          $ref: '#/components/schemas/UserIdNullable'
+        modifiedByUsername:
+          type: string
+          maxLength: 255
+          nullable: true
+        modifiedByDisplayName:
+          type: string
+          maxLength: 255
+          nullable: true
         serviceDate:
           type: string
           format: date
