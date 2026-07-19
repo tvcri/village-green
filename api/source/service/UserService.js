@@ -600,12 +600,10 @@ exports.getUserObject = async function (username) {
     lastClaims,
     status,
     -- Runtime identity (VSS spec §1-AMENDED): exactly one person whose email
-    -- matches the username → that person, else null. Case-insensitivity comes
-    -- from the utf8mb4_0900_ai_ci collation; no LOWER(), it would defeat
-    -- person INDEX_email.
-    (select if(count(*) = 1, min(p.id), null)
-     from person p
-     where p.email = ud.username) as personId,
+    -- matches the username → that person, else null. Single source of truth is
+    -- dbUtils.sqlResolvedPersonId — shared with the queryUsers volunteer
+    -- projection so the tag cannot drift from this gate.
+    ${dbUtils.sqlResolvedPersonId('ud.username')} as personId,
     -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
     -- published and the user has no acknowledgement of the current version within
     -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
