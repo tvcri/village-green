@@ -72,6 +72,19 @@ exports.queryUsers = async function (inProjection, inPredicates, userObject) {
     columns.push(`ud.webPreferences`)
   }
 
+  if (inProjection?.includes('volunteer')) {
+    // isVolunteer predicts the runtime VSS grant. It reuses the SAME identity
+    // fragment the runtime gate uses (dbUtils.sqlResolvedPersonId) so the two
+    // cannot drift: the resolved person is NULL for 0 or 2+ email matches, and
+    // NULL IN (…) => NULL => the else branch => false. So the column is true iff
+    // exactly one person matches the username AND that person is an active
+    // volunteer. cast(... as json) yields a real JSON boolean.
+    columns.push(`cast(if(
+      ${dbUtils.sqlResolvedPersonId('ud.username')} in (select av.personId from active_volunteer av),
+      'true', 'false'
+    ) as json) as isVolunteer`)
+  }
+
   if (inProjection?.includes('privacyStatus')) {
     // Correlated subqueries — one round-trip, no JS merge. needsAck is true
     // unless the user's latest ack is of the current rules version AND within

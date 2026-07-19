@@ -37,3 +37,14 @@ test('getUserObject sources personId from the shared fragment (no inline copy)',
   )
   assert.match(src, /dbUtils\.sqlResolvedPersonId\('ud\.username'\)/)
 })
+
+test('queryUsers emits isVolunteer built on the shared fragment when volunteer projection requested', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'service', 'UserService.js'), 'utf8')
+  // Projection is opt-in and gated on 'volunteer'.
+  assert.match(src, /inProjection\?\.includes\('volunteer'\)/)
+  // The column is built on the shared fragment, then tested against active_volunteer —
+  // not a re-copied identity subquery.
+  assert.match(src, /dbUtils\.sqlResolvedPersonId\('ud\.username'\)\} in \(select av\.personId from active_volunteer av\)/)
+  // Emits a real JSON boolean aliased isVolunteer.
+  assert.match(src, /as json\) as isVolunteer/)
+})
