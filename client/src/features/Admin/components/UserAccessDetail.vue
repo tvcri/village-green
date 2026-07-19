@@ -205,6 +205,9 @@ const handleSaveUsername = async () => {
 }
 
 h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   margin: 0 0 2rem 0;
   color: var(--color-text-primary);
   font-size: 1.5rem;
