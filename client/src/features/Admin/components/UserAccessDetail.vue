@@ -171,7 +171,7 @@ const handleSaveUsername = async () => {
         </div>
         <h2 v-else>
           Grants for {{ selectedUser?.username }}
-          <Tag v-if="selectedUser?.isVolunteer" value="VSS" severity="info" title="Eligible for Volunteer Self-Signup" />
+          <Tag v-if="selectedUser?.isVolunteer" value="VSS" severity="warn" title="Eligible for Volunteer Self-Signup" />
           <Button
             icon="pi pi-pencil"
             text

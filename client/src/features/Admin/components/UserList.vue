@@ -155,7 +155,7 @@ async function onDeleteUser(user) {
         <template #body="{ data }">
           <div class="access-cell">
             <AccessTags :user="data" />
-            <Tag v-if="data.isVolunteer" value="VSS" severity="info" title="Eligible for Volunteer Self-Signup" />
+            <Tag v-if="data.isVolunteer" value="VSS" severity="warn" title="Eligible for Volunteer Self-Signup" />
           </div>
         </template>
       </Column>
