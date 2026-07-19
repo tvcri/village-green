@@ -73,6 +73,19 @@ async function insertRequest({ email, personId, pinHash, kind, outcome, ttlMinut
   }
 }
 
+// Invalidate any prior live PIN for this email. Only unconsumed 'pin_sent'
+// rows are superseded; consumed rows are left intact (the reset flow depends on
+// the most-recently-consumed row within its window). Superseded rows are kept,
+// not deleted — the outcome flip is the audit record that a newer PIN replaced
+// them.
+async function supersedeLivePins(email) {
+  await dbUtils.pool.query(
+    `UPDATE enrollment_request SET outcome = 'superseded'
+     WHERE email = ? AND outcome = 'pin_sent' AND consumedAt IS NULL`,
+    [email]
+  )
+}
+
 // Fire-and-forget: a PIN that cannot be delivered promptly is equivalent to an
 // expired PIN (the user re-requests), so the send must never block or fail the
 // request path. Errors are logged, never surfaced. The plaintext PIN exists
@@ -135,6 +148,15 @@ exports.requestEnrollment = async function (rawEmail) {
 
   const pin = generatePin()
   const pinHash = await bcrypt.hash(pin, BCRYPT_ROUNDS)
+  // Supersede any prior live PIN for this email before issuing the new one, so
+  // exactly one unconsumed 'pin_sent' row exists per email at any instant. This
+  // is the invariant verify/reset already assume via ORDER BY id DESC — making
+  // it true in storage removes the ambiguity (a stale older row can never be
+  // the one a read resolves to) and shrinks the exposure to a single live PIN
+  // rather than one-per-request. Only unconsumed rows are touched: an already
+  // consumed row is the reset flow's gate within its window and must survive.
+  // Superseded rows are retained (not deleted) as an audit trail of issuance.
+  await supersedeLivePins(email)
   await insertRequest({ email, personId: eligibility.personId, pinHash, kind, outcome: 'pin_sent', ttlMinutes: PIN_TTL_MINUTES })
   sendPinWebhook({ email, pin, firstName: eligibility.firstName, kind })
 }
@@ -213,11 +235,22 @@ exports.resetEnrollmentPassword = async function (rawEmail, pin) {
      FROM enrollment_request
      WHERE email = ? AND kind = 'existing_account' AND consumedAt IS NOT NULL
        AND consumedAt > DATE_SUB(NOW(), INTERVAL ? MINUTE) AND resetAt IS NULL
+       AND resetAttempts < ?
      ORDER BY id DESC LIMIT 1`,
-    [email, RESET_WINDOW_MINUTES]
+    [email, RESET_WINDOW_MINUTES, ATTEMPT_CAP]
   )
   const row = rows[0]
   if (!row) return null
+
+  // Count the reset attempt before comparing so a failing caller burns the
+  // budget. resetAttempts is separate from the verify-path `attempts` so a
+  // user who mistyped during verify still gets a full reset budget, while an
+  // attacker cannot brute-force the 6-digit PIN against this second, unguarded
+  // check (reset is a bare request the server can't tie back to the prior
+  // verify). Same cap and pre-increment as verifyEnrollment.
+  await dbUtils.pool.query(
+    `UPDATE enrollment_request SET resetAttempts = resetAttempts + 1 WHERE id = ?`, [row.id]
+  )
 
   const match = await bcrypt.compare(String(pin), row.pinHash)
   if (!match) return null
