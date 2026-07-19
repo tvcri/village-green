@@ -4379,6 +4379,12 @@ components:
           $ref: '#/components/schemas/WebPreferences'
         privacyStatus:
           $ref: '#/components/schemas/PrivacyStatus'
+        isVolunteer:
+          type: boolean
+          description: >-
+            Present only with the `volunteer` projection. True iff the runtime
+            would grant this user VSS access — i.e. exactly one person's email
+            matches the username and that person is an active volunteer.
         volunteer:
           nullable: true
           additionalProperties: false
@@ -5329,6 +5335,7 @@ components:
           - privacyStatus
           - userGroups
           - webPreferences
+          - volunteer
     UserStatusQuery:
       name: status
       in: query
