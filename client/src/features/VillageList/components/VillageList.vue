@@ -90,7 +90,7 @@ const navigateToVillage = (villageId) => {
           </div>
         </template>
         <template #content>
-          <p class="vss-cta">Volunteer for a service request, or view your commitments and history</p>
+          <p class="vss-cta">Volunteer for a service request, or view your commitments<br/>and history</p>
         </template>
       </Card>
       <Card
@@ -240,6 +240,7 @@ h1 {
 .vss-cta {
   margin: 0;
   font-size: 0.85rem;
+  text-align: center;
   color: var(--color-text-dim);
   line-height: 1.4;
 }
