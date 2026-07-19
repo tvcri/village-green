@@ -101,6 +101,13 @@ async function submitPin() {
     }
     loginUrl.value = res.data.loginUrl || './'
     if (res.data.status === 'created') {
+      // Guard the contract: 'created' must carry a temp password. A blank one
+      // would strand the user on a password screen showing an empty code box
+      // and a Copy button that copies nothing — fail loudly instead.
+      if (!res.data.tempPassword) {
+        error.value = 'Your account was created, but we could not show a temporary password. Please start over and request a new PIN.'
+        return
+      }
       tempPassword.value = res.data.tempPassword
       step.value = 'password'
     }
@@ -119,6 +126,10 @@ async function requestReset() {
   try {
     const res = await resetPassword(email.value, pin.value)
     if (!res.ok) {
+      error.value = 'Could not issue a new temporary password. Please start over and request a new PIN.'
+      return
+    }
+    if (!res.data.tempPassword) {
       error.value = 'Could not issue a new temporary password. Please start over and request a new PIN.'
       return
     }

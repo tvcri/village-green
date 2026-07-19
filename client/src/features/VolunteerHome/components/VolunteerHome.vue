@@ -32,19 +32,22 @@ const historyPageRows = ref(10)
 // 'open' is the default tab, fetched eagerly; 'mine'/'history' are fetched
 // lazily the first time their tab is actually viewed, then cached for the
 // rest of the component's lifetime (no refetch on switching back).
-const { state: openRequests, isLoading: openLoading } = useAsyncState(
+// onError: null keeps a failed open-list fetch out of the global crash-style
+// error modal — a 403/500 on the primary list shows inline instead (mirrors
+// VillageList). Surfaced via the `openError` banner below the filters.
+const { state: openRequests, isLoading: openLoading, error: openError } = useAsyncState(
   () => getVolunteerRequests('open'),
-  { immediate: true, initialState: [] }
+  { immediate: true, initialState: [], onError: null }
 )
 
-const { state: myRequests, isLoading: mineLoading, execute: fetchMine } = useAsyncState(
+const { state: myRequests, isLoading: mineLoading, error: mineError, execute: fetchMine } = useAsyncState(
   () => getVolunteerRequests('mine'),
-  { immediate: false, initialState: [] }
+  { immediate: false, initialState: [], onError: null }
 )
 
-const { state: historyRequests, isLoading: historyLoading, execute: fetchHistory } = useAsyncState(
+const { state: historyRequests, isLoading: historyLoading, error: historyError, execute: fetchHistory } = useAsyncState(
   () => getVolunteerRequests('history'),
-  { immediate: false, initialState: [] }
+  { immediate: false, initialState: [], onError: null }
 )
 
 let mineFetched = false
@@ -61,9 +64,12 @@ watchEffect(() => {
   }
 })
 
+// onError: null: a failed village-filter fetch degrades the filter to no
+// options rather than crashing the page (the request list is the primary
+// content and has its own error surface).
 const { state: villageOptions } = useAsyncState(
   () => getVolunteerRequestVillages(),
-  { immediate: true, initialState: [] }
+  { immediate: true, initialState: [], onError: null }
 )
 
 // The village filter is rarely-changing (villages number ~13, added every
@@ -157,11 +163,15 @@ watch(selectedServiceLabels, (value) => {
 })
 
 // The prefixes for the currently-checked categories. Empty = no service filter.
-const selectedServicePrefixes = computed(() =>
-  SERVICE_CATEGORIES
-    .filter(c => selectedServiceLabels.value.includes(c.label))
+// Intersect with the categories the caller actually holds (serviceCategoryOptions):
+// a stored label for a since-revoked capability renders no pill, so it must not
+// silently narrow the list either — and the user would have no pill to un-check it.
+const selectedServicePrefixes = computed(() => {
+  const heldLabels = new Set(serviceCategoryOptions.value.map(c => c.label))
+  return SERVICE_CATEGORIES
+    .filter(c => heldLabels.has(c.label) && selectedServiceLabels.value.includes(c.label))
     .map(c => c.prefix)
-)
+})
 
 const filteredOpenRequests = computed(() => {
   return openRequests.value.filter((r) => {
@@ -257,6 +267,7 @@ function goToDetail(row) {
               </div>
             </template>
           </div>
+          <p v-if="openError" class="load-error">Couldn't load requests. Please try again later.</p>
           <DataTable
             :value="filteredOpenRequests"
             :loading="openLoading"
@@ -318,6 +329,7 @@ function goToDetail(row) {
           </div>
         </TabPanel>
         <TabPanel value="mine">
+          <p v-if="mineError" class="load-error">Couldn't load your commitments. Please try again later.</p>
           <DataTable
             :value="myRequests"
             :loading="mineLoading"
@@ -375,6 +387,7 @@ function goToDetail(row) {
           </div>
         </TabPanel>
         <TabPanel value="history">
+          <p v-if="historyError" class="load-error">Couldn't load your history. Please try again later.</p>
           <DataTable
             :value="historyRequests"
             :loading="historyLoading"
@@ -609,6 +622,14 @@ h1 {
   color: var(--color-text-dim);
   font-size: 0.9rem;
   margin: 0.5rem 0;
+}
+
+/* Inline "couldn't load" banner — a failed list fetch shows here instead of
+   the global crash-style error modal (onError: null on those fetches). */
+.load-error {
+  color: var(--color-text-error);
+  font-size: 0.95rem;
+  margin: 0 0 1rem 0;
 }
 
 /* Card-style elevation on the tab panel container — matches the box-shadow the
