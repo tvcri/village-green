@@ -8,7 +8,7 @@
         We'll send you a PIN to set up your Village Green account.
       </p>
       <form class="enroll-form" @submit.prevent="submitEmail">
-        <label for="enroll-email">Email address</label>
+        <label class="enroll-label" for="enroll-email">Email address</label>
         <InputText id="enroll-email" v-model="email" type="email" autocomplete="email" required />
         <Button type="submit" label="Send me a PIN" :loading="busy" />
       </form>
@@ -47,7 +47,7 @@
           @click="copyTempPassword"
         />
       </div>
-      <Button label="Take me to sign in" @click="goToLogin" />
+      <Button class="signin-button"label="Take me to sign in" @click="goToLogin" />
     </template>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
@@ -179,7 +179,6 @@ function startOver() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
   background: var(--color-background-light);
   border: 1px solid var(--color-border-default);
   border-radius: 8px;
@@ -195,6 +194,10 @@ function startOver() {
   gap: 0.75rem;
   width: 100%;
   max-width: 22rem;
+}
+
+.enroll-label {
+  font-weight: 600;
 }
 
 .enroll-form :deep(.p-inputtext) {
@@ -243,5 +246,9 @@ function startOver() {
   border-radius: 6px;
   align-self: center;
   user-select: all;
+}
+
+.signin-button {
+  margin-top: 1rem;
 }
 </style>
