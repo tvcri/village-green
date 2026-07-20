@@ -1,9 +1,9 @@
 # Security findings asserted by this suite
 
 This suite intentionally asserts the **correct/secure** behavior. Where the current
-code is insecure or broken, the corresponding tests **fail (red)** on purpose — or,
-where a red would be disruptive, a clearly-marked `KNOWN BUG` test pins the buggy
-behavior and must be flipped when the fix lands. Each finding maps to specific tests.
+code is insecure or broken, the corresponding tests **fail (red)** on purpose — a red
+run is expected until the underlying issues are fixed, and each red goes green with
+no edit needed when its fix lands. Each finding maps to specific tests.
 
 ## Status 2026-07-20: findings #1–#6 fixed by the RBAC rework (#56) — verified live
 
@@ -33,9 +33,10 @@ Reachable: any caller with village grants on **2+ villages** calling
 `GET /villages?projection=statistics` → `ER_OPERAND_COLUMNS` → **500**.
 Federation callers (allVillages path) and single-village callers dodge it.
 
-- Pinned by: `tests/villages/projections.test.js` (`KNOWN BUG` test asserting
-  the 500 — flip to 200 when fixed) and the unit characterization in
-  `api/source/test/serviceUtils.test.js`.
+- **RED tests** (assert the correct behavior, fail until fixed, self-green on
+  fix): `tests/villages/projections.test.js` (multi-village caller gets 200 +
+  statistics) and `api/source/test/serviceUtils.test.js` (flat `IN (1, 2)`
+  render in both arms).
 - Full write-up: `scratch/bug-report-2026-07-20.md`.
 
 ### B. Fresh scaffold ships an empty role catalog (deploy-blocking)
@@ -47,8 +48,12 @@ Federation callers (allVillages path) and single-village callers dodge it.
 `static_data_tables` list in `sql/generateSchema.sh` was never updated for
 0013's new static tables — one-line fix, see the bug report.
 
-- Worked around in this harness by `setup/seed.js seedRoleCatalog()`
-  (INSERT IGNORE — delete once the dump is fixed).
+- **RED test**: `tests/smoke/state-and-spec.test.js` statically checks the
+  dump artifact for the 0013 catalog rows — fails until `generateSchema.sh`'s
+  `static_data_tables` gains `role role_permission` and the dump is
+  regenerated. (A runtime red is impossible: the harness must work around the
+  bug via `setup/seed.js seedRoleCatalog()` just to run — delete that
+  workaround when this test goes green.)
 - Full write-up: `scratch/bug-report-2026-07-20.md`.
 
 ### C. `iss` claim is never validated (characterization)

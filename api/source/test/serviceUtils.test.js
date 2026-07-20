@@ -32,17 +32,19 @@ test('sqlGrantees applies the villageId filter to both union arms', () => {
   assert.equal(occurrences(sql, 'cg.villageId = 3'), 2)
 })
 
-// CHARACTERIZATION OF A BUG — same mis-binding class as e2e findings #3/#4
-// (test/api/SECURITY-FINDINGS.md): the villageIds param is an array, and
-// sqlGrantees binds [villageIds] into 'IN (?)', double-wrapping it. One
-// village works by accident (`IN ((5))`); two or more render a nested row
+// RED until fixed — same mis-binding class as former e2e findings #3/#4
+// (test/api/SECURITY-FINDINGS.md, open item A): the villageIds param is an
+// array, and sqlGrantees binds [villageIds] into 'IN (?)', double-wrapping it.
+// One village works by accident (`IN ((5))`); two or more render a nested row
 // constructor `IN ((1, 2))`, which MySQL rejects with ER_OPERAND_COLUMNS.
 // Reachable: non-admin with grants on ≥2 villages, GET /villages?projection=
 // statistics (VillageService.queryVillages → cteGranteesParams.villageIds).
-// When fixed, this should render `IN (1, 2)` in both arms — update to pin that.
-test('sqlGrantees villageIds IN-list is double-wrapped (known bug, see comment)', () => {
+// Fix: drop the extra brackets at service/utils.js:754 — this goes green
+// with no edit needed. Full write-up: scratch/bug-report-2026-07-20.md.
+test('sqlGrantees renders a flat villageIds IN-list in both arms (RED until utils.js:754 is fixed)', () => {
   const sql = dbUtils.sqlGrantees({ villageIds: [1, 2] })
-  assert.equal(occurrences(sql, 'cg.villageId IN ((1, 2))'), 2)
+  assert.equal(occurrences(sql, 'cg.villageId IN (1, 2)'), 2,
+    `expected a flat IN-list; got:\n${sql}`)
 })
 
 test('sqlGrantees applies the userId filter to both arms', () => {

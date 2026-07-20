@@ -40,13 +40,15 @@ test('list projection=statistics works for federation and single-village callers
   assert.ok(one.json.length && one.json.every(v => 'statistics' in v), 'single-village caller gets statistics')
 })
 
-test('KNOWN BUG: list projection=statistics 500s for a multi-village caller', async () => {
-  // RED characterization — scratch/bug-report-2026-07-20.md (bug 1): sqlGrantees
-  // double-wraps villageIds (api/source/service/utils.js:754), so the grantees
-  // CTE renders `cg.villageId IN ((1, 2))` whenever the caller's grant list has
-  // >= 2 entries -> ER_OPERAND_COLUMNS -> 500. Federation callers (allVillages
-  // path) and single-village callers dodge it. Flip this to 200-with-statistics
-  // when the extra array wrap is removed.
-  const { status } = await vgCall('getVillages', { projection: ['statistics'] }, { token: tokens.users.multi })
-  assert.equal(status, 500)
+test('list projection=statistics works for a multi-village caller (RED until fixed)', async () => {
+  // RED — scratch/bug-report-2026-07-20.md (bug 1): sqlGrantees double-wraps
+  // villageIds (api/source/service/utils.js:754), so the grantees CTE renders
+  // `cg.villageId IN ((1, 2))` whenever the caller's grant list has >= 2
+  // entries -> ER_OPERAND_COLUMNS -> 500 today. Federation callers
+  // (allVillages path) and single-village callers dodge it. This asserts the
+  // CORRECT behavior and goes green with no edit when the fix lands.
+  const { status, json } = await vgCall('getVillages', { projection: ['statistics'] }, { token: tokens.users.multi })
+  assert.equal(status, 200)
+  assert.ok(json.length === 2 && json.every(v => 'statistics' in v),
+    'multi-village caller gets statistics for both granted villages')
 })

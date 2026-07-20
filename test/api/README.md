@@ -16,9 +16,12 @@ users see the right data) as the throughline.
 > updated register (two open items remain: the `sqlGrantees` statistics 500 and
 > the empty role catalog in `sql/current/20-vg-static.sql`, worked around by
 > `setup/seed.js seedRoleCatalog()`; details in `scratch/bug-report-2026-07-20.md`).
-> Landscape: **204 tests — 202 pass, 0 fail, 2 todo** (~45 s wall clock,
-> ~20 s test phase). One green test is a pinned KNOWN-BUG characterization
-> (the statistics 500) that must be flipped when the fix lands.
+> Landscape: **205 tests — 201 pass, 2 deliberate REDs, 2 todo** (~45 s wall
+> clock, ~20 s test phase). The reds assert the *correct* behavior for the two
+> open bugs (the multi-village statistics 200, and the dump carrying the 0013
+> role catalog) per this suite's red-until-fixed convention — they go green
+> with no edit when the fixes land. A red run with exactly these two failures
+> is the expected state.
 >
 > **Status (2026-07-07):** re-synced with `main` after the #37–#47 merge (the person /
 > member / volunteer schema rework): the seeder targets the camelCase schema and seeds
