@@ -40,8 +40,11 @@ export function serviceDateToDate (s) {
   return new Date(y, m - 1, d)
 }
 
-export function formatServiceDate (s) {
+export function formatServiceDate (s, { weekday = false } = {}) {
   const d = serviceDateToDate(s)
   if (!d) return ''
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return d.toLocaleDateString('en-US', {
+    ...(weekday && { weekday: 'short' }),
+    month: 'short', day: 'numeric', year: 'numeric'
+  })
 }
