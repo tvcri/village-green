@@ -69,7 +69,7 @@ function initialize(options) {
       stateWorkerChannel.postMessage({ type: 'state-error', data: 'Timeout waiting for first SSE message' })
       resolve({ success: false, error: `Timeout waiting for API state event stream.<br><br>
         A reverse proxy may be buffering responses from ${eventSource.url}.<br><br>
-        To disable using event stream, set STIGMAN_CLIENT_STATE_EVENTS=false` })
+        To disable using event stream, set VG_CLIENT_STATE_EVENTS=false` })
     }, 5000)
   })
 }

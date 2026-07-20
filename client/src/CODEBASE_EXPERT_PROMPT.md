@@ -6,12 +6,17 @@ You are an expert on the Village Green (VG) Vue 3 client codebase. Your role is 
 3. Guide developers toward reusable code rather than duplication
 4. Enforce architectural consistency
 
+VG was originally forked from STIG Manager (an ExtJS/compliance-tracking app); the client has
+since been rebuilt around VG's own domain (villages, people, volunteers, service requests). Treat
+any lingering references to STIGs, benchmarks, collections, or reviews elsewhere in the codebase
+as leftover artifacts to be cleaned up, not as active patterns to follow.
+
 ---
 
 ## Codebase Scope
 
 **In scope:** `/home/csmig/dev/village-green/client/src/` — all `.js`, `.vue`, and test files
-**Out of scope:** Build config, node_modules, deleted STIGMAN code
+**Out of scope:** Build config, node_modules
 **Documentation:** `/home/csmig/dev/village-green/docs/architecture/client-initialization-and-data-flow.md`
 
 ---
@@ -97,8 +102,7 @@ const token = getAccessToken() // → VG.oidcWorker.token
 - `queryString.js` — query param utilities
 - `userApi.js` — user endpoint (`fetchCurrentUser()`)
 
-**Deleted (STIGMAN-specific):**
-- ~~assetsApi.js~~ ~~collectionsApi.js~~ ~~grantsApi.js~~ ~~reviewsApi.js~~ ~~stigsApi.js~~
+**Deleted:** The original STIG Manager API modules (`assetsApi.js`, `collectionsApi.js`, `grantsApi.js`, `reviewsApi.js`, `stigsApi.js`) were removed during the fork and are gone from the tree.
 
 **When building new features:** Create new `features/{Feature}/api/` modules (e.g., `features/PersonManagement/api/personApi.js`)
 
@@ -160,27 +164,14 @@ const { state, isLoading, error, execute } = useAsyncState(
 
 **File:** `router/index.js`
 
-Currently minimal (placeholder):
-```javascript
-const routes = [
-  { path: '/', name: 'home', component: Placeholder },
-  { path: '/:pathMatch(.*)*', name: 'not-found', component: Placeholder }
-]
-```
-
-**When building VG routes:** Extend this with feature routes. Example:
+Fleshed out with real VG routes (villages, members, volunteers, service requests, meta/admin
+pages, etc.). Route `meta` fields drive the navigation guard. Example:
 ```javascript
 {
-  path: '/villages/:villageId',
-  name: 'village-detail',
-  component: () => import('../features/VillageManagement/components/VillageDetail.vue'),
-  meta: {
-    requiresAdmin: false,
-    breadcrumbs: [
-      { label: 'Villages', route: { name: 'villages' } },
-      { label: (route) => `Village ${route.params.villageId}` }
-    ]
-  }
+  path: '/villages/:villageId/service-requests',
+  name: 'service-requests',
+  component: () => import('../features/ServiceRequestList/components/VillageServiceRequestList.vue'),
+  meta: { requiresPermission: 'sr:read', villageScoped: true },
 }
 ```
 
@@ -188,14 +179,14 @@ const routes = [
 
 **File:** `router/navigationGuards.js`
 
-Skeleton in place:
-```javascript
-export function navigationGuard(to) {
-  // Check requiresAdmin
-  // Check requiresCollectionGrant (STIGMAN-era, may be repurposed)
-  // Check minRoleId
-}
-```
+Implemented (not a skeleton). `navigationGuard(to)`, wired via `router.beforeEach`, uses
+`useCurrentUser()` to:
+- Redirect non-volunteers away from `meta.requiresVolunteer` routes, and redirect grantless
+  volunteers off the staff surface onto the volunteer surface
+- Enforce `meta.requiresPermission` (optionally scoped to `to.params.villageId` when
+  `meta.villageScoped` is set) via `hasPermission()`
+- Gate `/meta` routes behind `hasFederationAccess`
+- Require some village grant for any other village-scoped route via `hasVillageAccess()`
 
 **Uses:** `useCurrentUser()` to validate user privileges
 
@@ -352,14 +343,14 @@ const personCount = computed(() => persons.value?.length ?? 0)
 
 ---
 
-## VG Domain Concepts (Not STIGMAN)
+## VG Domain Concepts
 
-**What VG manages (different from STIGMAN):**
-- **Villages** — geographic communities (not collections)
-- **People** — individuals in a village (not assets)
+**What VG manages:**
+- **Villages** — geographic communities
+- **People** — individuals in a village
 - **Members** — people with roles in a village
 - **Volunteers** — people providing services
-- **Service Requests** — requests for help/services (not STIGs/reviews)
+- **Service Requests** — requests for help/services
 
 **Schema references:** See `/home/csmig/dev/village-green/docs/architecture/` for OAS endpoint specs
 

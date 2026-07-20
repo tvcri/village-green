@@ -5,13 +5,6 @@ import { api, apiCall, ApiError, apiFetch, configureApiSpec, configureAuth } fro
 const fetchMock = vi.fn()
 globalThis.fetch = fetchMock
 
-// Mock STIGMAN global
-globalThis.STIGMAN = {
-  Env: {
-    apiBase: 'http://localhost/api',
-  },
-}
-
 describe('apiClient', () => {
   beforeEach(() => {
     fetchMock.mockClear()

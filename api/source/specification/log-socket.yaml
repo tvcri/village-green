@@ -11,7 +11,7 @@ info:
     - Clients can send 'stream-stop' command to stop receiving log messages
     - Only authorized clients can send stream control commands
   contact:
-    name: STIG Manager Team
+    name: Village Green Team
   license:
     name: MIT
 
