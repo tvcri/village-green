@@ -77,7 +77,7 @@ const rowClass = computed(() => {
 
       <Column field="serviceDate" header="Date" sortable style="width: 12%">
         <template #body="slotProps">
-          {{ formatServiceDate(slotProps.data.serviceDate) || '—' }}
+          {{ formatServiceDate(slotProps.data.serviceDate, { weekday: true }) || '—' }}
         </template>
       </Column>
       <Column v-if="showVillageColumn" field="villageName" header="Village" sortable style="width: 15%"></Column>
@@ -118,7 +118,7 @@ const rowClass = computed(() => {
         <div class="card-row"><span class="label">#:</span><span>{{ request.displayNumber ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Member:</span><span>{{ request.memberFullName ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Volunteer:</span><span>{{ request.volunteerFullName ?? '—' }}</span></div>
-        <div class="card-row"><span class="label">Start:</span><span>{{ formatServiceDate(request.serviceDate) || '—' }}</span></div>
+        <div class="card-row"><span class="label">Start:</span><span>{{ formatServiceDate(request.serviceDate, { weekday: true }) || '—' }}</span></div>
         <div class="card-row"><span class="label">City:</span><span>{{ request.city ?? '—' }}</span></div>
       </div>
     </div>
