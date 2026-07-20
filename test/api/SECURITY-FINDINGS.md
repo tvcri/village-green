@@ -43,7 +43,9 @@ Federation callers (allVillages path) and single-village callers dodge it.
 `api/source/service/migrations/sql/current/20-vg-static.sql` marks migration
 `0013-rbac-roles.js` executed but carries none of its `role` /
 `role_permission` rows, so a fresh scaffold can grant nobody anything
-(every `role_grant` insert hits `fk_role_grant_role`).
+(every `role_grant` insert hits `fk_role_grant_role`). Root cause: the
+`static_data_tables` list in `sql/generateSchema.sh` was never updated for
+0013's new static tables — one-line fix, see the bug report.
 
 - Worked around in this harness by `setup/seed.js seedRoleCatalog()`
   (INSERT IGNORE — delete once the dump is fixed).
