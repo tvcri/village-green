@@ -129,6 +129,30 @@ CREATE TABLE `disability` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `enrollment_request`
+--
+
+DROP TABLE IF EXISTS `enrollment_request`;
+CREATE TABLE `enrollment_request` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `email` varchar(200) NOT NULL,
+  `personId` int DEFAULT NULL,
+  `pinHash` char(60) DEFAULT NULL,
+  `kind` varchar(32) DEFAULT NULL COMMENT 'new | existing_account',
+  `outcome` varchar(32) NOT NULL COMMENT 'pin_sent | superseded | ineligible_member | not_found | kc_unavailable',
+  `attempts` int NOT NULL DEFAULT '0',
+  `resetAttempts` int NOT NULL DEFAULT '0',
+  `expiresAt` datetime DEFAULT NULL,
+  `consumedAt` datetime DEFAULT NULL,
+  `resetAt` datetime DEFAULT NULL,
+  `createdAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `INDEX_er_email` (`email`),
+  KEY `fk_enrollment_request_person` (`personId`),
+  CONSTRAINT `fk_enrollment_request_person` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `fcv_submission`
 --
 
@@ -199,11 +223,12 @@ DROP TABLE IF EXISTS `notification_event`;
 CREATE TABLE `notification_event` (
   `id` int NOT NULL AUTO_INCREMENT,
   `eventType` varchar(32) NOT NULL COMMENT 'open | confirmed | cancelled | reminder',
-  `serviceRequestId` int NOT NULL,
+  `serviceRequestId` int DEFAULT NULL,
   `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `sentAt` timestamp NULL DEFAULT NULL,
   `recipients` json DEFAULT NULL COMMENT 'Array of person ids notified, written by sidecar on send',
   `failedAt` timestamp NULL DEFAULT NULL,
+  `payload` json DEFAULT NULL COMMENT 'Event-type-specific data for events not tied to a service request',
   PRIMARY KEY (`id`),
   KEY `fk_email_event_sr` (`serviceRequestId`),
   KEY `idx_email_event_pending` (`sentAt`,`createdAt`),
@@ -244,6 +269,7 @@ CREATE TABLE `person` (
   `comments` text,
   PRIMARY KEY (`id`),
   KEY `person_ibfk_1` (`villageId`),
+  KEY `INDEX_email` (`email`),
   CONSTRAINT `person_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
   CONSTRAINT `person_names_non_empty` CHECK (((`lastName` <> _utf8mb4'') and (`firstName` <> _utf8mb4'')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -398,6 +424,8 @@ CREATE TABLE `service_request` (
   `state` varchar(50) DEFAULT NULL,
   `zip` varchar(20) DEFAULT NULL,
   `createdUserId` int DEFAULT NULL,
+  `modifiedUserId` int DEFAULT NULL,
+  `modifiedAt` datetime DEFAULT NULL,
   `start` text,
   `startAddress` text,
   `startCity` varchar(100) DEFAULT NULL,
@@ -410,7 +438,9 @@ CREATE TABLE `service_request` (
   KEY `volunteer_person_id` (`volunteerPersonId`),
   KEY `fk_service_request_created_user` (`createdUserId`),
   KEY `idx_sr_village_date_status` (`villageId`,`serviceDate`,`status`),
+  KEY `fk_service_request_modified_user` (`modifiedUserId`),
   CONSTRAINT `fk_service_request_created_user` FOREIGN KEY (`createdUserId`) REFERENCES `user_data` (`userId`),
+  CONSTRAINT `fk_service_request_modified_user` FOREIGN KEY (`modifiedUserId`) REFERENCES `user_data` (`userId`),
   CONSTRAINT `service_request_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
   CONSTRAINT `service_request_ibfk_2` FOREIGN KEY (`memberPersonId`) REFERENCES `person` (`id`),
   CONSTRAINT `service_request_ibfk_3` FOREIGN KEY (`volunteerPersonId`) REFERENCES `person` (`id`)
@@ -623,4 +653,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-17 11:01:29
+-- Dump completed on 2026-07-20 22:34:52
