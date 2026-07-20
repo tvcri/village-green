@@ -6,16 +6,22 @@ import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
+import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { getVillages } from '../api/villageApi.js'
 
 const router = useRouter()
-const { hasFederationAccess } = useCurrentUser()
+const { user, hasFederationAccess } = useCurrentUser()
 const { getStatusSeverity } = useStatusSeverity()
 
 const { state: villages, isLoading, error } = useAsyncState(
   () => getVillages(['personCounts', 'srStatusCounts']),
-  { immediate: true }
+  // A 403 here means the user has no village access at all (no grants, not
+  // admin, not a volunteer) — an expected outcome, not a bug. Show it inline
+  // instead of the global crash-style error modal.
+  { immediate: true, onError: null }
 )
+
+const isAccessDenied = computed(() => getHttpStatus(error.value) === 403)
 
 const isEmpty = computed(() => !isLoading.value && Array.isArray(villages.value) && villages.value.length === 0)
 
@@ -42,6 +48,10 @@ const metaVillageCounts = computed(() => {
 // Meta Village is visible to users holding any federation-scoped role grant.
 const showMetaVillage = computed(() => hasFederationAccess.value)
 
+// The VSS card uses the same volunteer-identity gate as the header menu item —
+// any volunteer, regardless of role grants, can reach Volunteer Self Signup.
+const isVolunteer = computed(() => !!user.value?.volunteer)
+
 const navigateToVillage = (villageId) => {
   router.push({ name: 'village-detail', params: { villageId } })
 }
@@ -55,6 +65,10 @@ const navigateToVillage = (villageId) => {
       <p>Loading villages...</p>
     </div>
 
+    <div v-else-if="isAccessDenied" class="error-state">
+      <p>You don't have access to any villages yet. Contact your administrator if you believe this is a mistake.</p>
+    </div>
+
     <div v-else-if="error" class="error-state">
       <p>Unable to load villages. Please try again.</p>
     </div>
@@ -64,6 +78,21 @@ const navigateToVillage = (villageId) => {
     </div>
 
     <div v-else class="village-grid">
+      <Card
+        v-if="isVolunteer"
+        class="village-card vss-card"
+        @click="router.push({ name: 'volunteer' })"
+      >
+        <template #title>
+          <div class="title-header">
+            <i class="pi pi-heart vss-icon" />
+            <span class="village-name">Volunteer<br>Self Signup</span>
+          </div>
+        </template>
+        <template #content>
+          <p class="vss-cta">Volunteer for a service request, or view your commitments<br/>and history</p>
+        </template>
+      </Card>
       <Card
         v-if="showMetaVillage && metaVillageCounts"
         class="village-card meta-village-card"
@@ -197,6 +226,23 @@ h1 {
 
 .meta-village-card:hover {
   opacity: 1;
+}
+
+.vss-card {
+  border: 2px solid color-mix(in srgb, var(--color-action-red) 45%, transparent);
+}
+
+.vss-icon {
+  color: var(--color-action-red);
+  font-size: 1.1rem;
+}
+
+.vss-cta {
+  margin: 0;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--color-text-dim);
+  line-height: 1.4;
 }
 
 .title-header {

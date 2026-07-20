@@ -150,6 +150,27 @@ module.exports.getUser = async function getUser (req, res, next) {
 
     let response = await UserService.getUserByUserId(req.userObject.userId, projection)
     response.canElevate = holdsAnyElevatable(req.userObject)
+
+    // Volunteer block (VSS): identity-derived from the caller's linked person.
+    // A personId only means the username matched exactly one person by email —
+    // it does NOT mean that person is a volunteer. The VSS surface (and its
+    // /volunteer-requests gate) admit only ACTIVE volunteers, so gate this block
+    // on the same isActiveVolunteer check the access gate uses; otherwise the
+    // client offers a surface the API 403s. Don't infer volunteer status from
+    // villages.length — person.villageId is nullable, so an active volunteer
+    // with no village would be wrongly excluded.
+    const personId = req.userObject.personId
+    if (personId && await UserService.isActiveVolunteer(personId)) {
+      const [villages, capabilities] = await Promise.all([
+        UserService.getVolunteerVillages(personId),
+        UserService.getVolunteerCapabilities(personId),
+      ])
+      response.volunteer = { personId: String(personId), villages, capabilities }
+    } else {
+      response.volunteer = null
+    }
+
+
     res.json(response)
 }
   catch(err) {

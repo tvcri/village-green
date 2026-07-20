@@ -3,7 +3,7 @@ import { useElevate } from '../../../shared/composables/useElevate.js'
 
 export const getUsers = () => {
   const { elevate } = useElevate()
-  return apiCall('getUsers', { elevate: elevate.value ?? true })
+  return apiCall('getUsers', { elevate: elevate.value ?? true, projection: ['volunteer'] })
 }
 
 export const getUserGrants = (userId) => {

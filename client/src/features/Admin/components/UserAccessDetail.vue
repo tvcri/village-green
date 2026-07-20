@@ -3,6 +3,7 @@ import { computed, ref, onMounted, useTemplateRef } from 'vue'
 import { useRoute } from 'vue-router'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
+import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRoles } from '../../../shared/composables/useRoles.js'
 import { getVillages } from '../api/villageGrantApi.js'
@@ -140,7 +141,10 @@ const handleSaveUsername = async () => {
 
 <template>
   <div class="user-access-detail">
-    <h1>User Access</h1>
+    <h1>
+      User Access
+      <Tag v-if="selectedUser?.isVolunteer" value="VSS" severity="warn" title="Eligible for Volunteer Self-Signup" />
+    </h1>
 
     <div v-if="selectedUserId && grantsLoading" class="loading-state">
       <p>Loading grants...</p>
@@ -201,6 +205,9 @@ const handleSaveUsername = async () => {
 }
 
 h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   margin: 0 0 2rem 0;
   color: var(--color-text-primary);
   font-size: 1.5rem;

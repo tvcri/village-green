@@ -5,12 +5,19 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 const mockHasPermission = vi.fn(() => false)
 const mockHasVillageAccess = vi.fn(() => false)
 const mockHasFederationAccess = { value: false }
+const mockIsGrantless = { value: false }
+
+// Mirror the real composable: user is computed(() => VG.curUser), so expose
+// a live getter that reads whatever each test sets on globalThis.VG.
+const mockUser = { get value() { return globalThis.VG?.curUser } }
 
 vi.mock('../shared/composables/useCurrentUser.js', () => ({
   useCurrentUser: () => ({
+    user: mockUser,
     hasPermission: mockHasPermission,
     hasVillageAccess: mockHasVillageAccess,
     hasFederationAccess: mockHasFederationAccess,
+    isGrantless: mockIsGrantless,
   }),
 }))
 
@@ -60,6 +67,8 @@ describe('navigation guards', () => {
     mockHasPermission.mockReturnValue(false)
     mockHasVillageAccess.mockReturnValue(false)
     mockHasFederationAccess.value = false
+    mockIsGrantless.value = false
+    globalThis.VG = { curUser: null }
   })
 
   describe('requiresPermission (federation)', () => {
@@ -144,5 +153,49 @@ describe('navigation guards', () => {
       await router.isReady()
       expect(router.currentRoute.value.name).toBe('not-found')
     })
+  })
+})
+
+describe('volunteer surface', () => {
+  beforeEach(() => {
+    mockHasPermission.mockReturnValue(false)
+    mockHasVillageAccess.mockReturnValue(false)
+    mockHasFederationAccess.value = false
+    mockIsGrantless.value = false
+    globalThis.VG = { curUser: null }
+  })
+
+  it('blocks /volunteer for users without a volunteer block', () => {
+    globalThis.VG = { curUser: { volunteer: null } }
+    const result = navigationGuard({ name: 'volunteer', path: '/volunteer', params: {}, meta: { requiresVolunteer: true } })
+    expect(result).toEqual({ name: 'villages' })
+  })
+
+  it('allows /volunteer for users with a volunteer block', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    mockIsGrantless.value = true
+    const result = navigationGuard({ name: 'volunteer', path: '/volunteer', params: {}, meta: { requiresVolunteer: true } })
+    expect(result).toBeUndefined()
+  })
+
+  it('redirects volunteer-only (grantless) users to /volunteer from anywhere else', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    mockIsGrantless.value = true
+    const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
+    expect(result).toEqual({ name: 'volunteer' })
+  })
+
+  it('does not redirect grant-holding staff who also volunteer', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    mockIsGrantless.value = false
+    const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
+    expect(result).toBeUndefined()
+  })
+
+  it('allows volunteer-only users onto the request detail deep link', () => {
+    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    mockIsGrantless.value = true
+    const result = navigationGuard({ name: 'volunteer-request-detail', path: '/volunteer/requests/2303', params: { id: '2303' }, meta: { requiresVolunteer: true } })
+    expect(result).toBeUndefined()
   })
 })
