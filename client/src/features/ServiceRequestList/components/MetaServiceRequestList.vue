@@ -9,6 +9,7 @@ import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
+import Badge from 'primevue/badge'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
 import { useToast } from 'primevue/usetoast'
@@ -267,53 +268,44 @@ const clearFilters = () => {
     <div class="filter-section">
       <div class="filters-container">
         <div class="filters-header">
-          <button
+          <Button
             type="button"
-            class="filters-toggle"
-            :class="{ collapsed: filtersCollapsed }"
+            class="filters-btn"
+            outlined
+            :aria-expanded="!filtersCollapsed"
             @click="filtersCollapsed = !filtersCollapsed"
           >
-            <span class="toggle-icon">▼</span>
-            <span class="filters-title">
-              Filters
-              <span v-if="requests && requests.length && (filteredRequests.length < requests.length || activeFilterCount > 0)" class="filter-count-tag">
-                {{ filteredRequests.length }} of {{ requests.length }} requests
-                <span
-                  role="button"
-                  class="clear-filters-icon"
-                  @click.stop.prevent="clearFilters()"
-                  @keydown.enter.stop.prevent="clearFilters()"
-                  @keydown.space.stop.prevent="clearFilters()"
-                  tabindex="0"
-                  title="Clear all filters"
-                >
-                  ✕
-                </span>
-              </span>
+            <i class="pi pi-filter" aria-hidden="true" />
+            <span class="filters-btn-label">Filters</span>
+            <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
+            <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: filtersCollapsed }" aria-hidden="true" />
+          </Button>
+          <span v-if="requests && requests.length && (filteredRequests.length < requests.length || activeFilterCount > 0)" class="filter-count-tag">
+            {{ filteredRequests.length }} of {{ requests.length }} requests
+            <span
+              role="button"
+              class="clear-filters-icon"
+              @click.prevent="clearFilters()"
+              @keydown.enter.prevent="clearFilters()"
+              @keydown.space.prevent="clearFilters()"
+              tabindex="0"
+              title="Clear all filters"
+            >
+              ✕
             </span>
-          </button>
+          </span>
         </div>
 
         <div v-if="!filtersCollapsed" class="filters-content">
-          <div class="status-id-row">
-            <div class="status-filter-group">
-              <label class="filter-group-label">Status:</label>
-              <div class="status-filters">
-                <div v-for="status in statusOptions" :key="status" class="status-filter">
-                  <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
-                  <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
-                </div>
+          <div class="status-filter-group">
+            <label class="filter-group-label">Status:</label>
+            <div class="status-filters">
+              <div v-for="status in statusOptions" :key="status" class="status-filter">
+                <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
+                <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
               </div>
             </div>
-            <div class="search-box">
-              <label>Request ID / #:</label>
-              <IconField>
-                <InputText v-model="idSearch" placeholder="Search by ID or number" />
-                <InputIcon v-if="idSearch" class="pi pi-times" style="cursor: pointer" @click="idSearch = ''" />
-              </IconField>
-            </div>
           </div>
-
           <div class="search-box">
             <label>Member:</label>
             <Select v-model="selectedMember" :options="memberOptions" placeholder="-- Select member --" />
@@ -337,6 +329,13 @@ const clearFilters = () => {
           <div class="search-box">
             <label>Notifications:</label>
             <Select v-model="notificationFilter" :options="['All requests', 'Not notified']" />
+          </div>
+          <div class="search-box request-num-box">
+            <label>Request #:</label>
+            <IconField>
+              <InputText v-model="idSearch" placeholder="Search by number" />
+              <InputIcon v-if="idSearch" class="pi pi-times" style="cursor: pointer" @click="idSearch = ''" />
+            </IconField>
           </div>
         </div>
       </div>
@@ -390,23 +389,22 @@ const clearFilters = () => {
 h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .header-actions { display: flex; align-items: center; gap: 1rem; }
 .filter-section { margin-bottom: 1.5rem; padding: 1rem 0; background-color: var(--color-background-primary); border-bottom: 1px solid var(--color-border-default); width: 100%; display: flex; flex-direction: column; gap: 1rem; }
-.filters-container { display: flex; flex-direction: column; gap: 0; }
-.filters-header { display: flex; align-items: center; gap: 0.5rem; }
-.filters-toggle { display: flex; align-items: center; gap: 0.75rem; flex: 1; padding: 0.75rem; background: none; border: none; cursor: pointer; font-size: 1rem; text-align: left; color: var(--color-text-primary); font-weight: 500; transition: background-color 0.2s ease; min-height: 3rem; }
-.filters-toggle:hover { background-color: var(--color-background-subtle); border-radius: 4px; }
-.toggle-icon { display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; transition: transform 0.2s ease; color: var(--color-text-dim); flex-shrink: 0; }
-.filters-toggle .toggle-icon { transform: rotate(0deg); }
-.filters-toggle.collapsed .toggle-icon { transform: rotate(-90deg); }
-.filters-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; color: var(--color-text-primary); }
-.filter-count-tag { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; background-color: var(--color-background-subtle); border: 1px solid var(--color-border-default); border-radius: 12px; font-size: 0.8rem; color: var(--color-text-dim); font-weight: 500; white-space: nowrap; }
+.filters-container { display: flex; flex-direction: column; gap: 0.75rem; }
+.filters-header { display: flex; align-items: center; gap: 0.75rem; }
+/* Bolder label matches the "Use member's home" treatment: outlined + 700 label
+   reads as prominent without competing with the solid primary actions. */
+.filters-btn-label { font-weight: 700; }
+.filters-chevron { font-size: 0.75rem; transition: transform 0.2s ease; }
+.filters-chevron.collapsed { transform: rotate(-90deg); }
+.filter-count-tag { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; background-color: var(--color-background-subtle); border: 1px solid var(--color-border-default); border-radius: 12px; font-size: 0.875rem; color: var(--color-text-primary); font-weight: 500; white-space: nowrap; }
 .clear-filters-icon { display: inline-flex; align-items: center; justify-content: center; margin-left: 0.5rem; cursor: pointer; color: var(--color-text-dim); font-size: 0.75rem; font-weight: bold; line-height: 1; transition: color 0.2s ease; }
 .clear-filters-icon:hover { color: var(--color-text-primary); }
-.filters-content { display: flex; gap: 2rem; flex-wrap: wrap; align-items: flex-start; padding: 1rem; background-color: var(--color-background-light); border: 1px solid var(--color-border-default); border-radius: 4px; }
-.status-id-row { display: flex; gap: 2rem; align-items: flex-start; flex: 1 1 100%; }
-.status-id-row .status-filter-group { flex: 1 1 auto; }
+.filters-content { display: flex; gap: 0.75rem 1.25rem; flex-wrap: wrap; align-items: flex-start; padding: 1rem; background-color: var(--color-background-light); border: 1px solid var(--color-border-default); border-radius: 4px; }
 .status-filter-group { display: flex; flex-direction: column; gap: 0.5rem; flex: 1 1 100%; }
 .filter-group-label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .filters-content .search-box { display: flex; flex-direction: column; gap: 0.5rem; min-width: 160px; }
+.filters-content .request-num-box { min-width: 0; }
+.request-num-box :deep(input) { width: 10rem; }
 .filters-content .search-box label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .status-filter { display: flex; align-items: center; gap: 0.375rem; }
