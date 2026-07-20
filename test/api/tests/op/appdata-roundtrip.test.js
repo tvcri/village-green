@@ -32,7 +32,7 @@ test('appdata export -> import -> re-export round-trips losslessly', async () =>
 
   // Floor: the comparison below is vacuously true over an empty export, so pin
   // that the export actually contains the seeded dataset before comparing.
-  for (const table of ['village', 'person', 'member', 'volunteer', 'service_request', 'user_data', 'village_grant']) {
+  for (const table of ['village', 'person', 'member', 'volunteer', 'service_request', 'user_data', 'role_grant']) {
     assert.ok(a.tables.get(table)?.length > 0, `export includes seeded ${table} rows`)
   }
 

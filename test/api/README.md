@@ -5,6 +5,15 @@ surface — every resource is **characterized** (its real current behavior pinne
 regression net), with **authorization / information-exposure** correctness (only the right
 users see the right data) as the throughline.
 
+> **Status (2026-07-15): partially re-synced — expectations stale.** After the
+> #56/#58/#60 merge (capability-role RBAC + SR wall-clock split), the seeder is
+> re-synced (`role_grant`, `serviceDate`/`finishTime`, admin as a DB grant, and
+> a marked workaround seeding the role catalog that `sql/current/20-vg-static.sql`
+> omits — an upstream bug). The suite runs (~31 s) but the RBAC rework changed
+> real behavior: **84 pass / 83 fail / 7 todo**. The failures are catalogued, with
+> a retarget plan, in `scratch/unit-vs-e2e-testing.md` §9 — until that lands, the
+> "13 reds + green" contract below does not hold.
+>
 > **Status (2026-07-07):** re-synced with `main` after the #37–#47 merge (the person /
 > member / volunteer schema rework): the seeder targets the camelCase schema and seeds
 > `firstName`/`lastName` (`fullName` is DB-generated as `"last, first"`), with a drift

@@ -16,12 +16,17 @@ export const villages = {
   scratch: { id: 4, name: 'Pawtuxet' },
 }
 
-// roleId: 1=restricted, 2=full, 3=manage, 4=owner
-// privileges land in the token's realm_access.roles claim (e.g. 'admin').
+// roleId (post-#56 capability roles, seeded by migration 0013):
+//   village scope: 1=Local Service Coordinator, 2=Steering Committee, 3=Village Lead
+//   federation scope (villageId null): 4=Admin, 5=Staff, 6=Board, 7=Service Coordinator
+// Old fixture roles map per the migration's LEAST(roleId, 3): restricted→1,
+// full→2, owner→3. Admin is now a DB grant (roleId 4), not a token privilege —
+// holdsAnyElevatable() reads effective permissions computed from role_grant.
+// privileges still land in the token's realm_access.roles claim.
 export const users = {
   owner_v1: {
     userId: 1, name: 'Roger Williams', username: 'roger.williams@gmail.test',
-    grants: [{ villageId: villages.quahog.id, roleId: 4 }], privileges: [],
+    grants: [{ villageId: villages.quahog.id, roleId: 3 }], privileges: [],
   },
   full_v1: {
     userId: 2, name: 'Anne Hutchinson', username: 'anne.hutchinson@quahog.test',
@@ -51,7 +56,7 @@ export const users = {
   },
   admin: {
     userId: 7, name: 'Moses Brown', username: 'moses.brown@brownbros.test',
-    grants: [], privileges: ['admin'],
+    grants: [{ villageId: null, roleId: 4 }], privileges: ['admin'],
   },
   // Authenticated with valid scope but zero grants — must see nothing.
   nogrants: {
@@ -111,19 +116,19 @@ export const serviceRequests = {
     id: 1, villageId: villages.quahog.id, requestNumber: 101,
     memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
     status: 'Confirmed', serviceName: 'Ride to pharmacy', destination: "Goldman's Pharmacy",
-    finishAt: '2026-07-10 09:00:00',
+    serviceDate: '2026-07-10', finishTime: '09:00:00',
   },
   srV2: {
     id: 2, villageId: villages.innsmouth.id, requestNumber: 201,
     memberPersonId: persons.innsmouthMember.id, volunteerPersonId: persons.innsmouthVolunteer.id,
     status: 'Confirmed', serviceName: 'Ride to campus', destination: 'Miskatonic University',
-    finishAt: '2026-07-11 10:00:00',
+    serviceDate: '2026-07-11', finishTime: '10:00:00',
   },
   srV3: {
     id: 3, villageId: villages.miskatonic.id, requestNumber: 301,
     memberPersonId: persons.miskatonicMember.id, volunteerPersonId: null,
     status: 'Open', serviceName: 'Ride to hospital', destination: 'Arkham Hospital',
-    finishAt: '2026-07-12 11:00:00',
+    serviceDate: '2026-07-12', finishTime: '11:00:00',
   },
 }
 

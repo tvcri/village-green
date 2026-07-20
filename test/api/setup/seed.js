@@ -9,7 +9,7 @@ import { villages, users, persons, members, volunteers, serviceRequests, fcvSubm
 const TABLES = [
   'notification_event', 'service_request', 'fcv_submission', 'volunteer_vetting',
   'volunteer_capability', 'volunteer_village_associate', 'volunteer', 'member',
-  'person_disability', 'person', 'village_grant', 'user_group_user_map',
+  'person_disability', 'person', 'role_grant', 'user_group_user_map',
   'user_group', 'privacy_acknowledgement', 'privacy_rules', 'user_data', 'village',
 ]
 
@@ -19,14 +19,58 @@ const TABLES = [
 const EXPECTED_COLUMNS = {
   village: ['id', 'name'],
   user_data: ['userId', 'username'],
-  village_grant: ['villageId', 'userId', 'roleId'],
+  role_grant: ['villageId', 'userId', 'roleId'],
+  role: ['roleId', 'name', 'scope'],
+  role_permission: ['roleId', 'permission'],
   person: ['id', 'villageId', 'firstName', 'lastName', 'street', 'city', 'state', 'zip', 'email', 'phone', 'cell'],
   member: ['id', 'personId', 'memberNumber', 'status'],
   volunteer: ['id', 'personId', 'active'],
   service_request: ['id', 'requestNumber', 'villageId', 'memberPersonId', 'volunteerPersonId',
-    'status', 'serviceName', 'destination', 'createdAt', 'finishAt'],
+    'status', 'serviceName', 'destination', 'createdAt', 'serviceDate', 'finishTime'],
   fcv_submission: ['id', 'villageId', 'volunteerPersonId', 'memberPersonId', 'visitDate',
     'timeSpentMinutes', 'contactType', 'activityTypes', 'notes', 'submittedAt'],
+}
+
+// WORKAROUND for an upstream gap (found 2026-07-15): the fresh-scaffold dump
+// sql/current/20-vg-static.sql marks migration 0013-rbac-roles.js as executed
+// in `_migrations` but does NOT carry its static role / role_permission rows,
+// so a fresh scaffold has an empty role catalog and every role_grant insert
+// hits fk_role_grant_role. Mirror the 0013 catalog here (INSERT IGNORE, so a
+// fixed dump wins). Delete this block once main updates 20-vg-static.sql.
+const villageReads = ['person:read', 'member:read', 'volunteer:read', 'sr:read', 'friend:read', 'village:read']
+const ROLES = [
+  // [roleId, name, scope, permissions]
+  [1, 'Local Service Coordinator', 'village', villageReads],
+  [2, 'Steering Committee', 'village', villageReads],
+  [3, 'Village Lead', 'village', [...villageReads, 'member:read_financial']],
+  [4, 'Admin', 'federation', ['*']],
+  [5, 'Staff', 'federation', [
+    'person:read', 'person:write', 'person:read_confidential',
+    'member:read', 'member:write', 'member:read_financial', 'member:read_inactive',
+    'volunteer:read', 'volunteer:write', 'volunteer:read_inactive',
+    'sr:read', 'sr:write', 'friend:read', 'friend:write',
+    'village:read', 'village:write',
+  ]],
+  [6, 'Board', 'federation', villageReads],
+  [7, 'Service Coordinator', 'federation', [
+    'sr:read', 'sr:write', 'person:read', 'member:read', 'volunteer:read',
+    'village:read', 'friend:read', 'person:read_confidential',
+  ]],
+]
+
+async function seedRoleCatalog (conn) {
+  for (const [roleId, name, scope, permissions] of ROLES) {
+    await conn.query(
+      'INSERT IGNORE INTO role (roleId, name, scope, isSystem) VALUES (?, ?, ?, 1)',
+      [roleId, name, scope],
+    )
+    for (const p of permissions) {
+      await conn.query(
+        'INSERT IGNORE INTO role_permission (roleId, permission) VALUES (?, ?)',
+        [roleId, p],
+      )
+    }
+  }
 }
 
 async function assertSeedColumns (conn) {
@@ -70,6 +114,8 @@ export async function seed () {
     }
     await conn.query('SET FOREIGN_KEY_CHECKS = 1')
 
+    await seedRoleCatalog(conn)
+
     for (const v of Object.values(villages)) {
       await conn.query('INSERT INTO village (id, name) VALUES (?, ?)', [v.id, v.name])
     }
@@ -77,9 +123,10 @@ export async function seed () {
     for (const u of Object.values(users)) {
       await conn.query('INSERT INTO user_data (userId, username) VALUES (?, ?)', [u.userId, u.username])
       for (const g of u.grants) {
+        // villageId null = federation-scoped grant (Admin/Staff/Board/SC roles)
         await conn.query(
-          'INSERT INTO village_grant (villageId, userId, roleId) VALUES (?, ?, ?)',
-          [g.villageId, u.userId, g.roleId],
+          'INSERT INTO role_grant (villageId, userId, roleId) VALUES (?, ?, ?)',
+          [g.villageId ?? null, u.userId, g.roleId],
         )
       }
     }
@@ -109,10 +156,10 @@ export async function seed () {
       await conn.query(
         `INSERT INTO service_request
            (id, requestNumber, villageId, memberPersonId, volunteerPersonId,
-            status, serviceName, destination, createdAt, finishAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+            status, serviceName, destination, createdAt, serviceDate, finishTime)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
         [sr.id, sr.requestNumber, sr.villageId, sr.memberPersonId, sr.volunteerPersonId,
-          sr.status, sr.serviceName, sr.destination, sr.finishAt],
+          sr.status, sr.serviceName, sr.destination, sr.serviceDate, sr.finishTime],
       )
     }
 
