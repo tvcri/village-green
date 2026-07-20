@@ -82,10 +82,11 @@ test('patchUserGroup renames and replaces the membership set', async () => {
 
 test('a village grant to the group flows to its member users', async () => {
   assert.ok(groupId, 'precondition: create test ran')
-  // scratch user has no direct grants — Pawtuxet must be invisible to it
+  // scratch user holds no grants at all, so the deny-by-default staff gate
+  // (api/source/utils/accessGates.js) 403s it on /villages — "no access before
+  // the group grant" reads as 403 here, not an empty list.
   const before = await vgCall('getVillages', {}, { token: tokens.users.scratch })
-  assert.equal(before.status, 200)
-  assert.ok(!before.json.some(v => v.name === villages.scratch.name), 'no access before the group grant')
+  assert.equal(before.status, 403, 'grantless user is denied by the staff gate')
 
   const granted = await vgCall('createVillageGrant', { villageId: scratchVillage, ...E }, {
     ...admin, body: [{ userGroupId: groupId, roleId: 2 }],
@@ -95,6 +96,7 @@ test('a village grant to the group flows to its member users', async () => {
     assert.equal(granted.status, 201)
 
     const after = await vgCall('getVillages', {}, { token: tokens.users.scratch })
+    assert.equal(after.status, 200, 'the group grant admits the member user past the staff gate')
     assert.ok(after.json.some(v => v.name === villages.scratch.name),
       'group grant grants the member user access')
   } finally {
@@ -107,7 +109,7 @@ test('a village grant to the group flows to its member users', async () => {
   }
   assert.equal(cleared.status, 200)
   const revoked = await vgCall('getVillages', {}, { token: tokens.users.scratch })
-  assert.ok(!revoked.json.some(v => v.name === villages.scratch.name), 'revoked with the grant')
+  assert.equal(revoked.status, 403, 'revoked with the grant: grantless again, gate re-denies')
 })
 
 test('deleteUserGroup removes the group', async () => {

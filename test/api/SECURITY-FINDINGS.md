@@ -1,112 +1,84 @@
 # Security findings asserted by this suite
 
 This suite intentionally asserts the **correct/secure** behavior. Where the current
-code is insecure, the corresponding tests **fail (red)** on purpose — a red run here is
-expected until the underlying issues are fixed. When a fix lands, the test goes green
-with no edit needed. Each finding below maps to specific tests.
+code is insecure or broken, the corresponding tests **fail (red)** on purpose — or,
+where a red would be disruptive, a clearly-marked `KNOWN BUG` test pins the buggy
+behavior and must be flipped when the fix lands. Each finding maps to specific tests.
 
-## 1. Cross-village information exposure via by-ID endpoints (RED)
+## Status 2026-07-20: findings #1–#6 fixed by the RBAC rework (#56) — verified live
 
-`GET /service-requests/{id}` ([service/ServiceRequestService.js](../../api/source/service/ServiceRequestService.js)
-`getServiceRequest`) and `GET /persons/{id}` ([service/PersonService.js](../../api/source/service/PersonService.js)
-`getPerson`) apply **no village-grant filtering**. Any authenticated user holding the read
-scope can fetch a record from a village they have no grant on — including, for service
-requests, the member's/volunteer's home address, phone, and email via
-`?projection=memberAddress` / `?projection=volunteerAddress`.
+The original six findings (recorded below for history) were all resolved by the
+capability-role refactor, which added per-village permission checks
+(`hasPermission(perm, {villageId})`) to every controller path this register
+covered. Each former RED probe has been converted to a GREEN assertion (with a
+"fixed by #56" comment at the site) and verified against a live run on
+2026-07-20:
 
-The **list** endpoints are grant-filtered; only the single-record-by-ID paths leak.
+| # | Was | Now |
+|---|-----|-----|
+| 1 | Cross-village reads via by-ID endpoints (`GET /persons/{id}`, `/service-requests/{id}`) leaked address/phone/email | **403** — perm-checked after fetch (`tests/persons/authz.test.js`, `tests/service-request/authz.test.js`). Note the semantics changed from the suggested 404 to 403, and the check runs *before* existence on nested `/villages/{id}/...` routes. |
+| 2 | Cross-village SR writes ungated | **403** — `sr:write` on the target/existing village (`tests/service-request/authz.test.js`); village roles hold no writes at all now |
+| 3 | Multi-value `villageId` filter double-wrapped in `getServiceRequests` → 500 | Fixed — bare-array bind (`tests/service-request/meta-rollup.test.js` exercises the multi-value union green) |
+| 4 | Same double-wrap in `FriendService.getFriends` → 500 | Fixed — same shape (`tests/friends/list.test.js`) |
+| 5 | Person writes (create/patch/delete + member/volunteer sub-resources) ungated | **403** — `person:write`/`member:write`/`volunteer:write` on the person's village, plus a destination-village check when a patch moves a person (`tests/persons/write.test.js`, `tests/members/lifecycle.test.js`, `tests/volunteers/lifecycle.test.js`) |
+| 6 | Village write endpoints had no gate (masked by WIP bugs) | **Gated and working** — `village:write` per village; `createVillage` is admin+elevate (`village:create`); the WIP 500/404 bugs are also gone (`tests/villages/crud.test.js`) |
 
-- Asserted in: `tests/service-request/authz.test.js`, `tests/persons/authz.test.js`
-- Expected secure behavior: **404** for a record outside the caller's grants (matching the
-  existing nested-route convention, where `GET /villages/{id}/...` 404s for an ungranted
-  village). If the team prefers 403, update the assertion when the guard is added.
+## Open findings
 
-## 2. Cross-village writes via by-ID endpoints (RED)
+### A. `sqlGrantees` double-wraps `villageIds` → 500 (correctness, not exposure)
 
-`POST /service-requests` (`createServiceRequest`) and `PATCH /service-requests/{id}`
-(`patchServiceRequest`) do not check that the caller has a grant on the target village, so
-a user can create a request in, or modify a request belonging to, a village they don't
-administer.
+The same mis-binding class as former #3/#4 survives in one spot:
+`api/source/service/utils.js:754` pushes `[villageIds]` into `IN (?)`.
+Reachable: any caller with village grants on **2+ villages** calling
+`GET /villages?projection=statistics` → `ER_OPERAND_COLUMNS` → **500**.
+Federation callers (allVillages path) and single-village callers dodge it.
 
-- Asserted in: `tests/service-request/authz.test.js`
-- Expected secure behavior: **403/404** for a village outside the caller's grants.
+- Pinned by: `tests/villages/projections.test.js` (`KNOWN BUG` test asserting
+  the 500 — flip to 200 when fixed) and the unit characterization in
+  `api/source/test/serviceUtils.test.js`.
+- Full write-up: `scratch/bug-report-2026-07-20.md`.
 
-## 3. Multi-value `villageId` filter is mis-bound (RED, correctness not security)
+### B. Fresh scaffold ships an empty role catalog (deploy-blocking)
 
-In `getServiceRequests`, the client `villageId` filter is bound as `[villageId]` where
-`villageId` is already an array
-([ServiceRequestService.js:194](../../api/source/service/ServiceRequestService.js#L194)),
-double-wrapping it. A single value works by accident; **multiple** selected villages render
-a nested row-constructor — the generated SQL is `sr.village_id IN (('1', '2'))` — which
-MySQL rejects with `ER_OPERAND_COLUMNS` ("Operand should contain 1 column(s)"), so the
-endpoint returns **500**. This is the path the meta view uses when more than one village is
-selected.
+`api/source/service/migrations/sql/current/20-vg-static.sql` marks migration
+`0013-rbac-roles.js` executed but carries none of its `role` /
+`role_permission` rows, so a fresh scaffold can grant nobody anything
+(every `role_grant` insert hits `fk_role_grant_role`).
 
-- Asserted in: `tests/service-request/meta-rollup.test.js`
-- Note: not an information-exposure issue (the grant filter is always ANDed on top, so it
-  can only *under*-return, never leak), but a correctness bug.
+- Worked around in this harness by `setup/seed.js seedRoleCatalog()`
+  (INSERT IGNORE — delete once the dump is fixed).
+- Full write-up: `scratch/bug-report-2026-07-20.md`.
 
-## 4. Multi-value `villageId` filter on `/friends` is mis-bound (RED, correctness not security)
+### C. `iss` claim is never validated (characterization)
 
-`FriendService.getFriends` ([FriendService.js](../../api/source/service/FriendService.js))
-carries the **same defect as #3**: the client `villageId` filter is bound as `[villageId]`
-where `villageId` is already an array. With more than one village selected
-(`?villageId=1&villageId=2`) the generated SQL becomes `fcv.villageId IN (('1', '2'))`, which
-MySQL rejects with `ER_OPERAND_COLUMNS`, so the endpoint returns **500**. A single value works
-by accident.
+`jwt.verify` is called without an `issuer` option, so a token signed by the
+trusted key but carrying a foreign `iss` is accepted. Low severity while the
+JWKS is the single trust root; would matter if key material were ever shared.
 
-- Asserted in: `tests/friends/list.test.js`
-- Note: like #3, the caller's grant filter is always ANDed on top, so this can only
-  *under*-return, never leak — a correctness bug, not an exposure.
-
-## 5. Cross-village person writes via the Person endpoints (RED)
-
-The Person controller ([controllers/Person.js](../../api/source/controllers/Person.js))
-applies **no village-grant check** on any write path:
-
-- `POST /persons` (`createPerson`) trusts `body.villageId`, so a caller can inject a person
-  into a village they hold no grant on.
-- `PATCH /persons/{id}` (`patchPerson`) and `DELETE /persons/{id}` (`deletePerson`) resolve
-  the row with a grant-blind `PersonService.getPerson`, so a caller can modify or delete any
-  person by id — including persons in villages they do not administer.
-- The person **sub-resource roles** inherit the same hole: the Member and Volunteer
-  controllers ([controllers/Member.js](../../api/source/controllers/Member.js),
-  [controllers/Volunteer.js](../../api/source/controllers/Volunteer.js)) check only that the
-  person exists and has a home village — never that the caller holds a grant on that
-  village — so `PUT|PATCH|DELETE /persons/{personId}/member` and `.../volunteer` accept
-  cross-village role writes.
-
-Same class as #2 (cross-village writes), for the person resource and its role sub-resources.
-
-- Asserted in: `tests/persons/write.test.js`, plus the cross-village probes in
-  `tests/members/lifecycle.test.js` and `tests/volunteers/lifecycle.test.js`
-- Expected secure behavior: **403/404** for a person/village outside the caller's grants.
-
-## 6. Village write endpoints have no authorization gate (RED, latent)
-
-`POST /villages`, `PATCH /villages/{villageId}` and `DELETE /villages/{villageId}`
-([controllers/Village.js](../../api/source/controllers/Village.js)) perform **no privilege or
-grant check**, and the OAS requires only the `vg:village` scope — no `x-elevation-required`,
-unlike the village-grant endpoints. Today the hole is **masked by WIP bugs** (createVillage
-500s on a `ReferenceError`; patch/delete 404 for everyone because the existence lookup is
-made grant-blind with no grants) — but fixing those bugs without adding a guard would let any
-user holding the standard scope set create, rename, or delete villages.
-
-- Asserted in: `tests/villages/crud.test.js` (the non-admin create probe is the RED
-  tripwire; a cross-village patch probe guards the patch path; there is deliberately no
-  cross-village delete probe, since a successful insecure delete would destroy a canonical
-  village mid-run)
-- Expected secure behavior: village creation admin-gated (elevation, like user management);
-  patch/delete **403/404** for a village outside the caller's grants.
+- Characterized in `tests/auth/authentication.test.js` ("foreign issuer claim
+  is ACCEPTED").
 
 ---
 
 ### What is verified as already-correct (GREEN)
 
-- List endpoints filter to the caller's granted villages; `nogrants` users see nothing.
-- The meta roll-up union is exactly the caller's granted villages; a client-supplied
-  `villageId` can only *narrow within* grants, never expand scope (grant filter is always ANDed).
-- Nested routes (`GET /villages/{id}/...`) 404 for an ungranted village.
-- `elevate=true` is admin-only; an admin without `elevate` sees only granted villages (none).
-- Authentication: missing/expired/tampered/insecure-kid tokens are rejected; scope
-  enforcement distinguishes read from write.
+- Unfiltered list reads are a federation-scope privilege: village users must
+  pass `villageId ⊆ grants` (403 otherwise, including mixed granted+ungranted
+  filters); `nogrants` users are denied outright by the deny-by-default staff
+  gate (`utils/accessGates.js`).
+- Village roles (1–3) are read-only; every write path 403s for them —
+  including in their *own* village. Writes live with federation Staff (5),
+  Service Coordinator (7, sr:write only), or Admin (4).
+- Field-level reads are permission-gated: `member:read_financial`
+  (householdDues et al.) reaches Village Lead/staff but not roles 1–2, board,
+  or sc; `member:read_inactive` distinguishes staff from board.
+- Elevation is a real gate on the admin surface (`user:admin`, `grant:admin`,
+  `app:admin`, `village:create`): admin without `elevate=true` → 403;
+  non-holders with `elevate=true` → 403.
+- Group grants (`role_grant.userGroupId`) flow to member users and revoke
+  cleanly; grant writes are admin+elevate only (staff denied).
+- Authentication: missing/expired/tampered/insecure-kid tokens rejected;
+  audience enforced; scope enforcement (OutOfScopeError) fires before role
+  checks and is distinguishable in tests.
+- The privacy-ack gate fails closed for all users (federation roles included)
+  with the allowlist intact.

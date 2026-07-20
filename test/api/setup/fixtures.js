@@ -58,6 +58,21 @@ export const users = {
     userId: 7, name: 'Moses Brown', username: 'moses.brown@brownbros.test',
     grants: [{ villageId: null, roleId: 4 }], privileges: ['admin'],
   },
+  // Federation-scope operators (villageId null). Post-#56, all writes live at
+  // federation scope: staff holds every resource :write, sc only sr:write,
+  // board is read-everything. Named for famous Rhode Islanders.
+  staff: {
+    userId: 10, name: 'Sarah Helen Whitman', username: 'sarah.whitman@federation.test',
+    grants: [{ villageId: null, roleId: 5 }], privileges: [],
+  },
+  board: {
+    userId: 11, name: 'Ambrose Burnside', username: 'a.burnside@federation.test',
+    grants: [{ villageId: null, roleId: 6 }], privileges: [],
+  },
+  sc: {
+    userId: 12, name: 'Ida Lewis', username: 'ida.lewis@federation.test',
+    grants: [{ villageId: null, roleId: 7 }], privileges: [],
+  },
   // Authenticated with valid scope but zero grants — must see nothing.
   nogrants: {
     userId: 8, name: 'Mr. Calimari', username: 'mr.calimari@quahog.test',

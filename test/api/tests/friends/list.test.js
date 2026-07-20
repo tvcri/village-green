@@ -1,20 +1,23 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
-import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 import { villages, persons, fcvSubmissions as fcv } from '../../setup/fixtures.js'
 
-// GET /friends correctness: grant filtering, elevate, and the query filters.
-// Seeded data: one FCV submission per village (fcvV1 Quahog, fcvV2 Innsmouth,
-// fcvV3 Miskatonic). full_v1 -> Quahog, full_v2 -> Innsmouth, multi -> both.
-// Green tests go through vgCall; the RED probe pins its literal URL (vgFetch).
+// GET /friends correctness: village scoping and the query filters.
+// Post-#56: a village-scope user must pass villageId ⊆ granted (no filter ->
+// 403, covered in authz.test.js); federation readers (admin/staff/board/sc)
+// see every village on a plain call. Seeded data: one FCV submission per
+// village (fcvV1 Quahog, fcvV2 Innsmouth, fcvV3 Miskatonic). full_v1 ->
+// Quahog, full_v2 -> Innsmouth, multi -> both.
 const idsOf = (rows) => rows.map(r => r.friendId)
+const quahog = String(villages.quahog.id)
+const innsmouth = String(villages.innsmouth.id)
 
-// ---- grant filtering (GREEN) ----
+// ---- village scoping (GREEN) ----
 
 test('full_v1 sees only its Quahog FCV submission', async () => {
-  const { status, json } = await vgCall('getFriends', {}, { token: tokens.users.full_v1 })
+  const { status, json } = await vgCall('getFriends', { villageId: [quahog] }, { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   const ids = idsOf(json)
   assert.ok(ids.includes(String(fcv.fcvV1.id)), 'includes own Quahog submission')
@@ -23,7 +26,7 @@ test('full_v1 sees only its Quahog FCV submission', async () => {
 })
 
 test('FCV row joins volunteer + member names and echoes contactType', async () => {
-  const { json } = await vgCall('getFriends', {}, { token: tokens.users.full_v1 })
+  const { json } = await vgCall('getFriends', { villageId: [quahog] }, { token: tokens.users.full_v1 })
   const row = json.find(r => r.friendId === String(fcv.fcvV1.id))
   assert.ok(row, 'Quahog row present')
   assert.equal(row.volunteer.fullName, persons.quahogVolunteer.fullName)
@@ -31,85 +34,66 @@ test('FCV row joins volunteer + member names and echoes contactType', async () =
   assert.equal(row.contactType, fcv.fcvV1.contactType)
 })
 
-test('nogrants user sees no FCV submissions', async () => {
-  const { status, json } = await vgCall('getFriends', {}, { token: tokens.users.nogrants })
-  assert.equal(status, 200)
-  assert.equal(json.length, 0)
-})
+// ---- federation scope (GREEN) ----
+// #56 removed elevation from resource reads: a federation grant reaches every
+// village on a plain call, and there is no "admin without elevate" mode.
 
-// ---- elevate (GREEN) ----
-
-test('admin with elevate=true sees every village\'s submissions', async () => {
-  const { status, json } = await vgCall('getFriends', { elevate: 'true' }, { token: tokens.users.admin })
+test('admin sees every village\'s submissions on a plain call', async () => {
+  const { status, json } = await vgCall('getFriends', {}, { token: tokens.users.admin })
   assert.equal(status, 200)
   const ids = idsOf(json)
   assert.ok([fcv.fcvV1, fcv.fcvV2, fcv.fcvV3].every(f => ids.includes(String(f.id))), 'sees all three villages')
 })
 
-test('admin without elevate is grant-filtered (admin holds no grants -> none)', async () => {
-  const { status, json } = await vgCall('getFriends', {}, { token: tokens.users.admin })
+test('board (federation read-only) also sees all villages', async () => {
+  const { status, json } = await vgCall('getFriends', {}, { token: tokens.users.board })
   assert.equal(status, 200)
-  assert.equal(json.length, 0)
-})
-
-test('non-admin elevate=true -> 403', async () => {
-  const { status } = await vgCall('getFriends', { elevate: 'true' }, { token: tokens.users.full_v1 })
-  assert.equal(status, 403)
+  const ids = idsOf(json)
+  assert.ok([fcv.fcvV1, fcv.fcvV2, fcv.fcvV3].every(f => ids.includes(String(f.id))), 'sees all three villages')
 })
 
 // ---- query filters within grants (GREEN), via multi (Quahog + Innsmouth) ----
-
-test('multi user sees Quahog + Innsmouth, not Miskatonic', async () => {
-  const { json } = await vgCall('getFriends', {}, { token: tokens.users.multi })
-  const ids = idsOf(json)
-  assert.ok(ids.includes(String(fcv.fcvV1.id)) && ids.includes(String(fcv.fcvV2.id)))
-  assert.ok(!ids.includes(String(fcv.fcvV3.id)))
-})
+// (the multi-value villageId test at the bottom pins that the union itself works)
 
 test('contactType filter narrows to matching submissions', async () => {
-  const { json } = await vgCall('getFriends', { contactType: 'Phone' }, { token: tokens.users.multi })
+  const { json } = await vgCall('getFriends',
+    { villageId: [quahog, innsmouth], contactType: 'Phone' }, { token: tokens.users.multi })
   assert.deepEqual(idsOf(json), [String(fcv.fcvV2.id)]) // only the Innsmouth phone visit
 })
 
 test('activityType filter matches inside the JSON array', async () => {
-  const { json } = await vgCall('getFriends', { activityType: 'Ride' }, { token: tokens.users.multi })
+  const { json } = await vgCall('getFriends',
+    { villageId: [quahog, innsmouth], activityType: 'Ride' }, { token: tokens.users.multi })
   assert.deepEqual(idsOf(json), [String(fcv.fcvV1.id)]) // Quahog visit included a Ride
 })
 
 test('volunteerName filter is a substring match', async () => {
-  const { json } = await vgCall('getFriends', { volunteerName: 'Joe' }, { token: tokens.users.multi })
+  const { json } = await vgCall('getFriends',
+    { villageId: [quahog, innsmouth], volunteerName: 'Joe' }, { token: tokens.users.multi })
   assert.deepEqual(idsOf(json), [String(fcv.fcvV1.id)]) // Joe Swanson
 })
 
 test('dateStart filter excludes earlier visits', async () => {
-  const { json } = await vgCall('getFriends', { dateStart: '2026-06-02' }, { token: tokens.users.multi })
+  const { json } = await vgCall('getFriends',
+    { villageId: [quahog, innsmouth], dateStart: '2026-06-02' }, { token: tokens.users.multi })
   const ids = idsOf(json)
   assert.ok(ids.includes(String(fcv.fcvV2.id)), 'keeps the 06-02 visit')
   assert.ok(!ids.includes(String(fcv.fcvV1.id)), 'drops the 06-01 visit')
 })
 
 test('single client villageId narrows within grants', async () => {
-  const { json } = await vgCall('getFriends', { villageId: String(villages.innsmouth.id) }, { token: tokens.users.multi })
+  const { json } = await vgCall('getFriends', { villageId: [innsmouth] }, { token: tokens.users.multi })
   assert.deepEqual(idsOf(json), [String(fcv.fcvV2.id)])
 })
 
-// ---- multi-value villageId is double-wrapped -> 500 (RED — finding #4) ----
-// Literal vgFetch on purpose: a RED probe pins its URL so a spec rename can't
-// silently retarget it.
-
 test('multi-value villageId returns both selected (granted) villages', async () => {
-  // FriendService pushes `[villageId]` for the client filter; when villageId is
-  // already an array (multiple selected) this becomes IN (('1','2')) — a nested
-  // row constructor MySQL rejects with ER_OPERAND_COLUMNS (500). Same bug class
-  // as service-request finding #3. The grant filter is always ANDed, so this can
-  // only under-return, never leak — a correctness bug, not an exposure.
-  const { status, json } = await vgFetch('/friends', {
-    token: tokens.users.multi,
-    query: { villageId: [String(villages.quahog.id), String(villages.innsmouth.id)] },
-  })
+  // Formerly RED (finding #4: `[villageId]` double-wrap -> ER_OPERAND_COLUMNS
+  // 500). Fixed by #56 — FriendService now binds the array directly. Assert the
+  // row set too, not just the status: an under-returning regression (e.g. only
+  // one selected village) must fail here.
+  const { status, json } = await vgCall('getFriends',
+    { villageId: [quahog, innsmouth] }, { token: tokens.users.multi })
   assert.equal(status, 200)
-  // Assert the row set too, not just the status: a partial fix that stops the
-  // 500 but under-returns (e.g. only one selected village) must stay red.
   const ids = idsOf(json)
   assert.ok(ids.includes(String(fcv.fcvV1.id)), 'includes the Quahog submission')
   assert.ok(ids.includes(String(fcv.fcvV2.id)), 'includes the Innsmouth submission')

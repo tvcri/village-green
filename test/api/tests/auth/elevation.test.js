@@ -2,29 +2,44 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
-import { serviceRequests as sr } from '../../setup/fixtures.js'
+import { users } from '../../setup/fixtures.js'
 
-// villages that actually have service requests (excludes the data-less scratch village)
-const allVillageIds = [...new Set(Object.values(sr).map(r => String(r.villageId)))]
+// Post-#56, elevation is confined to the four federation-only admin perms
+// (village:create, user:admin, grant:admin, app:admin — held only via Admin's
+// wildcard) and `elevate` is no longer declared on resource reads. The gate is
+// hasPermission(perm) && elevate=true, plus setupUser's up-front "you can't
+// even ask" rejection of elevate=true from anyone holding no elevatable perm.
+// getUsers (user:admin) is the representative elevation-gated endpoint here.
 
-test('non-admin cannot elevate -> 403', async () => {
-  const { status } = await vgCall('getServiceRequests', { elevate: 'true' }, { token: tokens.users.full_v1 })
-  assert.equal(status, 403)
-})
-
-test('admin with elevate=true sees all villages', async () => {
-  const { status, json } = await vgCall('getServiceRequests', { elevate: 'true' }, { token: tokens.users.admin })
+test('admin with elevate=true -> 200 (getUsers lists every user)', async () => {
+  const { status, json } = await vgCall('getUsers', { elevate: 'true' }, { token: tokens.users.admin })
   assert.equal(status, 200)
-  const srIds = json.map(r => r.serviceRequestId)
-  for (const id of [sr.srV1.id, sr.srV2.id, sr.srV3.id]) {
-    assert.ok(srIds.includes(String(id)), `elevated admin should see service request ${id}`)
+  const usernames = json.map(u => u.username)
+  for (const u of [users.admin, users.full_v1, users.staff]) {
+    assert.ok(usernames.includes(u.username), `elevated admin should list ${u.username}`)
   }
-  const villageIds = new Set(json.map(r => r.villageId))
-  for (const vid of allVillageIds) assert.ok(villageIds.has(vid), `should span village ${vid}`)
 })
 
-test('admin without elevate is not implicitly omniscient (sees only granted = none)', async () => {
-  const { status, json } = await vgCall('getServiceRequests', {}, { token: tokens.users.admin })
-  assert.equal(status, 200)
-  assert.equal(json.length, 0)
+test('admin without elevate -> 403 (elevation is mandatory even for admin)', async () => {
+  const { status, json } = await vgCall('getUsers', {}, { token: tokens.users.admin })
+  assert.equal(status, 403)
+  assert.equal(json.error, 'User has insufficient privilege to complete this request.')
+})
+
+test('non-admin with elevate=true -> 403 rejected up-front', async () => {
+  // setupUser rejects elevate=true before routing when the caller holds no
+  // elevatable perm — village users and non-admin federation users alike.
+  for (const who of ['full_v1', 'staff']) {
+    const { status, json } = await vgCall('getUsers', { elevate: 'true' }, { token: tokens.users[who] })
+    assert.equal(status, 403, who)
+    assert.equal(json.error, 'Invalid use of parameter elevate=true.', who)
+  }
+})
+
+test('GET /user reports canElevate true only for admin', async () => {
+  for (const [who, expected] of [['admin', true], ['full_v1', false], ['staff', false]]) {
+    const { status, json } = await vgCall('getUser', {}, { token: tokens.users[who] })
+    assert.equal(status, 200, who)
+    assert.equal(json.canElevate, expected, `${who} canElevate`)
+  }
 })

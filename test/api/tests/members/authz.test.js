@@ -4,13 +4,12 @@ import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { persons } from '../../setup/fixtures.js'
 
-// The member role is a person sub-resource: PUT/PATCH/DELETE /persons/{id}/member
-// (the flat /members collection this suite originally specced was never built).
-// The framework's authentication + scope layer runs BEFORE the controller, so the
-// gating asserted here is REAL, current behavior (GREEN). DELETE is the probe:
-// it needs no body (no OpenAPI 400 ahead of the authz check), and probing a
-// person who holds no member role is non-destructive — reaching the handler
-// yields its memberExists 404, proving authn + scope passed.
+// The member role is a person sub-resource: PUT/PATCH/DELETE /persons/{id}/member.
+// Gating layers, in order: token authn (401) -> OAuth scope (403) -> existence
+// (404: person or member row missing) -> member:write on the person's home
+// village (403; post-#56 held only by federation Staff / Admin). DELETE is the
+// probe: it needs no body (no OpenAPI 400 ahead of the gates), and probing a
+// person who holds no member role is non-destructive.
 
 const personId = persons.quahogVolunteer.id // a volunteer; never a member
 
@@ -26,7 +25,16 @@ test('DELETE /persons/{id}/member with a valid token lacking vg:member scope -> 
   assert.equal(status, 403)
 })
 
-test('DELETE /persons/{id}/member with full scope reaches the handler (404: not a member)', async () => {
+test('DELETE /persons/{id}/member on a non-member reaches the handler (404 precedes the perm gate)', async () => {
+  // Existence (person + member row) is checked BEFORE member:write, so even a
+  // read-only village user gets the 404 here — proving authn + scope passed.
   const { status } = await vgCall('deletePersonMember', { personId }, { token: tokens.users.full_v1 })
   assert.equal(status, 404)
+})
+
+test('DELETE /persons/{id}/member on a real member by a village user -> 403 (member:write is federation-only)', async () => {
+  // quahogMember holds the member role; full_v1 is village-scoped (read-only
+  // post-#56), so the perm gate denies after existence passes. Non-destructive.
+  const { status } = await vgCall('deletePersonMember', { personId: persons.quahogMember.id }, { token: tokens.users.full_v1 })
+  assert.equal(status, 403)
 })

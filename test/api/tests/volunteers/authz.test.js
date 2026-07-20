@@ -3,10 +3,11 @@ import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 
-// Authentication + scope gating on GET /volunteers. The framework auth layer
-// runs BEFORE the controller, so this is independent of handler behavior; the
-// list contents and the person-scoped write endpoints are covered in
-// lifecycle.test.js.
+// Gating on GET /volunteers: token authn (401) -> OAuth scope (403) -> RBAC.
+// The endpoint takes no villageId param — the controller scopes rows to the
+// caller's volunteer:read grants (federation readers see all) and 403s a
+// caller with volunteer:read nowhere. List contents and the person-scoped
+// write endpoints are covered in lifecycle.test.js.
 
 test('GET /volunteers with no token -> 401', async () => {
   const { status } = await vgCall('getVolunteers')
@@ -19,7 +20,12 @@ test('GET /volunteers with a valid token lacking vg:volunteer scope -> 403', asy
   assert.equal(status, 403)
 })
 
-test('GET /volunteers with full scope -> 200 (reaches the stubbed handler)', async () => {
+test('GET /volunteers with volunteer:read on a village -> 200', async () => {
   const { status } = await vgCall('getVolunteers', {}, { token: tokens.users.full_v1 })
   assert.equal(status, 200)
+})
+
+test('GET /volunteers with volunteer:read nowhere -> 403', async () => {
+  const { status } = await vgCall('getVolunteers', {}, { token: tokens.users.nogrants })
+  assert.equal(status, 403)
 })

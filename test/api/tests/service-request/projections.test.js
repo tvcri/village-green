@@ -5,8 +5,8 @@ import { tokens } from '../../lib/context.js'
 import { serviceRequests as sr } from '../../setup/fixtures.js'
 
 // Each `?projection=` option expands the response with extra data. Exercised in
-// an authorized (own-village) context — the cross-village leak *via* projections
-// is finding #1, asserted in authz.test.js.
+// an authorized (own-village) context — the cross-village projection path is
+// enforced (403, fixed by #56) and asserted in authz.test.js.
 
 test('SR projection=volunteerAddress expands the volunteer address', async () => {
   const { status, json } = await vgCall('getServiceRequest',

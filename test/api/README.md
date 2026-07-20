@@ -5,14 +5,20 @@ surface — every resource is **characterized** (its real current behavior pinne
 regression net), with **authorization / information-exposure** correctness (only the right
 users see the right data) as the throughline.
 
-> **Status (2026-07-15): partially re-synced — expectations stale.** After the
-> #56/#58/#60 merge (capability-role RBAC + SR wall-clock split), the seeder is
-> re-synced (`role_grant`, `serviceDate`/`finishTime`, admin as a DB grant, and
-> a marked workaround seeding the role catalog that `sql/current/20-vg-static.sql`
-> omits — an upstream bug). The suite runs (~31 s) but the RBAC rework changed
-> real behavior: **84 pass / 83 fail / 7 todo**. The failures are catalogued, with
-> a retarget plan, in `scratch/unit-vs-e2e-testing.md` §9 — until that lands, the
-> "13 reds + green" contract below does not hold.
+> **Status (2026-07-20): fully retargeted to the post-#56/#58/#64 API.** The
+> whole suite now asserts the capability-role RBAC contract: village roles
+> (1–3) are read-only, writes live with federation Staff / Service Coordinator
+> fixtures (`staff`/`board`/`sc` were added), unfiltered list reads require a
+> federation grant (village users pass `villageId ⊆ grants`), cross-village
+> denials are 403 (perm precedes existence on nested routes), and elevation
+> gates only the admin surface. Former findings #1–#6 are **fixed by #56** and
+> their probes are now green assertions — see `SECURITY-FINDINGS.md` for the
+> updated register (two open items remain: the `sqlGrantees` statistics 500 and
+> the empty role catalog in `sql/current/20-vg-static.sql`, worked around by
+> `setup/seed.js seedRoleCatalog()`; details in `scratch/bug-report-2026-07-20.md`).
+> Landscape: **204 tests — 202 pass, 0 fail, 2 todo** (~45 s wall clock,
+> ~20 s test phase). One green test is a pinned KNOWN-BUG characterization
+> (the statistics 500) that must be flipped when the fix lands.
 >
 > **Status (2026-07-07):** re-synced with `main` after the #37–#47 merge (the person /
 > member / volunteer schema rework): the seeder targets the camelCase schema and seeds

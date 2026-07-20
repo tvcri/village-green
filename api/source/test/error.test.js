@@ -19,6 +19,7 @@ const statuses = {
   InvalidElevationError: 403,
   UserUnavailableError: 403,
   NotFoundError: 404,
+  ConflictError: 409,
   EndpointUnavailableError: 409,
   ModeLockedError: 409,
   UnprocessableError: 422,

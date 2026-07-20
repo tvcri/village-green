@@ -11,15 +11,15 @@ test('the spec declares exactly the village projections exercised here', () => {
   // Drift tripwire: if a new projection lands in the OAS, this fails and names
   // it — add coverage below (and to the sets in the tests) rather than let it
   // ship unexercised.
-  // (It already earned its keep: on its first run it flagged capabilityCounts,
-  // grants, and srStatusCounts as declared-but-unexercised.)
   const declared = ops.operationMap.get('getVillage').params.projection.schema.items.enum
   assert.deepEqual(declared.toSorted(),
-    ['capabilityCounts', 'grants', 'owners', 'personCounts', 'srStatusCounts', 'statistics'])
+    ['capabilityCounts', 'grants', 'personCounts', 'srStatusCounts', 'statistics'])
 })
 
-test('village projections expand the village (all but the broken statistics)', async () => {
-  for (const p of ['owners', 'personCounts', 'capabilityCounts', 'grants', 'srStatusCounts']) {
+test('village projections expand the village by id', async () => {
+  // statistics included: the by-id path builds its grantees CTE without a
+  // villageId IN-list (allVillages), so the pre-#56 500 is fixed here (#56).
+  for (const p of ['capabilityCounts', 'grants', 'personCounts', 'srStatusCounts', 'statistics']) {
     const { status, json } = await vgCall('getVillage',
       { villageId: villages.quahog.id, projection: [p] },
       { token: tokens.users.full_v1 })
@@ -28,11 +28,25 @@ test('village projections expand the village (all but the broken statistics)', a
   }
 })
 
-test('village projection=statistics expands village statistics',
-  { todo: 'the village `statistics` projection 500s on a SQL syntax error' }, async () => {
-    const { status, json } = await vgCall('getVillage',
-      { villageId: villages.quahog.id, projection: ['statistics'] },
-      { token: tokens.users.full_v1 })
-    assert.equal(status, 200)
-    assert.ok('statistics' in json, 'statistics projected')
-  })
+test('list projection=statistics works for federation and single-village callers', async () => {
+  const adm = await vgCall('getVillages', { projection: ['statistics'] }, { token: tokens.users.admin })
+  assert.equal(adm.status, 200)
+  assert.ok(adm.json.length && adm.json.every(v => 'statistics' in v), 'admin gets statistics per village')
+
+  // A single-village caller also works — but only accidentally: its one-entry
+  // grant list dodges the IN-list bug pinned RED below.
+  const one = await vgCall('getVillages', { projection: ['statistics'] }, { token: tokens.users.full_v1 })
+  assert.equal(one.status, 200)
+  assert.ok(one.json.length && one.json.every(v => 'statistics' in v), 'single-village caller gets statistics')
+})
+
+test('KNOWN BUG: list projection=statistics 500s for a multi-village caller', async () => {
+  // RED characterization — scratch/bug-report-2026-07-20.md (bug 1): sqlGrantees
+  // double-wraps villageIds (api/source/service/utils.js:754), so the grantees
+  // CTE renders `cg.villageId IN ((1, 2))` whenever the caller's grant list has
+  // >= 2 entries -> ER_OPERAND_COLUMNS -> 500. Federation callers (allVillages
+  // path) and single-village callers dodge it. Flip this to 200-with-statistics
+  // when the extra array wrap is removed.
+  const { status } = await vgCall('getVillages', { projection: ['statistics'] }, { token: tokens.users.multi })
+  assert.equal(status, 500)
+})

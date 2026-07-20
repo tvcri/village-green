@@ -1,63 +1,88 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
-import { vgFetch } from '../../lib/client.js'
 import { tokens } from '../../lib/context.js'
 import { villages, persons } from '../../setup/fixtures.js'
 
-// Person create/patch/delete. createPerson in your own village works (GREEN).
-// The Person controller applies NO village-grant check on the write paths
-// (createPerson trusts body.villageId; patch/delete look the row up with a
-// grant-blind getPerson), so cross-village writes slip through — finding #5.
-// Each cross-village probe asserts the SECURE outcome and undoes any successful
-// insecure write so the rest of the run is unaffected. The RED probes pin
-// literal URLs (vgFetch) so a spec rename can't silently retarget them.
-const PERSONS = '/persons'
+// Person create/patch/delete. Post-#56, person:write lives ONLY at federation
+// scope (Staff, or Admin's wildcard) — every village-scoped role is read-only,
+// so village users are denied even inside their granted village. The old
+// cross-village RED probes (finding #5) are now green 403 assertions (fixed by
+// #56). Created rows target the scratch village (id 4) and are deleted.
+const scratch = String(villages.scratch.id)
 const quahog = String(villages.quahog.id)
-const innsmouth = String(villages.innsmouth.id)
 
-// ---- createPerson happy path (GREEN) ----
+// ---- staff write lifecycle (GREEN) ----
 
-test('createPerson in the caller\'s own village returns 201 and echoes fields', async () => {
+test('createPerson as staff returns 201 and echoes fields; delete echoes the record', async () => {
   const { status, json } = await vgCall('createPerson', {}, {
-    token: tokens.users.full_v1,
-    body: { villageId: quahog, firstName: 'Glenn', lastName: 'Quagmire' },
+    token: tokens.users.staff,
+    body: { villageId: scratch, firstName: 'Glenn', lastName: 'Quagmire' },
   })
   assert.equal(status, 201)
   assert.equal(json.fullName, 'Quagmire, Glenn') // fullName is DB-generated as "last, first"
-  if (json.personId) await vgCall('deletePerson', { personId: json.personId }, { token: tokens.users.full_v1 })
+  const del = await vgCall('deletePerson', { personId: json.personId }, { token: tokens.users.staff })
+  assert.equal(del.status, 200)
+  assert.equal(del.json.fullName, 'Quagmire, Glenn', 'delete responds with the removed record')
 })
 
-// ---- cross-village writes: MUST be denied (RED — finding #5) ----
+// ---- village users: ALL person writes are denied (fixed by #56) ----
 
-test('createPerson into an ungranted village is denied', async () => {
-  const res = await vgFetch(PERSONS, {
-    token: tokens.users.full_v1, // Quahog only
-    body: { villageId: innsmouth, firstName: 'Intruder', lastName: 'Person' },
+test('createPerson by a village user is denied even in their granted village', async () => {
+  const res = await vgCall('createPerson', {}, {
+    token: tokens.users.full_v1, // Quahog role 2 — read-only post-#56
+    body: { villageId: quahog, firstName: 'Denied', lastName: 'OwnVillage' },
   })
-  if (res.status === 201 && res.json?.personId) {
-    await vgFetch(`${PERSONS}/${res.json.personId}`, { token: tokens.users.admin, method: 'DELETE' })
+  if (res.status === 201 && res.json?.personId) { // regression guard: undo
+    await vgCall('deletePerson', { personId: res.json.personId }, { token: tokens.users.staff })
   }
-  assert.ok(res.status === 403 || res.status === 404, `expected denial, got ${res.status}`)
+  assert.equal(res.status, 403)
 })
 
-test('patchPerson on a person in an ungranted village is denied', async () => {
-  // No-op same-value patch: even a successful insecure write changes nothing.
-  const { status } = await vgFetch(`${PERSONS}/${persons.innsmouthMember.id}`, {
-    token: tokens.users.full_v1, method: 'PATCH',
-    body: { lastName: persons.innsmouthMember.lastName },
+test('createPerson into an ungranted village -> 403', async () => {
+  const res = await vgCall('createPerson', {}, {
+    token: tokens.users.full_v1,
+    body: { villageId: scratch, firstName: 'Intruder', lastName: 'Person' },
   })
-  assert.ok(status === 403 || status === 404, `expected denial, got ${status}`)
+  if (res.status === 201 && res.json?.personId) { // regression guard: undo
+    await vgCall('deletePerson', { personId: res.json.personId }, { token: tokens.users.staff })
+  }
+  assert.equal(res.status, 403)
 })
 
-test('deletePerson on a person in an ungranted village is denied', async () => {
-  // Probe a throwaway Innsmouth person so a successful insecure delete is harmless.
+test('createPerson with no villageId is federation-scoped: village user -> 403, staff -> 201', async () => {
+  // A villageless person is global, so creating one needs federation person:write.
+  const denied = await vgCall('createPerson', {}, {
+    token: tokens.users.full_v1, body: { firstName: 'Denied', lastName: 'NoVillage' },
+  })
+  assert.equal(denied.status, 403)
   const created = await vgCall('createPerson', {}, {
-    token: tokens.users.admin, body: { villageId: innsmouth, firstName: 'Throwaway', lastName: 'Innsmouth' },
+    token: tokens.users.staff, body: { firstName: 'Allowed', lastName: 'NoVillage' },
+  })
+  assert.equal(created.status, 201)
+  await vgCall('deletePerson', { personId: created.json.personId }, { token: tokens.users.staff })
+})
+
+test('patchPerson by a village user -> 403 (own and ungranted village alike)', async () => {
+  // No-op same-value patches: even a regression changes nothing.
+  const own = await vgCall('patchPerson', { personId: persons.quahogMember.id }, {
+    token: tokens.users.full_v1, body: { lastName: persons.quahogMember.lastName },
+  })
+  assert.equal(own.status, 403)
+  const cross = await vgCall('patchPerson', { personId: persons.innsmouthMember.id }, {
+    token: tokens.users.full_v1, body: { lastName: persons.innsmouthMember.lastName },
+  })
+  assert.equal(cross.status, 403)
+})
+
+test('deletePerson by a village user -> 403', async () => {
+  // Probe a throwaway scratch-village person so a regression is harmless.
+  const created = await vgCall('createPerson', {}, {
+    token: tokens.users.staff, body: { villageId: scratch, firstName: 'Throwaway', lastName: 'DelProbe' },
   })
   assert.equal(created.status, 201)
   const id = created.json.personId
-  const del = await vgFetch(`${PERSONS}/${id}`, { token: tokens.users.full_v1, method: 'DELETE' })
-  if (del.status !== 200) await vgFetch(`${PERSONS}/${id}`, { token: tokens.users.admin, method: 'DELETE' })
-  assert.ok(del.status === 403 || del.status === 404, `expected denial, got ${del.status}`)
+  const del = await vgCall('deletePerson', { personId: id }, { token: tokens.users.full_v1 })
+  await vgCall('deletePerson', { personId: id }, { token: tokens.users.staff }) // cleanup (no-op if a regression deleted it)
+  assert.equal(del.status, 403)
 })
