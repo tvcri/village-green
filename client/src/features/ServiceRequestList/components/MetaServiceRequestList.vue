@@ -35,14 +35,16 @@ useScrollRestore(
   ['service-request-detail', 'meta-service-request-edit', 'meta-service-request-create']
 )
 
-const selectedVillage = ref('All villages')
+// Filter selects use null as "no filter"; the "All ..." text lives in each
+// Select's placeholder so show-clear only appears for a real selection.
+const selectedVillage = ref(null)
 const isCreatingSheet = ref(false)
 const filtersCollapsed = ref(true)
-const selectedMember = ref('All members')
-const selectedVolunteer = ref('All volunteers')
-const selectedService = ref('All services')
+const selectedMember = ref(null)
+const selectedVolunteer = ref(null)
+const selectedService = ref(null)
 const idSearch = ref('')
-const notificationFilter = ref('All requests')
+const notificationFilter = ref(null)
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
@@ -63,12 +65,13 @@ const onNotified = (updated) => {
   )
 }
 
-const selectedStatuses = ref(['open', 'confirmed'])
+const DEFAULT_STATUSES = ['open', 'confirmed']
+const selectedStatuses = ref([...DEFAULT_STATUSES])
 
 const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
   () => getServiceRequests({
     status: selectedStatuses.value,
-    villageId: selectedVillage.value !== 'All villages'
+    villageId: selectedVillage.value
       ? [(allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId].filter(Boolean)
       : [],
     hasNotifications: notificationFilter.value === 'Not notified' ? false : undefined
@@ -109,34 +112,34 @@ const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled
 const memberOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
   const members = new Set(requests.value.map(r => r.memberFullName).filter(Boolean))
-  return ['All members', ...Array.from(members).sort()]
+  return Array.from(members).sort()
 })
 
 const volunteerOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
   const volunteers = new Set(requests.value.map(r => r.volunteerFullName).filter(Boolean))
-  return ['All volunteers', ...Array.from(volunteers).sort()]
+  return Array.from(volunteers).sort()
 })
 
 const serviceOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
   const services = new Set(requests.value.map(r => r.serviceName).filter(Boolean))
-  return ['All services', ...Array.from(services).sort()]
+  return Array.from(services).sort()
 })
 
 const filteredRequests = computed(() => {
   if (!Array.isArray(requests.value)) return []
   return requests.value.filter(r => {
     let memberMatch = true
-    if (selectedMember.value && selectedMember.value !== 'All members') {
+    if (selectedMember.value) {
       memberMatch = r.memberFullName === selectedMember.value
     }
     let volunteerMatch = true
-    if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') {
+    if (selectedVolunteer.value) {
       volunteerMatch = r.volunteerFullName === selectedVolunteer.value
     }
     let serviceMatch = true
-    if (selectedService.value && selectedService.value !== 'All services') {
+    if (selectedService.value) {
       serviceMatch = r.serviceName === selectedService.value
     }
     let idMatch = true
@@ -149,14 +152,20 @@ const filteredRequests = computed(() => {
   })
 })
 
+const statusesAtDefault = computed(() =>
+  selectedStatuses.value.length === DEFAULT_STATUSES.length &&
+  DEFAULT_STATUSES.every(s => selectedStatuses.value.includes(s))
+)
+
 const activeFilterCount = computed(() => {
   let count = 0
-  if (selectedMember.value && selectedMember.value !== 'All members') count++
-  if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') count++
-  if (selectedService.value && selectedService.value !== 'All services') count++
-  if (selectedVillage.value && selectedVillage.value !== 'All villages') count++
+  if (!statusesAtDefault.value) count++
+  if (selectedMember.value) count++
+  if (selectedVolunteer.value) count++
+  if (selectedService.value) count++
+  if (selectedVillage.value) count++
   if (idSearch.value.trim()) count++
-  if (notificationFilter.value !== 'All requests') count++
+  if (notificationFilter.value) count++
   return count
 })
 
@@ -239,13 +248,13 @@ const navigateToEditRequest = (serviceRequestId) => {
 }
 
 const clearFilters = () => {
-  selectedMember.value = 'All members'
-  selectedVolunteer.value = 'All volunteers'
-  selectedService.value = 'All services'
-  selectedStatuses.value = []
-  selectedVillage.value = 'All villages'
+  selectedMember.value = null
+  selectedVolunteer.value = null
+  selectedService.value = null
+  selectedStatuses.value = [...DEFAULT_STATUSES]
+  selectedVillage.value = null
   idSearch.value = ''
-  notificationFilter.value = 'All requests'
+  notificationFilter.value = null
 }
 </script>
 
@@ -280,8 +289,8 @@ const clearFilters = () => {
             <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
             <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: filtersCollapsed }" aria-hidden="true" />
           </Button>
-          <span v-if="requests && requests.length && (filteredRequests.length < requests.length || activeFilterCount > 0)" class="filter-count-tag">
-            {{ filteredRequests.length }} of {{ requests.length }} requests
+          <span v-if="requests && activeFilterCount > 0" class="filter-count-tag">
+            {{ filteredRequests.length }} {{ filteredRequests.length === 1 ? 'request' : 'requests' }}
             <span
               role="button"
               class="clear-filters-icon"
@@ -307,33 +316,34 @@ const clearFilters = () => {
             </div>
           </div>
           <div class="search-box">
-            <label>Member:</label>
-            <Select v-model="selectedMember" :options="memberOptions" placeholder="-- Select member --" />
-          </div>
-          <div class="search-box">
-            <label>Volunteer:</label>
-            <Select v-model="selectedVolunteer" :options="volunteerOptions" placeholder="-- Select volunteer --" />
-          </div>
-          <div class="search-box">
-            <label>Service:</label>
-            <Select v-model="selectedService" :options="serviceOptions" placeholder="-- Select service --" />
-          </div>
-          <div class="search-box">
             <label>Village:</label>
             <Select
               v-model="selectedVillage"
-              :options="['All villages', ...(allVillages ?? []).map(v => v.name)]"
-              placeholder="-- All villages --"
+              :options="(allVillages ?? []).map(v => v.name)"
+              placeholder="All villages"
+              show-clear
             />
           </div>
           <div class="search-box">
+            <label>Member:</label>
+            <Select v-model="selectedMember" :options="memberOptions" placeholder="All members" show-clear />
+          </div>
+          <div class="search-box">
+            <label>Volunteer:</label>
+            <Select v-model="selectedVolunteer" :options="volunteerOptions" placeholder="All volunteers" show-clear />
+          </div>
+          <div class="search-box">
+            <label>Service:</label>
+            <Select v-model="selectedService" :options="serviceOptions" placeholder="All services" show-clear />
+          </div>
+          <div class="search-box">
             <label>Notifications:</label>
-            <Select v-model="notificationFilter" :options="['All requests', 'Not notified']" />
+            <Select v-model="notificationFilter" :options="['Not notified']" placeholder="All requests" show-clear />
           </div>
           <div class="search-box request-num-box">
             <label>Request #:</label>
             <IconField>
-              <InputText v-model="idSearch" placeholder="Search by number" />
+              <InputText v-model="idSearch" placeholder="Search by #" />
               <InputIcon v-if="idSearch" class="pi pi-times" style="cursor: pointer" @click="idSearch = ''" />
             </IconField>
           </div>
@@ -403,8 +413,11 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .status-filter-group { display: flex; flex-direction: column; gap: 0.5rem; flex: 1 1 100%; }
 .filter-group-label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .filters-content .search-box { display: flex; flex-direction: column; gap: 0.5rem; min-width: 160px; }
+/* Size the IconField wrapper, not the inner input, so the clear icon stays
+   anchored to the input's right edge. */
 .filters-content .request-num-box { min-width: 0; }
-.request-num-box :deep(input) { width: 10rem; }
+.request-num-box :deep(.p-iconfield) { width: 10rem; }
+.request-num-box :deep(input) { width: 100%; }
 .filters-content .search-box label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .status-filter { display: flex; align-items: center; gap: 0.375rem; }
