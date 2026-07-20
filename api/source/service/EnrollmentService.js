@@ -1,6 +1,6 @@
 'use strict'
 
-const { randomInt, randomBytes } = require('node:crypto')
+const { randomInt } = require('node:crypto')
 const { fetch } = require('undici')
 const bcrypt = require('bcryptjs')
 const dbUtils = require('./utils')
@@ -26,10 +26,42 @@ function generatePin() {
   return randomInt(0, 1000000).toString().padStart(6, '0')
 }
 
+// Must satisfy the Keycloak realm password policy: length >= 8, at least one
+// upper, one lower, one special. base64url output cannot -- its alphabet
+// ([A-Za-z0-9_-]) has no character Keycloak counts as special, so every reset
+// was rejected with invalidPasswordMinSpecialCharsMessage.
+const TEMP_PW_UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+const TEMP_PW_LOWER = 'abcdefghijkmnopqrstuvwxyz'
+const TEMP_PW_DIGIT = '23456789'
+const TEMP_PW_SPECIAL = '!@#$%&*+-=?'
+const TEMP_PW_ALL = TEMP_PW_UPPER + TEMP_PW_LOWER + TEMP_PW_DIGIT + TEMP_PW_SPECIAL
+const TEMP_PW_LENGTH = 14
+
+function pick(alphabet) {
+  return alphabet[randomInt(0, alphabet.length)]
+}
+
 function generateTempPassword() {
-  // 9 random bytes -> 12 base64url chars. Keycloak forces a change on first
-  // login (UPDATE_PASSWORD), so this only needs to be unguessable, not pretty.
-  return randomBytes(9).toString('base64url')
+  // One character guaranteed per required class, remainder free, then shuffled
+  // so the required ones aren't pinned to known positions. Keycloak forces a
+  // change on first login (UPDATE_PASSWORD), so this only needs to be
+  // unguessable and policy-compliant, not memorable. Look-alike characters
+  // (O/0, I/l/1) are excluded because users retype this from an email.
+  const chars = [
+    pick(TEMP_PW_UPPER),
+    pick(TEMP_PW_LOWER),
+    pick(TEMP_PW_DIGIT),
+    pick(TEMP_PW_SPECIAL),
+  ]
+  while (chars.length < TEMP_PW_LENGTH) {
+    chars.push(pick(TEMP_PW_ALL))
+  }
+  // Fisher-Yates with randomInt -- unbiased, unlike sort(() => Math.random()).
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(0, i + 1)
+    ;[chars[i], chars[j]] = [chars[j], chars[i]]
+  }
+  return chars.join('')
 }
 
 // rows: person rows carrying isVolunteer/isMember flags. person.email is not
