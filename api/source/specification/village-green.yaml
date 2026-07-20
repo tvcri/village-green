@@ -799,6 +799,158 @@ paths:
       security:
       - oauth:
         - vg:user:read
+  /enrollment/request:
+    post:
+      tags:
+      - Enrollment
+      summary: Request an enrollment PIN for a registered volunteer email
+      description: >-
+        Public endpoint. Always returns the identical response regardless of
+        whether the email is registered, holds which roles, or already has an
+        account (enumeration defense). Truthful branching happens only after
+        PIN verification.
+      operationId: requestEnrollment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+      responses:
+        '200':
+          description: >-
+            Uniform empty acknowledgement (enumeration defense). Carries no
+            outcome and no display text - the acknowledgement shown to the user
+            is client-owned copy.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+  /enrollment/verify:
+    post:
+      tags:
+      - Enrollment
+      summary: Verify an emailed PIN; create the account or report it exists
+      operationId: verifyEnrollment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              - pin
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                pin:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+      responses:
+        '200':
+          description: PIN accepted; truthful account state
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - loginUrl
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - created
+                    - exists
+                  tempPassword:
+                    type: string
+                  loginUrl:
+                    type: string
+        '400':
+          description: Invalid, expired, consumed, or attempt-capped PIN
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - invalid
+  /enrollment/reset-password:
+    post:
+      tags:
+      - Enrollment
+      summary: Re-issue a temporary password to a PIN-verified existing account
+      description: >-
+        Gated by the just-consumed enrollment row: requires the same email and
+        PIN that passed /enrollment/verify within the last 10 minutes, once.
+      operationId: resetEnrollmentPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              - pin
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                pin:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+      responses:
+        '200':
+          description: New temporary password issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - tempPassword
+                - loginUrl
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - reset
+                  tempPassword:
+                    type: string
+                  loginUrl:
+                    type: string
+        '400':
+          description: No eligible consumed row or PIN mismatch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - invalid
   /users:
     parameters:
     - $ref: '#/components/parameters/ElevateQuery'
@@ -1689,6 +1841,138 @@ paths:
                 $ref: '#/components/schemas/ServiceRequest'
         default:
           description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
+  /volunteer-requests:
+    get:
+      summary: List service requests visible to the requesting volunteer
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequests
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          description: open = pickable requests across all villages; mine = the caller's upcoming (Confirmed) commitments; history = the caller's past (Completed) requests
+          schema:
+            type: string
+            enum:
+            - open
+            - mine
+            - history
+      responses:
+        '200':
+          description: List of volunteer-scoped service requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/villages:
+    get:
+      summary: List all villages, for volunteer-facing filter UIs
+      description: Unfiltered by grants (the caller is a volunteer, not staff) — the full current village list, id and name only.
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequestVillages
+      responses:
+        '200':
+          description: List of villages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolunteerVillage'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/{serviceRequestId}:
+    get:
+      summary: Get a single service request visible to the requesting volunteer (deep-link landing)
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: The service request, if it is Open (any village) or one of the caller's own Confirmed/Completed requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible to this volunteer)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/{serviceRequestId}/sign-up:
+    post:
+      summary: Commit the requesting volunteer to an open service request
+      tags:
+      - VolunteerRequest
+      operationId: signUpVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: The confirmed service request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible, 409 not open)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
+  /volunteer-requests/{serviceRequestId}/release:
+    post:
+      summary: Release the requesting volunteer's commitment, reopening the request
+      tags:
+      - VolunteerRequest
+      operationId: releaseVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: The reopened service request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible, 409 not the caller's confirmed request)
           content:
             application/json:
               schema:
@@ -3508,6 +3792,20 @@ components:
           type: string
           maxLength: 255
           nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        modifiedUserId:
+          $ref: '#/components/schemas/UserIdNullable'
+        modifiedByUsername:
+          type: string
+          maxLength: 255
+          nullable: true
+        modifiedByDisplayName:
+          type: string
+          maxLength: 255
+          nullable: true
         serviceDate:
           type: string
           format: date
@@ -4081,6 +4379,33 @@ components:
           $ref: '#/components/schemas/WebPreferences'
         privacyStatus:
           $ref: '#/components/schemas/PrivacyStatus'
+        isVolunteer:
+          type: boolean
+          description: >-
+            Present only with the `volunteer` projection. True iff the runtime
+            would grant this user VSS access — i.e. exactly one person's email
+            matches the username and that person is an active volunteer.
+        volunteer:
+          nullable: true
+          additionalProperties: false
+          type: object
+          properties:
+            personId:
+              $ref: '#/components/schemas/StringIntId'
+            villages:
+              type: array
+              items:
+                additionalProperties: false
+                type: object
+                properties:
+                  villageId:
+                    $ref: '#/components/schemas/StringIntId'
+                  name:
+                    type: string
+            capabilities:
+              type: array
+              items:
+                type: string
       required:
       - userId
       - username
@@ -4524,6 +4849,152 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+    VolunteerMemberContact:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        fullName:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        cell:
+          type: string
+          nullable: true
+    VolunteerEmergencyContact:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        relationship:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+    VolunteerOwnAddress:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+    VolunteerVillage:
+      additionalProperties: false
+      type: object
+      properties:
+        villageId:
+          $ref: '#/components/schemas/StringIntId'
+        name:
+          type: string
+      required:
+      - villageId
+      - name
+    VolunteerServiceRequest:
+      additionalProperties: false
+      type: object
+      properties:
+        serviceRequestId:
+          $ref: '#/components/schemas/StringIntId'
+        villageId:
+          $ref: '#/components/schemas/StringIntId'
+        villageName:
+          type: string
+          nullable: true
+        status:
+          type: string
+        serviceName:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        instructions:
+          type: string
+          nullable: true
+        transportationType:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          nullable: true
+        serviceDate:
+          type: string
+          format: date
+          nullable: true
+        timesFlexible:
+          type: boolean
+        startTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        apptTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        returnTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        destination:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        member:
+          $ref: '#/components/schemas/VolunteerMemberContact'
+        emergencyContact:
+          $ref: '#/components/schemas/VolunteerEmergencyContact'
+        volunteerAddress:
+          $ref: '#/components/schemas/VolunteerOwnAddress'
+      required:
+      - serviceRequestId
+      - villageId
+      - status
     WebPreferences:
       type: object
       properties:
@@ -4864,6 +5335,7 @@ components:
           - privacyStatus
           - userGroups
           - webPreferences
+          - volunteer
     UserStatusQuery:
       name: status
       in: query

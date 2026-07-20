@@ -72,6 +72,19 @@ exports.queryUsers = async function (inProjection, inPredicates, userObject) {
     columns.push(`ud.webPreferences`)
   }
 
+  if (inProjection?.includes('volunteer')) {
+    // isVolunteer predicts the runtime VSS grant. It reuses the SAME identity
+    // fragment the runtime gate uses (dbUtils.sqlResolvedPersonId) so the two
+    // cannot drift: the resolved person is NULL for 0 or 2+ email matches, and
+    // NULL IN (…) => NULL => the else branch => false. So the column is true iff
+    // exactly one person matches the username AND that person is an active
+    // volunteer. cast(... as json) yields a real JSON boolean.
+    columns.push(`cast(if(
+      ${dbUtils.sqlResolvedPersonId('ud.username')} in (select av.personId from active_volunteer av),
+      'true', 'false'
+    ) as json) as isVolunteer`)
+  }
+
   if (inProjection?.includes('privacyStatus')) {
     // Correlated subqueries — one round-trip, no JS merge. needsAck is true
     // unless the user's latest ack is of the current rules version AND within
@@ -599,6 +612,11 @@ exports.getUserObject = async function (username) {
     lastAccess,
     lastClaims,
     status,
+    -- Runtime identity (VSS spec §1-AMENDED): exactly one person whose email
+    -- matches the username → that person, else null. Single source of truth is
+    -- dbUtils.sqlResolvedPersonId — shared with the queryUsers volunteer
+    -- projection so the tag cannot drift from this gate.
+    ${dbUtils.sqlResolvedPersonId('ud.username')} as personId,
     -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
     -- published and the user has no acknowledgement of the current version within
     -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
@@ -748,4 +766,50 @@ exports.deleteUserGrant = async function (userId, grantId) {
 
   const grants = await exports.getUserGrants(userId)
   return grants[0] || { grantId }
+}
+
+// ─── VSS identity link ──────────────────────────────────────────────────────
+
+// A volunteer's village is their person's village. active_volunteer is the
+// correct source here: this feeds authorization, and inactive volunteers
+// must lose the surface.
+exports.getVolunteerVillages = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    `SELECT CAST(p.villageId AS CHAR) AS villageId, v.name
+     FROM active_volunteer av
+     JOIN person p ON av.personId = p.id
+     JOIN village v ON p.villageId = v.id
+     WHERE av.personId = ?`,
+    [personId]
+  )
+  return rows
+}
+
+// The capability names the caller's active volunteer holds. Names (not ids)
+// because the sole consumer — the VSS Service filter — matches serviceName
+// prefixes by capability label. active_volunteer for the same reason as
+// getVolunteerVillages: an inactivated volunteer loses the VSS surface.
+exports.getVolunteerCapabilities = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    `SELECT c.name
+     FROM active_volunteer av
+     JOIN volunteer_capability vc ON vc.volunteerId = av.id
+     JOIN capability c ON c.id = vc.capabilityId
+     WHERE av.personId = ?
+     ORDER BY c.name`,
+    [personId]
+  )
+  return rows.map(r => r.name)
+}
+
+// Existence-only check for the volunteer access gate, which runs on every
+// /volunteer-requests request and needs only a boolean — not the village
+// list getVolunteerVillages builds. active_volunteer is the authorization
+// source: an inactive volunteer must lose the surface.
+exports.isActiveVolunteer = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    'SELECT 1 FROM active_volunteer WHERE personId = ? LIMIT 1',
+    [personId]
+  )
+  return rows.length > 0
 }

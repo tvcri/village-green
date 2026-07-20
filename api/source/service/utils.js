@@ -730,6 +730,16 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
   return `cast(concat('[', group_concat(${distinct ? 'distinct ' : ''}${value} ${orderBy ? `order by ${orderBy}` : ''}), ']') as json)`
 }
 
+// Runtime VSS identity guard (single source of truth). Resolves the ONE person
+// behind a username, else NULL: 0 or 2+ email matches => NULL (ambiguous/unknown
+// identity is not a person, and is therefore not VSS-eligible). Case-insensitivity
+// comes from the utf8mb4_0900_ai_ci collation — no LOWER(), which would defeat
+// person INDEX_email. `usernameCol` is a trusted column expression
+// (e.g. 'ud.username'), never user input.
+module.exports.sqlResolvedPersonId = function (usernameCol) {
+  return `(select if(count(*) = 1, min(p.id), null) from person p where p.email = ${usernameCol})`
+}
+
 module.exports.sqlGrantees = function ({villageId, villageIds, userId, username, nameMatch, includeColumnVillageId = true, returnCte = false}) {
   const predicates = {
     statements: [],

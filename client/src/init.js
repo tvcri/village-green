@@ -126,7 +126,25 @@ async function handleNoParameters(redirectUri, hash) {
     sessionStorage.setItem('codeVerifier', response.codeVerifier)
     sessionStorage.setItem('oidcState', response.state)
     sessionStorage.setItem('hash', hash)
-    window.location.href = response.redirectOidc
+
+    // Consume-once: a just-enrolled volunteer arrives via same-tab navigation
+    // with their email stashed under 'vg-login-hint'. Delete it unconditionally
+    // (even if we don't use it) so it can never leak into a later session, then
+    // append it as an OIDC login_hint to pre-fill the Keycloak username field.
+    // redirectOidc always carries a query string already, so append with '&'.
+    let redirectOidc = response.redirectOidc
+    try {
+      const hint = sessionStorage.getItem('vg-login-hint')
+      sessionStorage.removeItem('vg-login-hint')
+      if (hint) {
+        redirectOidc += `&login_hint=${encodeURIComponent(hint)}`
+      }
+    }
+    catch {
+      // Storage unavailable: redirect without a hint.
+    }
+
+    window.location.href = redirectOidc
     return false
   }
 }
