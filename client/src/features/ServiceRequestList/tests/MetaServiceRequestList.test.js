@@ -81,7 +81,7 @@ describe('MetaServiceRequestList CSV download', () => {
 
     // expand the collapsed filters panel, then filter by request number
     await fireEvent.click(screen.getByText('Filters'))
-    const idInput = screen.getByPlaceholderText('Search by ID or number')
+    const idInput = screen.getByPlaceholderText('Search by number')
     await fireEvent.update(idInput, '101')
 
     await waitFor(() => expect(screen.queryAllByText('Bob Baker')).toHaveLength(0))
