@@ -9,6 +9,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
 import { getUsersWithGrants, deleteUser } from '../../../shared/api/userApi.js'
@@ -151,7 +152,12 @@ async function onDeleteUser(user) {
         <template #body="{ data }">{{ data.displayName === data.username ? '—' : data.displayName }}</template>
       </Column>
       <Column header="Access" sortable :sort-field="row => accessSortString(row)">
-        <template #body="{ data }"><AccessTags :user="data" /></template>
+        <template #body="{ data }">
+          <div class="access-cell">
+            <AccessTags :user="data" />
+            <Tag v-if="data.isVolunteer" value="VSS" severity="warn" title="Eligible for Volunteer Self-Signup" />
+          </div>
+        </template>
       </Column>
       <Column field="lastAccess" header="Last Access" sortable>
         <template #body="{ data }">{{ data.lastAccess ? formatLocalDateTime(data.lastAccess * 1000) : '—' }}</template>
@@ -176,6 +182,13 @@ async function onDeleteUser(user) {
 <style scoped>
 .user-list {
   padding: 2rem;
+}
+
+.access-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 h1 {

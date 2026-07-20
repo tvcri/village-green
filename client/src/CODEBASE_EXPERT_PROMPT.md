@@ -395,3 +395,26 @@ const personCount = computed(() => persons.value?.length ?? 0)
 
 - **Full architecture:** `/home/csmig/dev/village-green/docs/architecture/client-initialization-and-data-flow.md`
 - **This prompt:** `/home/csmig/dev/village-green/client/src/CODEBASE_EXPERT_PROMPT.md`
+
+---
+
+## Testing Conventions (vitest) — added 2026-07-14
+
+- Run from `client/`: `npx vitest run`. **No `vitest.config.js` exists** — Vitest runs on defaults.
+- Every component test file needs `// @vitest-environment jsdom` on line 1 (no global environment setting).
+- `src/testUtils/setupTests.js` is wired to nothing — stub `matchMedia` (and `ResizeObserver` if needed) **inline per test file**; PrimeVue components call them on mount.
+- Style: `@testing-library/vue` with `global: { plugins: [PrimeVue] }`; `vi.mock()` for `vue-router`, `primevue/usetoast`, and the feature's own `api/*.js` module.
+- Trap: list components render desktop + mobile markup simultaneously — use `getAllByText`, not `getByText`, for row content.
+
+---
+
+## Standalone (Gate-Free) Pages — added 2026-07-14
+
+The OIDC gate lives in `src/init.js`; a page skips it by not loading `/src/init.js`. Precedents: `public/reauth.html`, `public/google-callback.html` (raw static), and `enroll.html` (true Vite multi-page Vue entry with its own `src/enroll/main.js` bootstrap, `volunteer-self-signup` branch). Key trap: `apiClient.js` is unusable on such pages — `getAccessToken` dereferences `VG.oidcWorker.token`, which only exists after `init.js` runs; use raw `fetch()` against `VG.Env.apiBase`. Full recipe: `docs/architecture/client-conventions.md`.
+
+---
+
+## More Documentation — added 2026-07-14
+
+- **Testing, standalone pages, Vite facts:** `/home/csmig/dev/village-green/docs/architecture/client-conventions.md`
+- **API-side architecture (routing, auth layers, conventions):** `/home/csmig/dev/village-green/docs/architecture/api-routing-and-auth.md`

@@ -336,10 +336,11 @@ const computedStatus = computed(() => {
 })
 
 const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
+const modifiedByDisplayName = computed(() => existingRequest.value?.modifiedByDisplayName || '')
 
-const formattedCreatedAt = computed(() => {
-  if (!form.value.createdAt) return ''
-  const d = new Date(form.value.createdAt)
+const formatTimestamp = (value) => {
+  if (!value) return ''
+  const d = new Date(value)
   if (isNaN(d)) return ''
   return d.toLocaleString('en-US', {
     year: 'numeric',
@@ -348,7 +349,10 @@ const formattedCreatedAt = computed(() => {
     hour: 'numeric',
     minute: '2-digit'
   })
-})
+}
+
+const formattedCreatedAt = computed(() => formatTimestamp(form.value.createdAt))
+const formattedModifiedAt = computed(() => formatTimestamp(existingRequest.value?.modifiedAt))
 
 
 const serviceNameOptions = [
@@ -835,6 +839,7 @@ const openPersonDialog = (personId) => {
               <h2 class="card-title">{{ isEdit ? `Edit Service Request (#${existingRequest?.requestNumber ?? serviceRequestId})` : 'Create Service Request' }}</h2>
             </div>
             <div v-if="formattedCreatedAt" class="card-subtitle">Created {{ formattedCreatedAt }}<template v-if="createdByDisplayName"> by {{ createdByDisplayName }}</template></div>
+            <div v-if="formattedModifiedAt" class="card-subtitle">Modified {{ formattedModifiedAt }}<template v-if="modifiedByDisplayName"> by {{ modifiedByDisplayName }}</template></div>
           </div>
           <div class="header-right">
             <Tag

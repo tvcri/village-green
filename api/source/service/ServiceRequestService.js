@@ -81,7 +81,11 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.startPhone AS startPhone',
     'CAST(sr.createdUserId AS CHAR) AS createdUserId',
     'ud.username AS createdByUsername',
-    `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`
+    `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`,
+    "DATE_FORMAT(sr.modifiedAt, '%Y-%m-%dT%TZ') AS modifiedAt",
+    'CAST(sr.modifiedUserId AS CHAR) AS modifiedUserId',
+    'udm.username AS modifiedByUsername',
+    `COALESCE(json_unquote(json_extract(udm.lastClaims, ${NAME_CLAIM_PATH})), udm.username) AS modifiedByDisplayName`
   ]
   const joins = new Set([
     'service_request sr',
@@ -91,7 +95,8 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'LEFT JOIN volunteer vol ON sr.volunteerPersonId = vol.personId',
     'LEFT JOIN person vp ON sr.volunteerPersonId = vp.id',
     'LEFT JOIN village vv ON vp.villageId = vv.id',
-    'LEFT JOIN user_data ud ON sr.createdUserId = ud.userId'
+    'LEFT JOIN user_data ud ON sr.createdUserId = ud.userId',
+    'LEFT JOIN user_data udm ON sr.modifiedUserId = udm.userId'
   ])
   const predicates = { statements: ['sr.id = ?'], binds: [serviceRequestId] }
 
@@ -364,3 +369,5 @@ module.exports.deleteServiceRequest = async function (serviceRequestId) {
   )
   return result.affectedRows > 0
 }
+
+module.exports.writeNotificationEvent = writeNotificationEvent

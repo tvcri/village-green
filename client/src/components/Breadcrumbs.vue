@@ -6,10 +6,16 @@ import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
 import { setPendingHighlight } from '../shared/lib/pendingHighlight.js'
+import { useCurrentUser } from '../shared/composables/useCurrentUser.js'
 import Menu from 'primevue/menu'
 
 const router = useRouter()
 const route = useRoute()
+
+// A grantless user (no village or federation grants) is a self-signup-only
+// volunteer: their breadcrumb root is the VSS home ("Home"), not the villages
+// list they can't use.
+const { isGrantless } = useCurrentUser()
 
 const menuRefs = new Map()
 
@@ -56,9 +62,9 @@ watch(() => route.name, (routeName) => {
 }, { immediate: true })
 
 const breadcrumbs = computed(() => {
-  const crumbs = [
-    { label: 'Villages', route: { name: 'villages' } }
-  ]
+  const crumbs = isGrantless.value
+    ? [{ label: 'Home', route: { name: 'volunteer' } }]
+    : [{ label: 'Villages', route: { name: 'villages' } }]
 
   // Handle admin routes first (to avoid adding village breadcrumb twice)
   if (route.name && route.name.startsWith('admin')) {
@@ -227,6 +233,11 @@ const breadcrumbs = computed(() => {
       } else {
         crumbs.push({ label: 'Service Requests', route: { name: 'service-requests', params: { villageId: vId } }, siblings: getSiblings('service-requests', { villageId: vId }) })
       }
+      crumbs.push({ label: 'Request' })
+      break
+    case 'volunteer-request-detail':
+      // Grantless VSS volunteer viewing a request: root is "Home" (set above),
+      // this is its "Request" child.
       crumbs.push({ label: 'Request' })
       break
   }
