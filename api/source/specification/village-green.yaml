@@ -3806,6 +3806,10 @@ components:
           type: string
           maxLength: 255
           nullable: true
+        # TEMPORARY: derived from modifiedUserId IS NOT NULL — valid only
+        # while VSS signup/release are the sole writers of modifiedUserId.
+        vssSignup:
+          type: boolean
         serviceDate:
           type: string
           format: date

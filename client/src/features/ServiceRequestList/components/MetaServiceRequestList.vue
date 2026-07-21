@@ -45,6 +45,9 @@ const selectedVolunteer = ref(null)
 const selectedService = ref(null)
 const idSearch = ref('')
 const notificationFilter = ref(null)
+// TECH DEBT: `vssSignup` is an API-side proxy derived from modifiedUserId
+// being non-null; see the board item on recording VSS signup explicitly.
+const vssSignupOnly = ref(false)
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
@@ -148,7 +151,11 @@ const filteredRequests = computed(() => {
       const displayedId = String(r.displayNumber ?? '').toLowerCase()
       idMatch = displayedId.includes(idQuery)
     }
-    return memberMatch && volunteerMatch && serviceMatch && idMatch
+    let vssMatch = true
+    if (vssSignupOnly.value) {
+      vssMatch = r.vssSignup === true
+    }
+    return memberMatch && volunteerMatch && serviceMatch && idMatch && vssMatch
   })
 })
 
@@ -166,6 +173,7 @@ const activeFilterCount = computed(() => {
   if (selectedVillage.value) count++
   if (idSearch.value.trim()) count++
   if (notificationFilter.value) count++
+  if (vssSignupOnly.value) count++
   return count
 })
 
@@ -255,6 +263,7 @@ const clearFilters = () => {
   selectedVillage.value = null
   idSearch.value = ''
   notificationFilter.value = null
+  vssSignupOnly.value = false
 }
 </script>
 
@@ -312,6 +321,10 @@ const clearFilters = () => {
               <div v-for="status in statusOptions" :key="status" class="status-filter">
                 <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
                 <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
+              </div>
+              <div class="status-filter">
+                <Checkbox v-model="vssSignupOnly" input-id="vss-signup-filter" binary />
+                <label for="vss-signup-filter">VSS Signup</label>
               </div>
             </div>
           </div>

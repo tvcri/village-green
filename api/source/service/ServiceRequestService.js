@@ -195,6 +195,11 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
     'CAST(sr.createdUserId AS CHAR) AS createdUserId',
     'ud.username AS createdByUsername',
     `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`,
+    // TECH DEBT: proxy for "accepted via VSS" — modifiedUserId is written
+    // only by the VSS signup/release paths today. When VSS records signup
+    // explicitly (board item "Record VSS signup explicitly instead of
+    // modifiedUserId proxy"), change only this derivation.
+    "CAST(IF(sr.modifiedUserId IS NOT NULL, 'true', 'false') AS JSON) AS vssSignup",
     `COALESCE(
       (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.eventType)')}
        FROM notification_event ne

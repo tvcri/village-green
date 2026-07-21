@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { render, screen, fireEvent, waitFor } from '@testing-library/vue'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import MetaServiceRequestList from '../components/MetaServiceRequestList.vue'
 import { downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -30,7 +30,8 @@ vi.mock('../api/serviceRequestApi.js', () => ({
       serviceDate: '2026-07-20',
       city: 'Springfield',
       villageName: 'Testville',
-      createdAt: '2026-07-01T12:00:00Z'
+      createdAt: '2026-07-01T12:00:00Z',
+      vssSignup: true
     },
     {
       serviceRequestId: 2,
@@ -42,7 +43,8 @@ vi.mock('../api/serviceRequestApi.js', () => ({
       serviceDate: '2026-07-21',
       city: 'Springfield',
       villageName: 'Testville',
-      createdAt: '2026-07-02T12:00:00Z'
+      createdAt: '2026-07-02T12:00:00Z',
+      vssSignup: false
     }
   ]),
   getServiceRequest: vi.fn(),
@@ -73,6 +75,10 @@ describe('MetaServiceRequestList CSV download', () => {
     })
   })
 
+  // vitest `globals` is off in vite.config.js, so Testing Library's automatic
+  // cleanup never registers and mounted components leak between tests.
+  afterEach(() => { cleanup() })
+
   it('downloads only the rows matching the active ID filter', async () => {
     render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
 
@@ -93,5 +99,19 @@ describe('MetaServiceRequestList CSV download', () => {
     expect(filename).toBe('service-requests.csv')
     expect(csv).toContain('Alice Anderson')
     expect(csv).not.toContain('Bob Baker')
+  })
+
+  it('shows only VSS signup rows when the VSS Signup checkbox is checked', async () => {
+    render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+
+    // rows render twice (desktop table + mobile cards), hence getAllByText
+    await screen.findAllByText('Alice Anderson')
+    expect(screen.getAllByText('Bob Baker').length).toBeGreaterThan(0)
+
+    await fireEvent.click(screen.getByText('Filters'))
+    await fireEvent.click(screen.getByLabelText('VSS Signup'))
+
+    await waitFor(() => expect(screen.queryAllByText('Bob Baker')).toHaveLength(0))
+    expect(screen.getAllByText('Alice Anderson').length).toBeGreaterThan(0)
   })
 })
