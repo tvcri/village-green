@@ -62,14 +62,22 @@ const qualifyingVolunteers = computed(() =>
   filterQualifying(accountVolunteers.value, request.value?.serviceName)
 )
 
-function volunteerName(personId) {
-  return accountVolunteers.value.find(v => v.personId === String(personId))?.name ?? ''
+// "First Last" for names inside sentences (confirm dialog, Confirmed banner,
+// toasts). Tabular displays (Volunteer column, picker list) keep the
+// "Last, First" fullName served as `name`, matching the Member columns.
+function informalName(v) {
+  if (!v) return ''
+  return [v.firstName, v.lastName].filter(Boolean).join(' ') || v.name || ''
+}
+
+function informalVolunteerName(personId) {
+  return informalName(accountVolunteers.value.find(v => v.personId === String(personId)))
 }
 
 // Multi-volunteer accounts see WHO is confirmed; single-volunteer accounts
 // keep the second-person copy.
 const confirmedBannerText = computed(() => {
-  const who = isMultiVolunteer.value ? volunteerName(request.value?.volunteerPersonId) : ''
+  const who = isMultiVolunteer.value ? informalVolunteerName(request.value?.volunteerPersonId) : ''
   return who
     ? `${who} is confirmed for this request. Please call the member to coordinate the service.`
     : `You're confirmed for this request. Please call the member to coordinate your service.`
@@ -156,7 +164,7 @@ function confirmSignUp() {
   // when the account has several; post the id only then (single-volunteer
   // accounts keep the omitted-body auto-select path — zero change for them).
   const chosen = isMultiVolunteer.value ? qualifyingVolunteers.value[0] : undefined
-  const subject = chosen ? `${chosen.name} will` : 'You will'
+  const subject = chosen ? `${informalName(chosen)} will` : 'You will'
   confirm.require({
     header: 'Sign up for this request?',
     message: `${subject} be confirmed as the provider for "${request.value.serviceName || 'this request'}"${request.value.member?.fullName ? ` for ${request.value.member.fullName}` : ''}.`,
@@ -175,7 +183,7 @@ function submitPicker() {
 async function doSignUp(personId) {
   try {
     await signUpVolunteerRequest(serviceRequestId.value, personId)
-    const who = personId && isMultiVolunteer.value ? volunteerName(personId) : ''
+    const who = personId && isMultiVolunteer.value ? informalVolunteerName(personId) : ''
     toast.add({
       severity: 'success',
       summary: 'Confirmed',
@@ -193,7 +201,7 @@ async function doSignUp(personId) {
       if (err.body?.detail?.reason === 'alreadyOwnAccount') {
         // Taken by the OTHER volunteer on this account — stay on the page;
         // the refetch shows it as the account's confirmed request.
-        const who = volunteerName(err.body.detail.volunteerPersonId)
+        const who = informalVolunteerName(err.body.detail.volunteerPersonId)
         toast.add({ severity: 'warn', summary: 'Already committed', detail: `${who || 'Another volunteer on your account'} is already committed to this request.`, life: 5000 })
         fetchRequest()
         return

@@ -4410,8 +4410,13 @@ components:
               personId:
                 $ref: '#/components/schemas/StringIntId'
               name:
+                description: Tabular display form ("Last, First" fullName)
                 type: string
                 nullable: true
+              firstName:
+                type: string
+              lastName:
+                type: string
               villages:
                 type: array
                 items:
@@ -4429,6 +4434,8 @@ components:
             required:
             - personId
             - name
+            - firstName
+            - lastName
             - villages
             - capabilities
       required:

@@ -810,17 +810,16 @@ exports.getVolunteerCapabilities = async function (personId) {
 // what the VSS client needs: display name (the "Who is this for?" picker and
 // the My-commitments Volunteer column) plus per-person villages/capabilities.
 // DISTINCT guards the out-of-scope person-with-multiple-volunteer-rows case.
-// name is "First Last" (display convention for volunteer names), NOT the
-// "Last, First" generated fullName — which still drives the ORDER BY so
-// siblings list in last-name order. fullName must also stay in the SELECT:
-// with DISTINCT, MySQL rejects ORDER BY expressions not in the select list
-// (error 3065). The row mapper below ignores it.
+// name is the generated "Last, First" fullName — the tabular display
+// convention (Volunteer column, picker list), matching Member columns.
+// firstName/lastName ride along so the client can compose the informal
+// "First Last" where the name sits inside a sentence (confirm dialog,
+// Confirmed banner, toasts).
 exports.getVolunteers = async function (personIds) {
   if (!personIds?.length) return []
   const [rows] = await dbUtils.pool.query(
     `SELECT DISTINCT CAST(av.personId AS CHAR) AS personId,
-       CONCAT_WS(' ', p.firstName, p.lastName) AS name,
-       p.fullName
+       p.fullName AS name, p.firstName, p.lastName
      FROM active_volunteer av
      JOIN person p ON av.personId = p.id
      WHERE av.personId IN (?)
@@ -832,7 +831,7 @@ exports.getVolunteers = async function (personIds) {
       exports.getVolunteerVillages(row.personId),
       exports.getVolunteerCapabilities(row.personId),
     ])
-    return { personId: row.personId, name: row.name, villages, capabilities }
+    return { personId: row.personId, name: row.name, firstName: row.firstName, lastName: row.lastName, villages, capabilities }
   }))
 }
 
