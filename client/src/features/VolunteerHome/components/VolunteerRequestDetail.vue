@@ -434,7 +434,7 @@ async function doRelease() {
         <span>{{ pickerMessage }}</span>
       </div>
       <template #footer>
-        <Button label="Cancel" text @click="pickerVisible = false" />
+        <Button label="Cancel" @click="pickerVisible = false" />
         <Button label="Sign up" icon="pi pi-heart" :disabled="!pickedPersonId" @click="submitPicker" />
       </template>
     </Dialog>
