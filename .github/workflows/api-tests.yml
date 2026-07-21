@@ -3,10 +3,18 @@ name: API tests
 # Black-box API integration tests (test/api). Runs the real server against a
 # disposable MySQL 8 + the mock OIDC provider — see test/api/README.md.
 #
-# Heads up: this suite is intentionally RED right now. Some tests assert secure
-# behavior the code does not yet implement, so the job fails until those guards
-# land (then it goes green automatically). See test/api/SECURITY-FINDINGS.md.
-# For that reason, don't make this a *required* check until it's green.
+# The `api-tests` job is green: the findings it was originally written to
+# characterize have all landed upstream (see test/api/SECURITY-FINDINGS.md), so
+# a failure there is a real regression and that job is safe to make a REQUIRED
+# check. If a new deliberate RED is ever characterized, it goes red by design
+# and this note should come back.
+#
+# The `response-validation` job is NOT green yet, and is not a regression
+# signal: it fails on ~39 pre-existing spec violations inherited from main
+# (mostly a missing `serviceRequestId` on several projections, plus some
+# string/integer id mismatches). They are pre-existing API behavior this suite
+# merely observes, not something it introduced. Keep that job non-required
+# until they're worked off, then flip it too.
 #
 # The run is instrumented (`npm run test:coverage`) and the c8 report is always
 # uploaded. The API child runs with VG_DEV_RESPONSE_VALIDATION=logOnly (set by
@@ -76,7 +84,7 @@ jobs:
   response-validation:
     name: Response validation
     needs: api-tests
-    if: always() # api-tests is red-by-design; still audit the responses it served
+    if: always() # audit the responses served even when the suite itself fails
     runs-on: ubuntu-latest
     steps:
       - name: Download API log artifact
