@@ -28,7 +28,7 @@ covered. Each former RED probe has been converted to a GREEN assertion (with a
 ### A. `sqlGrantees` double-wraps `villageIds` → 500 (correctness, not exposure)
 
 The same mis-binding class as former #3/#4 survives in one spot:
-`api/source/service/utils.js:754` pushes `[villageIds]` into `IN (?)`.
+the `villageIds` arm of `sqlGrantees` (`api/source/service/utils.js`) pushes `[villageIds]` into `IN (?)`.
 Reachable: any caller with village grants on **2+ villages** calling
 `GET /villages?projection=statistics` → `ER_OPERAND_COLUMNS` → **500**.
 Federation callers (allVillages path) and single-village callers dodge it.

@@ -22,7 +22,10 @@ test('GET /user returns the caller\'s own record with DB-derived grants', async 
   assert.deepEqual(json.grants[vid].roles.map(r => r.roleId), ['2'], 'role 2 Steering Committee')
   assert.ok(json.permissions?.byVillage?.[vid]?.includes('person:read'), 'per-village permission bundle')
   assert.equal(json.permissions.federation.length, 0, 'village user holds no federation permissions')
-  assert.equal(json.volunteer, null, 'no linked active-volunteer person for this username')
+  // #68 (multi-volunteer household accounts): the singular `volunteer` block
+  // became a `volunteers` array — empty when no resolved person behind the
+  // username is an active volunteer (fixture usernames match no person email).
+  assert.deepEqual(json.volunteers, [], 'no active-volunteer persons resolve from this username')
 })
 
 test('GET /user reflects identity per token (admin sees admin, canElevate=true)', async () => {

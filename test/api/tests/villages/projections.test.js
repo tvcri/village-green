@@ -41,8 +41,8 @@ test('list projection=statistics works for federation and single-village callers
 })
 
 test('list projection=statistics works for a multi-village caller (RED until fixed)', async () => {
-  // RED — scratch/bug-report-2026-07-20.md (bug 1): sqlGrantees double-wraps
-  // villageIds (api/source/service/utils.js:754), so the grantees CTE renders
+  // RED — scratch/bug-report-2026-07-20.md (bug 1): the villageIds arm of
+  // sqlGrantees (api/source/service/utils.js) double-wraps its bind, so the CTE renders
   // `cg.villageId IN ((1, 2))` whenever the caller's grant list has >= 2
   // entries -> ER_OPERAND_COLUMNS -> 500 today. Federation callers
   // (allVillages path) and single-village callers dodge it. This asserts the

@@ -23,6 +23,10 @@ users see the right data) as the throughline.
 > with no edit when the fixes land. A red run with exactly these two failures
 > is the expected state.
 >
+> Known blind spots — chiefly the #64/#68 VSS surface (`/volunteer-requests`,
+> `/enrollment`), which is structurally invisible to the canonical fixtures —
+> are catalogued with closing plans in `COVERAGE-GAPS.md`.
+>
 > **Status (2026-07-07):** re-synced with `main` after the #37–#47 merge (the person /
 > member / volunteer schema rework): the seeder targets the camelCase schema and seeds
 > `firstName`/`lastName` (`fullName` is DB-generated as `"last, first"`), with a drift
