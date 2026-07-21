@@ -153,10 +153,24 @@ const timeDisplay = computed(() => {
   ]
 })
 
+// The confirm sentence, shared by the single-volunteer ConfirmDialog and the
+// multi-volunteer picker dialog (whose subject tracks the selected radio).
+function signUpMessage(subject) {
+  return `${subject} be confirmed as the provider for "${request.value?.serviceName || 'this request'}"${request.value?.member?.fullName ? ` for ${request.value.member.fullName}` : ''}.`
+}
+
+const pickerMessage = computed(() => {
+  const chosen = qualifyingVolunteers.value.find(v => v.personId === pickedPersonId.value)
+  return signUpMessage(chosen ? `${informalName(chosen)} will` : 'You will')
+})
+
 function confirmSignUp() {
   if (isMultiVolunteer.value && qualifyingVolunteers.value.length > 1) {
-    // The picker doubles as the confirmation: "Who is this for?" + Sign up.
-    pickedPersonId.value = null
+    // The picker doubles as the confirmation: same header and running text as
+    // the single-volunteer confirm, with the volunteer radios under the
+    // title. Preselect the first qualifier so the sentence always has a
+    // subject; the text tracks the selection live.
+    pickedPersonId.value = qualifyingVolunteers.value[0].personId
     pickerVisible.value = true
     return
   }
@@ -164,10 +178,9 @@ function confirmSignUp() {
   // when the account has several; post the id only then (single-volunteer
   // accounts keep the omitted-body auto-select path — zero change for them).
   const chosen = isMultiVolunteer.value ? qualifyingVolunteers.value[0] : undefined
-  const subject = chosen ? `${informalName(chosen)} will` : 'You will'
   confirm.require({
     header: 'Sign up for this request?',
-    message: `${subject} be confirmed as the provider for "${request.value.serviceName || 'this request'}"${request.value.member?.fullName ? ` for ${request.value.member.fullName}` : ''}.`,
+    message: signUpMessage(chosen ? `${informalName(chosen)} will` : 'You will'),
     icon: 'pi pi-heart',
     acceptLabel: 'Sign up',
     rejectLabel: 'Cancel',
@@ -405,10 +418,14 @@ async function doRelease() {
       <p>Service request not found.</p>
     </div>
 
-    <Dialog v-model:visible="pickerVisible" header="Who is this for?" modal :style="{ maxWidth: '22rem' }">
+    <Dialog v-model:visible="pickerVisible" header="Sign up for this request?" modal :style="{ maxWidth: '28rem' }">
       <div v-for="v in qualifyingVolunteers" :key="v.personId" class="picker-row">
         <RadioButton v-model="pickedPersonId" :inputId="`vol-${v.personId}`" :value="v.personId" />
         <label :for="`vol-${v.personId}`">{{ v.name }}</label>
+      </div>
+      <div class="picker-message">
+        <i class="pi pi-heart"></i>
+        <span>{{ pickerMessage }}</span>
       </div>
       <template #footer>
         <Button label="Cancel" text @click="pickerVisible = false" />
@@ -616,6 +633,21 @@ async function doRelease() {
   padding: 0.5rem 0;
   font-size: 1rem;
   font-weight: 600;
+}
+
+/* Icon + running text below the radios — mirrors the shared ConfirmDialog's
+   icon/message row so the multi-volunteer dialog reads like the single case. */
+.picker-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  color: var(--color-text-primary);
+}
+
+.picker-message .pi-heart {
+  font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
 @media (max-width: 900px) {
