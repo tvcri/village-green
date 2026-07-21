@@ -46,6 +46,9 @@ const TWO_VOLUNTEERS = [
 describe('VolunteerHome Volunteer column (multi-volunteer accounts)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Known baseline so a future test that forgets to set userMock fails
+    // loudly on an empty account instead of inheriting the previous test's.
+    userMock.value = { volunteers: [] }
     routeMock.query = { tab: 'mine' }
     window.matchMedia = () => ({
       matches: false,

@@ -141,7 +141,9 @@ const showServiceFilter = computed(() => serviceCategoryOptions.value.length >= 
 const showVolunteerColumn = computed(() => accountVolunteers.value.length > 1)
 
 function volunteerLabel(row) {
-  return accountVolunteers.value.find(v => v.personId === row.volunteerPersonId)?.name ?? ''
+  // String() aligns with the detail view's lookup; both sides are CHAR-cast
+  // strings today, so this is drift-proofing, not a conversion.
+  return accountVolunteers.value.find(v => v.personId === String(row.volunteerPersonId))?.name ?? ''
 }
 
 const SERVICE_FILTER_KEY = 'vg.volunteerHome.serviceFilter'
