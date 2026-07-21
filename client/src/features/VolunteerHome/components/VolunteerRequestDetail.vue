@@ -47,8 +47,11 @@ const { state: request, isLoading, execute: fetchRequest } = useAsyncState(
 // Account volunteers (shared household email => several). Fetched from /user
 // like VolunteerHome does — no shared user store exists. onError: null — a
 // failed fetch degrades to single-volunteer behavior (no picker), and the
-// server still validates the selection.
-const { state: currentUser } = useAsyncState(
+// server still validates the selection. Sign up is disabled while this fetch
+// is in flight so a fast click can't skip the picker on a multi-volunteer
+// account; the 422 selectionRequired handler in doSignUp recovers the
+// failed-fetch case.
+const { state: currentUser, isLoading: userLoading, execute: fetchUser } = useAsyncState(
   () => getUser(),
   { immediate: true, initialState: null, onError: null }
 )
@@ -213,6 +216,19 @@ async function doSignUp(personId) {
   }
   catch (err) {
     if (isPrivacyAckError(err)) return
+    if (getHttpStatus(err) === 422 && err.body?.detail?.reason === 'selectionRequired') {
+      // The server sees 2+ qualifying volunteers but the client posted no
+      // personId — the /user fetch was degraded at click time. Recover by
+      // refetching the account volunteers and surfacing the picker.
+      await fetchUser()
+      if (qualifyingVolunteers.value.length > 1) {
+        pickedPersonId.value = qualifyingVolunteers.value[0].personId
+        pickerVisible.value = true
+        return
+      }
+      toast.add({ severity: 'warn', summary: 'Choose a volunteer', detail: 'More than one volunteer on your account qualifies for this request. Please reload the page and try again.', life: 5000 })
+      return
+    }
     if (getHttpStatus(err) === 409) {
       if (err.body?.detail?.reason === 'alreadyOwnAccount') {
         // Taken by the OTHER volunteer on this account — stay on the page;
@@ -402,6 +418,7 @@ async function doRelease() {
             v-if="request.status === 'Open'"
             label="Sign up!"
             icon="pi pi-heart"
+            :disabled="userLoading"
             @click="confirmSignUp"
           />
           <Button
