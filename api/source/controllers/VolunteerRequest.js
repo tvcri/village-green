@@ -17,7 +17,7 @@ module.exports.getVolunteerRequests = async function getVolunteerRequests (req, 
   try {
     const response = await VolunteerRequestService.getVolunteerRequests({
       scope: req.query.scope,
-      personId: req.userObject.personId,
+      personIds: req.userObject.personIds,
     })
     res.json(response)
   }
@@ -30,7 +30,7 @@ module.exports.getVolunteerRequest = async function getVolunteerRequest (req, re
   try {
     const response = await VolunteerRequestService.getVolunteerRequest({
       serviceRequestId: req.params.serviceRequestId,
-      personId: req.userObject.personId,
+      personIds: req.userObject.personIds,
     })
     if (!response) throw new SmError.NotFoundError()
     res.json(response)

@@ -5008,6 +5008,9 @@ components:
           $ref: '#/components/schemas/VolunteerEmergencyContact'
         volunteerAddress:
           $ref: '#/components/schemas/VolunteerOwnAddress'
+        volunteerPersonId:
+          type: string
+          nullable: true
       required:
       - serviceRequestId
       - villageId
