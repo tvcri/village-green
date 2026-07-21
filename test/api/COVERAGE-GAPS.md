@@ -4,52 +4,42 @@ What this suite deliberately does **not** cover yet, why, and what closing each
 gap would take. Companion to `SECURITY-FINDINGS.md` (which tracks *bugs*; this
 tracks *blind spots*). Last reviewed 2026-07-21 @ merge `081200a` (post-#67/#68).
 
-## 1. The VSS surface: `/volunteer-requests/**` (largest gap)
+## 1. ~~The VSS surface: `/volunteer-requests/**`~~ — CLOSED
 
-Untested end-to-end: the volunteer access gate, list scopes
-(`open`/`mine`/`history`), the capability-prefix visibility boundary, sign-up
-and release lifecycles, and the #68 multi-volunteer household outcomes
-(`selectionRequired` 422, `alreadyOwnAccount` 409, posted-`personId`
-validation, account-wide release).
+Closed by `tests/volunteer-requests/vss.test.js` (19 tests). What it took, since
+the obstacle was structural rather than an oversight: VSS access is
+identity-derived — the caller's `username` must equal an active
+volunteer-person's `email` (resolved through `active_volunteer`; see
+`utils.js sqlResolvedPersonIds`), and every canonical fixture username
+(`*@quahog.test`, …) deliberately matches no person email (`*@residents.test`),
+so the whole surface was invisible to every existing persona.
 
-**Why it's structural, not an oversight:** VSS access is identity-derived —
-the caller's `username` must equal an active volunteer-person's `email`
-(resolved at runtime through `active_volunteer`; see
-`utils.js sqlResolvedPersonIds`). Every canonical fixture username
-(`anne.hutchinson@quahog.test`, …) deliberately matches no person email
-(`*.@residents.test`), so all canonical users have empty `personIds` and the
-whole surface is invisible to them. Nothing here is exercised by accident.
+Three fixture additions opened it up:
 
-**What exists instead:** upstream unit tests
-(`api/source/test/volunteerRequestService.test.js`, `userServiceVss.test.js`,
-`accessGates.test.js`) cover the pure decision logic — outcome classification,
-capability-gate SQL shape, id-set escaping. The HTTP contract, the gates in
-middleware order, and the atomic first-wins UPDATE are not covered anywhere.
+- **`users.vssJoe`**, username `joe.swanson@residents.test` — the only fixture
+  user whose username matches a person email, and it holds **zero role grants**
+  (which is what pins the staff-gate exemption).
+- **`persons.vssHouseholdSibling`** — a second "Joe Swanson" person in
+  Innsmouth. `person()` derives email from the name, so it shares
+  quahogVolunteer's email automatically and `vssJoe` resolves to **two** active
+  volunteers: the #68 multi-volunteer household.
+- **`volunteerCapabilities`** — `volunteer_capability` was never seeded, so
+  before this every `scope=open` was empty and every sign-up 404'd. The
+  household holds Rides and *not* Errands, which is what makes the capability
+  boundary observable.
 
-**To close it:** add fixture user(s) whose username equals a volunteer
-person's email — e.g. a `vssJoe` user with username
-`joe.swanson@residents.test` (matches the seeded Quahog volunteer person), and
-a second volunteer person sharing that same email to exercise the household
-(multi-`personIds`) outcomes. Seed `volunteer_capability` rows so the
-capability boundary is observable (one capability held, one not). Then the
-interesting assertions are:
+Two traps worth remembering, both guarded by `assertVssIdentity` in `seed.js`:
+capability names map to serviceName **prefixes** with a colon (`Rides` →
+`'Ride:'`), so the seeded `'Ride to pharmacy'` fixtures match *nothing* — VSS
+tests create their own `'Ride: …'` requests; and a rename on either Joe Swanson
+silently empties `personIds`, which looks exactly like an access bug.
 
-- gate: canonical (email-unmatched) users → 403 on every `/volunteer-requests`
-  route; `vssJoe` → 200 even with **zero role grants** (the staff gate
-  exempts `/volunteer-requests`; volunteer access is identity, not grants)
-- `GET /user` → `volunteers[]` populated (the `[]` shape for canonical users
-  is already pinned in `tests/users/self.test.js`)
-- `scope=open` visibility limited by capability prefix; cross-village
-  visibility is by design (any active volunteer sees any village's open
-  requests)
-- sign-up: 200 confirmed / 404 for capability-mismatched (no existence leak) /
-  409 non-open / 422 `selectionRequired` for a 2-qualifier household with no
-  posted `personId` / 403 for a posted `personId` outside the caller's set /
-  409 `alreadyOwnAccount` naming the committed sibling
-- release: account-wide (either household member can release), 409 otherwise;
-  released row returns to `Open`
-- cleanup discipline: sign-up/release mutate `service_request` — use throwaway
-  SRs (created as `sc`), not the canonical fixtures
+It also surfaced a real defect: `VolunteerServiceRequest` is
+`additionalProperties: false` but the service returns `requestNumber`, so every
+VSS response violated the spec. Fixed by adding the property.
+
+Left uncovered on purpose: `scope=history` contents (needs `Completed`
+fixtures) and the capability-revocation read-back path.
 
 ## 2. `/enrollment/**` (self-service account claim)
 

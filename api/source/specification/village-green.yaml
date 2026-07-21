@@ -4973,6 +4973,12 @@ components:
         villageName:
           type: string
           nullable: true
+        requestNumber:
+          description: >-
+            The CE-legacy human-readable number; null for VG-native requests
+            (the client shows `requestNumber ?? serviceRequestId`).
+          type: integer
+          nullable: true
         status:
           type: string
         serviceName:

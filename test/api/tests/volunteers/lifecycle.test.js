@@ -38,6 +38,16 @@ async function listedNames (token) {
   return json.map(v => v.fullName)
 }
 
+// fullName is NOT unique across fixtures — persons.vssHouseholdSibling is a
+// second "Swanson, Joe" in Innsmouth (it shares quahogVolunteer's email so the
+// VSS household resolves to two volunteers). Scoping assertions must key on
+// personId, or an Innsmouth row that SHOULD be visible reads as a Quahog leak.
+async function listedPersonIds (token) {
+  const { status, json } = await vgCall('getVolunteers', {}, { token })
+  assert.equal(status, 200)
+  return json.map(v => String(v.personId))
+}
+
 // ---- list (GREEN — grant-scoped via active_volunteer) ----
 
 test('GET /volunteers returns the caller\'s granted-village volunteers', async () => {
@@ -53,9 +63,9 @@ test('GET /volunteers returns the caller\'s granted-village volunteers', async (
 })
 
 test('GET /volunteers is grant-scoped per caller (full_v2 sees Innsmouth, not Quahog)', async () => {
-  const names = await listedNames(tokens.users.full_v2)
-  assert.ok(names.includes(persons.innsmouthVolunteer.fullName), 'includes the Innsmouth volunteer')
-  assert.ok(!names.includes(persons.quahogVolunteer.fullName), 'must not leak the Quahog volunteer')
+  const ids = await listedPersonIds(tokens.users.full_v2)
+  assert.ok(ids.includes(String(persons.innsmouthVolunteer.id)), 'includes the Innsmouth volunteer')
+  assert.ok(!ids.includes(String(persons.quahogVolunteer.id)), 'must not leak the Quahog volunteer')
 })
 
 test('GET /volunteers: federation readers see every village on a plain call', async () => {

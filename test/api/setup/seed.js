@@ -3,7 +3,7 @@
 // `--keep` re-runs start clean. Uses explicit IDs from fixtures.js.
 import mysql from 'mysql2/promise'
 import { config } from './env.js'
-import { villages, users, persons, members, volunteers, serviceRequests, fcvSubmissions } from './fixtures.js'
+import { villages, users, persons, members, volunteers, volunteerCapabilities, serviceRequests, fcvSubmissions } from './fixtures.js'
 
 // Tables we own, child-before-parent for clean truncation.
 const TABLES = [
@@ -26,6 +26,7 @@ const EXPECTED_COLUMNS = {
   person: ['id', 'villageId', 'firstName', 'lastName', 'street', 'city', 'state', 'zip', 'email', 'phone', 'cell'],
   member: ['id', 'personId', 'memberNumber', 'status'],
   volunteer: ['id', 'personId', 'active'],
+  volunteer_capability: ['volunteerId', 'capabilityId'],
   service_request: ['id', 'requestNumber', 'villageId', 'memberPersonId', 'volunteerPersonId',
     'status', 'serviceName', 'destination', 'createdAt', 'serviceDate', 'finishTime'],
   fcv_submission: ['id', 'villageId', 'volunteerPersonId', 'memberPersonId', 'visitDate',
@@ -47,6 +48,45 @@ async function assertRoleCatalog (conn) {
       'every role_grant insert would hit fk_role_grant_role. Regenerate ' +
       'sql/current/20-vg-static.sql (generateSchema.sh --container) from a DB ' +
       'migrated through 0013-rbac-roles.js.',
+    )
+  }
+}
+
+// The VSS suite rests on two silent couplings that ordinary edits can break
+// without any test failing in an obvious place:
+//   1. users.vssJoe.username must EQUAL the email of >1 active volunteer person
+//      (that identity match is the only way through requireVolunteerAccess).
+//      person() derives email from the name, so renaming either Joe Swanson
+//      person silently empties personIds and every VSS test 403s.
+//   2. the capabilityIds referenced by volunteerCapabilities must exist in the
+//      scaffold's static `capability` catalog, or scope=open silently matches
+//      nothing and sign-ups all 404 — the SAME symptom as a real access bug.
+// Assert both at seed time so the failure names the cause.
+async function assertVssIdentity (conn) {
+  const [[{ matches }]] = await conn.query(
+    `SELECT COUNT(*) matches FROM person p
+       JOIN active_volunteer av ON av.personId = p.id
+      WHERE p.email = ?`,
+    [users.vssJoe.username],
+  )
+  if (matches < 2) {
+    throw new Error(
+      `users.vssJoe.username (${users.vssJoe.username}) resolves to ${matches} active ` +
+      'volunteer person(s); the VSS household tests need at least 2. It must equal ' +
+      'the generated email of both Joe Swanson person rows (persons.quahogVolunteer ' +
+      'and persons.vssHouseholdSibling) — check for a rename on either side.',
+    )
+  }
+
+  const wanted = [...new Set(volunteerCapabilities.map(vc => vc.capabilityId))]
+  const [rows] = await conn.query('SELECT id FROM capability WHERE id IN (?)', [wanted])
+  const have = new Set(rows.map(r => String(r.id)))
+  const absent = wanted.filter(id => !have.has(String(id)))
+  if (absent.length) {
+    throw new Error(
+      `volunteerCapabilities references capabilityId(s) ${absent.join(', ')} that are not in ` +
+      'the scaffolded `capability` catalog (sql/current/20-vg-static.sql). scope=open ' +
+      'would silently match nothing. Check the catalog ids after a static-data regen.',
     )
   }
 }
@@ -133,6 +173,15 @@ export async function seed () {
       await conn.query('INSERT INTO volunteer (id, personId, active) VALUES (?, ?, ?)', [vol.id, vol.personId, vol.active])
     }
 
+    for (const vc of volunteerCapabilities) {
+      // capability rows themselves are scaffold static data (like the role
+      // catalog) — assertVssIdentity checks the ids we reference still exist.
+      await conn.query(
+        'INSERT INTO volunteer_capability (volunteerId, capabilityId) VALUES (?, ?)',
+        [vc.volunteerId, vc.capabilityId],
+      )
+    }
+
     for (const sr of Object.values(serviceRequests)) {
       await conn.query(
         `INSERT INTO service_request
@@ -154,6 +203,9 @@ export async function seed () {
           f.contactType, JSON.stringify(f.activityTypes), f.notes, f.submittedAt],
       )
     }
+
+    // Last: reads the rows just seeded (active_volunteer is a view over them).
+    await assertVssIdentity(conn)
   } finally {
     await conn.end()
   }

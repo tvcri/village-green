@@ -84,6 +84,18 @@ export const users = {
     userId: 9, name: 'Scratch Tester', username: 'scratch.tester@scratch.test',
     grants: [], privileges: [],
   },
+  // VSS persona. Every OTHER fixture username is @quahog.test / @federation.test
+  // / etc. and deliberately matches no person email (@residents.test), so all of
+  // them resolve to personIds = [] and the whole /volunteer-requests surface is
+  // 403 for them. This one matches persons.quahogVolunteer AND
+  // persons.vssHouseholdSibling by email — which is the ONLY way in (VSS access
+  // is identity-derived, not grant-derived). Zero grants on purpose: it proves
+  // the staff gate exempts /volunteer-requests. seed.js asserts this username
+  // still matches those person rows, so renaming either side fails loudly.
+  vssJoe: {
+    userId: 13, name: 'Joe Swanson', username: 'joe.swanson@residents.test',
+    grants: [], privileges: [],
+  },
 }
 
 // person rows. Each village has a member-person and a volunteer-person, with
@@ -110,6 +122,14 @@ export const persons = {
   innsmouthVolunteer: person(4, villages.innsmouth.id, 'Caleb', 'Easton', '12 Harbor Rd', 'Innsmouth', '02882'),
   miskatonicMember: person(5, villages.miskatonic.id, 'Eleanor', 'Vance', '9 College St', 'Arkham', '02893'),
   miskatonicVolunteer: person(6, villages.miskatonic.id, 'Walter', 'Brattle', '10 Library Way', 'Arkham', '02893'),
+  // VSS household: a SECOND person row sharing quahogVolunteer's email
+  // (person() derives it from the name, so the duplicate is automatic — there is
+  // an INDEX on person.email, not a unique constraint). sqlResolvedPersonIds
+  // matches user_data.username against person.email, so the `vssJoe` user
+  // resolves to BOTH active volunteers and exercises the #68 multi-volunteer
+  // household outcomes (selectionRequired / alreadyOwnAccount / account-wide
+  // release). Different village on purpose: VSS is village-independent.
+  vssHouseholdSibling: person(7, villages.innsmouth.id, 'Joe', 'Swanson', '5 Marsh St', 'Innsmouth', '02882'),
 }
 
 // status 'Active' / active 1 so the active_member / active_volunteer views
@@ -124,7 +144,25 @@ export const volunteers = {
   quahog: { id: 1, personId: persons.quahogVolunteer.id, active: 1 },
   innsmouth: { id: 2, personId: persons.innsmouthVolunteer.id, active: 1 },
   miskatonic: { id: 3, personId: persons.miskatonicVolunteer.id, active: 1 },
+  vssSibling: { id: 4, personId: persons.vssHouseholdSibling.id, active: 1 },
 }
+
+// capabilityId values come from the scaffold's static catalog
+// (sql/current/20-vg-static.sql): 1 Errands, 2 Friends, 3 Home Help, 4 Tech
+// Support, 5 Rides, 11 Steering Committee.
+//
+// VolunteerRequestService maps capability -> serviceName PREFIX ('Rides' ->
+// 'Ride:', 'Errands' -> 'Errand:'), so scope=open only surfaces requests whose
+// serviceName starts with a held capability's prefix. Both household volunteers
+// hold Rides; NEITHER holds Errands — that asymmetry is what makes the
+// capability boundary observable (an 'Errand: ...' request must stay invisible).
+// The canonical volunteers get Rides too so their own rows behave normally.
+export const volunteerCapabilities = [
+  { volunteerId: volunteers.quahog.id, capabilityId: 5 },
+  { volunteerId: volunteers.innsmouth.id, capabilityId: 5 },
+  { volunteerId: volunteers.miskatonic.id, capabilityId: 5 },
+  { volunteerId: volunteers.vssSibling.id, capabilityId: 5 },
+]
 
 export const serviceRequests = {
   srV1: {
