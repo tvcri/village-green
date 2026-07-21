@@ -4387,29 +4387,42 @@ components:
           type: boolean
           description: >-
             Present only with the `volunteer` projection. True iff the runtime
-            would grant this user VSS access — i.e. exactly one person's email
+            would grant this user VSS access — i.e. at least one person's email
             matches the username and that person is an active volunteer.
-        volunteer:
-          nullable: true
-          additionalProperties: false
-          type: object
-          properties:
-            personId:
-              $ref: '#/components/schemas/StringIntId'
-            villages:
-              type: array
-              items:
-                additionalProperties: false
-                type: object
-                properties:
-                  villageId:
-                    $ref: '#/components/schemas/StringIntId'
-                  name:
-                    type: string
-            capabilities:
-              type: array
-              items:
+        volunteers:
+          type: array
+          description: >-
+            The caller's active volunteers, one entry per resolved person
+            (shared household email may map one account to several). Empty
+            array when none.
+          items:
+            additionalProperties: false
+            type: object
+            properties:
+              personId:
+                $ref: '#/components/schemas/StringIntId'
+              name:
                 type: string
+                nullable: true
+              villages:
+                type: array
+                items:
+                  additionalProperties: false
+                  type: object
+                  properties:
+                    villageId:
+                      $ref: '#/components/schemas/StringIntId'
+                    name:
+                      type: string
+              capabilities:
+                type: array
+                items:
+                  type: string
+            required:
+            - personId
+            - name
+            - villages
+            - capabilities
       required:
       - userId
       - username

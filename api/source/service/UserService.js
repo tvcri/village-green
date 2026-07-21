@@ -805,6 +805,30 @@ exports.getVolunteerCapabilities = async function (personId) {
   return rows.map(r => r.name)
 }
 
+// The caller's active volunteers, one entry per resolved person that has an
+// active volunteer row (shared household email => several entries). Carries
+// what the VSS client needs: display name (the "Who is this for?" picker and
+// the My-commitments Volunteer column) plus per-person villages/capabilities.
+// DISTINCT guards the out-of-scope person-with-multiple-volunteer-rows case.
+exports.getVolunteers = async function (personIds) {
+  if (!personIds?.length) return []
+  const [rows] = await dbUtils.pool.query(
+    `SELECT DISTINCT CAST(av.personId AS CHAR) AS personId, p.fullName AS name
+     FROM active_volunteer av
+     JOIN person p ON av.personId = p.id
+     WHERE av.personId IN (?)
+     ORDER BY p.fullName`,
+    [personIds]
+  )
+  return Promise.all(rows.map(async row => {
+    const [villages, capabilities] = await Promise.all([
+      exports.getVolunteerVillages(row.personId),
+      exports.getVolunteerCapabilities(row.personId),
+    ])
+    return { personId: row.personId, name: row.name, villages, capabilities }
+  }))
+}
+
 // Existence-only check for the volunteer access gate, which runs on every
 // /volunteer-requests request and needs only a boolean: is ANY of the caller's
 // resolved persons an active volunteer? active_volunteer is the authorization
