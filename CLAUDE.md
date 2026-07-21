@@ -27,9 +27,9 @@ builds its schema, and the `test/api` harness boots off them too.
 They are **not** regenerated automatically. After adding a migration:
 
 1. Migrate a dev DB to head.
-2. Run `api/source/service/migrations/sql/generateSchema-container.sh
-   [container]` (defaults to `village-green-orch-db-1`, or set
-   `VG_SCHEMA_DB_CONTAINER`). It runs `generateSchema.sh` inside the
+2. Run `api/source/service/migrations/sql/generateSchema.sh --container
+   [name]` (defaults to `village-green-orch-db-1`, or set
+   `VG_SCHEMA_DB_CONTAINER`). The flag re-execs the script inside the
    container so `mysqldump` matches the server version.
 3. Commit both regenerated files.
 
