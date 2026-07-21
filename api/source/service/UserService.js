@@ -812,12 +812,15 @@ exports.getVolunteerCapabilities = async function (personId) {
 // DISTINCT guards the out-of-scope person-with-multiple-volunteer-rows case.
 // name is "First Last" (display convention for volunteer names), NOT the
 // "Last, First" generated fullName — which still drives the ORDER BY so
-// siblings list in last-name order.
+// siblings list in last-name order. fullName must also stay in the SELECT:
+// with DISTINCT, MySQL rejects ORDER BY expressions not in the select list
+// (error 3065). The row mapper below ignores it.
 exports.getVolunteers = async function (personIds) {
   if (!personIds?.length) return []
   const [rows] = await dbUtils.pool.query(
     `SELECT DISTINCT CAST(av.personId AS CHAR) AS personId,
-       CONCAT_WS(' ', p.firstName, p.lastName) AS name
+       CONCAT_WS(' ', p.firstName, p.lastName) AS name,
+       p.fullName
      FROM active_volunteer av
      JOIN person p ON av.personId = p.id
      WHERE av.personId IN (?)
