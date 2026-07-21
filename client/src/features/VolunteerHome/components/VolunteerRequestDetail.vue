@@ -384,6 +384,10 @@ async function doRelease() {
       </template>
     </Card>
 
+    <div v-else-if="!isLoading" class="not-found">
+      <p>Service request not found.</p>
+    </div>
+
     <Dialog v-model:visible="pickerVisible" header="Who is this for?" modal :style="{ maxWidth: '22rem' }">
       <div v-for="v in qualifyingVolunteers" :key="v.personId" class="picker-row">
         <RadioButton v-model="pickedPersonId" :inputId="`vol-${v.personId}`" :value="v.personId" />
@@ -394,10 +398,6 @@ async function doRelease() {
         <Button label="Sign up" icon="pi pi-heart" :disabled="!pickedPersonId" @click="submitPicker" />
       </template>
     </Dialog>
-
-    <div v-else-if="!isLoading" class="not-found">
-      <p>Service request not found.</p>
-    </div>
   </div>
 </template>
 
