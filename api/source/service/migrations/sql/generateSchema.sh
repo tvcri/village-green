@@ -12,7 +12,11 @@
 
 
 #List of table names for static data.
-static_data_tables="capability _migrations"
+# Must include every table a migration seeds with catalog rows, or a fresh
+# scaffold marks that migration executed while shipping none of its data.
+# (role/role_permission come from 0013; role_grant/village_grant are per-install
+# migrated data, not catalog, and are deliberately excluded.)
+static_data_tables="capability role role_permission _migrations"
 
 # Export the schema of all tables in the 'vg' database into a SQL file,
 # removing any AUTO_INCREMENT attribute values to prevent conflicts with existing data when imported
