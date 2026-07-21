@@ -729,14 +729,19 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
   return `cast(concat('[', group_concat(${distinct ? 'distinct ' : ''}${value} ${orderBy ? `order by ${orderBy}` : ''}), ']') as json)`
 }
 
-// Runtime VSS identity (set form). Resolves EVERY person behind a username as
-// a JSON array of ids ('[]' when none match) — one email may map to several
-// persons (shared household email), and each may be a volunteer. Volunteer-ness
-// is checked downstream. Case-insensitivity comes from the utf8mb4_0900_ai_ci
-// collation — no LOWER(), which would defeat person INDEX_email. `usernameCol`
-// is a trusted column expression (e.g. 'ud.username'), never user input.
+// Runtime VSS identity (set form). Resolves the ACTIVE VOLUNTEERS behind a
+// username as a JSON array of person ids ('[]' when none match). person is
+// only the email key — one email may map to several persons (shared household
+// email), and only those with an active volunteer row are the account's VSS
+// identity. Filtering here (not downstream) is the invariant: deactivating a
+// volunteer removes them from every surface — list, history, disclosure,
+// release — on the next request. DISTINCT guards the out-of-scope
+// person-with-multiple-volunteer-rows case. Case-insensitivity comes from the
+// utf8mb4_0900_ai_ci collation — no LOWER(), which would defeat person
+// INDEX_email. `usernameCol` is a trusted column expression (e.g.
+// 'ud.username'), never user input.
 module.exports.sqlResolvedPersonIds = function (usernameCol) {
-  return `(select cast(concat('[', coalesce(group_concat(p.id), ''), ']') as json) from person p where p.email = ${usernameCol})`
+  return `(select cast(concat('[', coalesce(group_concat(distinct av.personId), ''), ']') as json) from person p join active_volunteer av on av.personId = p.id where p.email = ${usernameCol})`
 }
 
 // Companion predicate: true iff ANY person behind the username is an active

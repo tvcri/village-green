@@ -611,11 +611,11 @@ exports.getUserObject = async function (username) {
     lastAccess,
     lastClaims,
     status,
-    -- Runtime identity (VSS multi-volunteer, spec 2026-07-21): EVERY person
-    -- whose email matches the username, as a JSON id array ('[]' when none).
-    -- One email may map to several persons (shared household email);
-    -- volunteer-ness is checked downstream. Single source of truth is
-    -- dbUtils.sqlResolvedPersonIds.
+    -- Runtime identity (VSS multi-volunteer, spec 2026-07-21 as amended):
+    -- the ACTIVE VOLUNTEERS whose person email matches the username, as a
+    -- JSON id array ('[]' when none). person is only the email key; a
+    -- deactivated volunteer drops out of the set (and every VSS surface) on
+    -- the next request. Single source of truth is dbUtils.sqlResolvedPersonIds.
     ${dbUtils.sqlResolvedPersonIds('ud.username')} as personIds,
     -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
     -- published and the user has no acknowledgement of the current version within
@@ -833,17 +833,4 @@ exports.getVolunteers = async function (personIds) {
     ])
     return { personId: row.personId, name: row.name, firstName: row.firstName, lastName: row.lastName, villages, capabilities }
   }))
-}
-
-// Existence-only check for the volunteer access gate, which runs on every
-// /volunteer-requests request and needs only a boolean: is ANY of the caller's
-// resolved persons an active volunteer? active_volunteer is the authorization
-// source: an inactive volunteer must lose the surface.
-exports.isActiveVolunteer = async function (personIds) {
-  if (!personIds?.length) return false
-  const [rows] = await dbUtils.pool.query(
-    'SELECT 1 FROM active_volunteer WHERE personId IN (?) LIMIT 1',
-    [personIds]
-  )
-  return rows.length > 0
 }

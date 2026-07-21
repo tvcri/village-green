@@ -26,12 +26,23 @@ test('sqlResolvedPersonId (exactly-one form) is removed', () => {
   assert.equal(dbUtils.sqlResolvedPersonId, undefined)
 })
 
-test('sqlResolvedPersonIds is an exported fragment builder returning a JSON id array', () => {
+// Identity semantics (2026-07-21 amendment): personIds is the account's
+// ACTIVE volunteers — person is only the email key. Filtering at the resolver
+// (not downstream) is the invariant that keeps every VSS surface (list,
+// history, disclosure, release) closed to deactivated volunteers.
+test('sqlResolvedPersonIds resolves active volunteers only, as a JSON id array', () => {
   assert.equal(typeof dbUtils.sqlResolvedPersonIds, 'function')
   const frag = dbUtils.sqlResolvedPersonIds('ud.username')
-  assert.match(frag, /coalesce\(group_concat\(p\.id\), ''\)/)
+  assert.match(frag, /coalesce\(group_concat\(distinct av\.personId\), ''\)/)
+  assert.match(frag, /join active_volunteer av on av\.personId = p\.id/)
   assert.match(frag, /as json/)
   assert.match(frag, /p\.email = ud\.username/)
+})
+
+// Gate collapse rides the same amendment: with personIds active-by-construction
+// the existence re-check is redundant, so the helper must not survive.
+test('isActiveVolunteer existence helper is removed', () => {
+  assert.equal(UserService.isActiveVolunteer, undefined)
 })
 
 test('sqlIsActiveVolunteerForUsername is an exported ANY-volunteer predicate', () => {

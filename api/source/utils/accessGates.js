@@ -1,6 +1,5 @@
 'use strict'
 const SmError = require('./error')
-const UserService = require('../service/UserService')
 
 // Paths (relative to the /api mount) reachable by any authenticated user.
 // Everything else is staff surface: deny-by-default (VSS design spec §2).
@@ -47,16 +46,15 @@ const requireStaffAccess = function (req, res, next) {
 }
 
 // Volunteer gate for /volunteer-requests/**. Volunteer access is
-// identity-derived: any resolved person (shared household email => several)
-// with an active volunteer row, anywhere. Access is not village-scoped: any
+// identity-derived: personIds is the account's ACTIVE volunteers by
+// construction (sqlResolvedPersonIds filters through active_volunteer), so a
+// non-empty set IS the authorization. Access is not village-scoped: any
 // active volunteer can see and act on any village's open requests (VSS design
 // refinement).
 const requireVolunteerAccess = async function (req, res, next) {
   try {
     if (!req.userObject?.userId) return next()
     if (!req.userObject.personIds?.length) throw new SmError.PrivilegeError()
-    // Existence check only — the gate needs a boolean, not the village list.
-    if (!await UserService.isActiveVolunteer(req.userObject.personIds)) throw new SmError.PrivilegeError()
     next()
   } catch (e) {
     next(e)
