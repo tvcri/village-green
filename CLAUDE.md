@@ -17,6 +17,31 @@ the command affects the **board only**; it does not edit `todo.md`. Keep
 `todo.md` as the human-maintained backlog and add items there separately when
 the user wants them tracked in the file too.
 
+## Database migrations & the fresh-install scaffold
+
+`api/source/service/migrations/sql/current/10-vg-tables.sql` and
+`20-vg-static.sql` are **generated** — never hand-edit them (and during a
+merge conflict always `git checkout --ours`). They are how a fresh install
+builds its schema, and the `test/api` harness boots off them too.
+
+They are **not** regenerated automatically. After adding a migration:
+
+1. Migrate a dev DB to head.
+2. Run `api/source/service/migrations/sql/generateSchema-container.sh
+   [container]` (defaults to `village-green-orch-db-1`, or set
+   `VG_SCHEMA_DB_CONTAINER`). It runs `generateSchema.sh` inside the
+   container so `mysqldump` matches the server version.
+3. Commit both regenerated files.
+
+If the migration seeds **catalog rows**, also add its table(s) to
+`static_data_tables` in `generateSchema.sh`. Otherwise the dump marks the
+migration executed in `_migrations` while carrying none of its rows, and a
+fresh install comes up with that catalog empty — how the 0013 role catalog
+went missing until PR #69 (every `role_grant` insert hit
+`fk_role_grant_role`). Per-install *data migrations* (e.g. 0013's
+`role_grant` / `village_grant` backfill) stay out of the list: dumping them
+would ship one deployment's rows to every other.
+
 ## Service request dates & times
 
 `service_request.serviceDate` (DATE) and the four TIME columns
