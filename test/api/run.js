@@ -63,6 +63,26 @@ function ensureDeps () {
   }
 }
 
+async function assertPortsFree () {
+  // Fail with a message that names the override, rather than letting the OIDC
+  // server or the API child die on a bare EADDRINUSE mid-startup.
+  const { createServer } = await import('node:net')
+  const free = (port) => new Promise((resolve) => {
+    const srv = createServer()
+    srv.once('error', () => resolve(false))
+    srv.once('listening', () => srv.close(() => resolve(true)))
+    srv.listen(port, config.api.host)
+  })
+  for (const [port, evar] of [[config.api.port, 'VG_TEST_API_PORT'], [config.oidc.port, 'VG_TEST_OIDC_PORT']]) {
+    if (!await free(port)) {
+      throw new Error(
+        `port ${port} is already in use — set ${evar} to a free port below 32768 ` +
+        '(the ephemeral range starts there; see setup/env.js).',
+      )
+    }
+  }
+}
+
 async function waitForMysql (mysql) {
   for (let i = 0; i < 60; i++) {
     try {
@@ -195,6 +215,7 @@ async function main () {
   let apiChild, oidc, exitCode = 1
   try {
     ensureDeps()
+    await assertPortsFree()
 
     // Safe to load now that deps are installed.
     const { default: mysql } = await import('mysql2/promise')

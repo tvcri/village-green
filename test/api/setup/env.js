@@ -9,9 +9,21 @@ const dir = path.dirname(fileURLToPath(import.meta.url)) // test/api/setup
 const apiTestDir = path.resolve(dir, '..') // test/api
 const repoRoot = path.resolve(apiTestDir, '..', '..') // repo root
 
+// Ports must sit BELOW the kernel's ephemeral range (Linux default
+// 32768-60999, see /proc/sys/net/ipv4/ip_local_port_range). A fixed port inside
+// that range collides intermittently with an unrelated outbound connection that
+// happened to be assigned it — the failure is a bare EADDRINUSE at startup, and
+// it is rare enough to look like a flake. The earlier 54100/54180 defaults were
+// both inside it.
+//
+// Deliberately static rather than probe-and-bind: the API child needs its port
+// baked into VG_API_PORT, and the issuer URL, BEFORE it starts, so any
+// probe-then-hand-off has a TOCTOU window. Outside the ephemeral range there is
+// nothing to race with. (True dynamic allocation would mean binding :0 here and
+// passing the fd down — a much larger change to how run.js spawns the API.)
 const apiHost = process.env.VG_TEST_API_HOST || '127.0.0.1'
-const apiPort = Number(process.env.VG_TEST_API_PORT || 54100)
-const oidcPort = Number(process.env.VG_TEST_OIDC_PORT || 54180)
+const apiPort = Number(process.env.VG_TEST_API_PORT || 14100)
+const oidcPort = Number(process.env.VG_TEST_OIDC_PORT || 14180)
 
 export const config = {
   repoRoot,
