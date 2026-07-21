@@ -66,6 +66,15 @@ function volunteerName(personId) {
   return accountVolunteers.value.find(v => v.personId === String(personId))?.name ?? ''
 }
 
+// Multi-volunteer accounts see WHO is confirmed; single-volunteer accounts
+// keep the second-person copy.
+const confirmedBannerText = computed(() => {
+  const who = isMultiVolunteer.value ? volunteerName(request.value?.volunteerPersonId) : ''
+  return who
+    ? `${who} is confirmed for this request. Please call the member to coordinate the service.`
+    : `You're confirmed for this request. Please call the member to coordinate your service.`
+})
+
 const pickerVisible = ref(false)
 const pickedPersonId = ref(null)
 
@@ -252,7 +261,7 @@ async function doRelease() {
       <template #content>
         <div v-if="request.status === 'Confirmed'" class="confirmation-banner">
           <i class="pi pi-check-circle"></i>
-          You're confirmed for this request. Please call the member to coordinate your service.
+          {{ confirmedBannerText }}
         </div>
         <div v-else-if="request.status === 'Completed'" class="confirmation-banner">
           <i class="pi pi-check-circle"></i>

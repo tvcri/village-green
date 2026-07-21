@@ -136,6 +136,14 @@ const serviceCategoryOptions = computed(() => {
 // table. Show the Service filter only when the caller holds 2+ categories.
 const showServiceFilter = computed(() => serviceCategoryOptions.value.length >= 2)
 
+// Volunteer attribution — only meaningful when the account has 2+ volunteers
+// (shared household email); single-volunteer accounts see today's UI exactly.
+const showVolunteerColumn = computed(() => accountVolunteers.value.length > 1)
+
+function volunteerLabel(row) {
+  return accountVolunteers.value.find(v => v.personId === row.volunteerPersonId)?.name ?? ''
+}
+
 const SERVICE_FILTER_KEY = 'vg.volunteerHome.serviceFilter'
 let storedServiceFilter = []
 try {
@@ -351,6 +359,9 @@ function goToDetail(row) {
             <Column header="Member">
               <template #body="{ data }">{{ memberLabel(data) }}</template>
             </Column>
+            <Column v-if="showVolunteerColumn" header="Volunteer">
+              <template #body="{ data }">{{ volunteerLabel(data) }}</template>
+            </Column>
             <Column field="serviceDate" header="When" sortable>
               <template #body="{ data }">{{ formatWhen(data) }}</template>
             </Column>
@@ -373,6 +384,9 @@ function goToDetail(row) {
               <div class="card-row"><span class="label">When</span>{{ formatWhen(request) }}</div>
               <div class="card-row"><span class="label">Village</span>{{ request.villageName }}</div>
               <div class="card-row"><span class="label">Member</span>{{ memberLabel(request) }}</div>
+              <div v-if="showVolunteerColumn" class="card-row">
+                <span class="label">Volunteer</span>{{ volunteerLabel(request) }}
+              </div>
             </div>
           </div>
         </TabPanel>
@@ -409,6 +423,9 @@ function goToDetail(row) {
             <Column header="Member">
               <template #body="{ data }">{{ memberLabel(data) }}</template>
             </Column>
+            <Column v-if="showVolunteerColumn" header="Volunteer">
+              <template #body="{ data }">{{ volunteerLabel(data) }}</template>
+            </Column>
             <Column field="serviceDate" header="When" sortable>
               <template #body="{ data }">{{ formatWhen(data) }}</template>
             </Column>
@@ -431,6 +448,9 @@ function goToDetail(row) {
               <div class="card-row"><span class="label">When</span>{{ formatWhen(request) }}</div>
               <div class="card-row"><span class="label">Village</span>{{ request.villageName }}</div>
               <div class="card-row"><span class="label">Member</span>{{ memberLabel(request) }}</div>
+              <div v-if="showVolunteerColumn" class="card-row">
+                <span class="label">Volunteer</span>{{ volunteerLabel(request) }}
+              </div>
             </div>
           </div>
         </TabPanel>
