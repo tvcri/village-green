@@ -810,10 +810,14 @@ exports.getVolunteerCapabilities = async function (personId) {
 // what the VSS client needs: display name (the "Who is this for?" picker and
 // the My-commitments Volunteer column) plus per-person villages/capabilities.
 // DISTINCT guards the out-of-scope person-with-multiple-volunteer-rows case.
+// name is "First Last" (display convention for volunteer names), NOT the
+// "Last, First" generated fullName — which still drives the ORDER BY so
+// siblings list in last-name order.
 exports.getVolunteers = async function (personIds) {
   if (!personIds?.length) return []
   const [rows] = await dbUtils.pool.query(
-    `SELECT DISTINCT CAST(av.personId AS CHAR) AS personId, p.fullName AS name
+    `SELECT DISTINCT CAST(av.personId AS CHAR) AS personId,
+       CONCAT_WS(' ', p.firstName, p.lastName) AS name
      FROM active_volunteer av
      JOIN person p ON av.personId = p.id
      WHERE av.personId IN (?)
