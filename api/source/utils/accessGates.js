@@ -47,15 +47,16 @@ const requireStaffAccess = function (req, res, next) {
 }
 
 // Volunteer gate for /volunteer-requests/**. Volunteer access is
-// identity-derived: linked person with an active volunteer row, anywhere.
-// Access is not village-scoped: any active volunteer can see and act on
-// any village's open requests (VSS design refinement).
+// identity-derived: any resolved person (shared household email => several)
+// with an active volunteer row, anywhere. Access is not village-scoped: any
+// active volunteer can see and act on any village's open requests (VSS design
+// refinement).
 const requireVolunteerAccess = async function (req, res, next) {
   try {
     if (!req.userObject?.userId) return next()
-    if (!req.userObject.personId) throw new SmError.PrivilegeError()
+    if (!req.userObject.personIds?.length) throw new SmError.PrivilegeError()
     // Existence check only — the gate needs a boolean, not the village list.
-    if (!await UserService.isActiveVolunteer(req.userObject.personId)) throw new SmError.PrivilegeError()
+    if (!await UserService.isActiveVolunteer(req.userObject.personIds)) throw new SmError.PrivilegeError()
     next()
   } catch (e) {
     next(e)

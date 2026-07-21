@@ -73,14 +73,13 @@ exports.queryUsers = async function (inProjection, inPredicates, userObject) {
   }
 
   if (inProjection?.includes('volunteer')) {
-    // isVolunteer predicts the runtime VSS grant. It reuses the SAME identity
-    // fragment the runtime gate uses (dbUtils.sqlResolvedPersonId) so the two
-    // cannot drift: the resolved person is NULL for 0 or 2+ email matches, and
-    // NULL IN (…) => NULL => the else branch => false. So the column is true iff
-    // exactly one person matches the username AND that person is an active
-    // volunteer. cast(... as json) yields a real JSON boolean.
+    // isVolunteer predicts the runtime VSS grant: true iff ANY person whose
+    // email matches the username is an active volunteer (shared household
+    // email => several persons). Built on the shared dbUtils fragment so it
+    // cannot drift from the access-gate semantics. cast(... as json) yields a
+    // real JSON boolean.
     columns.push(`cast(if(
-      ${dbUtils.sqlResolvedPersonId('ud.username')} in (select av.personId from active_volunteer av),
+      ${dbUtils.sqlIsActiveVolunteerForUsername('ud.username')},
       'true', 'false'
     ) as json) as isVolunteer`)
   }
@@ -612,11 +611,12 @@ exports.getUserObject = async function (username) {
     lastAccess,
     lastClaims,
     status,
-    -- Runtime identity (VSS spec §1-AMENDED): exactly one person whose email
-    -- matches the username → that person, else null. Single source of truth is
-    -- dbUtils.sqlResolvedPersonId — shared with the queryUsers volunteer
-    -- projection so the tag cannot drift from this gate.
-    ${dbUtils.sqlResolvedPersonId('ud.username')} as personId,
+    -- Runtime identity (VSS multi-volunteer, spec 2026-07-21): EVERY person
+    -- whose email matches the username, as a JSON id array ('[]' when none).
+    -- One email may map to several persons (shared household email);
+    -- volunteer-ness is checked downstream. Single source of truth is
+    -- dbUtils.sqlResolvedPersonIds.
+    ${dbUtils.sqlResolvedPersonIds('ud.username')} as personIds,
     -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
     -- published and the user has no acknowledgement of the current version within
     -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
@@ -640,6 +640,9 @@ exports.getUserObject = async function (username) {
   const [rows] = await dbUtils.pool.query(sql, [config.privacy.ackIntervalDays, username])
   const row = rows[0]
   if (row) {
+    // Normalize to strings once; every ownership comparison downstream is
+    // string-vs-string (StringIntId bodies, CAST(... AS CHAR) columns).
+    row.personIds = (row.personIds ?? []).map(String)
     row.privacyAckRequired = row.privacyAckRequired === 1
     const { computeEffective } = require('../utils/authz')
     const roleData = await _this.getUserRoleData(row.userId)
@@ -803,13 +806,14 @@ exports.getVolunteerCapabilities = async function (personId) {
 }
 
 // Existence-only check for the volunteer access gate, which runs on every
-// /volunteer-requests request and needs only a boolean — not the village
-// list getVolunteerVillages builds. active_volunteer is the authorization
+// /volunteer-requests request and needs only a boolean: is ANY of the caller's
+// resolved persons an active volunteer? active_volunteer is the authorization
 // source: an inactive volunteer must lose the surface.
-exports.isActiveVolunteer = async function (personId) {
+exports.isActiveVolunteer = async function (personIds) {
+  if (!personIds?.length) return false
   const [rows] = await dbUtils.pool.query(
-    'SELECT 1 FROM active_volunteer WHERE personId = ? LIMIT 1',
-    [personId]
+    'SELECT 1 FROM active_volunteer WHERE personId IN (?) LIMIT 1',
+    [personIds]
   )
   return rows.length > 0
 }

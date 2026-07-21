@@ -20,31 +20,41 @@ test('stored-link functions are removed', () => {
   assert.equal(UserService.deleteUserPersonLink, undefined)
 })
 
-test('sqlResolvedPersonId is an exported fragment builder', () => {
-  assert.equal(typeof dbUtils.sqlResolvedPersonId, 'function')
-  const frag = dbUtils.sqlResolvedPersonId('ud.username')
-  assert.match(frag, /if\(count\(\*\) = 1, min\(p\.id\), null\)/)
+// Multi-volunteer accounts (spec 2026-07-21): the exactly-one resolver is
+// replaced by a set resolver; ambiguous (2+) matches are now valid identities.
+test('sqlResolvedPersonId (exactly-one form) is removed', () => {
+  assert.equal(dbUtils.sqlResolvedPersonId, undefined)
+})
+
+test('sqlResolvedPersonIds is an exported fragment builder returning a JSON id array', () => {
+  assert.equal(typeof dbUtils.sqlResolvedPersonIds, 'function')
+  const frag = dbUtils.sqlResolvedPersonIds('ud.username')
+  assert.match(frag, /coalesce\(group_concat\(p\.id\), ''\)/)
+  assert.match(frag, /as json/)
   assert.match(frag, /p\.email = ud\.username/)
 })
 
-test('getUserObject sources personId from the shared fragment (no inline copy)', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'service', 'UserService.js'), 'utf8')
-  // The identity rule must not be hand-written inside UserService anymore.
-  assert.equal(
-    /if\(count\(\*\) = 1, min\(p\.id\), null\)/.test(src),
-    false,
-    'inline identity guard still present in UserService.js — must use dbUtils.sqlResolvedPersonId'
-  )
-  assert.match(src, /dbUtils\.sqlResolvedPersonId\('ud\.username'\)/)
+test('sqlIsActiveVolunteerForUsername is an exported ANY-volunteer predicate', () => {
+  assert.equal(typeof dbUtils.sqlIsActiveVolunteerForUsername, 'function')
+  const frag = dbUtils.sqlIsActiveVolunteerForUsername('ud.username')
+  assert.match(frag, /exists/)
+  assert.match(frag, /active_volunteer av on av\.personId = p\.id/)
+  assert.match(frag, /p\.email = ud\.username/)
 })
 
-test('queryUsers emits isVolunteer built on the shared fragment when volunteer projection requested', () => {
+test('getUserObject sources personIds from the shared fragment (no inline copy)', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'service', 'UserService.js'), 'utf8')
-  // Projection is opt-in and gated on 'volunteer'.
+  assert.equal(
+    /group_concat\(p\.id\)/.test(src),
+    false,
+    'inline identity SQL in UserService.js — must use dbUtils.sqlResolvedPersonIds'
+  )
+  assert.match(src, /dbUtils\.sqlResolvedPersonIds\('ud\.username'\)/)
+})
+
+test('queryUsers emits isVolunteer built on the shared any-volunteer fragment', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'service', 'UserService.js'), 'utf8')
   assert.match(src, /inProjection\?\.includes\('volunteer'\)/)
-  // The column is built on the shared fragment, then tested against active_volunteer —
-  // not a re-copied identity subquery.
-  assert.match(src, /dbUtils\.sqlResolvedPersonId\('ud\.username'\)\} in \(select av\.personId from active_volunteer av\)/)
-  // Emits a real JSON boolean aliased isVolunteer.
+  assert.match(src, /dbUtils\.sqlIsActiveVolunteerForUsername\('ud\.username'\)/)
   assert.match(src, /as json\) as isVolunteer/)
 })

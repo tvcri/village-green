@@ -65,7 +65,9 @@ function generateTempPassword() {
 }
 
 // rows: person rows carrying isVolunteer/isMember flags. person.email is not
-// unique, so several rows can match one email; an active volunteer row wins.
+// unique, so several rows can match one email (the same set semantics as
+// dbUtils.sqlResolvedPersonIds / req.userObject.personIds); for enrollment an
+// active volunteer row wins.
 function classifyEligibility(rows) {
   const volunteer = rows.find(r => r.isVolunteer)
   if (volunteer) return { status: 'volunteer', personId: volunteer.id, firstName: volunteer.firstName }
