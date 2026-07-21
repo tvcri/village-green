@@ -299,7 +299,12 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
         [serviceRequestId]
       )
       const outcome = module.exports.classifySignUpFailure({ row: rows[0], personId: chosen, personIds })
-      return { outcome, owningPersonId: rows[0]?.volunteerPersonId != null ? String(rows[0].volunteerPersonId) : null }
+      // owningPersonId only travels with alreadyOwnAccount — the one outcome
+      // whose 409 detail names the committed volunteer; conflict must not
+      // carry a stranger's id even though the controller doesn't serialize it.
+      return outcome === 'alreadyOwnAccount'
+        ? { outcome, owningPersonId: String(rows[0].volunteerPersonId) }
+        : { outcome }
     },
   })
 }

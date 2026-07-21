@@ -2775,7 +2775,9 @@ components:
       type: object
       properties:
         detail:
-          type: string
+          oneOf:
+          - type: string
+          - type: object
         error:
           type: string
         stack:
@@ -4400,7 +4402,7 @@ components:
           description: >-
             The caller's active volunteers, one entry per resolved person
             (shared household email may map one account to several). Empty
-            array when none.
+            array when none. Populated on GET /user only.
           items:
             additionalProperties: false
             type: object
