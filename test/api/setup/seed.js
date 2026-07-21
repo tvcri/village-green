@@ -32,45 +32,22 @@ const EXPECTED_COLUMNS = {
     'timeSpentMinutes', 'contactType', 'activityTypes', 'notes', 'submittedAt'],
 }
 
-// WORKAROUND for an upstream gap (found 2026-07-15): the fresh-scaffold dump
-// sql/current/20-vg-static.sql marks migration 0013-rbac-roles.js as executed
-// in `_migrations` but does NOT carry its static role / role_permission rows,
-// so a fresh scaffold has an empty role catalog and every role_grant insert
-// hits fk_role_grant_role. Mirror the 0013 catalog here (INSERT IGNORE, so a
-// fixed dump wins). Delete this block once main updates 20-vg-static.sql.
-const villageReads = ['person:read', 'member:read', 'volunteer:read', 'sr:read', 'friend:read', 'village:read']
-const ROLES = [
-  // [roleId, name, scope, permissions]
-  [1, 'Local Service Coordinator', 'village', villageReads],
-  [2, 'Steering Committee', 'village', villageReads],
-  [3, 'Village Lead', 'village', [...villageReads, 'member:read_financial']],
-  [4, 'Admin', 'federation', ['*']],
-  [5, 'Staff', 'federation', [
-    'person:read', 'person:write', 'person:read_confidential',
-    'member:read', 'member:write', 'member:read_financial', 'member:read_inactive',
-    'volunteer:read', 'volunteer:write', 'volunteer:read_inactive',
-    'sr:read', 'sr:write', 'friend:read', 'friend:write',
-    'village:read', 'village:write',
-  ]],
-  [6, 'Board', 'federation', villageReads],
-  [7, 'Service Coordinator', 'federation', [
-    'sr:read', 'sr:write', 'person:read', 'member:read', 'volunteer:read',
-    'village:read', 'friend:read', 'person:read_confidential',
-  ]],
-]
-
-async function seedRoleCatalog (conn) {
-  for (const [roleId, name, scope, permissions] of ROLES) {
-    await conn.query(
-      'INSERT IGNORE INTO role (roleId, name, scope, isSystem) VALUES (?, ?, ?, 1)',
-      [roleId, name, scope],
+// The role catalog (role / role_permission) comes from the fresh-scaffold dump
+// sql/current/20-vg-static.sql, which carries migration 0013-rbac-roles.js's
+// static rows (fixed in #69 — the dump previously marked 0013 executed while
+// shipping none of its rows, and this file mirrored the catalog to compensate).
+// Do NOT re-introduce that mirror: a second copy of the authorization rules
+// would silently rot out of sync with 0013.
+async function assertRoleCatalog (conn) {
+  const [[{ roles }]] = await conn.query('SELECT COUNT(*) roles FROM role')
+  const [[{ perms }]] = await conn.query('SELECT COUNT(*) perms FROM role_permission')
+  if (!roles || !perms) {
+    throw new Error(
+      `the scaffolded schema has an empty role catalog (role=${roles}, role_permission=${perms}) — ` +
+      'every role_grant insert would hit fk_role_grant_role. Regenerate ' +
+      'sql/current/20-vg-static.sql (generateSchema.sh --container) from a DB ' +
+      'migrated through 0013-rbac-roles.js.',
     )
-    for (const p of permissions) {
-      await conn.query(
-        'INSERT IGNORE INTO role_permission (roleId, permission) VALUES (?, ?)',
-        [roleId, p],
-      )
-    }
   }
 }
 
@@ -115,7 +92,10 @@ export async function seed () {
     }
     await conn.query('SET FOREIGN_KEY_CHECKS = 1')
 
-    await seedRoleCatalog(conn)
+    // After truncation: `role`/`role_permission` are NOT in TABLES (the catalog
+    // is scaffold-provided static data), so this asserts what actually survives
+    // into the seeding phase, where the role_grant FKs resolve against it.
+    await assertRoleCatalog(conn)
 
     for (const v of Object.values(villages)) {
       await conn.query('INSERT INTO village (id, name) VALUES (?, ?)', [v.id, v.name])
