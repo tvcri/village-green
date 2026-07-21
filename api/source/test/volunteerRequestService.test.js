@@ -6,23 +6,30 @@ const path = require('node:path')
 const svc = require(path.join('..', 'service', 'VolunteerRequestService'))
 
 test('classifySignUpFailure: missing rows are notFound', () => {
-  assert.equal(svc.classifySignUpFailure({ row: undefined, personId: 5 }), 'notFound')
+  assert.equal(svc.classifySignUpFailure({ row: undefined, personId: '5', personIds: ['5'] }), 'notFound')
 })
 
 test('classifySignUpFailure: own confirmed request is an idempotent no-op', () => {
   assert.equal(
-    svc.classifySignUpFailure({ row: { status: 'Confirmed', volunteerPersonId: 5 }, personId: 5 }),
+    svc.classifySignUpFailure({ row: { status: 'Confirmed', volunteerPersonId: 5 }, personId: '5', personIds: ['5', '6'] }),
     'alreadyOwn'
+  )
+})
+
+test('classifySignUpFailure: confirmed to another volunteer on the SAME account is alreadyOwnAccount', () => {
+  assert.equal(
+    svc.classifySignUpFailure({ row: { status: 'Confirmed', volunteerPersonId: 6 }, personId: '5', personIds: ['5', '6'] }),
+    'alreadyOwnAccount'
   )
 })
 
 test('classifySignUpFailure: anything else is a conflict (any village)', () => {
   assert.equal(
-    svc.classifySignUpFailure({ row: { status: 'Confirmed', volunteerPersonId: 8 }, personId: 5 }),
+    svc.classifySignUpFailure({ row: { status: 'Confirmed', volunteerPersonId: 8 }, personId: '5', personIds: ['5', '6'] }),
     'conflict'
   )
   assert.equal(
-    svc.classifySignUpFailure({ row: { status: 'Completed', volunteerPersonId: null }, personId: 5 }),
+    svc.classifySignUpFailure({ row: { status: 'Completed', volunteerPersonId: null }, personId: '5', personIds: ['5'] }),
     'conflict'
   )
 })

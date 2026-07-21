@@ -140,9 +140,15 @@ function baseJoins() {
 // transaction). Any active volunteer can see and act on any village's
 // requests (VSS design refinement: cross-village visibility/sign-up), so
 // only existence — not village membership — decides notFound vs conflict.
-module.exports.classifySignUpFailure = function ({ row, personId }) {
+module.exports.classifySignUpFailure = function ({ row, personId, personIds }) {
   if (!row) return 'notFound'
-  if (row.status === 'Confirmed' && String(row.volunteerPersonId) === String(personId)) return 'alreadyOwn'
+  if (row.status === 'Confirmed') {
+    const owner = String(row.volunteerPersonId)
+    if (owner === String(personId)) return 'alreadyOwn'
+    // Owned by ANOTHER volunteer on the same account (shared household
+    // email): distinct outcome so the client can name who is committed.
+    if ((personIds ?? []).map(String).includes(owner)) return 'alreadyOwnAccount'
+  }
   return 'conflict'
 }
 
@@ -243,35 +249,46 @@ module.exports.getVolunteerRequest = async function ({ serviceRequestId, personI
   return rows[0] ?? null
 }
 
-module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, personId, userId }) {
+module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, personId, personIds, userId }) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      // Capability gate (pre-check, short-circuit). A volunteer may only pick up
-      // a request whose serviceName matches one of their capabilities. Checked
-      // BEFORE the atomic UPDATE. A request outside the caller's capabilities is
-      // treated as if it does not exist — outcome 'notFound' -> 404, no existence
-      // leak — indistinguishable from a truly missing request. The capability
-      // part cannot change mid-request, so no race is introduced.
-      const gate = module.exports.capabilityGateSql(personId)
-      const [gateRows] = await connection.query(
-        `WITH ${gate.cte}
-         SELECT EXISTS (
-           SELECT 1 FROM service_request sr
-           ${gate.join}
-           WHERE sr.id = ?
-         ) AS matchesCapability`,
-        [serviceRequestId]
+      // Which of the caller's persons hold a capability matching this request?
+      // Replaces the old boolean pre-check: same boundary and same no-leak
+      // outcome (a request outside every capability is 'notFound',
+      // indistinguishable from missing), but also yields the auto-select
+      // candidate set when no personId was posted. The capability part cannot
+      // change mid-request, so no race is introduced.
+      const prefixCase = module.exports.buildCapabilityPrefixCase()
+      const [qualRows] = await connection.query(
+        `SELECT DISTINCT av.personId
+         FROM active_volunteer av
+         JOIN volunteer_capability vc ON vc.volunteerId = av.id
+         JOIN capability c ON c.id = vc.capabilityId
+         JOIN service_request sr ON sr.id = ?
+           AND (${prefixCase}) IS NOT NULL
+           AND sr.serviceName LIKE concat((${prefixCase}), '%')
+         WHERE av.personId IN (?)`,
+        [serviceRequestId, personIds?.length ? personIds : [null]]
       )
-      if (!gateRows[0].matchesCapability) {
-        return { outcome: 'notFound' }
+      const qualifying = qualRows.map(r => String(r.personId))
+
+      // Selection: a posted personId must individually qualify (the account
+      // union is not enough — the chosen volunteer does the work). Omitted:
+      // auto-select iff exactly one qualifies; 2+ need an explicit choice.
+      let chosen = personId != null ? String(personId) : null
+      if (chosen) {
+        if (!qualifying.includes(chosen)) return { outcome: 'notFound' }
       }
+      else if (qualifying.length === 0) return { outcome: 'notFound' }
+      else if (qualifying.length > 1) return { outcome: 'selectionRequired' }
+      else chosen = qualifying[0]
 
       // Atomic first-wins: any unassigned Open request, any village.
       const [result] = await connection.query(
         `UPDATE service_request
          SET volunteerPersonId = ?, status = 'Confirmed', modifiedUserId = ?, modifiedAt = UTC_TIMESTAMP()
          WHERE id = ? AND status = 'Open' AND volunteerPersonId IS NULL`,
-        [personId, userId, serviceRequestId]
+        [chosen, userId, serviceRequestId]
       )
       if (result.affectedRows === 1) {
         await ServiceRequestService.writeNotificationEvent(connection, serviceRequestId, 'Confirmed')
@@ -281,19 +298,22 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
         'SELECT status, volunteerPersonId FROM service_request WHERE id = ?',
         [serviceRequestId]
       )
-      return { outcome: module.exports.classifySignUpFailure({ row: rows[0], personId }) }
+      const outcome = module.exports.classifySignUpFailure({ row: rows[0], personId: chosen, personIds })
+      return { outcome, owningPersonId: rows[0]?.volunteerPersonId != null ? String(rows[0].volunteerPersonId) : null }
     },
   })
 }
 
-module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, personId, userId }) {
+module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, personIds, userId }) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      // Account-level release (spec, conscious decision): any of the caller's
+      // volunteers' commitments can be released from the shared account.
       const [result] = await connection.query(
         `UPDATE service_request
          SET volunteerPersonId = NULL, status = 'Open', modifiedUserId = ?, modifiedAt = UTC_TIMESTAMP()
-         WHERE id = ? AND status = 'Confirmed' AND volunteerPersonId = ?`,
-        [userId, serviceRequestId, personId]
+         WHERE id = ? AND status = 'Confirmed' AND volunteerPersonId IN (?)`,
+        [userId, serviceRequestId, personIds?.length ? personIds : [null]]
       )
       if (result.affectedRows === 1) {
         // Re-broadcast to the volunteer list. The member is deliberately NOT
