@@ -764,7 +764,7 @@ module.exports.sqlGrantees = function ({villageId, villageIds, userId, username,
   }
   if (villageIds) {
     predicates.statements.push('cg.villageId IN (?)')
-    predicates.binds.push([villageIds])
+    predicates.binds.push(villageIds)
   }
   if (userId) {
     predicates.statements.push('ud.userId = ?')
