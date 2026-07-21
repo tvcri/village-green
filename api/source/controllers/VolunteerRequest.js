@@ -67,8 +67,11 @@ module.exports.signUpVolunteerRequest = async function signUpVolunteerRequest (r
     }
     if (outcome === 'conflict') throw new SmError.ConflictError('Service request is not open for sign-up.')
     // 'confirmed' | 'alreadyOwn': read back after commit (transaction
-    // read-back convention).
+    // read-back convention). Null is reachable (a concurrent release between
+    // commit and read-back drops the row from the caller's visible set) —
+    // fail closed like the GET handler, never 200 with a null body.
     const response = await VolunteerRequestService.getVolunteerRequest({ serviceRequestId, personIds })
+    if (!response) throw new SmError.NotFoundError()
     res.json(response)
   }
   catch (err) {
@@ -87,7 +90,12 @@ module.exports.releaseVolunteerRequest = async function releaseVolunteerRequest 
     })
     if (outcome === 'notFound') throw new SmError.NotFoundError()
     if (outcome === 'conflict') throw new SmError.ConflictError("Service request is not this account's confirmed request.")
+    // The released row is Open with no owner, so read-back visibility rides on
+    // the capability leg alone — null when the caller's capability was revoked
+    // after they confirmed. The release itself succeeded; fail closed on the
+    // read-back rather than sending 200 with a null body.
     const response = await VolunteerRequestService.getVolunteerRequest({ serviceRequestId, personIds })
+    if (!response) throw new SmError.NotFoundError()
     res.json(response)
   }
   catch (err) {
