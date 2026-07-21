@@ -45,6 +45,9 @@ const selectedVolunteer = ref(null)
 const selectedService = ref(null)
 const idSearch = ref('')
 const notificationFilter = ref(null)
+// TECH DEBT: `vssSignup` is an API-side proxy derived from modifiedUserId
+// being non-null; see the board item on recording VSS signup explicitly.
+const vssSignupOnly = ref(false)
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
@@ -148,7 +151,11 @@ const filteredRequests = computed(() => {
       const displayedId = String(r.displayNumber ?? '').toLowerCase()
       idMatch = displayedId.includes(idQuery)
     }
-    return memberMatch && volunteerMatch && serviceMatch && idMatch
+    let vssMatch = true
+    if (vssSignupOnly.value) {
+      vssMatch = r.vssSignup === true
+    }
+    return memberMatch && volunteerMatch && serviceMatch && idMatch && vssMatch
   })
 })
 
@@ -166,6 +173,7 @@ const activeFilterCount = computed(() => {
   if (selectedVillage.value) count++
   if (idSearch.value.trim()) count++
   if (notificationFilter.value) count++
+  if (vssSignupOnly.value) count++
   return count
 })
 
@@ -255,6 +263,7 @@ const clearFilters = () => {
   selectedVillage.value = null
   idSearch.value = ''
   notificationFilter.value = null
+  vssSignupOnly.value = false
 }
 </script>
 
@@ -340,6 +349,12 @@ const clearFilters = () => {
             <label>Notifications:</label>
             <Select v-model="notificationFilter" :options="['Not notified']" placeholder="All requests" show-clear />
           </div>
+          <div class="search-box vss-signup-box">
+            <label for="vss-signup-filter">VSS Signup</label>
+            <div class="status-filter">
+              <Checkbox v-model="vssSignupOnly" input-id="vss-signup-filter" binary />
+            </div>
+          </div>
           <div class="search-box request-num-box">
             <label>Request #:</label>
             <IconField>
@@ -416,6 +431,7 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 /* Size the IconField wrapper, not the inner input, so the clear icon stays
    anchored to the input's right edge. */
 .filters-content .request-num-box { min-width: 0; }
+.filters-content .vss-signup-box { min-width: 0; }
 .request-num-box :deep(.p-iconfield) { width: 10rem; }
 .request-num-box :deep(input) { width: 100%; }
 .filters-content .search-box label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
