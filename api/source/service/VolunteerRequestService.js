@@ -277,12 +277,31 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
       // Selection: a posted personId must individually qualify (the account
       // union is not enough — the chosen volunteer does the work). Omitted:
       // auto-select iff exactly one qualifies; 2+ need an explicit choice.
+      // The notFound outcomes stay first: capability is the existence
+      // boundary, so a non-qualifying caller must not learn the row's status.
       let chosen = personId != null ? String(personId) : null
       if (chosen) {
         if (!qualifying.includes(chosen)) return { outcome: 'notFound' }
       }
       else if (qualifying.length === 0) return { outcome: 'notFound' }
-      else if (qualifying.length > 1) return { outcome: 'selectionRequired' }
+      else if (qualifying.length > 1) {
+        // selectionRequired is only truthful for a signable (Open) request.
+        // Classify a non-open row by status/ownership instead, or the caller
+        // is told to pick when no choice could win — and an omitted-body
+        // retry after a lost success response dead-ends in 422 forever.
+        const [stateRows] = await connection.query(
+          'SELECT status, volunteerPersonId FROM service_request WHERE id = ?',
+          [serviceRequestId]
+        )
+        const row = stateRows[0]
+        if (row && row.status !== 'Open') {
+          const outcome = module.exports.classifySignUpFailure({ row, personId: null, personIds })
+          return outcome === 'alreadyOwnAccount'
+            ? { outcome, owningPersonId: String(row.volunteerPersonId) }
+            : { outcome }
+        }
+        return { outcome: 'selectionRequired' }
+      }
       else chosen = qualifying[0]
 
       // Atomic first-wins: any unassigned Open request, any village.

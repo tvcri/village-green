@@ -2,6 +2,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const path = require('node:path')
+const fs = require('node:fs')
 
 const svc = require(path.join('..', 'service', 'VolunteerRequestService'))
 
@@ -37,6 +38,18 @@ test('classifySignUpFailure: anything else is a conflict (any village)', () => {
 test('classifyReleaseFailure: missing rows are notFound, existing are conflict', () => {
   assert.equal(svc.classifyReleaseFailure({ row: undefined }), 'notFound')
   assert.equal(svc.classifyReleaseFailure({ row: { status: 'Open' } }), 'conflict')
+})
+
+// selectionRequired is only truthful for a signable (Open) request: the
+// 2+-qualifiers branch must read the row and classify a non-Open state
+// (alreadyOwn/alreadyOwnAccount/conflict) instead of returning 422 for a
+// request no choice could win.
+test('signUpVolunteerRequest classifies a non-open row before selectionRequired', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'service', 'VolunteerRequestService.js'), 'utf8')
+  const branch = src.slice(src.indexOf('qualifying.length > 1'), src.indexOf('else chosen = qualifying[0]'))
+  assert.match(branch, /SELECT status, volunteerPersonId FROM service_request WHERE id = \?/)
+  assert.match(branch, /status !== 'Open'/)
+  assert.match(branch, /classifySignUpFailure/)
 })
 
 test('service exports the request functions', () => {
