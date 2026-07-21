@@ -418,7 +418,10 @@ async function doRelease() {
       <p>Service request not found.</p>
     </div>
 
-    <Dialog v-model:visible="pickerVisible" header="Sign up for this request?" modal :style="{ maxWidth: '28rem' }">
+    <!-- No width style: the shared ConfirmDialog is content-sized by the
+         PrimeVue default, and this dialog carries the same running text, so
+         leaving it unstyled keeps the two visually matched. -->
+    <Dialog v-model:visible="pickerVisible" header="Sign up for this request?" modal>
       <div v-for="v in qualifyingVolunteers" :key="v.personId" class="picker-row">
         <RadioButton v-model="pickedPersonId" :inputId="`vol-${v.personId}`" :value="v.personId" />
         <label :for="`vol-${v.personId}`">{{ v.name }}</label>
