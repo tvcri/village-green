@@ -23,38 +23,26 @@ covered. Each former RED probe has been converted to a GREEN assertion (with a
 | 5 | Person writes (create/patch/delete + member/volunteer sub-resources) ungated | **403** — `person:write`/`member:write`/`volunteer:write` on the person's village, plus a destination-village check when a patch moves a person (`tests/persons/write.test.js`, `tests/members/lifecycle.test.js`, `tests/volunteers/lifecycle.test.js`) |
 | 6 | Village write endpoints had no gate (masked by WIP bugs) | **Gated and working** — `village:write` per village; `createVillage` is admin+elevate (`village:create`); the WIP 500/404 bugs are also gone (`tests/villages/crud.test.js`) |
 
+## Status 2026-07-21: findings A and B fixed by #69 — verified
+
+Both were found by this suite and fixed upstream in production code. Their RED
+probes flipped GREEN on the fix commit alone, with no test edit — the intended
+behavior of the red-until-fixed convention.
+
+| # | Was | Now |
+|---|-----|-----|
+| A | `sqlGrantees` pushed `[villageIds]` into `IN (?)`, rendering `IN ((1, 2))` → `ER_OPERAND_COLUMNS` → **500** for any caller with grants on 2+ villages hitting `GET /villages?projection=statistics`. Federation (allVillages) and single-village callers dodged it. | **Fixed** — flat bind. Green in `tests/villages/projections.test.js` and `api/source/test/serviceUtils.test.js`. |
+| B | `generateSchema.sh`'s `static_data_tables` was never updated for `0013-rbac-roles.js`, so the scaffold dump marked 0013 executed while carrying none of its `role` / `role_permission` rows — a fresh install could grant nobody anything (every `role_grant` insert hit `fk_role_grant_role`). Deploy-blocking. | **Fixed** — `role role_permission` added to the list and both artifacts regenerated (they had also fallen three migrations behind, 0015–0017). Green in `tests/smoke/state-and-spec.test.js`. The `seedRoleCatalog()` workaround in `setup/seed.js` is deleted; `assertRoleCatalog()` now fails fast if a scaffold ever ships an empty catalog again. |
+
+Related, same root cause as B: `current/30-vg-views.sql` was **deleted**.
+`mysqldump` already emits `active_member` / `active_volunteer` into
+`10-vg-tables.sql`, so fresh installs get them without migration 0006 running.
+Worse, `30-` loaded last and its `SELECT *` form overwrote the dump's
+column-expanded definitions, reintroducing the add-a-column-and-it-is-invisible
+trap. The load-order problem it worked around is fixed by the `readdir().sort()`
+in `setupInitialSchema`.
+
 ## Open findings
-
-### A. `sqlGrantees` double-wraps `villageIds` → 500 (correctness, not exposure)
-
-The same mis-binding class as former #3/#4 survives in one spot:
-the `villageIds` arm of `sqlGrantees` (`api/source/service/utils.js`) pushes `[villageIds]` into `IN (?)`.
-Reachable: any caller with village grants on **2+ villages** calling
-`GET /villages?projection=statistics` → `ER_OPERAND_COLUMNS` → **500**.
-Federation callers (allVillages path) and single-village callers dodge it.
-
-- **RED tests** (assert the correct behavior, fail until fixed, self-green on
-  fix): `tests/villages/projections.test.js` (multi-village caller gets 200 +
-  statistics) and `api/source/test/serviceUtils.test.js` (flat `IN (1, 2)`
-  render in both arms).
-- Full write-up: `scratch/bug-report-2026-07-20.md`.
-
-### B. Fresh scaffold ships an empty role catalog (deploy-blocking)
-
-`api/source/service/migrations/sql/current/20-vg-static.sql` marks migration
-`0013-rbac-roles.js` executed but carries none of its `role` /
-`role_permission` rows, so a fresh scaffold can grant nobody anything
-(every `role_grant` insert hits `fk_role_grant_role`). Root cause: the
-`static_data_tables` list in `sql/generateSchema.sh` was never updated for
-0013's new static tables — one-line fix, see the bug report.
-
-- **RED test**: `tests/smoke/state-and-spec.test.js` statically checks the
-  dump artifact for the 0013 catalog rows — fails until `generateSchema.sh`'s
-  `static_data_tables` gains `role role_permission` and the dump is
-  regenerated. (A runtime red is impossible: the harness must work around the
-  bug via `setup/seed.js seedRoleCatalog()` just to run — delete that
-  workaround when this test goes green.)
-- Full write-up: `scratch/bug-report-2026-07-20.md`.
 
 ### C. `iss` claim is never validated (characterization)
 

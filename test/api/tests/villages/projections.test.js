@@ -40,13 +40,13 @@ test('list projection=statistics works for federation and single-village callers
   assert.ok(one.json.length && one.json.every(v => 'statistics' in v), 'single-village caller gets statistics')
 })
 
-test('list projection=statistics works for a multi-village caller (RED until fixed)', async () => {
-  // RED — scratch/bug-report-2026-07-20.md (bug 1): the villageIds arm of
-  // sqlGrantees (api/source/service/utils.js) double-wraps its bind, so the CTE renders
-  // `cg.villageId IN ((1, 2))` whenever the caller's grant list has >= 2
-  // entries -> ER_OPERAND_COLUMNS -> 500 today. Federation callers
-  // (allVillages path) and single-village callers dodge it. This asserts the
-  // CORRECT behavior and goes green with no edit when the fix lands.
+test('list projection=statistics works for a multi-village caller', async () => {
+  // Regression guard for finding A (fixed by #69): the villageIds arm of
+  // sqlGrantees double-wrapped its bind, so the CTE rendered
+  // `cg.villageId IN ((1, 2))` whenever the caller's grant list had >= 2
+  // entries -> ER_OPERAND_COLUMNS -> 500. Federation callers (allVillages
+  // path) and single-village callers dodged it, so `multi` is the only
+  // canonical user that exercises this — keep it multi-village.
   const { status, json } = await vgCall('getVillages', { projection: ['statistics'] }, { token: tokens.users.multi })
   assert.equal(status, 200)
   assert.ok(json.length === 2 && json.every(v => 'statistics' in v),

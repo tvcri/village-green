@@ -32,17 +32,16 @@ test('sqlGrantees applies the villageId filter to both union arms', () => {
   assert.equal(occurrences(sql, 'cg.villageId = 3'), 2)
 })
 
-// RED until fixed — same mis-binding class as former e2e findings #3/#4
-// (test/api/SECURITY-FINDINGS.md, open item A): the villageIds param is an
-// array, and sqlGrantees binds [villageIds] into 'IN (?)', double-wrapping it.
-// One village works by accident (`IN ((5))`); two or more render a nested row
-// constructor `IN ((1, 2))`, which MySQL rejects with ER_OPERAND_COLUMNS.
-// Reachable: non-admin with grants on ≥2 villages, GET /villages?projection=
-// statistics (VillageService.queryVillages → cteGranteesParams.villageIds).
-// Fix: drop the extra brackets in sqlGrantees' villageIds arm
-// (`binds.push([villageIds])` -> `binds.push(villageIds)`) — this goes green
-// with no edit needed. Full write-up: scratch/bug-report-2026-07-20.md.
-test('sqlGrantees renders a flat villageIds IN-list in both arms (RED until the double-wrap is fixed)', () => {
+// Regression guard for finding A (fixed by #69; same mis-binding class as
+// former e2e findings #3/#4 — see test/api/SECURITY-FINDINGS.md): villageIds
+// is an array, and sqlGrantees used to bind [villageIds] into 'IN (?)',
+// double-wrapping it. One village worked by accident (`IN ((5))`); two or more
+// rendered a nested row constructor `IN ((1, 2))`, which MySQL rejects with
+// ER_OPERAND_COLUMNS. Reachable: non-admin with grants on >=2 villages, via
+// GET /villages?projection=statistics (VillageService.queryVillages ->
+// cteGranteesParams.villageIds). Assert two villages, not one — a single-value
+// case passes either way and would not catch a regression.
+test('sqlGrantees renders a flat villageIds IN-list in both arms', () => {
   const sql = dbUtils.sqlGrantees({ villageIds: [1, 2] })
   assert.equal(occurrences(sql, 'cg.villageId IN (1, 2)'), 2,
     `expected a flat IN-list; got:\n${sql}`)

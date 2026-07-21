@@ -12,16 +12,15 @@ users see the right data) as the throughline.
 > federation grant (village users pass `villageId ⊆ grants`), cross-village
 > denials are 403 (perm precedes existence on nested routes), and elevation
 > gates only the admin surface. Former findings #1–#6 are **fixed by #56** and
-> their probes are now green assertions — see `SECURITY-FINDINGS.md` for the
-> updated register (two open items remain: the `sqlGrantees` statistics 500 and
-> the empty role catalog in `sql/current/20-vg-static.sql`, worked around by
-> `setup/seed.js seedRoleCatalog()`; details in `scratch/bug-report-2026-07-20.md`).
-> Landscape: **205 tests — 201 pass, 2 deliberate REDs, 2 todo** (~45 s wall
-> clock, ~20 s test phase). The reds assert the *correct* behavior for the two
-> open bugs (the multi-village statistics 200, and the dump carrying the 0013
-> role catalog) per this suite's red-until-fixed convention — they go green
-> with no edit when the fixes land. A red run with exactly these two failures
-> is the expected state.
+> their probes are now green assertions; findings A and B (the `sqlGrantees`
+> multi-village statistics 500, and the fresh scaffold shipping an empty 0013
+> role catalog) are **fixed by #69** — see `SECURITY-FINDINGS.md` for the
+> register.
+> Landscape: **205 tests — 203 pass, 0 fail, 2 todo** (~45 s wall clock, ~20 s
+> test phase). There are currently **no deliberate REDs**: every documented
+> finding has been fixed upstream, and each red flipped green with no edit,
+> which is what the red-until-fixed convention is for. **Any** failure is now
+> a real regression.
 >
 > Known blind spots — chiefly the #64/#68 VSS surface (`/volunteer-requests`,
 > `/enrollment`), which is structurally invisible to the canonical fixtures —
@@ -112,10 +111,10 @@ A run is made of three kinds of test:
 - **Red (hard fail)** — assertions of the *correct/secure* behavior on endpoints that are
   implemented but **buggy**. They fail on purpose and flip green when the bug is fixed, no
   edit needed. The red set is exactly the findings in
-  [SECURITY-FINDINGS.md](./SECURITY-FINDINGS.md) — currently **13** (cross-village exposure
-  on the service-request / person by-id paths, cross-village writes — including the
-  member/volunteer role sub-resources — two double-wrapped multi-`villageId` 500s, and
-  the ungated village write endpoints). Any *unexpected* red is a real regression.
+  [SECURITY-FINDINGS.md](./SECURITY-FINDINGS.md) — **currently empty**: the original
+  #1–#6 were fixed by #56, and A/B by #69. The convention earned its keep — every red
+  flipped green on the fix commit alone, with no test edit. Write a new red whenever you
+  characterize a bug you are not fixing in the same change.
 - **Todo** — `node:test`'s `test.todo`: the *desired* behavior of endpoints **not built
   yet** (village writes are WIP). A failing todo does **not** fail the run, so the unbuilt
   surface is documented without drowning the regression signal; when the endpoint lands and
@@ -125,8 +124,9 @@ A run is made of three kinds of test:
   since been retargeted) — todo specs should be written against an agreed OpenAPI change,
   not a predicted one.
 
-So a "clean" run is the **13** documented reds, a stack of todos, and everything else green.
-`npm test` exits non-zero only because of those 13 reds.
+So a "clean" run today is **all green** plus a stack of todos, and `npm test` exits **0**.
+When a red is added for a newly characterized bug, the run exits non-zero until that bug
+is fixed — expected, and the count belongs in `SECURITY-FINDINGS.md`.
 
 ## Coverage
 

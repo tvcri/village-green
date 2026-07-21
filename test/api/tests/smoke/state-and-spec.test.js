@@ -18,17 +18,18 @@ test('GET /op/definition serves the OpenAPI document', async () => {
   assert.ok(json && (json.openapi || json.paths), 'should look like an OpenAPI document')
 })
 
-test('the static dump carries the 0013 role catalog (RED until generateSchema.sh is fixed)', async () => {
-  // RED — scratch/bug-report-2026-07-20.md (bug 2): sql/generateSchema.sh's
+test('the static dump carries the 0013 role catalog', async () => {
+  // Regression guard for finding B (fixed by #69): generateSchema.sh's
   // static_data_tables list was never updated for migration 0013's new static
-  // tables, so 20-vg-static.sql marks 0013 as executed in _migrations while
-  // carrying zero role / role_permission rows. Any fresh scaffold then has an
-  // empty role catalog and every role_grant insert hits fk_role_grant_role —
-  // new installs cannot grant anyone anything. The harness works around it
-  // (setup/seed.js seedRoleCatalog); this static check on the dump artifact
-  // stays red until the dump is regenerated with the tables added — then
-  // delete seedRoleCatalog(). Checked on disk (not via the DB) so the verdict
-  // is immune to --keep re-runs inheriting the workaround's rows.
+  // tables, so 20-vg-static.sql marked 0013 executed in _migrations while
+  // carrying zero role / role_permission rows. Any fresh scaffold then had an
+  // empty role catalog and every role_grant insert hit fk_role_grant_role —
+  // new installs could not grant anyone anything.
+  //
+  // Keep this green by adding any future catalog-seeding migration's table to
+  // static_data_tables and regenerating (generateSchema.sh --container).
+  // Checked on disk rather than via the DB so the verdict is immune to --keep
+  // re-runs inheriting rows from an earlier scaffold.
   const { readFile } = await import('node:fs/promises')
   const path = await import('node:path')
   const { config } = await import('../../setup/env.js')
