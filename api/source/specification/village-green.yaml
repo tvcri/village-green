@@ -1940,6 +1940,12 @@ paths:
       operationId: signUpVolunteerRequest
       parameters:
         - $ref: '#/components/parameters/ServiceRequestIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerSignUpPost'
       responses:
         '200':
           description: The confirmed service request
@@ -1948,7 +1954,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VolunteerServiceRequest'
         default:
-          description: error (404 not visible, 409 not open)
+          description: error (404 not visible, 409 not open / committed to another account volunteer, 422 selection required)
           content:
             application/json:
               schema:
@@ -2769,7 +2775,9 @@ components:
       type: object
       properties:
         detail:
-          type: string
+          oneOf:
+          - type: string
+          - type: object
         error:
           type: string
         stack:
@@ -3806,6 +3814,10 @@ components:
           type: string
           maxLength: 255
           nullable: true
+        # TEMPORARY: derived from modifiedUserId IS NOT NULL — valid only
+        # while VSS signup/release are the sole writers of modifiedUserId.
+        vssSignup:
+          type: boolean
         serviceDate:
           type: string
           format: date
@@ -4383,29 +4395,49 @@ components:
           type: boolean
           description: >-
             Present only with the `volunteer` projection. True iff the runtime
-            would grant this user VSS access — i.e. exactly one person's email
+            would grant this user VSS access — i.e. at least one person's email
             matches the username and that person is an active volunteer.
-        volunteer:
-          nullable: true
-          additionalProperties: false
-          type: object
-          properties:
-            personId:
-              $ref: '#/components/schemas/StringIntId'
-            villages:
-              type: array
-              items:
-                additionalProperties: false
-                type: object
-                properties:
-                  villageId:
-                    $ref: '#/components/schemas/StringIntId'
-                  name:
-                    type: string
-            capabilities:
-              type: array
-              items:
+        volunteers:
+          type: array
+          description: >-
+            The caller's active volunteers, one entry per resolved person
+            (shared household email may map one account to several). Empty
+            array when none. Populated on GET /user only.
+          items:
+            additionalProperties: false
+            type: object
+            properties:
+              personId:
+                $ref: '#/components/schemas/StringIntId'
+              name:
+                description: Tabular display form ("Last, First" fullName)
                 type: string
+                nullable: true
+              firstName:
+                type: string
+              lastName:
+                type: string
+              villages:
+                type: array
+                items:
+                  additionalProperties: false
+                  type: object
+                  properties:
+                    villageId:
+                      $ref: '#/components/schemas/StringIntId'
+                    name:
+                      type: string
+              capabilities:
+                type: array
+                items:
+                  type: string
+            required:
+            - personId
+            - name
+            - firstName
+            - lastName
+            - villages
+            - capabilities
       required:
       - userId
       - username
@@ -4855,6 +4887,13 @@ components:
       type: object
       properties:
         fullName:
+          description: Tabular display form ("Last, First")
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
           type: string
           nullable: true
         address:
@@ -4917,6 +4956,12 @@ components:
       required:
       - villageId
       - name
+    VolunteerSignUpPost:
+      additionalProperties: false
+      type: object
+      properties:
+        personId:
+          $ref: '#/components/schemas/StringIntId'
     VolunteerServiceRequest:
       additionalProperties: false
       type: object
@@ -4991,6 +5036,9 @@ components:
           $ref: '#/components/schemas/VolunteerEmergencyContact'
         volunteerAddress:
           $ref: '#/components/schemas/VolunteerOwnAddress'
+        volunteerPersonId:
+          type: string
+          nullable: true
       required:
       - serviceRequestId
       - villageId

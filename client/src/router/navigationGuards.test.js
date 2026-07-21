@@ -165,35 +165,35 @@ describe('volunteer surface', () => {
     globalThis.VG = { curUser: null }
   })
 
-  it('blocks /volunteer for users without a volunteer block', () => {
-    globalThis.VG = { curUser: { volunteer: null } }
+  it('blocks /volunteer for users without any volunteer entries', () => {
+    globalThis.VG = { curUser: { volunteers: [] } }
     const result = navigationGuard({ name: 'volunteer', path: '/volunteer', params: {}, meta: { requiresVolunteer: true } })
     expect(result).toEqual({ name: 'villages' })
   })
 
-  it('allows /volunteer for users with a volunteer block', () => {
-    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+  it('allows /volunteer for users with a volunteer entry', () => {
+    globalThis.VG = { curUser: { volunteers: [{ personId: '7', villages: [{ villageId: '3' }] }] } }
     mockIsGrantless.value = true
     const result = navigationGuard({ name: 'volunteer', path: '/volunteer', params: {}, meta: { requiresVolunteer: true } })
     expect(result).toBeUndefined()
   })
 
   it('redirects volunteer-only (grantless) users to /volunteer from anywhere else', () => {
-    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    globalThis.VG = { curUser: { volunteers: [{ personId: '7', villages: [{ villageId: '3' }] }] } }
     mockIsGrantless.value = true
     const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
     expect(result).toEqual({ name: 'volunteer' })
   })
 
   it('does not redirect grant-holding staff who also volunteer', () => {
-    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    globalThis.VG = { curUser: { volunteers: [{ personId: '7', villages: [{ villageId: '3' }] }] } }
     mockIsGrantless.value = false
     const result = navigationGuard({ name: 'villages', path: '/', params: {}, meta: {} })
     expect(result).toBeUndefined()
   })
 
   it('allows volunteer-only users onto the request detail deep link', () => {
-    globalThis.VG = { curUser: { volunteer: { personId: '7', villages: [{ villageId: '3' }] } } }
+    globalThis.VG = { curUser: { volunteers: [{ personId: '7', villages: [{ villageId: '3' }] }] } }
     mockIsGrantless.value = true
     const result = navigationGuard({ name: 'volunteer-request-detail', path: '/volunteer/requests/2303', params: { id: '2303' }, meta: { requiresVolunteer: true } })
     expect(result).toBeUndefined()

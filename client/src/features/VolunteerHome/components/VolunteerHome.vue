@@ -16,6 +16,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { serviceDateToDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
 import { getVolunteerRequests, getVolunteerRequestVillages } from '../api/volunteerRequestApi.js'
 import { getUser } from '../../../shared/api/userApi.js'
+import { SERVICE_CATEGORIES } from '../lib/serviceCategories.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -98,22 +99,6 @@ watch(activeTab, (tab) => {
   router.replace({ query: { ...route.query, tab } })
 })
 
-// The VSS service-category vocabulary: each capability the caller may hold,
-// paired with the serviceName prefix that identifies its requests. This is the
-// client-side inverse of the API's buildCapabilityPrefixCase. Matching on the
-// prefix absorbs the legacy whitespace-after-colon deviations (Errand:Shopping
-// vs Errand: Shopping), since the cut is at the colon. 'Friends' is deliberately
-// absent: it has no service type and is not a VSS-supported category.
-// `key` doubles as the CSS class suffix for the category color treatments —
-// the Service tag (.service-tag--rides) and the filter pill
-// (.service-pill--rides); colors are defined via the --cat-* vars in <style>.
-const SERVICE_CATEGORIES = [
-  { key: 'errands', label: 'Errands', prefix: 'Errand:' },
-  { key: 'home-help', label: 'Home Help', prefix: 'Household Chores/Handy Help' },
-  { key: 'rides', label: 'Rides', prefix: 'Ride:' },
-  { key: 'tech-support', label: 'Tech Support', prefix: 'Tech Support' },
-]
-
 // The category key for a request's serviceName, by the same prefix match as the
 // filter (absorbs whitespace-after-colon). null when it matches no category —
 // such a card gets no accent stripe (neutral).
@@ -137,14 +122,29 @@ const { state: currentUser } = useAsyncState(
   { immediate: true, initialState: null, onError: null }
 )
 
+const accountVolunteers = computed(() => currentUser.value?.volunteers ?? [])
+
 const serviceCategoryOptions = computed(() => {
-  const held = new Set(currentUser.value?.volunteer?.capabilities ?? [])
+  // Union across the account's volunteers (shared household email): a
+  // category is offered if ANY of them holds it — mirrors the API's
+  // union-scoped open list.
+  const held = new Set(accountVolunteers.value.flatMap(v => v.capabilities ?? []))
   return SERVICE_CATEGORIES.filter(c => held.has(c.label))
 })
 
 // A lone option is noise: checking/unchecking it just toggles to an empty
 // table. Show the Service filter only when the caller holds 2+ categories.
 const showServiceFilter = computed(() => serviceCategoryOptions.value.length >= 2)
+
+// Volunteer attribution — only meaningful when the account has 2+ volunteers
+// (shared household email); single-volunteer accounts see today's UI exactly.
+const showVolunteerColumn = computed(() => accountVolunteers.value.length > 1)
+
+function volunteerLabel(row) {
+  // String() aligns with the detail view's lookup; both sides are CHAR-cast
+  // strings today, so this is drift-proofing, not a conversion.
+  return accountVolunteers.value.find(v => v.personId === String(row.volunteerPersonId))?.name ?? ''
+}
 
 const SERVICE_FILTER_KEY = 'vg.volunteerHome.serviceFilter'
 let storedServiceFilter = []
@@ -361,6 +361,9 @@ function goToDetail(row) {
             <Column header="Member">
               <template #body="{ data }">{{ memberLabel(data) }}</template>
             </Column>
+            <Column v-if="showVolunteerColumn" header="Volunteer">
+              <template #body="{ data }">{{ volunteerLabel(data) }}</template>
+            </Column>
             <Column field="serviceDate" header="When" sortable>
               <template #body="{ data }">{{ formatWhen(data) }}</template>
             </Column>
@@ -383,6 +386,9 @@ function goToDetail(row) {
               <div class="card-row"><span class="label">When</span>{{ formatWhen(request) }}</div>
               <div class="card-row"><span class="label">Village</span>{{ request.villageName }}</div>
               <div class="card-row"><span class="label">Member</span>{{ memberLabel(request) }}</div>
+              <div v-if="showVolunteerColumn" class="card-row">
+                <span class="label">Volunteer</span>{{ volunteerLabel(request) }}
+              </div>
             </div>
           </div>
         </TabPanel>
@@ -419,6 +425,9 @@ function goToDetail(row) {
             <Column header="Member">
               <template #body="{ data }">{{ memberLabel(data) }}</template>
             </Column>
+            <Column v-if="showVolunteerColumn" header="Volunteer">
+              <template #body="{ data }">{{ volunteerLabel(data) }}</template>
+            </Column>
             <Column field="serviceDate" header="When" sortable>
               <template #body="{ data }">{{ formatWhen(data) }}</template>
             </Column>
@@ -441,6 +450,9 @@ function goToDetail(row) {
               <div class="card-row"><span class="label">When</span>{{ formatWhen(request) }}</div>
               <div class="card-row"><span class="label">Village</span>{{ request.villageName }}</div>
               <div class="card-row"><span class="label">Member</span>{{ memberLabel(request) }}</div>
+              <div v-if="showVolunteerColumn" class="card-row">
+                <span class="label">Volunteer</span>{{ volunteerLabel(request) }}
+              </div>
             </div>
           </div>
         </TabPanel>
