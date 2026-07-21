@@ -322,7 +322,7 @@ const clearFilters = () => {
                 <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
                 <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
               </div>
-              <div class="status-filter vss-signup-filter">
+              <div class="status-filter">
                 <Checkbox v-model="vssSignupOnly" input-id="vss-signup-filter" binary />
                 <label for="vss-signup-filter">VSS Signup</label>
               </div>
@@ -434,12 +434,6 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .filters-content .search-box label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .status-filter { display: flex; align-items: center; gap: 0.375rem; }
-/* Flush right on the status row. margin-left:auto only reads as "flush right"
-   while the row fits on one line, so it is dropped once the row wraps. */
-.vss-signup-filter { margin-left: auto; }
-@media (max-width: 768px) {
-  .vss-signup-filter { margin-left: 0; }
-}
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
 }
