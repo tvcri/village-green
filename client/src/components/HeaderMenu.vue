@@ -44,7 +44,7 @@ const menuItems = computed(() => {
     })
   }
 
-  if (user.value?.volunteer) {
+  if (user.value?.volunteers?.length) {
     items.push({
       label: 'Volunteer Self Signup',
       icon: 'pi pi-heart',

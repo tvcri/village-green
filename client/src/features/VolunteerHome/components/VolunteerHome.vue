@@ -16,6 +16,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { serviceDateToDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
 import { getVolunteerRequests, getVolunteerRequestVillages } from '../api/volunteerRequestApi.js'
 import { getUser } from '../../../shared/api/userApi.js'
+import { SERVICE_CATEGORIES } from '../lib/serviceCategories.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -98,22 +99,6 @@ watch(activeTab, (tab) => {
   router.replace({ query: { ...route.query, tab } })
 })
 
-// The VSS service-category vocabulary: each capability the caller may hold,
-// paired with the serviceName prefix that identifies its requests. This is the
-// client-side inverse of the API's buildCapabilityPrefixCase. Matching on the
-// prefix absorbs the legacy whitespace-after-colon deviations (Errand:Shopping
-// vs Errand: Shopping), since the cut is at the colon. 'Friends' is deliberately
-// absent: it has no service type and is not a VSS-supported category.
-// `key` doubles as the CSS class suffix for the category color treatments —
-// the Service tag (.service-tag--rides) and the filter pill
-// (.service-pill--rides); colors are defined via the --cat-* vars in <style>.
-const SERVICE_CATEGORIES = [
-  { key: 'errands', label: 'Errands', prefix: 'Errand:' },
-  { key: 'home-help', label: 'Home Help', prefix: 'Household Chores/Handy Help' },
-  { key: 'rides', label: 'Rides', prefix: 'Ride:' },
-  { key: 'tech-support', label: 'Tech Support', prefix: 'Tech Support' },
-]
-
 // The category key for a request's serviceName, by the same prefix match as the
 // filter (absorbs whitespace-after-colon). null when it matches no category —
 // such a card gets no accent stripe (neutral).
@@ -137,8 +122,13 @@ const { state: currentUser } = useAsyncState(
   { immediate: true, initialState: null, onError: null }
 )
 
+const accountVolunteers = computed(() => currentUser.value?.volunteers ?? [])
+
 const serviceCategoryOptions = computed(() => {
-  const held = new Set(currentUser.value?.volunteer?.capabilities ?? [])
+  // Union across the account's volunteers (shared household email): a
+  // category is offered if ANY of them holds it — mirrors the API's
+  // union-scoped open list.
+  const held = new Set(accountVolunteers.value.flatMap(v => v.capabilities ?? []))
   return SERVICE_CATEGORIES.filter(c => held.has(c.label))
 })
 
