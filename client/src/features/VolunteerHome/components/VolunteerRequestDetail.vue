@@ -6,11 +6,15 @@ import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import RadioButton from 'primevue/radiobutton'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { formatServiceDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
 import { getHttpStatus, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getVolunteerRequest, signUpVolunteerRequest, releaseVolunteerRequest } from '../api/volunteerRequestApi.js'
+import { getUser } from '../../../shared/api/userApi.js'
+import { filterQualifying } from '../lib/serviceCategories.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
 
 const route = useRoute()
@@ -39,6 +43,31 @@ const { state: request, isLoading, execute: fetchRequest } = useAsyncState(
     },
   }
 )
+
+// Account volunteers (shared household email => several). Fetched from /user
+// like VolunteerHome does — no shared user store exists. onError: null — a
+// failed fetch degrades to single-volunteer behavior (no picker), and the
+// server still validates the selection.
+const { state: currentUser } = useAsyncState(
+  () => getUser(),
+  { immediate: true, initialState: null, onError: null }
+)
+const accountVolunteers = computed(() => currentUser.value?.volunteers ?? [])
+const isMultiVolunteer = computed(() => accountVolunteers.value.length > 1)
+
+// The volunteers who can take THIS request (per-person capability match,
+// mirroring the server's sign-up qualification; the server stays
+// authoritative at write time).
+const qualifyingVolunteers = computed(() =>
+  filterQualifying(accountVolunteers.value, request.value?.serviceName)
+)
+
+function volunteerName(personId) {
+  return accountVolunteers.value.find(v => v.personId === String(personId))?.name ?? ''
+}
+
+const pickerVisible = ref(false)
+const pickedPersonId = ref(null)
 
 const SHOW_MAP_KEY = 'vg.showMap'
 const showMap = ref(localStorage.getItem(SHOW_MAP_KEY) !== 'false')
@@ -108,26 +137,58 @@ const timeDisplay = computed(() => {
 })
 
 function confirmSignUp() {
+  if (isMultiVolunteer.value && qualifyingVolunteers.value.length > 1) {
+    // The picker doubles as the confirmation: "Who is this for?" + Sign up.
+    pickedPersonId.value = null
+    pickerVisible.value = true
+    return
+  }
+  // 0 or 1 qualifiers: no choice to make. Name the volunteer in the confirm
+  // when the account has several; post the id only then (single-volunteer
+  // accounts keep the omitted-body auto-select path — zero change for them).
+  const chosen = isMultiVolunteer.value ? qualifyingVolunteers.value[0] : undefined
+  const subject = chosen ? `${chosen.name} will` : 'You will'
   confirm.require({
     header: 'Sign up for this request?',
-    message: `You will be confirmed as the provider for "${request.value.serviceName || 'this request'}"${request.value.member?.fullName ? ` for ${request.value.member.fullName}` : ''}.`,
+    message: `${subject} be confirmed as the provider for "${request.value.serviceName || 'this request'}"${request.value.member?.fullName ? ` for ${request.value.member.fullName}` : ''}.`,
     icon: 'pi pi-heart',
     acceptLabel: 'Sign up',
     rejectLabel: 'Cancel',
-    accept: doSignUp,
+    accept: () => doSignUp(chosen?.personId),
   })
 }
 
-async function doSignUp() {
+function submitPicker() {
+  pickerVisible.value = false
+  doSignUp(pickedPersonId.value)
+}
+
+async function doSignUp(personId) {
   try {
-    await signUpVolunteerRequest(serviceRequestId.value)
-    toast.add({ severity: 'success', summary: 'Confirmed', detail: 'You are confirmed for this request. Watch your email for details.', life: 5000 })
+    await signUpVolunteerRequest(serviceRequestId.value, personId)
+    const who = personId && isMultiVolunteer.value ? volunteerName(personId) : ''
+    toast.add({
+      severity: 'success',
+      summary: 'Confirmed',
+      detail: who
+        ? `${who} is confirmed for this request. Watch your email for details.`
+        : 'You are confirmed for this request. Watch your email for details.',
+      life: 5000,
+    })
     fetchRequest()
     showCallReminder()
   }
   catch (err) {
     if (isPrivacyAckError(err)) return
     if (getHttpStatus(err) === 409) {
+      if (err.body?.detail?.reason === 'alreadyOwnAccount') {
+        // Taken by the OTHER volunteer on this account — stay on the page;
+        // the refetch shows it as the account's confirmed request.
+        const who = volunteerName(err.body.detail.volunteerPersonId)
+        toast.add({ severity: 'warn', summary: 'Already committed', detail: `${who || 'Another volunteer on your account'} is already committed to this request.`, life: 5000 })
+        fetchRequest()
+        return
+      }
       toast.add({ severity: 'warn', summary: 'No longer available', detail: 'Another volunteer signed up for this request first.', life: 5000 })
       router.replace({ name: 'volunteer' })
     }
@@ -322,6 +383,17 @@ async function doRelease() {
         </div>
       </template>
     </Card>
+
+    <Dialog v-model:visible="pickerVisible" header="Who is this for?" modal :style="{ maxWidth: '22rem' }">
+      <div v-for="v in qualifyingVolunteers" :key="v.personId" class="picker-row">
+        <RadioButton v-model="pickedPersonId" :inputId="`vol-${v.personId}`" :value="v.personId" />
+        <label :for="`vol-${v.personId}`">{{ v.name }}</label>
+      </div>
+      <template #footer>
+        <Button label="Cancel" text @click="pickerVisible = false" />
+        <Button label="Sign up" icon="pi pi-heart" :disabled="!pickedPersonId" @click="submitPicker" />
+      </template>
+    </Dialog>
 
     <div v-else-if="!isLoading" class="not-found">
       <p>Service request not found.</p>
@@ -518,6 +590,15 @@ async function doRelease() {
   text-align: center;
   padding: 2rem;
   color: var(--color-text-dim);
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 @media (max-width: 900px) {
