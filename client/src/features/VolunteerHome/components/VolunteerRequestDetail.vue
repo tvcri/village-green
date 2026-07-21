@@ -62,12 +62,14 @@ const qualifyingVolunteers = computed(() =>
   filterQualifying(accountVolunteers.value, request.value?.serviceName)
 )
 
-// "First Last" for names inside sentences (confirm dialog, Confirmed banner,
-// toasts). Tabular displays (Volunteer column, picker list) keep the
-// "Last, First" fullName served as `name`, matching the Member columns.
+// General rule: a name inside a sentence (or the sign-up dialogs) reads
+// "First Last"; tables and labeled fields keep the "Last, First" fullName.
+// Works for volunteer entries (`name`) and the request's member (`fullName`);
+// the fallback covers rows from an API that predates first/last in the
+// payload.
 function informalName(v) {
   if (!v) return ''
-  return [v.firstName, v.lastName].filter(Boolean).join(' ') || v.name || ''
+  return [v.firstName, v.lastName].filter(Boolean).join(' ') || v.name || v.fullName || ''
 }
 
 function informalVolunteerName(personId) {
@@ -156,7 +158,8 @@ const timeDisplay = computed(() => {
 // The confirm sentence, shared by the single-volunteer ConfirmDialog and the
 // multi-volunteer picker dialog (whose subject tracks the selected radio).
 function signUpMessage(subject) {
-  return `${subject} be confirmed as the provider for "${request.value?.serviceName || 'this request'}"${request.value?.member?.fullName ? ` for ${request.value.member.fullName}` : ''}.`
+  const member = informalName(request.value?.member)
+  return `${subject} be confirmed as the provider for "${request.value?.serviceName || 'this request'}"${member ? ` for ${member}` : ''}.`
 }
 
 const pickerMessage = computed(() => {
@@ -424,7 +427,7 @@ async function doRelease() {
     <Dialog v-model:visible="pickerVisible" header="Sign up for this request?" modal>
       <div v-for="v in qualifyingVolunteers" :key="v.personId" class="picker-row">
         <RadioButton v-model="pickedPersonId" :inputId="`vol-${v.personId}`" :value="v.personId" />
-        <label :for="`vol-${v.personId}`">{{ v.name }}</label>
+        <label :for="`vol-${v.personId}`">{{ informalName(v) }}</label>
       </div>
       <div class="picker-message">
         <i class="pi pi-heart"></i>

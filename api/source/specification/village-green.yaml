@@ -4887,6 +4887,13 @@ components:
       type: object
       properties:
         fullName:
+          description: Tabular display form ("Last, First")
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
           type: string
           nullable: true
         address:
