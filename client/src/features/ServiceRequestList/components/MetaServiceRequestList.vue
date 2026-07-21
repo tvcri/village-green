@@ -9,6 +9,7 @@ import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
+import Badge from 'primevue/badge'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
 import { useToast } from 'primevue/usetoast'
@@ -34,14 +35,19 @@ useScrollRestore(
   ['service-request-detail', 'meta-service-request-edit', 'meta-service-request-create']
 )
 
-const selectedVillage = ref('All villages')
+// Filter selects use null as "no filter"; the "All ..." text lives in each
+// Select's placeholder so show-clear only appears for a real selection.
+const selectedVillage = ref(null)
 const isCreatingSheet = ref(false)
 const filtersCollapsed = ref(true)
-const selectedMember = ref('All members')
-const selectedVolunteer = ref('All volunteers')
-const selectedService = ref('All services')
+const selectedMember = ref(null)
+const selectedVolunteer = ref(null)
+const selectedService = ref(null)
 const idSearch = ref('')
-const notificationFilter = ref('All requests')
+const notificationFilter = ref(null)
+// TECH DEBT: `vssSignup` is an API-side proxy derived from modifiedUserId
+// being non-null; see the board item on recording VSS signup explicitly.
+const vssSignupOnly = ref(false)
 const historyDialogVisible = ref(false)
 const historyRequestId = ref(null)
 const historyRequestLabel = ref(null)
@@ -62,12 +68,13 @@ const onNotified = (updated) => {
   )
 }
 
-const selectedStatuses = ref(['open', 'confirmed'])
+const DEFAULT_STATUSES = ['open', 'confirmed']
+const selectedStatuses = ref([...DEFAULT_STATUSES])
 
 const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
   () => getServiceRequests({
     status: selectedStatuses.value,
-    villageId: selectedVillage.value !== 'All villages'
+    villageId: selectedVillage.value
       ? [(allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId].filter(Boolean)
       : [],
     hasNotifications: notificationFilter.value === 'Not notified' ? false : undefined
@@ -108,34 +115,34 @@ const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled
 const memberOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
   const members = new Set(requests.value.map(r => r.memberFullName).filter(Boolean))
-  return ['All members', ...Array.from(members).sort()]
+  return Array.from(members).sort()
 })
 
 const volunteerOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
   const volunteers = new Set(requests.value.map(r => r.volunteerFullName).filter(Boolean))
-  return ['All volunteers', ...Array.from(volunteers).sort()]
+  return Array.from(volunteers).sort()
 })
 
 const serviceOptions = computed(() => {
   if (!Array.isArray(requests.value)) return []
   const services = new Set(requests.value.map(r => r.serviceName).filter(Boolean))
-  return ['All services', ...Array.from(services).sort()]
+  return Array.from(services).sort()
 })
 
 const filteredRequests = computed(() => {
   if (!Array.isArray(requests.value)) return []
   return requests.value.filter(r => {
     let memberMatch = true
-    if (selectedMember.value && selectedMember.value !== 'All members') {
+    if (selectedMember.value) {
       memberMatch = r.memberFullName === selectedMember.value
     }
     let volunteerMatch = true
-    if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') {
+    if (selectedVolunteer.value) {
       volunteerMatch = r.volunteerFullName === selectedVolunteer.value
     }
     let serviceMatch = true
-    if (selectedService.value && selectedService.value !== 'All services') {
+    if (selectedService.value) {
       serviceMatch = r.serviceName === selectedService.value
     }
     let idMatch = true
@@ -144,18 +151,29 @@ const filteredRequests = computed(() => {
       const displayedId = String(r.displayNumber ?? '').toLowerCase()
       idMatch = displayedId.includes(idQuery)
     }
-    return memberMatch && volunteerMatch && serviceMatch && idMatch
+    let vssMatch = true
+    if (vssSignupOnly.value) {
+      vssMatch = r.vssSignup === true
+    }
+    return memberMatch && volunteerMatch && serviceMatch && idMatch && vssMatch
   })
 })
 
+const statusesAtDefault = computed(() =>
+  selectedStatuses.value.length === DEFAULT_STATUSES.length &&
+  DEFAULT_STATUSES.every(s => selectedStatuses.value.includes(s))
+)
+
 const activeFilterCount = computed(() => {
   let count = 0
-  if (selectedMember.value && selectedMember.value !== 'All members') count++
-  if (selectedVolunteer.value && selectedVolunteer.value !== 'All volunteers') count++
-  if (selectedService.value && selectedService.value !== 'All services') count++
-  if (selectedVillage.value && selectedVillage.value !== 'All villages') count++
+  if (!statusesAtDefault.value) count++
+  if (selectedMember.value) count++
+  if (selectedVolunteer.value) count++
+  if (selectedService.value) count++
+  if (selectedVillage.value) count++
   if (idSearch.value.trim()) count++
-  if (notificationFilter.value !== 'All requests') count++
+  if (notificationFilter.value) count++
+  if (vssSignupOnly.value) count++
   return count
 })
 
@@ -238,13 +256,14 @@ const navigateToEditRequest = (serviceRequestId) => {
 }
 
 const clearFilters = () => {
-  selectedMember.value = 'All members'
-  selectedVolunteer.value = 'All volunteers'
-  selectedService.value = 'All services'
-  selectedStatuses.value = []
-  selectedVillage.value = 'All villages'
+  selectedMember.value = null
+  selectedVolunteer.value = null
+  selectedService.value = null
+  selectedStatuses.value = [...DEFAULT_STATUSES]
+  selectedVillage.value = null
   idSearch.value = ''
-  notificationFilter.value = 'All requests'
+  notificationFilter.value = null
+  vssSignupOnly.value = false
 }
 </script>
 
@@ -267,76 +286,79 @@ const clearFilters = () => {
     <div class="filter-section">
       <div class="filters-container">
         <div class="filters-header">
-          <button
+          <Button
             type="button"
-            class="filters-toggle"
-            :class="{ collapsed: filtersCollapsed }"
+            class="filters-btn"
+            outlined
+            :aria-expanded="!filtersCollapsed"
             @click="filtersCollapsed = !filtersCollapsed"
           >
-            <span class="toggle-icon">▼</span>
-            <span class="filters-title">
-              Filters
-              <span v-if="requests && requests.length && (filteredRequests.length < requests.length || activeFilterCount > 0)" class="filter-count-tag">
-                {{ filteredRequests.length }} of {{ requests.length }} requests
-                <span
-                  role="button"
-                  class="clear-filters-icon"
-                  @click.stop.prevent="clearFilters()"
-                  @keydown.enter.stop.prevent="clearFilters()"
-                  @keydown.space.stop.prevent="clearFilters()"
-                  tabindex="0"
-                  title="Clear all filters"
-                >
-                  ✕
-                </span>
-              </span>
+            <i class="pi pi-filter" aria-hidden="true" />
+            <span class="filters-btn-label">Filters</span>
+            <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
+            <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: filtersCollapsed }" aria-hidden="true" />
+          </Button>
+          <span v-if="requests && activeFilterCount > 0" class="filter-count-tag">
+            {{ filteredRequests.length }} {{ filteredRequests.length === 1 ? 'request' : 'requests' }}
+            <span
+              role="button"
+              class="clear-filters-icon"
+              @click.prevent="clearFilters()"
+              @keydown.enter.prevent="clearFilters()"
+              @keydown.space.prevent="clearFilters()"
+              tabindex="0"
+              title="Clear all filters"
+            >
+              ✕
             </span>
-          </button>
+          </span>
         </div>
 
         <div v-if="!filtersCollapsed" class="filters-content">
-          <div class="status-id-row">
-            <div class="status-filter-group">
-              <label class="filter-group-label">Status:</label>
-              <div class="status-filters">
-                <div v-for="status in statusOptions" :key="status" class="status-filter">
-                  <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
-                  <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
-                </div>
+          <div class="status-filter-group">
+            <label class="filter-group-label">Status:</label>
+            <div class="status-filters">
+              <div v-for="status in statusOptions" :key="status" class="status-filter">
+                <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
+                <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
+              </div>
+              <div class="status-filter">
+                <Checkbox v-model="vssSignupOnly" input-id="vss-signup-filter" binary />
+                <label for="vss-signup-filter">VSS Signup</label>
               </div>
             </div>
-            <div class="search-box">
-              <label>Request ID / #:</label>
-              <IconField>
-                <InputText v-model="idSearch" placeholder="Search by ID or number" />
-                <InputIcon v-if="idSearch" class="pi pi-times" style="cursor: pointer" @click="idSearch = ''" />
-              </IconField>
-            </div>
-          </div>
-
-          <div class="search-box">
-            <label>Member:</label>
-            <Select v-model="selectedMember" :options="memberOptions" placeholder="-- Select member --" />
-          </div>
-          <div class="search-box">
-            <label>Volunteer:</label>
-            <Select v-model="selectedVolunteer" :options="volunteerOptions" placeholder="-- Select volunteer --" />
-          </div>
-          <div class="search-box">
-            <label>Service:</label>
-            <Select v-model="selectedService" :options="serviceOptions" placeholder="-- Select service --" />
           </div>
           <div class="search-box">
             <label>Village:</label>
             <Select
               v-model="selectedVillage"
-              :options="['All villages', ...(allVillages ?? []).map(v => v.name)]"
-              placeholder="-- All villages --"
+              :options="(allVillages ?? []).map(v => v.name)"
+              placeholder="All villages"
+              show-clear
             />
           </div>
           <div class="search-box">
+            <label>Member:</label>
+            <Select v-model="selectedMember" :options="memberOptions" placeholder="All members" show-clear />
+          </div>
+          <div class="search-box">
+            <label>Volunteer:</label>
+            <Select v-model="selectedVolunteer" :options="volunteerOptions" placeholder="All volunteers" show-clear />
+          </div>
+          <div class="search-box">
+            <label>Service:</label>
+            <Select v-model="selectedService" :options="serviceOptions" placeholder="All services" show-clear />
+          </div>
+          <div class="search-box">
             <label>Notifications:</label>
-            <Select v-model="notificationFilter" :options="['All requests', 'Not notified']" />
+            <Select v-model="notificationFilter" :options="['Not notified']" placeholder="All requests" show-clear />
+          </div>
+          <div class="search-box request-num-box">
+            <label>Request #:</label>
+            <IconField>
+              <InputText v-model="idSearch" placeholder="Search by #" />
+              <InputIcon v-if="idSearch" class="pi pi-times" style="cursor: pointer" @click="idSearch = ''" />
+            </IconField>
           </div>
         </div>
       </div>
@@ -390,23 +412,25 @@ const clearFilters = () => {
 h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .header-actions { display: flex; align-items: center; gap: 1rem; }
 .filter-section { margin-bottom: 1.5rem; padding: 1rem 0; background-color: var(--color-background-primary); border-bottom: 1px solid var(--color-border-default); width: 100%; display: flex; flex-direction: column; gap: 1rem; }
-.filters-container { display: flex; flex-direction: column; gap: 0; }
-.filters-header { display: flex; align-items: center; gap: 0.5rem; }
-.filters-toggle { display: flex; align-items: center; gap: 0.75rem; flex: 1; padding: 0.75rem; background: none; border: none; cursor: pointer; font-size: 1rem; text-align: left; color: var(--color-text-primary); font-weight: 500; transition: background-color 0.2s ease; min-height: 3rem; }
-.filters-toggle:hover { background-color: var(--color-background-subtle); border-radius: 4px; }
-.toggle-icon { display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; transition: transform 0.2s ease; color: var(--color-text-dim); flex-shrink: 0; }
-.filters-toggle .toggle-icon { transform: rotate(0deg); }
-.filters-toggle.collapsed .toggle-icon { transform: rotate(-90deg); }
-.filters-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; color: var(--color-text-primary); }
-.filter-count-tag { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; background-color: var(--color-background-subtle); border: 1px solid var(--color-border-default); border-radius: 12px; font-size: 0.8rem; color: var(--color-text-dim); font-weight: 500; white-space: nowrap; }
+.filters-container { display: flex; flex-direction: column; gap: 0.75rem; }
+.filters-header { display: flex; align-items: center; gap: 0.75rem; }
+/* Bolder label matches the "Use member's home" treatment: outlined + 700 label
+   reads as prominent without competing with the solid primary actions. */
+.filters-btn-label { font-weight: 700; }
+.filters-chevron { font-size: 0.75rem; transition: transform 0.2s ease; }
+.filters-chevron.collapsed { transform: rotate(-90deg); }
+.filter-count-tag { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; background-color: var(--color-background-subtle); border: 1px solid var(--color-border-default); border-radius: 12px; font-size: 0.875rem; color: var(--color-text-primary); font-weight: 500; white-space: nowrap; }
 .clear-filters-icon { display: inline-flex; align-items: center; justify-content: center; margin-left: 0.5rem; cursor: pointer; color: var(--color-text-dim); font-size: 0.75rem; font-weight: bold; line-height: 1; transition: color 0.2s ease; }
 .clear-filters-icon:hover { color: var(--color-text-primary); }
-.filters-content { display: flex; gap: 2rem; flex-wrap: wrap; align-items: flex-start; padding: 1rem; background-color: var(--color-background-light); border: 1px solid var(--color-border-default); border-radius: 4px; }
-.status-id-row { display: flex; gap: 2rem; align-items: flex-start; flex: 1 1 100%; }
-.status-id-row .status-filter-group { flex: 1 1 auto; }
+.filters-content { display: flex; gap: 0.75rem 1.25rem; flex-wrap: wrap; align-items: flex-start; padding: 1rem; background-color: var(--color-background-light); border: 1px solid var(--color-border-default); border-radius: 4px; }
 .status-filter-group { display: flex; flex-direction: column; gap: 0.5rem; flex: 1 1 100%; }
 .filter-group-label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .filters-content .search-box { display: flex; flex-direction: column; gap: 0.5rem; min-width: 160px; }
+/* Size the IconField wrapper, not the inner input, so the clear icon stays
+   anchored to the input's right edge. */
+.filters-content .request-num-box { min-width: 0; }
+.request-num-box :deep(.p-iconfield) { width: 10rem; }
+.request-num-box :deep(input) { width: 100%; }
 .filters-content .search-box label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .status-filter { display: flex; align-items: center; gap: 0.375rem; }
