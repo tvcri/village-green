@@ -644,7 +644,11 @@ async function doRelease() {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  margin-top: 0.75rem;
+  /* Match the title-to-radios gap: the dialog header/content boundary
+     contributes ~1.25rem, so the same margin here (the last .picker-row's
+     0.5rem bottom padding roughly offsets the content top padding's excess)
+     keeps the message visually equidistant. */
+  margin-top: 1.25rem;
   color: var(--color-text-primary);
 }
 
