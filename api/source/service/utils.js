@@ -103,7 +103,8 @@ async function setupInitialSchema(){
   logger.writeInfo('mysql', 'schema', { message: 'setting up new schema.' })
   const importer = new Importer(_this.pool)
   const dir = path.join(__dirname, 'migrations', 'sql', 'current')
-  const files = await fs.promises.readdir(dir)
+  // Apply in filename order (10-, 20-, 30-, ...); readdir order is not guaranteed.
+  const files = (await fs.promises.readdir(dir)).sort()
   try {
     for (const file of files) {
       logger.writeInfo('mysql', 'schema', {status: 'running', name: file })
