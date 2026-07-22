@@ -2620,10 +2620,13 @@ paths:
                           nullable: true
                         city:
                           type: string
+                          nullable: true
                         state:
                           type: string
+                          nullable: true
                         zip:
                           type: string
+                          nullable: true
                   summary:
                     type: object
                     properties:
