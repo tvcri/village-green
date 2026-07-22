@@ -153,7 +153,8 @@ const breadcrumbs = computed(() => {
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Service Requests', siblings: [
         { label: 'Persons', route: { name: 'meta-persons' } },
-        { label: 'Friends', route: { name: 'meta-friends' } }
+        { label: 'Friends', route: { name: 'meta-friends' } },
+        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
       ]})
       break
     case 'meta-service-request-create':
@@ -166,14 +167,24 @@ const breadcrumbs = computed(() => {
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', siblings: [
         { label: 'Service Requests', route: { name: 'meta-service-requests' } },
-        { label: 'Friends', route: { name: 'meta-friends' } }
+        { label: 'Friends', route: { name: 'meta-friends' } },
+        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
       ]})
       break
     case 'meta-friends':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Friends', siblings: [
         { label: 'Persons', route: { name: 'meta-persons' } },
-        { label: 'Service Requests', route: { name: 'meta-service-requests' } }
+        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
+        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
+      ]})
+      break
+    case 'meta-mailing-labels':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Mailing Labels', siblings: [
+        { label: 'Persons', route: { name: 'meta-persons' } },
+        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
+        { label: 'Friends', route: { name: 'meta-friends' } }
       ]})
       break
     case 'friends':
