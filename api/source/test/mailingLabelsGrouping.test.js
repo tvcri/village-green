@@ -100,3 +100,21 @@ test('groupByAddress on empty input returns empty result', () => {
   assert.equal(result.summary.labelCount, 0)
   assert.equal(result.summary.mergedCount, 0)
 })
+
+test('groupByAddress exposes sortLastName from the primary recipient', () => {
+  const result = groupByAddress([at('Anna', 'Chianesi', '1 A St')])
+  assert.equal(result.labels[0].sortLastName, 'Chianesi')
+})
+
+test('groupByAddress sortLastName is the byName-first surname for a household', () => {
+  // Composed name reads "Jane and John Smith", but the sort key is the real
+  // last name of the alphabetically-first recipient — so the label sorts
+  // under S regardless of the "First and First Surname" display order.
+  const result = groupByAddress([
+    at('John', 'Smith', '123 Main St'),
+    at('Jane', 'Smith', '123 Main St'),
+  ])
+  assert.equal(result.labels.length, 1)
+  assert.equal(result.labels[0].name, 'Jane and John Smith')
+  assert.equal(result.labels[0].sortLastName, 'Smith')
+})

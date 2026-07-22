@@ -86,6 +86,10 @@ function groupByAddress (rows) {
       city: sample.city,
       state: sample.state,
       zip: sample.zip,
+      // The primary (byName-first) recipient's real last name, exposed so the
+      // client can offer a last-name sort without parsing it back out of the
+      // composed `name` string ("Jane and John Smith" -> sorts under S).
+      sortLastName: sample.lastName ?? null,
     }
   })
 

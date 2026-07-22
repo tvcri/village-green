@@ -2627,6 +2627,10 @@ paths:
                         zip:
                           type: string
                           nullable: true
+                        sortLastName:
+                          type: string
+                          nullable: true
+                          description: Primary recipient's last name, for client-side sorting
                   summary:
                     type: object
                     properties:
