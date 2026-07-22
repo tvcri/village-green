@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from '@testing-library/vue'
+import { render, screen, waitFor, cleanup } from '@testing-library/vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import ServiceRequestCreateEdit from '../components/ServiceRequestCreateEdit.vue'
@@ -45,7 +45,12 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => {
+  // Unmount between tests so screen queries don't see a prior test's DOM
+  // (e.g. a Ride render's "Starting Location" leaking into an Errand assertion).
+  cleanup()
+  vi.clearAllMocks()
+})
 
 const globalOpts = {
   plugins: [PrimeVue],
@@ -87,6 +92,17 @@ describe('ServiceRequestCreateEdit start section', () => {
       const headers = screen.getAllByText(/^Starting Location$/i)
       expect(headers.length).toBeGreaterThan(0)
     })
+  })
+
+  it('hides Starting Location for an Errand but shows Destination', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Errand: Shopping'
+    await waitFor(() => {
+      expect(screen.getAllByText(/^Destination$/).length).toBeGreaterThan(0)
+    })
+    expect(screen.queryAllByText(/^Starting Location$/).length).toBe(0)
   })
 
   it('auto-populates Start from member home when a Ride is selected and Start is empty', async () => {

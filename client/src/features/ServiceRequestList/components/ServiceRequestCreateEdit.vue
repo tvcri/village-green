@@ -1095,8 +1095,10 @@ const openPersonDialog = (personId) => {
             </div>
           </div>
 
-          <!-- Start Section -->
+          <!-- Location Sections -->
           <template v-if="showLocationFields">
+            <!-- Start Section (Rides only) -->
+            <template v-if="isRideService">
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Starting Location</h3>
               <div style="display: flex; gap: 0.5rem;">
@@ -1167,6 +1169,8 @@ const openPersonDialog = (personId) => {
                 />
               </div>
             </div>
+
+            </template>
 
             <!-- Destination Section -->
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
