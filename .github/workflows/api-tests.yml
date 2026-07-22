@@ -3,18 +3,16 @@ name: API tests
 # Black-box API integration tests (test/api). Runs the real server against a
 # disposable MySQL 8 + the mock OIDC provider — see test/api/README.md.
 #
-# The `api-tests` job is green: the findings it was originally written to
-# characterize have all landed upstream (see test/api/SECURITY-FINDINGS.md), so
-# a failure there is a real regression and that job is safe to make a REQUIRED
-# check. If a new deliberate RED is ever characterized, it goes red by design
-# and this note should come back.
+# Both jobs are green and safe to make REQUIRED checks:
 #
-# The `response-validation` job is NOT green yet, and is not a regression
-# signal: it fails on ~39 pre-existing spec violations inherited from main
-# (mostly a missing `serviceRequestId` on several projections, plus some
-# string/integer id mismatches). They are pre-existing API behavior this suite
-# merely observes, not something it introduced. Keep that job non-required
-# until they're worked off, then flip it too.
+#   - `api-tests`: the findings it was originally written to characterize have
+#     all landed upstream (see test/api/SECURITY-FINDINGS.md). If a new
+#     deliberate RED is ever characterized, it goes red by design and a note
+#     to that effect should come back.
+#
+#   - `response-validation`: the 8 pre-existing spec-drift violations it once
+#     surfaced were fixed in PR #73. A nonzero count here now means a response
+#     that violates the OpenAPI spec — a real regression.
 #
 # The run is instrumented (`npm run test:coverage`) and the c8 report is always
 # uploaded. The API child runs with VG_DEV_RESPONSE_VALIDATION=logOnly (set by
