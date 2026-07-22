@@ -2589,6 +2589,119 @@ paths:
       - oauth:
         - vg:user:write
       x-elevation-required: true
+  /mailing-labels:
+    get:
+      summary: Generate mailing labels for an audience
+      tags:
+      - MailingLabel
+      operationId: getMailingLabels
+      parameters:
+      - name: audience
+        in: query
+        required: true
+        description: Audience id from /mailing-labels/audiences
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Label-ready address groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audience:
+                    type: string
+                  labels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        street:
+                          type: string
+                        unit:
+                          type: string
+                          nullable: true
+                        city:
+                          type: string
+                          nullable: true
+                        state:
+                          type: string
+                          nullable: true
+                        zip:
+                          type: string
+                          nullable: true
+                        sortLastName:
+                          type: string
+                          nullable: true
+                          description: Primary recipient's last name, for client-side sorting
+                  summary:
+                    type: object
+                    properties:
+                      recipientCount:
+                        type: integer
+                      labelCount:
+                        type: integer
+                      mergedCount:
+                        type: integer
+                  warnings:
+                    type: object
+                    properties:
+                      unmailable:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            reason:
+                              type: string
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person:read
+  /mailing-labels/audiences:
+    get:
+      summary: List mailing-label audiences available to the requesting user
+      tags:
+      - MailingLabel
+      operationId: getMailingLabelAudiences
+      responses:
+        '200':
+          description: Available audiences
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    label:
+                      type: string
+                    description:
+                      type: string
+                    params:
+                      type: array
+                      items:
+                        type: object
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person:read
 components:
   schemas:
     ApiClassification:
