@@ -105,6 +105,30 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(screen.queryAllByText(/^Starting Location$/).length).toBe(0)
   })
 
+  it('hides the Destination "Use member\'s home" button for an Errand', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Errand: Shopping'
+    await waitFor(() => {
+      expect(screen.getAllByText(/^Destination$/).length).toBeGreaterThan(0)
+    })
+    // Start section is Rides-only, so any use-home button left would be the
+    // Destination one — assert none render for an Errand.
+    expect(document.querySelectorAll('.use-home-btn').length).toBe(0)
+  })
+
+  it('shows a "Use member\'s home" button for a Ride destination', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Ride: Medical Appnt'
+    await waitFor(() => {
+      // Ride renders both Start and Destination use-home buttons.
+      expect(document.querySelectorAll('.use-home-btn').length).toBe(2)
+    })
+  })
+
   it('auto-populates Start from member home when a Ride is selected and Start is empty', async () => {
     const vm = await mountAndExpose()
     const { getPerson } = await import('../../PersonList/api/personApi.js')

@@ -1176,7 +1176,7 @@ const openPersonDialog = (personId) => {
             <div style="display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
               <div style="display: flex; gap: 0.5rem;">
-                <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
+                <Button v-if="isRideService" type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
                 <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear destination" @click="clearDestination" />
               </div>
             </div>
