@@ -267,10 +267,12 @@ watch(selectedMember, (val) => {
   // Only update if it's a complete selected object with both label and value
   if (val && typeof val === 'object' && val.label && val.value) {
     form.value.memberPersonId = String(val.value)
-    // Fetch the member's home and auto-fill Start only when Start is empty,
-    // so an edit-load's saved Start values are never clobbered.
+    // Fetch the member's home. Only fill Start here when the service is already
+    // a Ride and Start is empty (covers changing the member on an existing Ride);
+    // the primary prefill trigger is Ride selection (see isRideService watcher).
+    // Guarding on emptiness keeps an edit-load's saved Start values intact.
     loadMemberHome(val.value).then(() => {
-      if (startIsEmpty.value) applyMemberHomeToStart()
+      if (isRideService.value && startIsEmpty.value) applyMemberHomeToStart()
     })
   } else {
     form.value.memberPersonId = null
@@ -574,12 +576,17 @@ const resetForNewRequest = () => {
   }
 }
 
+// Starting Location is a Rides-only concept. Prefill it from the member's home
+// when a Ride is chosen (only if Start is empty, so typed/saved values survive),
+// and clear it when leaving Ride so a non-Ride never carries hidden start data.
 watch(isRideService, (newIsRide) => {
   if (!formLoaded.value) return
   if (newIsRide) {
     form.value.transportationType = 'Round Trip'
+    if (startIsEmpty.value) applyMemberHomeToStart()
   } else {
     form.value.transportationType = 'None'
+    clearStart()
   }
 })
 

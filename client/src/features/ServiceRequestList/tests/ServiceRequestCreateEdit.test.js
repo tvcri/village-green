@@ -89,12 +89,18 @@ describe('ServiceRequestCreateEdit start section', () => {
     })
   })
 
-  it('auto-populates Start from member home when a member is selected and Start is empty', async () => {
+  it('auto-populates Start from member home when a Ride is selected and Start is empty', async () => {
     const vm = await mountAndExpose()
     const { getPerson } = await import('../../PersonList/api/personApi.js')
 
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
     vm.selectedMember = { label: 'Mabel Member', value: '7' }
     await waitFor(() => expect(getPerson).toHaveBeenCalledWith('7'))
+    // No Ride yet -> Start stays empty.
+    expect(vm.form.startAddress).toBe('')
+
+    vm.form.serviceName = 'Ride: Medical Appnt'
     await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
     expect(vm.form.startCity).toBe('Springfield')
     expect(vm.form.startZip).toBe('22150')
@@ -127,13 +133,35 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(vm.form.startPhone).toBe('')
   })
 
+  it('does not populate Start for a non-Ride (Errand) service', async () => {
+    const vm = await mountAndExpose()
+    vm.selectedMember = { label: 'Mabel Member', value: '7' }
+    await waitFor(() => expect(vm.selectedMemberHome).not.toBeNull())
+    vm.form.serviceName = 'Errand: Shopping'
+    await new Promise((r) => setTimeout(r, 0))
+    expect(vm.form.startAddress).toBe('')
+    expect(vm.form.start).toBe('')
+  })
+
+  it('clears Start when switching from a Ride to a non-Ride', async () => {
+    const vm = await mountAndExpose()
+    vm.selectedMember = { label: 'Mabel Member', value: '7' }
+    await waitFor(() => expect(vm.selectedMemberHome).not.toBeNull())
+    vm.form.serviceName = 'Ride: Medical Appnt'
+    await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+    vm.form.serviceName = 'Errand: Shopping'
+    await waitFor(() => expect(vm.form.startAddress).toBe(''))
+    expect(vm.form.start).toBe('')
+  })
+
   it('fill-from-home writes the "Member\'s Home" name label into each leg', async () => {
     const vm = await mountAndExpose()
     // Load the member's home first.
     vm.selectedMember = { label: 'Mabel Member', value: '7' }
     await waitFor(() => expect(vm.selectedMemberHome).not.toBeNull())
 
-    // Auto-populate on select fills the empty Start leg, name included.
+    // Start fills only once a Ride is chosen; the name label is included.
+    vm.form.serviceName = 'Ride: Medical Appnt'
     await waitFor(() => expect(vm.form.start).toBe("Member's Home"))
 
     // Explicit destination fill writes the name so the required field is set.
