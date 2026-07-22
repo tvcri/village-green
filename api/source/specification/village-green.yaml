@@ -1167,6 +1167,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/UserGroupProjected'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       security:
       - oauth:
         - vg:user:read
@@ -2780,6 +2786,9 @@ components:
         errands:
           type: integer
           minimum: 0
+        friends:
+          type: integer
+          minimum: 0
         rides:
           type: integer
           minimum: 0
@@ -2791,6 +2800,7 @@ components:
           minimum: 0
       required:
       - errands
+      - friends
       - rides
       - homeHelp
       - techSupport
@@ -2874,7 +2884,13 @@ components:
       type: object
       properties:
         ui:
-          type: string
+          type: object
+          additionalProperties: false
+          properties:
+            current:
+              type: string
+            next:
+              type: string
     CeDump:
       type: object
       additionalProperties: false
@@ -3275,6 +3291,7 @@ components:
         joinDate:
           type: string
           format: date
+          nullable: true
     MemberId:
       $ref: '#/components/schemas/StringIntId'
     MemberPatch:
@@ -3521,7 +3538,16 @@ components:
           maxLength: 200
           nullable: true
         village:
-          $ref: '#/components/schemas/Village'
+          # Always an object (built inline via JSON_OBJECT), but a villageless
+          # (global) person yields null members — a LEFT JOIN with no village.
+          type: object
+          nullable: true
+          properties:
+            villageId:
+              $ref: '#/components/schemas/VillageIdNullable'
+            name:
+              type: string
+              nullable: true
         activeAs:
           $ref: '#/components/schemas/ActiveAs'
         member:
@@ -4640,6 +4666,41 @@ components:
         '
       pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$
       type: string
+    VillageGrants:
+      description: >-
+        Role grants scoped to this village, from the ?projection=grants option
+        on getVillage. Each entry pairs a roleId with either a user or a
+        user-group grantee (never both). Shape mirrors the JSON the grants
+        projection SQL emits in VillageService.queryVillages.
+      type: array
+      items:
+        additionalProperties: false
+        type: object
+        properties:
+          roleId:
+            type: integer
+          user:
+            additionalProperties: false
+            type: object
+            properties:
+              userId:
+                $ref: '#/components/schemas/StringIntId'
+              username:
+                type: string
+              displayName:
+                type: string
+                nullable: true
+          userGroup:
+            additionalProperties: false
+            type: object
+            properties:
+              userGroupId:
+                $ref: '#/components/schemas/StringIntId'
+              name:
+                type: string
+              description:
+                type: string
+                nullable: true
     Village:
       additionalProperties: false
       type: object
@@ -4657,6 +4718,8 @@ components:
           $ref: '#/components/schemas/ServiceRequestStatusCounts'
         statistics:
           $ref: '#/components/schemas/VillageStatistics'
+        grants:
+          $ref: '#/components/schemas/VillageGrants'
       required:
       - villageId
       - name
