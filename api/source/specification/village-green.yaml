@@ -3977,6 +3977,9 @@ components:
         description:
           type: string
           nullable: true
+        start:
+          type: string
+          nullable: true
         destination:
           type: string
           nullable: true
@@ -4004,6 +4007,25 @@ components:
           pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
+          type: string
+          maxLength: 50
+          nullable: true
+        startAddress:
+          type: string
+          nullable: true
+        startCity:
+          type: string
+          maxLength: 100
+          nullable: true
+        startState:
+          type: string
+          maxLength: 50
+          nullable: true
+        startZip:
+          type: string
+          maxLength: 20
+          nullable: true
+        startPhone:
           type: string
           maxLength: 50
           nullable: true
@@ -4044,7 +4066,7 @@ components:
           maxLength: 10
           minLength: 1
           pattern: ^[0-9]{1,10}$
-          nullable: true
+          nullable: false
         volunteerPersonId:
           type: string
           maxLength: 10
@@ -4095,6 +4117,9 @@ components:
         description:
           type: string
           nullable: true
+        start:
+          type: string
+          nullable: true
         destination:
           type: string
           nullable: true
@@ -4125,11 +4150,31 @@ components:
           type: string
           maxLength: 50
           nullable: true
+        startAddress:
+          type: string
+          nullable: true
+        startCity:
+          type: string
+          maxLength: 100
+          nullable: true
+        startState:
+          type: string
+          maxLength: 50
+          nullable: true
+        startZip:
+          type: string
+          maxLength: 20
+          nullable: true
+        startPhone:
+          type: string
+          maxLength: 50
+          nullable: true
     ServiceRequestPost:
       additionalProperties: false
       type: object
       required:
       - villageId
+      - memberPersonId
       properties:
         requestNumber:
           type: integer
@@ -4140,7 +4185,7 @@ components:
           maxLength: 10
           minLength: 1
           pattern: ^[0-9]{1,10}$
-          nullable: true
+          nullable: false
         volunteerPersonId:
           type: string
           maxLength: 10
@@ -4187,6 +4232,9 @@ components:
         description:
           type: string
           nullable: true
+        start:
+          type: string
+          nullable: true
         destination:
           type: string
           nullable: true
@@ -4214,6 +4262,25 @@ components:
           pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
+          type: string
+          maxLength: 50
+          nullable: true
+        startAddress:
+          type: string
+          nullable: true
+        startCity:
+          type: string
+          maxLength: 100
+          nullable: true
+        startState:
+          type: string
+          maxLength: 50
+          nullable: true
+        startZip:
+          type: string
+          maxLength: 20
+          nullable: true
+        startPhone:
           type: string
           maxLength: 50
           nullable: true

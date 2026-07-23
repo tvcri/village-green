@@ -426,6 +426,12 @@ CREATE TABLE `service_request` (
   `createdUserId` int DEFAULT NULL,
   `modifiedUserId` int DEFAULT NULL,
   `modifiedAt` datetime DEFAULT NULL,
+  `start` text,
+  `startAddress` text,
+  `startCity` varchar(100) DEFAULT NULL,
+  `startState` varchar(50) DEFAULT NULL,
+  `startZip` varchar(20) DEFAULT NULL,
+  `startPhone` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `village_id` (`villageId`),
   KEY `member_person_id` (`memberPersonId`),
@@ -647,4 +653,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-21 16:48:42
+-- Dump completed on 2026-07-23  1:04:47
