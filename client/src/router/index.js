@@ -172,6 +172,12 @@ const routes = [
     component: () => import('../features/FriendList/components/FriendList.vue'),
   },
   {
+    path: '/meta/mailing-labels',
+    name: 'meta-mailing-labels',
+    component: () => import('../features/MailingLabels/components/MailingLabels.vue'),
+    meta: { requiresPermission: 'person:read' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: { template: '<div style="padding: 2rem;"><h1>Page not found</h1></div>' },

@@ -103,7 +103,8 @@ async function setupInitialSchema(){
   logger.writeInfo('mysql', 'schema', { message: 'setting up new schema.' })
   const importer = new Importer(_this.pool)
   const dir = path.join(__dirname, 'migrations', 'sql', 'current')
-  const files = await fs.promises.readdir(dir)
+  // Apply in filename order (10-, 20-, 30-, ...); readdir order is not guaranteed.
+  const files = (await fs.promises.readdir(dir)).sort()
   try {
     for (const file of files) {
       logger.writeInfo('mysql', 'schema', {status: 'running', name: file })
@@ -729,14 +730,27 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
   return `cast(concat('[', group_concat(${distinct ? 'distinct ' : ''}${value} ${orderBy ? `order by ${orderBy}` : ''}), ']') as json)`
 }
 
-// Runtime VSS identity guard (single source of truth). Resolves the ONE person
-// behind a username, else NULL: 0 or 2+ email matches => NULL (ambiguous/unknown
-// identity is not a person, and is therefore not VSS-eligible). Case-insensitivity
-// comes from the utf8mb4_0900_ai_ci collation — no LOWER(), which would defeat
-// person INDEX_email. `usernameCol` is a trusted column expression
-// (e.g. 'ud.username'), never user input.
-module.exports.sqlResolvedPersonId = function (usernameCol) {
-  return `(select if(count(*) = 1, min(p.id), null) from person p where p.email = ${usernameCol})`
+// Runtime VSS identity (set form). Resolves the ACTIVE VOLUNTEERS behind a
+// username as a JSON array of person ids ('[]' when none match). person is
+// only the email key — one email may map to several persons (shared household
+// email), and only those with an active volunteer row are the account's VSS
+// identity. Filtering here (not downstream) is the invariant: deactivating a
+// volunteer removes them from every surface — list, history, disclosure,
+// release — on the next request. DISTINCT guards the out-of-scope
+// person-with-multiple-volunteer-rows case. Case-insensitivity comes from the
+// utf8mb4_0900_ai_ci collation — no LOWER(), which would defeat person
+// INDEX_email. `usernameCol` is a trusted column expression (e.g.
+// 'ud.username'), never user input.
+module.exports.sqlResolvedPersonIds = function (usernameCol) {
+  return `(select cast(concat('[', coalesce(group_concat(distinct av.personId), ''), ']') as json) from person p join active_volunteer av on av.personId = p.id where p.email = ${usernameCol})`
+}
+
+// Companion predicate: true iff ANY person behind the username is an active
+// volunteer. Same email-match rule as sqlResolvedPersonIds (collation
+// case-insensitivity, no LOWER()); used where a boolean beats materializing
+// the id array (queryUsers isVolunteer projection).
+module.exports.sqlIsActiveVolunteerForUsername = function (usernameCol) {
+  return `exists (select 1 from person p join active_volunteer av on av.personId = p.id where p.email = ${usernameCol})`
 }
 
 module.exports.sqlGrantees = function ({villageId, villageIds, userId, username, nameMatch, includeColumnVillageId = true, returnCte = false}) {
@@ -750,7 +764,7 @@ module.exports.sqlGrantees = function ({villageId, villageIds, userId, username,
   }
   if (villageIds) {
     predicates.statements.push('cg.villageId IN (?)')
-    predicates.binds.push([villageIds])
+    predicates.binds.push(villageIds)
   }
   if (userId) {
     predicates.statements.push('ud.userId = ?')

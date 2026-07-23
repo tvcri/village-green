@@ -1167,6 +1167,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/UserGroupProjected'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       security:
       - oauth:
         - vg:user:read
@@ -1940,6 +1946,12 @@ paths:
       operationId: signUpVolunteerRequest
       parameters:
         - $ref: '#/components/parameters/ServiceRequestIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerSignUpPost'
       responses:
         '200':
           description: The confirmed service request
@@ -1948,7 +1960,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VolunteerServiceRequest'
         default:
-          description: error (404 not visible, 409 not open)
+          description: error (404 not visible, 409 not open / committed to another account volunteer, 422 selection required)
           content:
             application/json:
               schema:
@@ -2577,6 +2589,119 @@ paths:
       - oauth:
         - vg:user:write
       x-elevation-required: true
+  /mailing-labels:
+    get:
+      summary: Generate mailing labels for an audience
+      tags:
+      - MailingLabel
+      operationId: getMailingLabels
+      parameters:
+      - name: audience
+        in: query
+        required: true
+        description: Audience id from /mailing-labels/audiences
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Label-ready address groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audience:
+                    type: string
+                  labels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        street:
+                          type: string
+                        unit:
+                          type: string
+                          nullable: true
+                        city:
+                          type: string
+                          nullable: true
+                        state:
+                          type: string
+                          nullable: true
+                        zip:
+                          type: string
+                          nullable: true
+                        sortLastName:
+                          type: string
+                          nullable: true
+                          description: Primary recipient's last name, for client-side sorting
+                  summary:
+                    type: object
+                    properties:
+                      recipientCount:
+                        type: integer
+                      labelCount:
+                        type: integer
+                      mergedCount:
+                        type: integer
+                  warnings:
+                    type: object
+                    properties:
+                      unmailable:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            reason:
+                              type: string
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person:read
+  /mailing-labels/audiences:
+    get:
+      summary: List mailing-label audiences available to the requesting user
+      tags:
+      - MailingLabel
+      operationId: getMailingLabelAudiences
+      responses:
+        '200':
+          description: Available audiences
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    label:
+                      type: string
+                    description:
+                      type: string
+                    params:
+                      type: array
+                      items:
+                        type: object
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person:read
 components:
   schemas:
     ApiClassification:
@@ -2661,6 +2786,9 @@ components:
         errands:
           type: integer
           minimum: 0
+        friends:
+          type: integer
+          minimum: 0
         rides:
           type: integer
           minimum: 0
@@ -2672,6 +2800,7 @@ components:
           minimum: 0
       required:
       - errands
+      - friends
       - rides
       - homeHelp
       - techSupport
@@ -2755,7 +2884,13 @@ components:
       type: object
       properties:
         ui:
-          type: string
+          type: object
+          additionalProperties: false
+          properties:
+            current:
+              type: string
+            next:
+              type: string
     CeDump:
       type: object
       additionalProperties: false
@@ -2769,7 +2904,9 @@ components:
       type: object
       properties:
         detail:
-          type: string
+          oneOf:
+          - type: string
+          - type: object
         error:
           type: string
         stack:
@@ -3154,6 +3291,7 @@ components:
         joinDate:
           type: string
           format: date
+          nullable: true
     MemberId:
       $ref: '#/components/schemas/StringIntId'
     MemberPatch:
@@ -3400,7 +3538,16 @@ components:
           maxLength: 200
           nullable: true
         village:
-          $ref: '#/components/schemas/Village'
+          # Always an object (built inline via JSON_OBJECT), but a villageless
+          # (global) person yields null members — a LEFT JOIN with no village.
+          type: object
+          nullable: true
+          properties:
+            villageId:
+              $ref: '#/components/schemas/VillageIdNullable'
+            name:
+              type: string
+              nullable: true
         activeAs:
           $ref: '#/components/schemas/ActiveAs'
         member:
@@ -4454,29 +4601,49 @@ components:
           type: boolean
           description: >-
             Present only with the `volunteer` projection. True iff the runtime
-            would grant this user VSS access — i.e. exactly one person's email
+            would grant this user VSS access — i.e. at least one person's email
             matches the username and that person is an active volunteer.
-        volunteer:
-          nullable: true
-          additionalProperties: false
-          type: object
-          properties:
-            personId:
-              $ref: '#/components/schemas/StringIntId'
-            villages:
-              type: array
-              items:
-                additionalProperties: false
-                type: object
-                properties:
-                  villageId:
-                    $ref: '#/components/schemas/StringIntId'
-                  name:
-                    type: string
-            capabilities:
-              type: array
-              items:
+        volunteers:
+          type: array
+          description: >-
+            The caller's active volunteers, one entry per resolved person
+            (shared household email may map one account to several). Empty
+            array when none. Populated on GET /user only.
+          items:
+            additionalProperties: false
+            type: object
+            properties:
+              personId:
+                $ref: '#/components/schemas/StringIntId'
+              name:
+                description: Tabular display form ("Last, First" fullName)
                 type: string
+                nullable: true
+              firstName:
+                type: string
+              lastName:
+                type: string
+              villages:
+                type: array
+                items:
+                  additionalProperties: false
+                  type: object
+                  properties:
+                    villageId:
+                      $ref: '#/components/schemas/StringIntId'
+                    name:
+                      type: string
+              capabilities:
+                type: array
+                items:
+                  type: string
+            required:
+            - personId
+            - name
+            - firstName
+            - lastName
+            - villages
+            - capabilities
       required:
       - userId
       - username
@@ -4566,6 +4733,41 @@ components:
         '
       pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$
       type: string
+    VillageGrants:
+      description: >-
+        Role grants scoped to this village, from the ?projection=grants option
+        on getVillage. Each entry pairs a roleId with either a user or a
+        user-group grantee (never both). Shape mirrors the JSON the grants
+        projection SQL emits in VillageService.queryVillages.
+      type: array
+      items:
+        additionalProperties: false
+        type: object
+        properties:
+          roleId:
+            type: integer
+          user:
+            additionalProperties: false
+            type: object
+            properties:
+              userId:
+                $ref: '#/components/schemas/StringIntId'
+              username:
+                type: string
+              displayName:
+                type: string
+                nullable: true
+          userGroup:
+            additionalProperties: false
+            type: object
+            properties:
+              userGroupId:
+                $ref: '#/components/schemas/StringIntId'
+              name:
+                type: string
+              description:
+                type: string
+                nullable: true
     Village:
       additionalProperties: false
       type: object
@@ -4583,6 +4785,8 @@ components:
           $ref: '#/components/schemas/ServiceRequestStatusCounts'
         statistics:
           $ref: '#/components/schemas/VillageStatistics'
+        grants:
+          $ref: '#/components/schemas/VillageGrants'
       required:
       - villageId
       - name
@@ -4926,6 +5130,13 @@ components:
       type: object
       properties:
         fullName:
+          description: Tabular display form ("Last, First")
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
           type: string
           nullable: true
         address:
@@ -4988,6 +5199,12 @@ components:
       required:
       - villageId
       - name
+    VolunteerSignUpPost:
+      additionalProperties: false
+      type: object
+      properties:
+        personId:
+          $ref: '#/components/schemas/StringIntId'
     VolunteerServiceRequest:
       additionalProperties: false
       type: object
@@ -4998,6 +5215,12 @@ components:
           $ref: '#/components/schemas/StringIntId'
         villageName:
           type: string
+          nullable: true
+        requestNumber:
+          description: >-
+            The CE-legacy human-readable number; null for VG-native requests
+            (the client shows `requestNumber ?? serviceRequestId`).
+          type: integer
           nullable: true
         status:
           type: string
@@ -5062,6 +5285,9 @@ components:
           $ref: '#/components/schemas/VolunteerEmergencyContact'
         volunteerAddress:
           $ref: '#/components/schemas/VolunteerOwnAddress'
+        volunteerPersonId:
+          type: string
+          nullable: true
       required:
       - serviceRequestId
       - villageId

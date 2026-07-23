@@ -32,7 +32,36 @@ async function queryPersons (inPredicates = {}) {
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
       WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
-    END AS activeAs`
+    END AS activeAs`,
+    // communities + disabilities are `required` on the Person schema, so the
+    // list path must emit them just like getPerson does (this query had
+    // copy-diverged and dropped both, failing response validation). NULL-safe
+    // via COALESCE — a person with none yields JSON_ARRAY(), not null.
+    `(
+      SELECT COALESCE(
+        ${dbUtils.jsonArrayAgg({
+          value: `JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name)`,
+          orderBy: 'c.name'
+        })},
+        JSON_ARRAY()
+      )
+      FROM person_community pc
+      JOIN community c ON c.id = pc.communityId
+      WHERE pc.personId = p.id
+    ) AS communities`,
+    `(
+      SELECT COALESCE(
+        ${dbUtils.jsonArrayAgg({
+          value: `JSON_OBJECT('disabilityId', CAST(d.id AS CHAR), 'name', d.name, 'note', pd.note)`,
+          orderBy: 'd.name'
+        })},
+        JSON_ARRAY()
+      )
+      FROM person_disability pd
+      JOIN disability d ON d.id = pd.disabilityId
+      WHERE pd.personId = p.id
+        AND d.name IN ('Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane')
+    ) AS disabilities`
   ]
   const joins = new Set([
     'person p',

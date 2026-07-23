@@ -1,0 +1,8 @@
+node_modules/
+.tokens.json
+.definition.json
+.api.log
+.test-report.tap
+.coverage/
+.coverage-tmp/
+test-fixtures.appdata.jsonl

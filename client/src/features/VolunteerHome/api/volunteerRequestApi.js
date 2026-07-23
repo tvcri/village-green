@@ -9,8 +9,8 @@ export const getVolunteerRequests = (scope) =>
 export const getVolunteerRequest = (serviceRequestId) =>
   apiCall('getVolunteerRequest', { serviceRequestId })
 
-export const signUpVolunteerRequest = (serviceRequestId) =>
-  apiCall('signUpVolunteerRequest', { serviceRequestId })
+export const signUpVolunteerRequest = (serviceRequestId, personId) =>
+  apiCall('signUpVolunteerRequest', { serviceRequestId }, personId ? { personId } : undefined)
 
 export const releaseVolunteerRequest = (serviceRequestId) =>
   apiCall('releaseVolunteerRequest', { serviceRequestId })
