@@ -105,7 +105,7 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(screen.queryAllByText(/^Starting Location$/).length).toBe(0)
   })
 
-  it('hides the Destination "Use member\'s home" button for an Errand', async () => {
+  it('hides the Destination fill/clear buttons for an Errand', async () => {
     const vm = await mountAndExpose()
     vm.form.villageId = '1'
     vm.form.memberPersonId = '7'
@@ -113,9 +113,9 @@ describe('ServiceRequestCreateEdit start section', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/^Destination$/).length).toBeGreaterThan(0)
     })
-    // Start section is Rides-only, so any use-home button left would be the
-    // Destination one — assert none render for an Errand.
+    // Errands match production: plain address fields, no fill/clear helpers.
     expect(document.querySelectorAll('.use-home-btn').length).toBe(0)
+    expect(screen.queryByText(/^Clear fields$/)).toBeNull()
   })
 
   it('shows a "Use member\'s home" button for a Ride destination', async () => {
