@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, isPrivacyAckError } from '../api/apiClient.js'
 import { usePrivacyAck } from '../composables/usePrivacyAck.js'
@@ -10,9 +11,11 @@ describe('apiClient privacy-ack 403 interceptor', () => {
   beforeEach(() => {
     fetchMock.mockClear()
     vi.clearAllMocks()
+    // apiFetch calls reloadIfExpired() first; a token with no exp reads as
+    // expired and would reload the page instead of fetching. Give it a live one.
     globalThis.VG = {
       Env: { apiBase: 'http://localhost/api' },
-      oidcWorker: { token: null },
+      oidcWorker: { token: null, tokenParsed: { exp: Math.floor(Date.now() / 1000) + 3600 } },
     }
   })
 

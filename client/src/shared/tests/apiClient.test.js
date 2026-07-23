@@ -1,15 +1,26 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, apiCall, ApiError, apiFetch, configureApiSpec, configureAuth } from '../api/apiClient.js'
+import { api, apiCall, ApiError, apiFetch, configureApiSpec } from '../api/apiClient.js'
 
 // Mock global fetch
 const fetchMock = vi.fn()
 globalThis.fetch = fetchMock
 
+// The client reads its base URL and bearer token off the VG global. tokenParsed
+// must carry a future exp: apiFetch calls reloadIfExpired() before fetching, and
+// a missing exp reads as expired, which reloads the page instead of requesting.
+function setVG({ token = null } = {}) {
+  globalThis.VG = {
+    Env: { apiBase: 'http://localhost/api' },
+    oidcWorker: { token, tokenParsed: { exp: Math.floor(Date.now() / 1000) + 3600 } },
+  }
+}
+
 describe('apiClient', () => {
   beforeEach(() => {
     fetchMock.mockClear()
     vi.clearAllMocks()
-    configureAuth({ getToken: () => null }) // Reset auth
+    setVG() // no token unless a test opts in
   })
 
   it('should make a GET request with correct headers', async () => {
@@ -32,7 +43,7 @@ describe('apiClient', () => {
   })
 
   it('should include authorization token when configured', async () => {
-    configureAuth({ getToken: () => 'fake-token' })
+    setVG({ token: 'fake-token' })
     fetchMock.mockResolvedValueOnce({
       ok: true,
       text: async () => JSON.stringify({}),
