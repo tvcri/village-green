@@ -75,13 +75,13 @@ const rowClass = computed(() => {
         </div>
       </template>
 
-      <Column field="serviceDate" header="Date" sortable style="width: 12%">
+      <Column field="serviceDate" header="Date" sortable style="width: 17%">
         <template #body="slotProps">
-          {{ formatServiceDate(slotProps.data.serviceDate) || '—' }}
+          {{ formatServiceDate(slotProps.data.serviceDate, { weekday: true }) || '—' }}
         </template>
       </Column>
-      <Column v-if="showVillageColumn" field="villageName" header="Village" sortable style="width: 15%"></Column>
-      <Column field="serviceName" header="Service" sortable style="width: 20%"></Column>
+      <Column v-if="showVillageColumn" field="villageName" header="Village" sortable style="width: 12%"></Column>
+      <Column field="serviceName" header="Service" sortable style="width: 18%"></Column>
       <Column field="status" header="Status" sortable headerClass="text-center" style="width: 12%;">
         <template #body="slotProps">
           <Tag :value="slotProps.data.status" :severity="getStatusSeverity(slotProps.data.status)" />
@@ -90,7 +90,7 @@ const rowClass = computed(() => {
       <Column field="memberFullName" header="Member" sortable style="width: 15%"></Column>
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
       <Column field="city" header="Destination" sortable style="width: 13%"></Column>
-      <Column field="displayNumber" header="#" sortable style="width: 10%;">
+      <Column field="displayNumber" header="#" sortable style="width: 6%;">
           
         <template #body="slotProps">{{ slotProps.data.displayNumber ?? '—' }}</template>
       </Column>
@@ -118,7 +118,7 @@ const rowClass = computed(() => {
         <div class="card-row"><span class="label">#:</span><span>{{ request.displayNumber ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Member:</span><span>{{ request.memberFullName ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Volunteer:</span><span>{{ request.volunteerFullName ?? '—' }}</span></div>
-        <div class="card-row"><span class="label">Start:</span><span>{{ formatServiceDate(request.serviceDate) || '—' }}</span></div>
+        <div class="card-row"><span class="label">Start:</span><span>{{ formatServiceDate(request.serviceDate, { weekday: true }) || '—' }}</span></div>
         <div class="card-row"><span class="label">City:</span><span>{{ request.city ?? '—' }}</span></div>
       </div>
     </div>

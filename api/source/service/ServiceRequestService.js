@@ -68,11 +68,17 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
+    'sr.`start` AS `start`',
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
     'sr.zip AS zip',
     'sr.phone AS phone',
+    'sr.startAddress AS startAddress',
+    'sr.startCity AS startCity',
+    'sr.startState AS startState',
+    'sr.startZip AS startZip',
+    'sr.startPhone AS startPhone',
     'CAST(sr.createdUserId AS CHAR) AS createdUserId',
     'ud.username AS createdByUsername',
     `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`,
@@ -175,14 +181,25 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
     'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
+    'sr.`start` AS `start`',
     'sr.destination AS destination',
     'sr.address AS address',
     'sr.city AS city',
     'sr.zip AS zip',
     'sr.phone AS phone',
+    'sr.startAddress AS startAddress',
+    'sr.startCity AS startCity',
+    'sr.startState AS startState',
+    'sr.startZip AS startZip',
+    'sr.startPhone AS startPhone',
     'CAST(sr.createdUserId AS CHAR) AS createdUserId',
     'ud.username AS createdByUsername',
     `COALESCE(json_unquote(json_extract(ud.lastClaims, ${NAME_CLAIM_PATH})), ud.username) AS createdByDisplayName`,
+    // TECH DEBT: proxy for "accepted via VSS" — modifiedUserId is written
+    // only by the VSS signup/release paths today. When VSS records signup
+    // explicitly (board item "Record VSS signup explicitly instead of
+    // modifiedUserId proxy"), change only this derivation.
+    "CAST(IF(sr.modifiedUserId IS NOT NULL, 'true', 'false') AS JSON) AS vssSignup",
     `COALESCE(
       (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.eventType)')}
        FROM notification_event ne
@@ -264,11 +281,17 @@ module.exports.createServiceRequest = async function (payload, userId) {
         state: payload.state || null,
         instructions: payload.instructions || null,
         description: payload.description || null,
+        start: payload.start || null,
         destination: payload.destination || null,
         address: payload.address || null,
         city: payload.city || null,
         zip: payload.zip || null,
         phone: payload.phone || null,
+        startAddress: payload.startAddress || null,
+        startCity: payload.startCity || null,
+        startState: payload.startState || null,
+        startZip: payload.startZip || null,
+        startPhone: payload.startPhone || null,
         createdUserId: userId
       }
 
@@ -316,8 +339,14 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       if (payload.zip !== undefined) updateFields.zip = payload.zip || null
       if (payload.address !== undefined) updateFields.address = payload.address || null
       if (payload.phone !== undefined) updateFields.phone = payload.phone || null
+      if (payload.startAddress !== undefined) updateFields.startAddress = payload.startAddress || null
+      if (payload.startCity !== undefined) updateFields.startCity = payload.startCity || null
+      if (payload.startState !== undefined) updateFields.startState = payload.startState || null
+      if (payload.startZip !== undefined) updateFields.startZip = payload.startZip || null
+      if (payload.startPhone !== undefined) updateFields.startPhone = payload.startPhone || null
       if (payload.instructions !== undefined) updateFields.instructions = payload.instructions || null
       if (payload.description !== undefined) updateFields.description = payload.description || null
+      if (payload.start !== undefined) updateFields.start = payload.start || null
       if (payload.destination !== undefined) updateFields.destination = payload.destination || null
 
       const newVolunteerPersonId = payload.volunteerPersonId !== undefined

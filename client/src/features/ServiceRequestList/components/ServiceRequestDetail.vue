@@ -30,12 +30,25 @@ function toggleMap() {
 
 const volunteerAddress = computed(() => request.value?.volunteerAddress ?? null)
 
+// The trip's start leg: the SR's explicit start* if present, else — for
+// historical rows with NULL start* — a client-side fallback to the member's
+// home (the legacy "pickup is always home" assumption, kept only in the
+// presentation layer so old rides render unchanged).
+const startAddress = computed(() => {
+  const r = request.value
+  if (!r) return ''
+  const parts = [r.startAddress, r.startCity, r.startState, r.startZip].filter(Boolean)
+  if (parts.length) return parts.join(', ')
+  const mem = r.memberAddress
+  if (!mem) return ''
+  return [mem.address, mem.city, mem.state, mem.zip].filter(Boolean).join(', ')
+})
+
 const mapOrigin = computed(() => {
   const vol = volunteerAddress.value
   if (vol) return [vol.address, vol.city, vol.state, vol.zip].filter(Boolean).join(', ')
-  const mem = request.value?.memberAddress
-  if (!mem) return ''
-  return [mem.address, mem.city, mem.state, mem.zip].filter(Boolean).join(', ')
+  // No volunteer assigned: the trip origin is the start leg.
+  return startAddress.value
 })
 
 const mapDestination = computed(() => {
@@ -45,10 +58,10 @@ const mapDestination = computed(() => {
 })
 
 const mapWaypoint = computed(() => {
+  // Pickup = the start leg, meaningful as a waypoint only when a volunteer
+  // origin precedes it. Without a volunteer, start is the origin (above).
   if (!volunteerAddress.value) return ''
-  const mem = request.value?.memberAddress
-  if (!mem) return ''
-  return [mem.address, mem.city, mem.state, mem.zip].filter(Boolean).join(', ')
+  return startAddress.value
 })
 
 function formatDate(dateStr) {
@@ -211,6 +224,33 @@ const timeDisplay = computed(() => {
             <span class="value">{{ request.transportationType }}</span>
           </div>
 
+          <template v-if="request.start || request.startAddress || request.startCity">
+            <div v-if="request.start" class="detail-field">
+              <span class="label">Starting Location:</span>
+              <span class="value">{{ request.start }}</span>
+            </div>
+
+            <div v-if="request.startAddress" class="detail-field">
+              <span class="label">Start Address:</span>
+              <span class="value">{{ request.startAddress }}</span>
+            </div>
+
+            <div v-if="request.startCity || request.startState" class="detail-field">
+              <span class="label">Start City/State:</span>
+              <span class="value">{{ [request.startCity, request.startState].filter(Boolean).join(', ') }}</span>
+            </div>
+
+            <div v-if="request.startPhone" class="detail-field">
+              <span class="label">Start Phone:</span>
+              <div class="phone-numbers">
+                <a :href="`tel:${request.startPhone}`" class="phone-item">
+                  <i class="pi pi-phone"></i>
+                  <span class="phone-number">{{ request.startPhone }}</span>
+                </a>
+              </div>
+            </div>
+          </template>
+
           <div v-if="request.destination" class="detail-field">
             <span class="label">Destination:</span>
             <span class="value">{{ request.destination }}</span>
@@ -252,8 +292,8 @@ const timeDisplay = computed(() => {
           </button>
           <template v-if="showMap">
             <p class="map-route-label">
-              <template v-if="volunteerAddress">Volunteer <span class="arrow">➜</span> Member <span class="arrow">➜</span> Destination</template>
-              <template v-else>Member <span class="arrow">➜</span> Destination</template>
+              <template v-if="volunteerAddress">Volunteer <span class="arrow">➜</span> Start <span class="arrow">➜</span> Destination</template>
+              <template v-else>Start <span class="arrow">➜</span> Destination</template>
             </p>
             <ServiceRequestMap
               :origin="mapOrigin"

@@ -72,4 +72,7 @@ describe('formatServiceDate', () => {
   it('renders empty for null', () => {
     expect(formatServiceDate(null)).toBe('')
   })
+  it('prepends the abbreviated weekday when asked', () => {
+    expect(formatServiceDate('2026-07-15', { weekday: true })).toBe('Wed, Jul 15, 2026')
+  })
 })

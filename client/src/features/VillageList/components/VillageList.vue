@@ -50,7 +50,7 @@ const showMetaVillage = computed(() => hasFederationAccess.value)
 
 // The VSS card uses the same volunteer-identity gate as the header menu item —
 // any volunteer, regardless of role grants, can reach Volunteer Self Signup.
-const isVolunteer = computed(() => !!user.value?.volunteer)
+const isVolunteer = computed(() => !!user.value?.volunteers?.length)
 
 const navigateToVillage = (villageId) => {
   router.push({ name: 'village-detail', params: { villageId } })

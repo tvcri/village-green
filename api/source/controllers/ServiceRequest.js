@@ -116,7 +116,10 @@ module.exports.deleteServiceRequest = async function deleteServiceRequest (req, 
     if (!deleted) {
       throw new SmError.NotFoundError()
     }
-    res.json({})
+    // Spec (deleteServiceRequest 200) returns the deleted ServiceRequest. We
+    // already fetched it as `existing` above; return that rather than {} (the
+    // empty body violated the response schema — required serviceRequestId).
+    res.json(existing)
   }
   catch (err) {
     next(err)

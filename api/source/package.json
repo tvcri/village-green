@@ -6,7 +6,25 @@
   "scripts": {
     "prestart": "npm install",
     "start": "node index.js",
-    "test": "node --test 'test/*.test.js'"
+    "test": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=.test-report.tap 'test/*.test.js'",
+    "test:coverage": "c8 node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=.test-report.tap 'test/*.test.js'"
+  },
+  "c8": {
+    "all": true,
+    "src": ".",
+    "exclude": [
+      "test/**",
+      "node_modules/**",
+      "specification/**",
+      "service/migrations/**",
+      "utils/klona.js",
+      "coverage/**"
+    ],
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "report-dir": "coverage"
   },
   "keywords": [
     "swagger"
@@ -43,5 +61,8 @@
     "umzug": "^2.3.0",
     "undici": "^6.24.0",
     "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "c8": "^11.0.0"
   }
 }

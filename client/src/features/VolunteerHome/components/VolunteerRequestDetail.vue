@@ -6,11 +6,15 @@ import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import RadioButton from 'primevue/radiobutton'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { formatServiceDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
 import { getHttpStatus, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getVolunteerRequest, signUpVolunteerRequest, releaseVolunteerRequest } from '../api/volunteerRequestApi.js'
+import { getUser } from '../../../shared/api/userApi.js'
+import { filterQualifying } from '../lib/serviceCategories.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
 
 const route = useRoute()
@@ -39,6 +43,53 @@ const { state: request, isLoading, execute: fetchRequest } = useAsyncState(
     },
   }
 )
+
+// Account volunteers (shared household email => several). Fetched from /user
+// like VolunteerHome does — no shared user store exists. onError: null — a
+// failed fetch degrades to single-volunteer behavior (no picker), and the
+// server still validates the selection. Sign up is disabled while this fetch
+// is in flight so a fast click can't skip the picker on a multi-volunteer
+// account; the 422 selectionRequired handler in doSignUp recovers the
+// failed-fetch case.
+const { state: currentUser, isLoading: userLoading, execute: fetchUser } = useAsyncState(
+  () => getUser(),
+  { immediate: true, initialState: null, onError: null }
+)
+const accountVolunteers = computed(() => currentUser.value?.volunteers ?? [])
+const isMultiVolunteer = computed(() => accountVolunteers.value.length > 1)
+
+// The volunteers who can take THIS request (per-person capability match,
+// mirroring the server's sign-up qualification; the server stays
+// authoritative at write time).
+const qualifyingVolunteers = computed(() =>
+  filterQualifying(accountVolunteers.value, request.value?.serviceName)
+)
+
+// General rule: a name inside a sentence (or the sign-up dialogs) reads
+// "First Last"; tables and labeled fields keep the "Last, First" fullName.
+// Works for volunteer entries (`name`) and the request's member (`fullName`);
+// the fallback covers rows from an API that predates first/last in the
+// payload.
+function informalName(v) {
+  if (!v) return ''
+  return [v.firstName, v.lastName].filter(Boolean).join(' ') || v.name || v.fullName || ''
+}
+
+function informalVolunteerName(personId) {
+  return informalName(accountVolunteers.value.find(v => v.personId === String(personId)))
+}
+
+// Multi-volunteer accounts see WHO is confirmed; single-volunteer accounts
+// keep the second-person copy.
+const confirmedBannerText = computed(() => {
+  const who = isMultiVolunteer.value ? informalVolunteerName(request.value?.volunteerPersonId) : ''
+  return who
+    ? `${who} is confirmed for this request. Please call the member to coordinate the service.`
+    : `You're confirmed for this request. Please call the member to coordinate your service.`
+})
+
+const pickerVisible = ref(false)
+const pickedPersonId = ref(null)
 
 const SHOW_MAP_KEY = 'vg.showMap'
 const showMap = ref(localStorage.getItem(SHOW_MAP_KEY) !== 'false')
@@ -107,27 +158,86 @@ const timeDisplay = computed(() => {
   ]
 })
 
+// The confirm sentence, shared by the single-volunteer ConfirmDialog and the
+// multi-volunteer picker dialog (whose subject tracks the selected radio).
+function signUpMessage(subject) {
+  const member = informalName(request.value?.member)
+  return `${subject} be confirmed as the provider for "${request.value?.serviceName || 'this request'}"${member ? ` for ${member}` : ''}.`
+}
+
+const pickerMessage = computed(() => {
+  const chosen = qualifyingVolunteers.value.find(v => v.personId === pickedPersonId.value)
+  return signUpMessage(chosen ? `${informalName(chosen)} will` : 'You will')
+})
+
 function confirmSignUp() {
+  if (isMultiVolunteer.value && qualifyingVolunteers.value.length > 1) {
+    // The picker doubles as the confirmation: same header and running text as
+    // the single-volunteer confirm, with the volunteer radios under the
+    // title. Preselect the first qualifier so the sentence always has a
+    // subject; the text tracks the selection live.
+    pickedPersonId.value = qualifyingVolunteers.value[0].personId
+    pickerVisible.value = true
+    return
+  }
+  // 0 or 1 qualifiers: no choice to make. Name the volunteer in the confirm
+  // when the account has several; post the id only then (single-volunteer
+  // accounts keep the omitted-body auto-select path — zero change for them).
+  const chosen = isMultiVolunteer.value ? qualifyingVolunteers.value[0] : undefined
   confirm.require({
     header: 'Sign up for this request?',
-    message: `You will be confirmed as the provider for "${request.value.serviceName || 'this request'}"${request.value.member?.fullName ? ` for ${request.value.member.fullName}` : ''}.`,
+    message: signUpMessage(chosen ? `${informalName(chosen)} will` : 'You will'),
     icon: 'pi pi-heart',
     acceptLabel: 'Sign up',
     rejectLabel: 'Cancel',
-    accept: doSignUp,
+    accept: () => doSignUp(chosen?.personId),
   })
 }
 
-async function doSignUp() {
+function submitPicker() {
+  pickerVisible.value = false
+  doSignUp(pickedPersonId.value)
+}
+
+async function doSignUp(personId) {
   try {
-    await signUpVolunteerRequest(serviceRequestId.value)
-    toast.add({ severity: 'success', summary: 'Confirmed', detail: 'You are confirmed for this request. Watch your email for details.', life: 5000 })
+    await signUpVolunteerRequest(serviceRequestId.value, personId)
+    const who = personId && isMultiVolunteer.value ? informalVolunteerName(personId) : ''
+    toast.add({
+      severity: 'success',
+      summary: 'Confirmed',
+      detail: who
+        ? `${who} is confirmed for this request. Watch your email for details.`
+        : 'You are confirmed for this request. Watch your email for details.',
+      life: 5000,
+    })
     fetchRequest()
     showCallReminder()
   }
   catch (err) {
     if (isPrivacyAckError(err)) return
+    if (getHttpStatus(err) === 422 && err.body?.detail?.reason === 'selectionRequired') {
+      // The server sees 2+ qualifying volunteers but the client posted no
+      // personId — the /user fetch was degraded at click time. Recover by
+      // refetching the account volunteers and surfacing the picker.
+      await fetchUser()
+      if (qualifyingVolunteers.value.length > 1) {
+        pickedPersonId.value = qualifyingVolunteers.value[0].personId
+        pickerVisible.value = true
+        return
+      }
+      toast.add({ severity: 'warn', summary: 'Choose a volunteer', detail: 'More than one volunteer on your account qualifies for this request. Please reload the page and try again.', life: 5000 })
+      return
+    }
     if (getHttpStatus(err) === 409) {
+      if (err.body?.detail?.reason === 'alreadyOwnAccount') {
+        // Taken by the OTHER volunteer on this account — stay on the page;
+        // the refetch shows it as the account's confirmed request.
+        const who = informalVolunteerName(err.body.detail.volunteerPersonId)
+        toast.add({ severity: 'warn', summary: 'Already committed', detail: `${who || 'Another volunteer on your account'} is already committed to this request.`, life: 5000 })
+        fetchRequest()
+        return
+      }
       toast.add({ severity: 'warn', summary: 'No longer available', detail: 'Another volunteer signed up for this request first.', life: 5000 })
       router.replace({ name: 'volunteer' })
     }
@@ -191,7 +301,7 @@ async function doRelease() {
       <template #content>
         <div v-if="request.status === 'Confirmed'" class="confirmation-banner">
           <i class="pi pi-check-circle"></i>
-          You're confirmed for this request. Please call the member to coordinate your service.
+          {{ confirmedBannerText }}
         </div>
         <div v-else-if="request.status === 'Completed'" class="confirmation-banner">
           <i class="pi pi-check-circle"></i>
@@ -308,6 +418,7 @@ async function doRelease() {
             v-if="request.status === 'Open'"
             label="Sign up!"
             icon="pi pi-heart"
+            :disabled="userLoading"
             @click="confirmSignUp"
           />
           <Button
@@ -326,6 +437,24 @@ async function doRelease() {
     <div v-else-if="!isLoading" class="not-found">
       <p>Service request not found.</p>
     </div>
+
+    <!-- No width style: the shared ConfirmDialog is content-sized by the
+         PrimeVue default, and this dialog carries the same running text, so
+         leaving it unstyled keeps the two visually matched. -->
+    <Dialog v-model:visible="pickerVisible" header="Sign up for this request?" modal>
+      <div v-for="v in qualifyingVolunteers" :key="v.personId" class="picker-row">
+        <RadioButton v-model="pickedPersonId" :inputId="`vol-${v.personId}`" :value="v.personId" />
+        <label :for="`vol-${v.personId}`">{{ informalName(v) }}</label>
+      </div>
+      <div class="picker-message">
+        <i class="pi pi-heart"></i>
+        <span>{{ pickerMessage }}</span>
+      </div>
+      <template #footer>
+        <Button label="Cancel" @click="pickerVisible = false" />
+        <Button label="Sign up" icon="pi pi-heart" :disabled="!pickedPersonId" @click="submitPicker" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -518,6 +647,34 @@ async function doRelease() {
   text-align: center;
   padding: 2rem;
   color: var(--color-text-dim);
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Icon + running text below the radios — mirrors the shared ConfirmDialog's
+   icon/message row so the multi-volunteer dialog reads like the single case. */
+.picker-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  /* Match the title-to-radios gap: the dialog header/content boundary
+     contributes ~1.25rem, so the same margin here (the last .picker-row's
+     0.5rem bottom padding roughly offsets the content top padding's excess)
+     keeps the message visually equidistant. */
+  margin-top: 1.25rem;
+  color: var(--color-text-primary);
+}
+
+.picker-message .pi-heart {
+  font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
 @media (max-width: 900px) {

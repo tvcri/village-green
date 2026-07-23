@@ -6,7 +6,7 @@ export function navigationGuard(to) {
   // VSS: the volunteer surface requires identity-derived volunteer access.
   // Read volunteer status from the same composable source as isGrantless
   // (user is computed(() => VG.curUser)) so both derive from one value.
-  const isVolunteer = !!user.value?.volunteer
+  const isVolunteer = (user.value?.volunteers?.length ?? 0) > 0
   if (to.meta.requiresVolunteer && !isVolunteer) {
     return { name: 'villages' }
   }

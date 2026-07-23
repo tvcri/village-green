@@ -20,6 +20,7 @@ import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
+import { getPerson } from '../../PersonList/api/personApi.js'
 import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
@@ -84,6 +85,12 @@ const form = ref({
   zip: '',
   address: '',
   phone: '',
+  start: '',
+  startAddress: '',
+  startCity: '',
+  startState: '',
+  startZip: '',
+  startPhone: '',
   instructions: '',
   description: '',
   destination: ''
@@ -132,6 +139,12 @@ watch(existingRequest, async (val) => {
       zip: val.zip || '',
       address: val.address || '',
       phone: val.phone || '',
+      start: val.start || '',
+      startAddress: val.startAddress || '',
+      startCity: val.startCity || '',
+      startState: val.startState || '',
+      startZip: val.startZip || '',
+      startPhone: val.startPhone || '',
       instructions: val.instructions || '',
       description: val.description || '',
       destination: val.destination || ''
@@ -170,6 +183,72 @@ const volunteerFilteredOptions = ref([])
 const selectedMember = ref(null)
 const selectedVolunteer = ref(null)
 
+// The selected member's home address, fetched on member-select. getVillageMembers
+// omits address fields, so fetch the person to obtain home. "Member's home" is a
+// fill convenience only — never stored as SR state.
+const selectedMemberHome = ref(null)
+
+async function loadMemberHome (personId) {
+  if (!personId) { selectedMemberHome.value = null; return }
+  try {
+    const p = await getPerson(String(personId))
+    selectedMemberHome.value = p
+      ? { address: p.address || '', city: p.city || '', state: p.state || '', zip: p.zip || '', phone: p.phone || '' }
+      : null
+  } catch {
+    selectedMemberHome.value = null
+  }
+}
+
+// The name label written when filling a leg from the member's home. Keeps the
+// required name field populated (an empty name fails ride validation) and reads
+// naturally on the detail view and map.
+const MEMBER_HOME_LABEL = "Member's Home"
+
+function applyMemberHomeToStart () {
+  const h = selectedMemberHome.value
+  if (!h) return
+  form.value.start = MEMBER_HOME_LABEL
+  form.value.startAddress = h.address
+  form.value.startCity = h.city
+  form.value.startState = h.state
+  form.value.startZip = h.zip
+  form.value.startPhone = h.phone
+}
+
+function applyMemberHomeToDestination () {
+  const h = selectedMemberHome.value
+  if (!h) return
+  form.value.destination = MEMBER_HOME_LABEL
+  form.value.address = h.address
+  form.value.city = h.city
+  form.value.state = h.state
+  form.value.zip = h.zip
+  form.value.phone = h.phone
+}
+
+function clearStart () {
+  form.value.start = ''
+  form.value.startAddress = ''
+  form.value.startCity = ''
+  form.value.startState = ''
+  form.value.startZip = ''
+  form.value.startPhone = ''
+}
+
+function clearDestination () {
+  form.value.destination = ''
+  form.value.address = ''
+  form.value.city = ''
+  form.value.state = ''
+  form.value.zip = ''
+  form.value.phone = ''
+}
+
+const startIsEmpty = computed(() =>
+  !form.value.start && !form.value.startAddress && !form.value.startCity &&
+  !form.value.startState && !form.value.startZip && !form.value.startPhone)
+
 const filterMembers = (event) => {
   const query = event.query.toLowerCase()
   memberFilteredOptions.value = allMemberOptions.value.filter(m =>
@@ -188,8 +267,16 @@ watch(selectedMember, (val) => {
   // Only update if it's a complete selected object with both label and value
   if (val && typeof val === 'object' && val.label && val.value) {
     form.value.memberPersonId = String(val.value)
+    // Fetch the member's home. Only fill Start here when the service is already
+    // a Ride and Start is empty (covers changing the member on an existing Ride);
+    // the primary prefill trigger is Ride selection (see isRideService watcher).
+    // Guarding on emptiness keeps an edit-load's saved Start values intact.
+    loadMemberHome(val.value).then(() => {
+      if (isRideService.value && startIsEmpty.value) applyMemberHomeToStart()
+    })
   } else {
     form.value.memberPersonId = null
+    selectedMemberHome.value = null
   }
 })
 
@@ -388,6 +475,16 @@ watch(() => form.value.timesFlexible, (flex) => {
   form.value.finishTime = null
 })
 
+// Arrive/Return are Round-Trip-only. When the user switches away from Round
+// Trip, clear them so the model doesn't carry stale values a One Way trip
+// never shows. Guarded on formLoaded so loading a stored request doesn't wipe
+// legitimately-stored values.
+watch(() => form.value.transportationType, (type) => {
+  if (!formLoaded.value || type === 'Round Trip') return
+  form.value.apptTime = null
+  form.value.returnTime = null
+})
+
 const isRideService = computed(() => form.value.serviceName?.startsWith('Ride:'))
 
 const noLocationServices = ['Tech Support', 'Household Chores/Handy Help']
@@ -429,8 +526,13 @@ const isFormValid = computed(() => {
 // render without being auto-cleared — this is what handleSubmit catches.
 const timesInOrder = computed(() => {
   const f = form.value
-  if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) return false
-  if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) return false
+  // apptTime/returnTime are Round-Trip-only. Guard on transportationType so a
+  // stale value left over from switching Round Trip -> One Way can't fail a
+  // valid One Way (whose payload nulls them anyway).
+  if (f.transportationType === 'Round Trip') {
+    if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) return false
+    if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) return false
+  }
   const finishAfter = f.transportationType === 'Round Trip' ? f.returnTime : f.startTime
   if (f.finishTime != null && finishAfter != null && f.finishTime <= finishAfter) return false
   return true
@@ -462,18 +564,29 @@ const resetForNewRequest = () => {
     zip: '',
     address: '',
     phone: '',
+    start: '',
+    startAddress: '',
+    startCity: '',
+    startState: '',
+    startZip: '',
+    startPhone: '',
     instructions: '',
     description: '',
     destination: ''
   }
 }
 
+// Starting Location is a Rides-only concept. Prefill it from the member's home
+// when a Ride is chosen (only if Start is empty, so typed/saved values survive),
+// and clear it when leaving Ride so a non-Ride never carries hidden start data.
 watch(isRideService, (newIsRide) => {
   if (!formLoaded.value) return
   if (newIsRide) {
     form.value.transportationType = 'Round Trip'
+    if (startIsEmpty.value) applyMemberHomeToStart()
   } else {
     form.value.transportationType = 'None'
+    clearStart()
   }
 })
 
@@ -521,9 +634,10 @@ const handleSubmit = async (notify = false) => {
 
       if (!form.value.timesFlexible && !timesInOrder.value) {
         const f = form.value
-        if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
+        const isRoundTrip = f.transportationType === 'Round Trip'
+        if (isRoundTrip && f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
           toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time must be after Start time', life: 3000 })
-        } else if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
+        } else if (isRoundTrip && f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
           toast.add({ severity: 'error', summary: 'Error', detail: 'Return time must be after Arrival time', life: 3000 })
         } else {
           const finishAfterLabel = f.transportationType === 'Round Trip' ? 'Return' : 'Start'
@@ -555,6 +669,12 @@ const handleSubmit = async (notify = false) => {
       zip: form.value.zip || null,
       address: form.value.address || null,
       phone: form.value.phone || null,
+      start: form.value.start || null,
+      startAddress: form.value.startAddress || null,
+      startCity: form.value.startCity || null,
+      startState: form.value.startState || null,
+      startZip: form.value.startZip || null,
+      startPhone: form.value.startPhone || null,
       instructions: form.value.instructions || null,
       description: form.value.description || null,
       destination: form.value.destination || null
@@ -975,10 +1095,90 @@ const openPersonDialog = (personId) => {
             </div>
           </div>
 
-          <!-- Destination Section -->
+          <!-- Location Sections -->
           <template v-if="showLocationFields">
-            <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+            <!-- Start Section (Rides only) -->
+            <template v-if="isRideService">
+            <div style="display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
+              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Starting Location</h3>
+              <div style="display: flex; gap: 0.5rem;">
+                <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToStart" />
+                <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear start" @click="clearStart" />
+              </div>
+            </div>
+
+            <!-- Starting Location / Address Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Starting Location</label>
+                <InputText
+                  v-model="form.start"
+                  placeholder="Enter starting location"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Address</label>
+                <InputText
+                  v-model="form.startAddress"
+                  placeholder="Enter start address"
+                  style="width: 100%;"
+                />
+              </div>
+            </div>
+
+            <!-- Start City / State / Zip / Phone Row -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr; gap: 1rem;">
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">City</label>
+                <InputText
+                  v-model="form.startCity"
+                  placeholder="City"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">State</label>
+                <Select
+                  v-model="form.startState"
+                  :options="stateOptions.map(s => ({ label: s, value: s }))"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="State"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Zip</label>
+                <InputText
+                  v-model="form.startZip"
+                  placeholder="Zip"
+                  style="width: 100%;"
+                />
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Phone</label>
+                <InputText
+                  v-model="form.startPhone"
+                  placeholder="Phone"
+                  style="width: 100%;"
+                />
+              </div>
+            </div>
+
+            </template>
+
+            <!-- Destination Section -->
+            <div style="display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
+              <div v-if="isRideService" style="display: flex; gap: 0.5rem;">
+                <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
+                <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear destination" @click="clearDestination" />
+              </div>
             </div>
 
             <!-- Destination / Address Row -->
@@ -1144,6 +1344,13 @@ const openPersonDialog = (personId) => {
 .req {
   color: var(--color-error);
   margin-left: 0.15rem;
+}
+
+/* Bolder label on the "Use member's home" buttons so they read as prominent
+   without going to a solid fill (which would compete with Save). :deep pierces
+   PrimeVue's scoped button styles to reach the label span. */
+.use-home-btn :deep(.p-button-label) {
+  font-weight: 700;
 }
 
 .person-field-row {

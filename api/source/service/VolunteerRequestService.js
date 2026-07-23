@@ -20,6 +20,16 @@ module.exports.buildCapabilityPrefixCase = function () {
     ` ELSE NULL END`
 }
 
+// Renders a person-id set for SQL IN (...). Escaped inline (not `?` binds) so
+// callers can drop the result into column lists and CTEs without disturbing
+// their bind arrays. An empty set becomes IN (NULL): matches nothing — never
+// the syntax error IN (). (Unreachable behind the volunteer gate, which
+// requires a non-empty set; belt-and-suspenders.) Ids are integers resolved
+// from our own DB; the escape is defensive, not a user-input boundary.
+function escapedIdList (personIds) {
+  return mysql.escape(personIds?.length ? personIds : [null])
+}
+
 // The capability boundary as reusable, bind-free SQL pieces, shared by every
 // volunteer-request read/write path (list, single GET, pickup). `cte` resolves
 // the caller's ACTIVE-volunteer capabilities to serviceName prefixes; `join`
@@ -27,19 +37,21 @@ module.exports.buildCapabilityPrefixCase = function () {
 // request outside the caller's capabilities simply doesn't join — invisible on
 // reads, un-pickable on writes.
 //
-// personId is escaped inline (not a `?` bind) so callers can drop these strings
+// The set is escaped inline (not a `?` bind) so callers can drop these strings
 // into makeQueryString or connection.query without disturbing their bind arrays
-// — same rationale as the ownership literal in getVolunteerRequest. personId is
-// always an integer resolved by the volunteer gate from our own DB; the escape
-// is defensive belt-and-suspenders, not a user-input boundary.
-module.exports.capabilityGateSql = function (personId) {
+// — same rationale as the ownership literal in getVolunteerRequest. personIds
+// are always integers resolved by the volunteer gate from our own DB; the
+// escape is defensive belt-and-suspenders, not a user-input boundary. The
+// CTE's SELECT DISTINCT unions capabilities across every matching volunteer
+// row (any-of-set gate, across the caller's whole account).
+module.exports.capabilityGateSql = function (personIds) {
   return {
     cte: `cteCapability AS (
       SELECT DISTINCT ${module.exports.buildCapabilityPrefixCase()} AS prefix
       FROM active_volunteer av
       JOIN volunteer_capability vc ON vc.volunteerId = av.id
       JOIN capability c ON c.id = vc.capabilityId
-      WHERE av.personId = ${mysql.escape(personId)}
+      WHERE av.personId IN (${escapedIdList(personIds)})
     )`,
     join: `JOIN cteCapability cc ON cc.prefix IS NOT NULL AND sr.serviceName LIKE concat(cc.prefix, '%')`,
   }
@@ -80,6 +92,8 @@ function baseColumns() {
     'sr.phone AS phone',
     `IF(sr.memberPersonId IS NOT NULL, JSON_OBJECT(
       'fullName', mp.fullName,
+      'firstName', mp.firstName,
+      'lastName', mp.lastName,
       'address', mp.address,
       'city', mp.city,
       'state', mp.state,
@@ -128,9 +142,15 @@ function baseJoins() {
 // transaction). Any active volunteer can see and act on any village's
 // requests (VSS design refinement: cross-village visibility/sign-up), so
 // only existence — not village membership — decides notFound vs conflict.
-module.exports.classifySignUpFailure = function ({ row, personId }) {
+module.exports.classifySignUpFailure = function ({ row, personId, personIds }) {
   if (!row) return 'notFound'
-  if (row.status === 'Confirmed' && String(row.volunteerPersonId) === String(personId)) return 'alreadyOwn'
+  if (row.status === 'Confirmed') {
+    const owner = String(row.volunteerPersonId)
+    if (owner === String(personId)) return 'alreadyOwn'
+    // Owned by ANOTHER volunteer on the same account (shared household
+    // email): distinct outcome so the client can name who is committed.
+    if ((personIds ?? []).map(String).includes(owner)) return 'alreadyOwnAccount'
+  }
   return 'conflict'
 }
 
@@ -155,7 +175,7 @@ module.exports.getVolunteerRequestVillages = async function () {
 // commitments. history: the caller's past (Completed) requests. Once a
 // volunteer owns a request, emergencyContact/volunteerAddress are visible
 // the same way in both mine and history — no further gating by status.
-module.exports.getVolunteerRequests = async function ({ scope, personId }) {
+module.exports.getVolunteerRequests = async function ({ scope, personIds }) {
   const columns = baseColumns()
   const joins = baseJoins()
   const predicates = { statements: [], binds: [] }
@@ -163,21 +183,26 @@ module.exports.getVolunteerRequests = async function ({ scope, personId }) {
 
   if (scope === 'open') {
     // Capability boundary: an Open request is visible only if its serviceName
-    // matches a prefix for a capability the caller holds (see capabilityGateSql).
-    const gate = module.exports.capabilityGateSql(personId)
+    // matches a prefix for a capability ANY of the caller's volunteers holds
+    // (union across the account — see capabilityGateSql).
+    const gate = module.exports.capabilityGateSql(personIds)
     ctes.push(gate.cte)
     joins.add(gate.join)
     predicates.statements.push("sr.status = 'Open'")
   } else {
-    // Ownership expressed as an inline-escaped literal (not a `?` bind) so it
-    // can sit inside the column list ahead of the WHERE predicates without
-    // disturbing mysql.format's single linear bind-array ordering.
-    const ownershipSql = `sr.volunteerPersonId = ${mysql.escape(personId)}`
+    // Ownership is account-wide: any of the caller's resolved persons.
+    // Inline-escaped literal (not a `?` bind) so it can sit inside the column
+    // list ahead of the WHERE predicates without disturbing mysql.format's
+    // single linear bind-array ordering.
+    const ownershipSql = `sr.volunteerPersonId IN (${escapedIdList(personIds)})`
     columns.push(emergencyContactColumn(ownershipSql))
     columns.push(volunteerAddressColumn(ownershipSql))
+    // Which account volunteer owns each row — the client maps this to a name
+    // via /user volunteers[] for the Volunteer column (multi-volunteer
+    // accounts only).
+    columns.push('CAST(sr.volunteerPersonId AS CHAR) AS volunteerPersonId')
     const statusFilter = scope === 'mine' ? "sr.status = 'Confirmed'" : "sr.status = 'Completed'"
-    predicates.statements.push('sr.volunteerPersonId = ?', statusFilter)
-    predicates.binds.push(personId)
+    predicates.statements.push(`sr.volunteerPersonId IN (${escapedIdList(personIds)})`, statusFilter)
   }
 
   // Soonest-first: volunteers browse upcoming/open work by when it happens.
@@ -194,66 +219,97 @@ module.exports.getVolunteerRequests = async function ({ scope, personId }) {
 // Confirmed/Completed requests. Used both for the deep-link single-item GET
 // and for read-back after a successful sign-up/release, where the
 // just-completed UPDATE has already put the row into one of these states.
-module.exports.getVolunteerRequest = async function ({ serviceRequestId, personId }) {
+module.exports.getVolunteerRequest = async function ({ serviceRequestId, personIds }) {
   const columns = baseColumns()
-  // personId is an integer from our own DB; escaped inline because
-  // makeQueryString applies binds to predicates only (NAME_CLAIM_PATH pattern).
-  // Ownership alone, any status — an Open row never matches (volunteerPersonId
-  // is NULL), so this still returns null for Open, matching the email precedent.
-  const ownershipSql = `sr.volunteerPersonId = ${mysql.escape(personId)}`
+  // Ownership is account-wide (any resolved person). Inline-escaped for the
+  // same bind-ordering reason as the list endpoint. An Open row never matches
+  // (volunteerPersonId is NULL), so this still returns null disclosure for
+  // Open, matching the email precedent.
+  const ownershipSql = `sr.volunteerPersonId IN (${escapedIdList(personIds)})`
   columns.push(emergencyContactColumn(ownershipSql))
   columns.push(volunteerAddressColumn(ownershipSql))
+  columns.push('CAST(sr.volunteerPersonId AS CHAR) AS volunteerPersonId')
   const joins = baseJoins()
   // Capability gate applies ONLY to the Open leg: a volunteer may see an Open
   // request just when it matches their capabilities. The ownership leg is
   // unconditional — a request the caller already owns stays visible for
   // read-back even if their capability is later revoked. Expressed as EXISTS
   // (not a JOIN) so it scopes to the Open leg without filtering owned rows.
-  const gate = module.exports.capabilityGateSql(personId)
+  const gate = module.exports.capabilityGateSql(personIds)
   const ctes = [gate.cte]
   const openMatchesCapability =
     `sr.status = 'Open' AND EXISTS (SELECT 1 FROM cteCapability cc WHERE cc.prefix IS NOT NULL AND sr.serviceName LIKE concat(cc.prefix, '%'))`
   const predicates = {
     statements: [
       'sr.id = ?',
-      `((${openMatchesCapability}) OR (sr.volunteerPersonId = ? AND sr.status IN ('Confirmed', 'Completed')))`,
+      `((${openMatchesCapability}) OR (${ownershipSql} AND sr.status IN ('Confirmed', 'Completed')))`,
     ],
-    binds: [serviceRequestId, personId],
+    binds: [serviceRequestId],
   }
   const sql = dbUtils.makeQueryString({ ctes, columns, joins, predicates, format: true })
   const [rows] = await dbUtils.pool.query(sql)
   return rows[0] ?? null
 }
 
-module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, personId, userId }) {
+module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, personId, personIds, userId }) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      // Capability gate (pre-check, short-circuit). A volunteer may only pick up
-      // a request whose serviceName matches one of their capabilities. Checked
-      // BEFORE the atomic UPDATE. A request outside the caller's capabilities is
-      // treated as if it does not exist — outcome 'notFound' -> 404, no existence
-      // leak — indistinguishable from a truly missing request. The capability
-      // part cannot change mid-request, so no race is introduced.
-      const gate = module.exports.capabilityGateSql(personId)
-      const [gateRows] = await connection.query(
-        `WITH ${gate.cte}
-         SELECT EXISTS (
-           SELECT 1 FROM service_request sr
-           ${gate.join}
-           WHERE sr.id = ?
-         ) AS matchesCapability`,
-        [serviceRequestId]
+      // Which of the caller's persons hold a capability matching this request?
+      // Replaces the old boolean pre-check: same boundary and same no-leak
+      // outcome (a request outside every capability is 'notFound',
+      // indistinguishable from missing), but also yields the auto-select
+      // candidate set when no personId was posted. The capability part cannot
+      // change mid-request, so no race is introduced.
+      const prefixCase = module.exports.buildCapabilityPrefixCase()
+      const [qualRows] = await connection.query(
+        `SELECT DISTINCT av.personId
+         FROM active_volunteer av
+         JOIN volunteer_capability vc ON vc.volunteerId = av.id
+         JOIN capability c ON c.id = vc.capabilityId
+         JOIN service_request sr ON sr.id = ?
+           AND (${prefixCase}) IS NOT NULL
+           AND sr.serviceName LIKE concat((${prefixCase}), '%')
+         WHERE av.personId IN (?)`,
+        [serviceRequestId, personIds?.length ? personIds : [null]]
       )
-      if (!gateRows[0].matchesCapability) {
-        return { outcome: 'notFound' }
+      const qualifying = qualRows.map(r => String(r.personId))
+
+      // Selection: a posted personId must individually qualify (the account
+      // union is not enough — the chosen volunteer does the work). Omitted:
+      // auto-select iff exactly one qualifies; 2+ need an explicit choice.
+      // The notFound outcomes stay first: capability is the existence
+      // boundary, so a non-qualifying caller must not learn the row's status.
+      let chosen = personId != null ? String(personId) : null
+      if (chosen) {
+        if (!qualifying.includes(chosen)) return { outcome: 'notFound' }
       }
+      else if (qualifying.length === 0) return { outcome: 'notFound' }
+      else if (qualifying.length > 1) {
+        // selectionRequired is only truthful for a signable (Open) request.
+        // Classify a non-open row by status/ownership instead, or the caller
+        // is told to pick when no choice could win — and an omitted-body
+        // retry after a lost success response dead-ends in 422 forever.
+        const [stateRows] = await connection.query(
+          'SELECT status, volunteerPersonId FROM service_request WHERE id = ?',
+          [serviceRequestId]
+        )
+        const row = stateRows[0]
+        if (row && row.status !== 'Open') {
+          const outcome = module.exports.classifySignUpFailure({ row, personId: null, personIds })
+          return outcome === 'alreadyOwnAccount'
+            ? { outcome, owningPersonId: String(row.volunteerPersonId) }
+            : { outcome }
+        }
+        return { outcome: 'selectionRequired' }
+      }
+      else chosen = qualifying[0]
 
       // Atomic first-wins: any unassigned Open request, any village.
       const [result] = await connection.query(
         `UPDATE service_request
          SET volunteerPersonId = ?, status = 'Confirmed', modifiedUserId = ?, modifiedAt = UTC_TIMESTAMP()
          WHERE id = ? AND status = 'Open' AND volunteerPersonId IS NULL`,
-        [personId, userId, serviceRequestId]
+        [chosen, userId, serviceRequestId]
       )
       if (result.affectedRows === 1) {
         await ServiceRequestService.writeNotificationEvent(connection, serviceRequestId, 'Confirmed')
@@ -263,19 +319,27 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
         'SELECT status, volunteerPersonId FROM service_request WHERE id = ?',
         [serviceRequestId]
       )
-      return { outcome: module.exports.classifySignUpFailure({ row: rows[0], personId }) }
+      const outcome = module.exports.classifySignUpFailure({ row: rows[0], personId: chosen, personIds })
+      // owningPersonId only travels with alreadyOwnAccount — the one outcome
+      // whose 409 detail names the committed volunteer; conflict must not
+      // carry a stranger's id even though the controller doesn't serialize it.
+      return outcome === 'alreadyOwnAccount'
+        ? { outcome, owningPersonId: String(rows[0].volunteerPersonId) }
+        : { outcome }
     },
   })
 }
 
-module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, personId, userId }) {
+module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, personIds, userId }) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      // Account-level release (spec, conscious decision): any of the caller's
+      // volunteers' commitments can be released from the shared account.
       const [result] = await connection.query(
         `UPDATE service_request
          SET volunteerPersonId = NULL, status = 'Open', modifiedUserId = ?, modifiedAt = UTC_TIMESTAMP()
-         WHERE id = ? AND status = 'Confirmed' AND volunteerPersonId = ?`,
-        [userId, serviceRequestId, personId]
+         WHERE id = ? AND status = 'Confirmed' AND volunteerPersonId IN (?)`,
+        [userId, serviceRequestId, personIds?.length ? personIds : [null]]
       )
       if (result.affectedRows === 1) {
         // Re-broadcast to the volunteer list. The member is deliberately NOT
