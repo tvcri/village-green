@@ -13,7 +13,7 @@
 //   - Returned string includes the leading '?' when non-empty.
 //
 // Usage:
-//   urlObj.search = buildQueryString({ benchmarkId: 'VMware Aria 8.x', projection: ['stigs'] })
+//   urlObj.search = buildQueryString({ lastName: 'Van Der Berg', villageId: ['1', '2'] })
 export function buildQueryString(params) {
   const e = encodeURIComponent
   const parts = []

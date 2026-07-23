@@ -9,8 +9,8 @@ describe('buildQueryString', () => {
   })
 
   it('encodes spaces in values as %20 (not +)', () => {
-    expect(buildQueryString({ benchmarkId: 'VMware Aria 8.x' }))
-      .toBe('?benchmarkId=VMware%20Aria%208.x')
+    expect(buildQueryString({ lastName: 'Van Der Berg 8th' }))
+      .toBe('?lastName=Van%20Der%20Berg%208th')
   })
 
   it('encodes a literal + in a value as %2B (so a swap-back is unambiguous)', () => {
@@ -22,8 +22,8 @@ describe('buildQueryString', () => {
   })
 
   it('emits repeated keys for array values (form/explode style)', () => {
-    expect(buildQueryString({ collectionId: ['col1', 'col2', 'col3'] }))
-      .toBe('?collectionId=col1&collectionId=col2&collectionId=col3')
+    expect(buildQueryString({ villageId: ['1', '2', '3'] }))
+      .toBe('?villageId=1&villageId=2&villageId=3')
   })
 
   it('encodes spaces inside each array element', () => {
@@ -32,8 +32,8 @@ describe('buildQueryString', () => {
   })
 
   it('mixes scalar and array values in one call', () => {
-    expect(buildQueryString({ format: 'csv', collectionId: ['a', 'b'] }))
-      .toBe('?format=csv&collectionId=a&collectionId=b')
+    expect(buildQueryString({ format: 'csv', villageId: ['1', '2'] }))
+      .toBe('?format=csv&villageId=1&villageId=2')
   })
 
   it('coerces null and undefined to "null" / "undefined" (matches URLSearchParams)', () => {
