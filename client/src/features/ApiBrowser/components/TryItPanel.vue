@@ -123,9 +123,19 @@ async function copy(text, what) {
   font-size: 0.78rem;
   color: var(--color-text-dim);
 }
+/* auto-FIT, not auto-fill: auto-fill keeps the empty tracks it created, so a
+   single param renders at one-third width with dead space beside it and
+   re-narrows every time a phantom column appears. auto-fit collapses empty
+   tracks to zero and the 1fr tracks absorb the space, so one field spans the
+   full width and two split it evenly.
+
+   160px, not 220px: the left pane's floor is min-size="25", which on a 1280px
+   viewport leaves only ~300px of grid — 220px tracks collapse to a single
+   stacked column there. 160px keeps two columns at the narrowest the user can
+   drag to, which is the point of a param grid. */
 .param-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 0.75rem;
 }
 .url-bar {

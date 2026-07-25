@@ -130,6 +130,26 @@ const dateValue = computed(() => (props.modelValue ? serviceDateToDate(props.mod
   gap: 0.25rem;
   min-width: 0;
 }
+/* PrimeVue inputs carry no width of their own, so they sit at the browser's
+   intrinsic ~20ch and ignore their grid track. Widening the pane then stretched
+   the TRACK while the control stayed put, until the grid snapped to another
+   column — read as "stretch, bounce, stretch". Make the controls fill the cell
+   so a drag is continuous.
+
+   Verified rendered markup: Select/MultiSelect/AutoComplete render a DIV and
+   InputNumber/DatePicker a SPAN, but ALL five carry .p-inputwrapper — so that
+   one class covers every wrapper-based control. Select additionally sizes
+   itself from its inner label, which ignores the wrapper's width; .p-select-label
+   is what actually makes a Select fill its cell. */
+.param-field :deep(.p-inputtext),
+.param-field :deep(.p-inputwrapper) {
+  width: 100%;
+}
+.param-field :deep(.p-select-label),
+.param-field :deep(.p-multiselect-label) {
+  width: 100%;
+  min-width: 0;
+}
 .param-field label {
   font-size: 0.8rem;
   font-weight: 600;
