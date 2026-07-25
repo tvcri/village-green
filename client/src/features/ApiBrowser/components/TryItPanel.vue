@@ -7,7 +7,10 @@ import { isOmitted } from '../lib/paramValues.js'
 import { toCurl } from '../lib/curl.js'
 
 const props = defineProps({
-  operationId: { type: String, required: true },
+  // Empty until the user picks a row. The panel stays MOUNTED in that state so
+  // its splitter pane keeps its height — v-if here would collapse the pane on
+  // first paint and make the divider position meaningless until a selection.
+  operationId: { type: String, default: '' },
   descriptors: { type: Array, required: true },
   values: { type: Object, required: true },
   isLoading: { type: Boolean, default: false },
@@ -37,11 +40,15 @@ async function copy(text, what) {
 </script>
 
 <template>
-  <div class="tryit-panel">
+  <div v-if="!operationId" class="tryit-panel tryit-empty">
+    <p class="tryit-hint">Select an operation to try it out.</p>
+  </div>
+
+  <div v-else class="tryit-panel">
     <div class="tryit-header">
       <span class="op-id">{{ operationId }}</span>
       <Button
-        label="Execute"
+        label="Fetch"
         icon="pi pi-play"
         :loading="isLoading"
         :disabled="missingRequired.length > 0 || isLoading"
@@ -90,13 +97,16 @@ async function copy(text, what) {
 </template>
 
 <style scoped>
+/* No border-top: the splitter gutter above is now the visual seam. */
 .tryit-panel {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  border-top: 1px solid var(--color-border-default);
-  padding-top: 0.75rem;
   min-height: 0;
+}
+.tryit-empty {
+  justify-content: center;
+  align-items: center;
 }
 .tryit-header {
   display: flex;

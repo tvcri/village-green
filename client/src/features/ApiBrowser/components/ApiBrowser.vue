@@ -7,6 +7,7 @@ import TryItPanel from './TryItPanel.vue'
 import ResponsePanel from './ResponsePanel.vue'
 import { apiCall, getApiSpec, getUrlForOperation } from '../../../shared/api/apiClient.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { buildOperationRows } from '../lib/operationRows.js'
 import { buildDescriptors } from '../lib/paramModel.js'
 import { initialValues, toParams } from '../lib/paramValues.js'
@@ -14,9 +15,11 @@ import { metaFromError, metaFromResponse } from '../lib/responseMeta.js'
 
 const selectedOperationId = ref('')
 
+const { canElevate } = useCurrentUser()
+
 const rows = computed(() => {
   const spec = getApiSpec()
-  return spec ? buildOperationRows(spec.operationMap) : []
+  return spec ? buildOperationRows(spec.operationMap, { canElevate: canElevate.value }) : []
 })
 
 function onSelect(operationId) {
@@ -111,25 +114,37 @@ watch(selectedOperationId, () => { result.value = null })
   <div class="api-browser">
     <Splitter class="browser-split" state-key="vg-apibrowser-splitter-h" state-storage="local">
       <SplitterPanel class="split-panel" :size="55" :min-size="25">
-        <div class="request-column">
-          <OperationTable
-            class="op-table"
-            :rows="rows"
-            :selected-operation-id="selectedOperationId"
-            @select="onSelect"
-          />
-          <TryItPanel
-            v-if="selectedOperationId"
-            class="tryit-form"
-            :operation-id="selectedOperationId"
-            :descriptors="descriptors"
-            :values="paramValues"
-            :resolved="resolvedUrl"
-            :is-loading="isLoadingForSelection"
-            @update:values="paramValues = $event"
-            @execute="execute"
-          />
-        </div>
+        <Splitter
+          class="request-split"
+          layout="vertical"
+          state-key="vg-apibrowser-splitter-v"
+          state-storage="local"
+        >
+          <SplitterPanel class="split-panel" :size="60" :min-size="20">
+            <div class="request-column">
+              <OperationTable
+                class="op-table"
+                :rows="rows"
+                :selected-operation-id="selectedOperationId"
+                @select="onSelect"
+              />
+            </div>
+          </SplitterPanel>
+          <SplitterPanel class="split-panel" :size="40" :min-size="15">
+            <div class="request-column">
+              <TryItPanel
+                class="tryit-form"
+                :operation-id="selectedOperationId"
+                :descriptors="descriptors"
+                :values="paramValues"
+                :resolved="resolvedUrl"
+                :is-loading="isLoadingForSelection"
+                @update:values="paramValues = $event"
+                @execute="execute"
+              />
+            </div>
+          </SplitterPanel>
+        </Splitter>
       </SplitterPanel>
       <SplitterPanel class="split-panel" :size="45" :min-size="25">
         <div class="response-column">
@@ -172,6 +187,10 @@ watch(selectedOperationId, () => { result.value = null })
 .split-panel {
   overflow: hidden;
 }
+.request-split {
+  height: 100%;
+  min-height: 0;
+}
 .request-column,
 .response-column {
   height: 100%;
@@ -181,18 +200,20 @@ watch(selectedOperationId, () => { result.value = null })
   gap: 0.75rem;
   padding: 0.75rem;
 }
-/* The table absorbs the remainder; the form (added in Task 5) is content-sized
-   so the split rebalances automatically as the selected op's field count
-   changes (0 fields for 14 of 47 GETs, 9 for getFriends). */
-.op-table {
+/* Both children fill their splitter panel. Their heights are set by the
+   divider — NOT by content — so selecting an operation can never resize the
+   table. An earlier revision content-sized the form (flex: 0 0 auto) to avoid
+   dead space under 0-param operations; the cost was the table jumping on every
+   selection, which is far worse than a stable region that happens to be roomy.
+   The divider persists per state-key, so the user's chosen balance sticks. */
+.op-table,
+.tryit-form {
   flex: 1 1 auto;
   min-height: 0;
 }
-/* Content-sized so the split rebalances automatically as field count changes;
-   capped + scrollable so a 9-param form can't squeeze the table to nothing. */
+/* The form scrolls within its pane: a 9-param operation (getFriends) must not
+   push Fetch out of reach when the user has dragged the divider up. */
 .tryit-form {
-  flex: 0 0 auto;
-  max-height: 45%;
   overflow-y: auto;
 }
 </style>

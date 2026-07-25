@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen, within } from '@testing-library/vue'
 import userEvent from '@testing-library/user-event'
 import PrimeVue from 'primevue/config'
 
@@ -46,8 +46,17 @@ function renderBrowser() {
   return render(ApiBrowser, { global: { plugins: [PrimeVue], directives: { tooltip: {} } } })
 }
 
+// This project's vitest config has no globals/auto-cleanup, so each render
+// stayed mounted in document.body for the whole file. Tests compensated with
+// within(container), but any unscoped getAllByText(...)[0] would silently hit
+// an EARLIER test's still-mounted ApiBrowser. Unmount between tests instead.
+afterEach(cleanup)
+
 beforeEach(() => {
   vi.clearAllMocks()
+  // useCurrentUser reads the VG global; canElevate gates whether
+  // x-elevation-required operations are listed at all.
+  globalThis.VG = { curUser: { canElevate: true } }
   window.matchMedia = window.matchMedia || (query => ({
     matches: false, media: query, onchange: null,
     addListener: vi.fn(), removeListener: vi.fn(),
@@ -68,8 +77,27 @@ describe('ApiBrowser', () => {
 
     await userEvent.click(screen.getAllByText('getVillage')[0])
 
-    expect(await screen.findByText('Execute')).toBeTruthy()
+    expect(await screen.findByText('Fetch')).toBeTruthy()
     expect(screen.getAllByText(/villageId/).length).toBeGreaterThan(0)
+  })
+
+  // The try-it panel occupies its own splitter pane, so it must stay MOUNTED
+  // before any selection — an empty prompt, not an absent component. If it were
+  // v-if'd away the pane would collapse on first paint and the persisted
+  // divider position would not apply until the user picked a row.
+  it('keeps the try-it pane occupied before any operation is selected', async () => {
+    // Scoped to this render's container: earlier tests leave their mounted
+    // ApiBrowser (with a selection made) in document.body, so a bare `screen`
+    // query would find THEIR Fetch button and fail spuriously.
+    const { container } = renderBrowser()
+    const scoped = within(container)
+
+    expect(scoped.getByText(/Select an operation to try it out/)).toBeTruthy()
+
+    await userEvent.click(scoped.getAllByText('getVillage')[0])
+
+    expect(await scoped.findByText('Fetch')).toBeTruthy()
+    expect(scoped.queryByText(/Select an operation to try it out/)).toBeNull()
   })
 
   it('renders a 403 as a normal result rather than throwing', async () => {
@@ -80,7 +108,7 @@ describe('ApiBrowser', () => {
 
     renderBrowser()
     await userEvent.click(screen.getAllByText('getVillages')[0])
-    await userEvent.click(await screen.findByText('Execute'))
+    await userEvent.click(await screen.findByText('Fetch'))
 
     // The status chip renders the code; no error is thrown, so it resolves
     // and renders here rather than propagating.
@@ -123,7 +151,7 @@ describe('ApiBrowser', () => {
     // Still selected, and the half-filled form must survive — re-selecting
     // the same operationId must not re-trigger the descriptors watch that
     // reinitializes paramValues.
-    expect(await scoped.findByText('Execute')).toBeTruthy()
+    expect(await scoped.findByText('Fetch')).toBeTruthy()
     expect(villageIdInput.value).toBe('42')
     const row = scoped.getAllByText('getVillage')[0].closest('tr')
     expect(row.getAttribute('aria-selected')).toBe('true')
@@ -142,11 +170,11 @@ describe('ApiBrowser', () => {
     const { container } = renderBrowser()
     const scoped = within(container)
 
-    // Execute op A (getVillages) — leave it pending.
+    // Fetch op A (getVillages) — leave it pending.
     await userEvent.click(scoped.getAllByText('getVillages')[0])
-    await userEvent.click(await scoped.findByText('Execute'))
+    await userEvent.click(await scoped.findByText('Fetch'))
 
-    // Switch to op B (getFriends, paramless so Execute stays enabled) before A resolves.
+    // Switch to op B (getFriends, paramless so Fetch stays enabled) before A resolves.
     await userEvent.click(scoped.getAllByText('getFriends')[0])
 
     // The spinner must not appear to belong to B — B's request was never issued.
@@ -172,10 +200,10 @@ describe('ApiBrowser', () => {
     // show the empty/prompt state for the newly-selected op — not A's 418.
     expect(scoped.queryByText(/A-STALE-MARKER-9182/)).toBeFalsy()
     expect(scoped.queryByText('418')).toBeFalsy()
-    expect(scoped.getByText(/Select an operation and execute it/)).toBeTruthy()
+    expect(scoped.getByText(/Select an operation and fetch it/)).toBeTruthy()
 
     // Executing B for real still works and renders B's own response.
-    await userEvent.click(await scoped.findByText('Execute'))
+    await userEvent.click(await scoped.findByText('Fetch'))
     expect(await scoped.findByText('op')).toBeTruthy()
     expect(await scoped.findByText(/"B"/)).toBeTruthy()
     expect(scoped.queryByText(/A-STALE-MARKER-9182/)).toBeFalsy()

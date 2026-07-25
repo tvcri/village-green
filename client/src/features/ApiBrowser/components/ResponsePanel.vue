@@ -129,7 +129,7 @@ function download() {
     </template>
 
     <div v-else class="response-center muted">
-      Select an operation and execute it to see the response here
+      Select an operation and fetch it to see the response here
     </div>
   </div>
 </template>

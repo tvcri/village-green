@@ -22,6 +22,14 @@ const selection = computed(() =>
   props.rows.find(row => row.operationId === props.selectedOperationId) ?? null
 )
 
+// Summary has no column, so the row's native title carries it. A native
+// tooltip (not v-tooltip) because the directive binds to one element, and
+// PrimeVue renders rows internally — pass-through `title` is the only way to
+// reach every <tr> without a body template on each column.
+function rowTitle(row) {
+  return row?.summary ?? ''
+}
+
 function onRowSelect(event) {
   emit('select', event.data.operationId)
 }
@@ -49,6 +57,8 @@ function onRowUnselect() {}
       v-model:filters="filters"
       :selection="selection"
       :global-filter-fields="['path', 'operationId', 'summary', 'tag']"
+      :row-hover="true"
+      :pt="{ bodyRow: ({ props: rowProps }) => ({ title: rowTitle(rowProps.rowData) }) }"
       selection-mode="single"
       data-key="operationId"
       sort-mode="single"
@@ -66,10 +76,10 @@ function onRowUnselect() {}
         </template>
       </Column>
       <Column field="tag" header="Tag" sortable style="width: 11rem" />
+      <!-- Summary is deliberately absent as a column — it rides along as this
+           row's tooltip. It was the column forcing rows to wrap. -->
+      <Column field="operationId" header="Operation" sortable />
       <Column field="path" header="Path" sortable />
-      <Column field="operationId" header="operationId" sortable />
-      <Column field="summary" header="Summary" />
-      <Column field="paramCount" header="Params" sortable style="width: 6rem" />
       <template #empty>No operations match the filter.</template>
     </DataTable>
   </div>
@@ -95,5 +105,14 @@ function onRowUnselect() {}
 .operation-table :deep(.p-datatable) {
   flex: 1 1 auto;
   min-height: 0;
+}
+/* One line per row. Without this a long operationId wraps and that row grows
+   taller than its neighbours, which is the multiline behavior we're removing.
+   min-width:0 is required for ellipsis to engage inside a table cell. */
+.operation-table :deep(.p-datatable-tbody > tr > td) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 </style>
