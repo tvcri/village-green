@@ -626,7 +626,7 @@ DELIMITER $
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ $
 /*!50003 SET @saved_time_zone      = @@time_zone */ $
 /*!50003 SET time_zone             = 'SYSTEM' */ $
-/*!50106 CREATE*/ /*!50117 DEFINER=`root`@`%`*/ /*!50106 EVENT `vg_reminder_enqueue` ON SCHEDULE EVERY 1 DAY STARTS '2026-07-24 11:00:00' ON COMPLETION NOT PRESERVE ENABLE DO INSERT INTO notification_event (eventType, serviceRequestId)
+/*!50106 CREATE*/ /*!50117 */ /*!50106 EVENT `vg_reminder_enqueue` ON SCHEDULE EVERY 1 DAY STARTS '2026-07-24 11:00:00' ON COMPLETION NOT PRESERVE ENABLE DO INSERT INTO notification_event (eventType, serviceRequestId)
   SELECT 'reminder', sr.id
   FROM service_request sr
   WHERE sr.status = 'Confirmed'
@@ -675,4 +675,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-25 22:58:45
+-- Dump completed on 2026-07-25 23:25:08
