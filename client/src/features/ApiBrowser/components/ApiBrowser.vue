@@ -3,8 +3,12 @@ import { computed, ref } from 'vue'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import OperationTable from './OperationTable.vue'
+import TryItPanel from './TryItPanel.vue'
 import { getApiSpec } from '../../../shared/api/apiClient.js'
 import { buildOperationRows } from '../lib/operationRows.js'
+import { buildDescriptors } from '../lib/paramModel.js'
+import { initialValues } from '../lib/paramValues.js'
+import { watch } from 'vue'
 
 const selectedOperationId = ref('')
 
@@ -16,6 +20,20 @@ const rows = computed(() => {
 function onSelect(operationId) {
   selectedOperationId.value = operationId
 }
+
+const paramValues = ref({})
+
+const selectedOp = computed(() => {
+  const spec = getApiSpec()
+  return selectedOperationId.value ? spec?.operationMap.get(selectedOperationId.value) : null
+})
+
+const descriptors = computed(() =>
+  selectedOp.value ? buildDescriptors(selectedOp.value.params) : []
+)
+
+// Reset the form whenever the selected operation changes.
+watch(descriptors, next => { paramValues.value = initialValues(next) })
 </script>
 
 <template>
@@ -28,6 +46,14 @@ function onSelect(operationId) {
             :rows="rows"
             :selected-operation-id="selectedOperationId"
             @select="onSelect"
+          />
+          <TryItPanel
+            v-if="selectedOperationId"
+            class="tryit-form"
+            :operation-id="selectedOperationId"
+            :descriptors="descriptors"
+            :values="paramValues"
+            @update:values="paramValues = $event"
           />
         </div>
       </SplitterPanel>
@@ -83,6 +109,13 @@ function onSelect(operationId) {
 .op-table {
   flex: 1 1 auto;
   min-height: 0;
+}
+/* Content-sized so the split rebalances automatically as field count changes;
+   capped + scrollable so a 9-param form can't squeeze the table to nothing. */
+.tryit-form {
+  flex: 0 0 auto;
+  max-height: 45%;
+  overflow-y: auto;
 }
 .response-empty {
   height: 100%;
