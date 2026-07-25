@@ -1,4 +1,5 @@
 import { postAnalyticsEvents } from '../api/analyticsApi.js'
+import { deviceClass } from '../lib/deviceClass.js'
 
 const queue = []
 let flushTimer = null
@@ -51,6 +52,7 @@ export function useAnalytics() {
       path: route.path ?? null,
       eventName: null,
       metadata: null,
+      deviceClass,
     })
   }
 
@@ -61,6 +63,7 @@ export function useAnalytics() {
       path: null,
       eventName,
       metadata,
+      deviceClass,
     })
   }
 
