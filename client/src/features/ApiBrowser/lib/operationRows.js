@@ -10,14 +10,23 @@ export const EXCLUDED_OPERATION_IDS = new Set(['streamStateSse'])
 /**
  * Flatten an OpenApiOps operationMap into rows for the operation DataTable.
  *
- * @param {Map<string, {path: string, method: string, params: object, summary?: string, tags?: string[]}>} operationMap
+ * Operations marked `x-elevation-required` in the spec are hidden from users
+ * who cannot elevate: the API would reject every one of them, so listing them
+ * would offer nothing but guaranteed 403s. Users who CAN elevate still see
+ * them regardless of whether they are currently elevated — gating on live
+ * elevation state would make rows appear and vanish as the user toggles it.
+ *
+ * @param {Map<string, {path: string, method: string, params: object, summary?: string, tags?: string[], elevationRequired?: boolean}>} operationMap
+ * @param {object} [options]
+ * @param {boolean} [options.canElevate] - when false, elevation-required operations are omitted
  * @returns {Array<{operationId: string, method: string, tag: string, path: string, summary: string, paramCount: number}>}
  */
-export function buildOperationRows(operationMap) {
+export function buildOperationRows(operationMap, { canElevate = false } = {}) {
   const rows = []
   for (const [operationId, op] of operationMap) {
     if (op.method !== 'get') continue
     if (EXCLUDED_OPERATION_IDS.has(operationId)) continue
+    if (op.elevationRequired && !canElevate) continue
     rows.push({
       operationId,
       method: op.method.toUpperCase(),

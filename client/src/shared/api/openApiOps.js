@@ -12,7 +12,7 @@ class OpenApiOps {
   constructor({ apiBase, definition }) {
     this.definition = definition
     this.apiBase = apiBase || definition.servers?.[0]?.url
-    /** @type {Map<string,{path, method, params, summary, description, tags}>} */
+    /** @type {Map<string,{path, method, params, summary, description, tags, elevationRequired}>} */
     this.operationMap = this.#buildOperationIdMap(this.definition)
   }
 
@@ -20,7 +20,7 @@ class OpenApiOps {
    * Creates and populates an operationMap from an OAS definition
    *
    * @param {object} definition parsed JSON of the OAS definition
-   * @returns {Map<string,{path, method, params, summary, description, tags}>}
+   * @returns {Map<string,{path, method, params, summary, description, tags, elevationRequired}>}
    */
   #buildOperationIdMap(definition) {
     // One pass resolves every $ref in this spec (verified: 583 -> 0, nested 5
@@ -51,6 +51,9 @@ class OpenApiOps {
             summary: value.summary,
             description: value.description,
             tags: value.tags ?? [],
+            // The spec sets x-elevation-required: true and never false, so
+            // presence is the signal; normalize to a plain boolean here.
+            elevationRequired: value['x-elevation-required'] === true,
           })
         }
       }

@@ -20,6 +20,10 @@ function fixtureMap() {
       path: '/villages', method: 'post', params: {},
       summary: 'Create a Village', tags: ['Village'],
     }],
+    ['getJobs', {
+      path: '/jobs', method: 'get', params: {},
+      summary: 'Return the Jobs', tags: ['Job'], elevationRequired: true,
+    }],
   ])
 }
 
@@ -28,6 +32,26 @@ describe('buildOperationRows', () => {
     const rows = buildOperationRows(fixtureMap())
     expect(rows.every(r => r.method === 'GET')).toBe(true)
     expect(rows.find(r => r.operationId === 'createVillage')).toBeUndefined()
+  })
+
+  // x-elevation-required operations would 403 for a user who cannot elevate,
+  // so they are omitted entirely rather than listed and left to fail.
+  it('hides elevation-required operations when the user cannot elevate', () => {
+    const rows = buildOperationRows(fixtureMap(), { canElevate: false })
+    expect(rows.find(r => r.operationId === 'getJobs')).toBeUndefined()
+    // Non-elevated operations are unaffected.
+    expect(rows.find(r => r.operationId === 'getVillages')).toBeDefined()
+  })
+
+  it('shows elevation-required operations when the user can elevate', () => {
+    const rows = buildOperationRows(fixtureMap(), { canElevate: true })
+    expect(rows.find(r => r.operationId === 'getJobs')).toBeDefined()
+  })
+
+  // Fail closed: an omitted flag must hide them, not reveal them.
+  it('hides elevation-required operations when no option is passed', () => {
+    const rows = buildOperationRows(fixtureMap())
+    expect(rows.find(r => r.operationId === 'getJobs')).toBeUndefined()
   })
 
   it('excludes streamStateSse', () => {
