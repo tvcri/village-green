@@ -5422,6 +5422,10 @@ components:
           type: object
           nullable: true
           additionalProperties: true
+        deviceClass:
+          type: string
+          enum: [mobile, tablet, desktop, unknown]
+      additionalProperties: false
     AnalyticsSummaryRow:
       type: object
       properties:
@@ -5436,6 +5440,14 @@ components:
           type: string
           format: date-time
           nullable: true
+        mobileVisits:
+          type: integer
+        tabletVisits:
+          type: integer
+        desktopVisits:
+          type: integer
+        unknownVisits:
+          type: integer
   parameters:
     AppDataFormatQuery:
       name: format
