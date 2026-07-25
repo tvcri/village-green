@@ -4,10 +4,13 @@ import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import OperationTable from './OperationTable.vue'
 import TryItPanel from './TryItPanel.vue'
-import { getApiSpec, getUrlForOperation } from '../../../shared/api/apiClient.js'
+import ResponsePanel from './ResponsePanel.vue'
+import { apiCall, getApiSpec, getUrlForOperation } from '../../../shared/api/apiClient.js'
+import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { buildOperationRows } from '../lib/operationRows.js'
 import { buildDescriptors } from '../lib/paramModel.js'
 import { initialValues, toParams } from '../lib/paramValues.js'
+import { metaFromError, metaFromResponse } from '../lib/responseMeta.js'
 import { watch } from 'vue'
 
 const selectedOperationId = ref('')
@@ -48,6 +51,33 @@ const resolvedUrl = computed(() => {
     return { url: '', hint: err.message }
   }
 })
+
+const { state: result, isLoading, execute } = useAsyncState(
+  async () => {
+    const t0 = performance.now()
+    try {
+      const res = await apiCall(
+        selectedOperationId.value,
+        requestParams.value,
+        undefined,
+        { responseType: 'response' },
+      )
+      const text = await res.text()
+      return metaFromResponse(res, text, performance.now() - t0)
+    }
+    catch (err) {
+      // The privacy-ack modal owns this one; swallowing it would render a dead
+      // result behind a modal that has already unmounted the router-view.
+      if (err?.name === 'PrivacyAckError') throw err
+      // Everything else — 403, 404, 500 — is a RESULT, not an error.
+      return metaFromError(err, performance.now() - t0)
+    }
+  },
+  { immediate: false, onError: null },
+)
+
+// Clear a stale response when the selection changes.
+watch(selectedOperationId, () => { result.value = null })
 </script>
 
 <template>
@@ -68,13 +98,19 @@ const resolvedUrl = computed(() => {
             :descriptors="descriptors"
             :values="paramValues"
             :resolved="resolvedUrl"
+            :is-loading="isLoading"
             @update:values="paramValues = $event"
+            @execute="execute"
           />
         </div>
       </SplitterPanel>
       <SplitterPanel class="split-panel" :size="45" :min-size="25">
         <div class="response-column">
-          <div class="response-empty">Select an operation and execute it to see the response here</div>
+          <ResponsePanel
+            :result="result"
+            :is-loading="isLoading"
+            :operation-id="selectedOperationId"
+          />
         </div>
       </SplitterPanel>
     </Splitter>
