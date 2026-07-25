@@ -27,6 +27,15 @@ vi.mock('../../../shared/api/apiClient.js', () => ({
 
 vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
 
+const mockTriggerError = vi.fn()
+vi.mock('../../../shared/composables/useGlobalError.js', () => ({
+  useGlobalError: () => ({
+    error: { value: null },
+    triggerError: mockTriggerError,
+    clearError: vi.fn(),
+  }),
+}))
+
 const ApiBrowser = (await import('../components/ApiBrowser.vue')).default
 
 function renderBrowser() {
@@ -69,9 +78,13 @@ describe('ApiBrowser', () => {
     await userEvent.click(screen.getAllByText('getVillages')[0])
     await userEvent.click(await screen.findByText('Execute'))
 
-    // The status chip renders the code; no error is thrown and no global modal
-    // is triggered (useAsyncState was given onError: null).
+    // The status chip renders the code; no error is thrown, so it resolves
+    // and renders here rather than propagating.
     expect(await screen.findByText('403')).toBeTruthy()
     expect(screen.getAllByText(/forbidden/).length).toBeGreaterThan(0)
+    // And it must never reach the global error mechanism that drives
+    // GlobalErrorModal.vue — the 403 renders in-panel as a normal result,
+    // it does not pop the app-wide error modal.
+    expect(mockTriggerError).not.toHaveBeenCalled()
   })
 })
