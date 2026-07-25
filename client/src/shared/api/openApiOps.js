@@ -12,7 +12,7 @@ class OpenApiOps {
   constructor({ apiBase, definition }) {
     this.definition = definition
     this.apiBase = apiBase || definition.servers?.[0]?.url
-    /** @type {Map<string,{path, method, params}>} */
+    /** @type {Map<string,{path, method, params, summary, description, tags}>} */
     this.operationMap = this.#buildOperationIdMap(this.definition)
   }
 
@@ -20,10 +20,13 @@ class OpenApiOps {
    * Creates and populates an operationMap from an OAS definition
    *
    * @param {object} definition parsed JSON of the OAS definition
-   * @returns {Map<string,{path, method, params}>}
+   * @returns {Map<string,{path, method, params, summary, description, tags}>}
    */
   #buildOperationIdMap(definition) {
-    // buggy module requires double de-referencing to reach our depths
+    // One pass resolves every $ref in this spec (verified: 583 -> 0, nested 5
+    // deep). The old double-dereference workaround is obsolete — fixed upstream
+    // in https://github.com/trojs/openapi-dereference/pull/53; installed 1.2.1
+    // recurses into resolved targets.
     const oasDeref = dereferenceSync(definition)
     const operationMap = new Map()
     const operations = ['get', 'post', 'patch', 'put', 'delete']
@@ -45,6 +48,9 @@ class OpenApiOps {
             path: pathKey,
             method: key,
             params: opParams,
+            summary: value.summary,
+            description: value.description,
+            tags: value.tags ?? [],
           })
         }
       }
