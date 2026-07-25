@@ -46,6 +46,9 @@ watch([fromDate, toDate, userIdFilter], onFilterChange)
       <Column field="routeName" header="Route" sortable />
       <Column field="totalVisits" header="Total Visits" sortable />
       <Column field="uniqueUsers" header="Unique Users" sortable />
+      <Column field="mobileVisits" header="Mobile" sortable />
+      <Column field="tabletVisits" header="Tablet" sortable />
+      <Column field="desktopVisits" header="Desktop" sortable />
       <Column field="lastVisited" header="Last Visited" sortable>
         <template #body="{ data }">
           {{ data.lastVisited ? new Date(data.lastVisited).toLocaleString() : '—' }}
@@ -58,7 +61,7 @@ watch([fromDate, toDate, userIdFilter], onFilterChange)
 <style scoped>
 .analytics-summary {
   padding: 2rem;
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
