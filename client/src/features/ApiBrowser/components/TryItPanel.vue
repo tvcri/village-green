@@ -26,8 +26,13 @@ function setValue(name, value) {
 }
 
 async function copy(text, what) {
-  await navigator.clipboard.writeText(text)
-  toast.add({ severity: 'success', summary: `${what} copied`, life: 1500 })
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.add({ severity: 'success', summary: `${what} copied`, life: 1500 })
+  }
+  catch {
+    toast.add({ severity: 'error', summary: `Could not copy ${what.toLowerCase()}`, life: 3000 })
+  }
 }
 </script>
 

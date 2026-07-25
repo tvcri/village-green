@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
@@ -7,7 +7,7 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Tag from 'primevue/tag'
 
-defineProps({
+const props = defineProps({
   rows: { type: Array, required: true },
   selectedOperationId: { type: String, default: '' },
 })
@@ -15,9 +15,24 @@ const emit = defineEmits(['select'])
 
 const filters = ref({ global: { value: null, matchMode: 'contains' } })
 
+// Single source of truth is the parent's selectedOperationId — look up the
+// row object PrimeVue needs for its `selection` prop rather than tracking a
+// second, parallel piece of selection state in this component.
+const selection = computed(() =>
+  props.rows.find(row => row.operationId === props.selectedOperationId) ?? null
+)
+
 function onRowSelect(event) {
   emit('select', event.data.operationId)
 }
+
+// With `selection` bound, PrimeVue fires row-unselect when the user clicks
+// the row that is already selected (its default toggle behavior). Re-clicking
+// the selected operation is almost always the user re-focusing it, not asking
+// to clear it — and emitting `select` here would be a no-op anyway (parent's
+// operationId ref already holds this value), while emitting nothing keeps the
+// row highlighted instead of flashing unselected. Deliberately swallow it.
+function onRowUnselect() {}
 </script>
 
 <template>
@@ -32,6 +47,7 @@ function onRowSelect(event) {
     <DataTable
       :value="rows"
       v-model:filters="filters"
+      :selection="selection"
       :global-filter-fields="['path', 'operationId', 'summary', 'tag']"
       selection-mode="single"
       data-key="operationId"
@@ -42,6 +58,7 @@ function onRowSelect(event) {
       size="small"
       striped-rows
       @row-select="onRowSelect"
+      @row-unselect="onRowUnselect"
     >
       <Column field="method" header="Method" sortable style="width: 6rem">
         <template #body="{ data }">

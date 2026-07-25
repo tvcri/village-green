@@ -8,8 +8,8 @@ const props = defineProps({
   value: { type: null, required: true },
   path: { type: String, default: '$' },
   label: { type: String, default: '' },
-  expanded: { type: Object, required: true },
-  limits: { type: Object, required: true },
+  expanded: { type: Set, required: true },
+  limits: { type: Map, required: true },
 })
 const emit = defineEmits(['toggle', 'more'])
 

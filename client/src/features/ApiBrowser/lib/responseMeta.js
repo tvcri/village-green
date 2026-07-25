@@ -17,7 +17,7 @@ function looksJson(contentType) {
  * `bytes` measures the DECODED body, not transfer size: content-length is the
  * compressed figure and is often absent under chunked encoding.
  */
-export function metaFromResponse(res, text, ms) {
+export function metaFromResponse(res, text, ms, forOperationId = null) {
   const contentType = res.headers.get('content-type') ?? ''
   let body = null
   let isJson = false
@@ -40,6 +40,7 @@ export function metaFromResponse(res, text, ms) {
     body,
     isJson,
     raw: text,
+    forOperationId,
   }
 }
 
@@ -48,7 +49,7 @@ export function metaFromResponse(res, text, ms) {
  * non-2xx arrives as an ApiError (already carrying status and a parsed body),
  * never as a Response. A 403/404 is a RESULT here, not an error.
  */
-export function metaFromError(err, ms) {
+export function metaFromError(err, ms, forOperationId = null) {
   const isApiError = err?.name === 'ApiError' || err?.name === 'PrivacyAckError'
   if (isApiError) {
     const isJson = err.body !== null && typeof err.body === 'object'
@@ -63,6 +64,7 @@ export function metaFromError(err, ms) {
       body: isJson ? err.body : null,
       isJson,
       raw,
+      forOperationId,
     }
   }
   return {
@@ -76,5 +78,6 @@ export function metaFromError(err, ms) {
     isJson: false,
     raw: '',
     transport: true,
+    forOperationId,
   }
 }

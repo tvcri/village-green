@@ -16,6 +16,12 @@ describe('metaFromResponse', () => {
     expect(meta.body).toEqual({ a: 1 })
     expect(meta.isJson).toBe(true)
     expect(meta.ms).toBe(12.4)
+    expect(meta.forOperationId).toBe(null)
+  })
+
+  it('stamps the supplied operation identity, defaulting to null', () => {
+    const meta = metaFromResponse(fakeResponse(), '{"a":1}', 1, 'getVillage')
+    expect(meta.forOperationId).toBe('getVillage')
   })
 
   it('keeps non-JSON bodies as raw text', () => {
@@ -49,5 +55,11 @@ describe('metaFromError', () => {
     expect(meta.status).toBe(null)
     expect(meta.transport).toBe(true)
     expect(meta.statusText).toContain('Failed to fetch')
+  })
+
+  it('stamps the supplied operation identity on both the ApiError and transport-failure shapes', () => {
+    const apiErr = { name: 'ApiError', message: 'HTTP 403', status: 403, url: '/x', body: { error: 'forbidden' } }
+    expect(metaFromError(apiErr, 8, 'getVillage').forOperationId).toBe('getVillage')
+    expect(metaFromError(new TypeError('Failed to fetch'), 5, 'getVillage').forOperationId).toBe('getVillage')
   })
 })

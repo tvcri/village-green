@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import OperationTable from './OperationTable.vue'
@@ -11,7 +11,6 @@ import { buildOperationRows } from '../lib/operationRows.js'
 import { buildDescriptors } from '../lib/paramModel.js'
 import { initialValues, toParams } from '../lib/paramValues.js'
 import { metaFromError, metaFromResponse } from '../lib/responseMeta.js'
-import { watch } from 'vue'
 
 const selectedOperationId = ref('')
 
@@ -52,28 +51,56 @@ const resolvedUrl = computed(() => {
   }
 })
 
+// Which operationId the in-flight (or most recently settled) request
+// belongs to. useAsyncState's generation counter only guards a NEWER
+// execute() call from a stale one — it does nothing when the selection
+// changes without a new execute(), so a request for A left running while the
+// user switches to B still resolves and would otherwise write A's result (and
+// A's loading state) under B. Stamping identity here, and gating both the
+// result and isLoading on it below, keeps the fix local to this feature
+// instead of touching the shared composable.
+const inFlightOperationId = ref(null)
+
 const { state: result, isLoading, execute } = useAsyncState(
   async () => {
+    const requestOperationId = selectedOperationId.value
+    inFlightOperationId.value = requestOperationId
     const t0 = performance.now()
     try {
       const res = await apiCall(
-        selectedOperationId.value,
+        requestOperationId,
         requestParams.value,
         undefined,
         { responseType: 'response' },
       )
       const text = await res.text()
-      return metaFromResponse(res, text, performance.now() - t0)
+      return metaFromResponse(res, text, performance.now() - t0, requestOperationId)
     }
     catch (err) {
       // The privacy-ack modal owns this one; swallowing it would render a dead
       // result behind a modal that has already unmounted the router-view.
       if (err?.name === 'PrivacyAckError') throw err
       // Everything else — 403, 404, 500 — is a RESULT, not an error.
-      return metaFromError(err, performance.now() - t0)
+      return metaFromError(err, performance.now() - t0, requestOperationId)
     }
   },
   { immediate: false, onError: null },
+)
+
+// A response for an operation the user has since switched away from is
+// discarded rather than displayed — it's stale, not just old.
+const resultForSelection = computed(() => {
+  const r = result.value
+  if (!r) return null
+  return r.forOperationId === selectedOperationId.value ? r : null
+})
+
+// The spinner must only appear to belong to the currently-selected
+// operation. isLoading alone would keep spinning for the OLD operation's
+// still-in-flight request after the user has switched to a new one that was
+// never executed.
+const isLoadingForSelection = computed(
+  () => isLoading.value && inFlightOperationId.value === selectedOperationId.value
 )
 
 // Clear a stale response when the selection changes.
@@ -98,7 +125,7 @@ watch(selectedOperationId, () => { result.value = null })
             :descriptors="descriptors"
             :values="paramValues"
             :resolved="resolvedUrl"
-            :is-loading="isLoading"
+            :is-loading="isLoadingForSelection"
             @update:values="paramValues = $event"
             @execute="execute"
           />
@@ -107,8 +134,8 @@ watch(selectedOperationId, () => { result.value = null })
       <SplitterPanel class="split-panel" :size="45" :min-size="25">
         <div class="response-column">
           <ResponsePanel
-            :result="result"
-            :is-loading="isLoading"
+            :result="resultForSelection"
+            :is-loading="isLoadingForSelection"
             :operation-id="selectedOperationId"
           />
         </div>
@@ -167,13 +194,5 @@ watch(selectedOperationId, () => { result.value = null })
   flex: 0 0 auto;
   max-height: 45%;
   overflow-y: auto;
-}
-.response-empty {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-dim);
-  text-align: center;
 }
 </style>

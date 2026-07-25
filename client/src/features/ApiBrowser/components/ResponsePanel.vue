@@ -44,8 +44,13 @@ function setDepth(n) {
 }
 
 async function copyJson() {
-  await navigator.clipboard.writeText(JSON.stringify(props.result.body, null, 2))
-  toast.add({ severity: 'success', summary: 'JSON copied', life: 1500 })
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(props.result.body, null, 2))
+    toast.add({ severity: 'success', summary: 'JSON copied', life: 1500 })
+  }
+  catch {
+    toast.add({ severity: 'error', summary: 'Could not copy JSON', life: 3000 })
+  }
 }
 
 const severity = computed(() => {
@@ -154,16 +159,6 @@ function download() {
 .spacer {
   flex: 1 1 auto;
 }
-.raw-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  margin: 0;
-  padding: 0.6rem;
-  font-size: 0.78rem;
-  background: var(--color-background-dark);
-  border-radius: 4px;
-}
 .response-center {
   height: 100%;
   display: flex;
@@ -176,7 +171,7 @@ function download() {
   color: var(--color-text-dim);
 }
 .transport-error {
-  color: var(--color-danger, #dc2626);
+  color: var(--color-status-error-text);
 }
 .tree-region {
   flex: 1 1 auto;
