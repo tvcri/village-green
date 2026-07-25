@@ -1,8 +1,12 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
+import { useToast } from 'primevue/usetoast'
+import JsonTree from './JsonTree.vue'
+import JsonTreeToolbar from './JsonTreeToolbar.vue'
+import { pathsToDepth } from '../lib/jsonTreeModel.js'
 import { MAX_TREE_BYTES } from '../lib/responseMeta.js'
 
 const props = defineProps({
@@ -10,6 +14,39 @@ const props = defineProps({
   isLoading: { type: Boolean, default: false },
   operationId: { type: String, default: '' },
 })
+
+const toast = useToast()
+const expanded = ref(new Set())
+const limits = ref(new Map())
+const depth = ref(2)
+
+watch(() => props.result, next => {
+  limits.value = new Map()
+  expanded.value = next?.isJson ? pathsToDepth(next.body, depth.value) : new Set()
+})
+
+function onToggle(path) {
+  const set = new Set(expanded.value)
+  if (set.has(path)) set.delete(path)
+  else set.add(path)
+  expanded.value = set
+}
+
+function onMore(path) {
+  const map = new Map(limits.value)
+  map.set(path, (map.get(path) ?? 200) + 200)
+  limits.value = map
+}
+
+function setDepth(n) {
+  depth.value = n
+  expanded.value = pathsToDepth(props.result?.body, n)
+}
+
+async function copyJson() {
+  await navigator.clipboard.writeText(JSON.stringify(props.result.body, null, 2))
+  toast.add({ severity: 'success', summary: 'JSON copied', life: 1500 })
+}
 
 const severity = computed(() => {
   const status = props.result?.status
@@ -65,7 +102,25 @@ function download() {
         Response is {{ sizeLabel }}, too large to render as a tree — use Download.
       </p>
 
-      <pre v-else class="raw-body">{{ result.raw }}</pre>
+      <template v-else>
+        <JsonTreeToolbar
+          :depth="depth"
+          @expand-all="expanded = pathsToDepth(result.body, Infinity)"
+          @collapse-all="expanded = new Set()"
+          @set-depth="setDepth"
+          @copy="copyJson"
+        />
+        <div class="tree-region json-tree">
+          <JsonTree
+            :value="result.body"
+            path="$"
+            :expanded="expanded"
+            :limits="limits"
+            @toggle="onToggle"
+            @more="onMore"
+          />
+        </div>
+      </template>
     </template>
 
     <div v-else class="response-center muted">
@@ -122,5 +177,31 @@ function download() {
 }
 .transport-error {
   color: var(--color-danger, #dc2626);
+}
+.tree-region {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.6rem;
+  background: var(--color-background-dark);
+  border-radius: 4px;
+}
+/* Type colors as custom properties, defined once and overridden in a single
+   dark block rather than per-rule. All selectors stay under .json-tree. */
+.json-tree {
+  --jt-key: #7c3aed;
+  --jt-string: #16a34a;
+  --jt-number: #2563eb;
+  --jt-bool: #c2410c;
+  --jt-null: var(--color-text-dim);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+:global(:root.app-dark) .json-tree {
+  --jt-key: #c4b5fd;
+  --jt-string: #86efac;
+  --jt-number: #93c5fd;
+  --jt-bool: #fdba74;
 }
 </style>
