@@ -1,16 +1,21 @@
 <script setup>
 import { computed } from 'vue'
 import Button from 'primevue/button'
+import { useToast } from 'primevue/usetoast'
 import ParamField from './ParamField.vue'
 import { isOmitted } from '../lib/paramValues.js'
+import { toCurl } from '../lib/curl.js'
 
 const props = defineProps({
   operationId: { type: String, required: true },
   descriptors: { type: Array, required: true },
   values: { type: Object, required: true },
   isLoading: { type: Boolean, default: false },
+  resolved: { type: Object, default: () => ({ url: '', hint: '' }) },
 })
 const emit = defineEmits(['update:values', 'execute'])
+
+const toast = useToast()
 
 const missingRequired = computed(() =>
   props.descriptors.filter(d => d.required && isOmitted(props.values[d.name])).map(d => d.name)
@@ -18,6 +23,11 @@ const missingRequired = computed(() =>
 
 function setValue(name, value) {
   emit('update:values', { ...props.values, [name]: value })
+}
+
+async function copy(text, what) {
+  await navigator.clipboard.writeText(text)
+  toast.add({ severity: 'success', summary: `${what} copied`, life: 1500 })
 }
 </script>
 
@@ -31,6 +41,29 @@ function setValue(name, value) {
         :loading="isLoading"
         :disabled="missingRequired.length > 0 || isLoading"
         @click="emit('execute')"
+      />
+    </div>
+
+    <div class="url-bar">
+      <code v-if="resolved.url" class="url-text">{{ resolved.url }}</code>
+      <code v-else class="url-text muted">{{ resolved.hint || '—' }}</code>
+      <Button
+        icon="pi pi-copy"
+        severity="secondary"
+        text
+        aria-label="Copy URL"
+        v-tooltip.bottom="'Copy URL'"
+        :disabled="!resolved.url"
+        @click="copy(resolved.url, 'URL')"
+      />
+      <Button
+        label="curl"
+        icon="pi pi-terminal"
+        severity="secondary"
+        text
+        v-tooltip.bottom="'Copy as curl (token redacted as $TOKEN)'"
+        :disabled="!resolved.url"
+        @click="copy(toCurl(resolved.url), 'curl command')"
       />
     </div>
 
@@ -79,5 +112,24 @@ function setValue(name, value) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0.75rem;
+}
+.url-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.url-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  background: var(--color-background-dark);
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+}
+.url-text.muted {
+  color: var(--color-text-dim);
 }
 </style>

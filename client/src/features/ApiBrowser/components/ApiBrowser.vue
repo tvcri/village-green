@@ -4,10 +4,10 @@ import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 import OperationTable from './OperationTable.vue'
 import TryItPanel from './TryItPanel.vue'
-import { getApiSpec } from '../../../shared/api/apiClient.js'
+import { getApiSpec, getUrlForOperation } from '../../../shared/api/apiClient.js'
 import { buildOperationRows } from '../lib/operationRows.js'
 import { buildDescriptors } from '../lib/paramModel.js'
-import { initialValues } from '../lib/paramValues.js'
+import { initialValues, toParams } from '../lib/paramValues.js'
 import { watch } from 'vue'
 
 const selectedOperationId = ref('')
@@ -34,6 +34,20 @@ const descriptors = computed(() =>
 
 // Reset the form whenever the selected operation changes.
 watch(descriptors, next => { paramValues.value = initialValues(next) })
+
+const requestParams = computed(() => toParams(descriptors.value, paramValues.value))
+
+// getUrl throws while a required path param is blank — the normal state right
+// after selecting an op — and its message is already user-facing.
+const resolvedUrl = computed(() => {
+  if (!selectedOperationId.value) return { url: '', hint: '' }
+  try {
+    return { url: getUrlForOperation(selectedOperationId.value, requestParams.value), hint: '' }
+  }
+  catch (err) {
+    return { url: '', hint: err.message }
+  }
+})
 </script>
 
 <template>
@@ -53,6 +67,7 @@ watch(descriptors, next => { paramValues.value = initialValues(next) })
             :operation-id="selectedOperationId"
             :descriptors="descriptors"
             :values="paramValues"
+            :resolved="resolvedUrl"
             @update:values="paramValues = $event"
           />
         </div>

@@ -139,7 +139,7 @@ const dateValue = computed(() => (props.modelValue ? serviceDateToDate(props.mod
   gap: 0.35rem;
 }
 .required {
-  color: var(--color-danger, #dc2626);
+  color: var(--color-status-error-text);
 }
 .param-in {
   font-weight: 400;
@@ -152,6 +152,6 @@ const dateValue = computed(() => (props.modelValue ? serviceDateToDate(props.mod
   line-height: 1.3;
 }
 .param-hint.warn {
-  color: var(--color-warning, #b45309);
+  color: var(--color-status-warning-text);
 }
 </style>
