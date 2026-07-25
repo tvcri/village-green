@@ -26,6 +26,13 @@ export function navigationGuard(to) {
     }
   }
 
+  // Routes that need *some* grant but no specific permission. Gates on
+  // isGrantless directly rather than relying on the volunteer redirect above,
+  // which only catches users who are BOTH volunteers and grantless.
+  if (to.meta.requiresAnyGrant && isGrantless.value) {
+    return { name: 'villages' }
+  }
+
   // Meta section requires some federation-scoped role
   if (to.path === '/meta' || to.path.startsWith('/meta/')) {
     if (!hasFederationAccess.value) return { name: 'villages' }
