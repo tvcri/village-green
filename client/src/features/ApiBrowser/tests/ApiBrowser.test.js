@@ -152,21 +152,32 @@ describe('ApiBrowser', () => {
     // The spinner must not appear to belong to B — B's request was never issued.
     expect(container.querySelector('.p-progressspinner')).toBeFalsy()
 
-    // Now let A resolve. Its body must NOT appear under B.
+    // Now let A resolve, with a status/body that appears nowhere else in this
+    // fixture. Flush enough microtask ticks that useAsyncState's `await`
+    // chain (res.text() -> metaFromResponse -> state.value = result) actually
+    // runs and WRITES result.value with A's meta while B is still selected —
+    // otherwise this assertion would hold vacuously whether or not the
+    // discard guard (`resultForSelection`) exists, since there'd be nothing
+    // stale to wrongly render in the first place.
     resolveA({
-      status: 200, statusText: 'OK',
+      status: 418, statusText: "I'm a teapot",
       headers: { get: name => (name === 'content-type' ? 'application/json' : null) },
-      text: () => Promise.resolve('{"op":"A-stale"}'),
+      text: () => Promise.resolve('{"marker":"A-STALE-MARKER-9182"}'),
     })
-    await Promise.resolve()
-    await Promise.resolve()
+    await vi.waitFor(() => expect(mockApiCall).toHaveBeenCalledTimes(1))
+    // Give the res.text()/JSON.parse/state.value write chain time to settle.
+    for (let i = 0; i < 10; i++) await Promise.resolve()
 
-    expect(scoped.queryByText(/A-stale/)).toBeFalsy()
+    // A's distinctive marker must never render under B, and the panel must
+    // show the empty/prompt state for the newly-selected op — not A's 418.
+    expect(scoped.queryByText(/A-STALE-MARKER-9182/)).toBeFalsy()
+    expect(scoped.queryByText('418')).toBeFalsy()
+    expect(scoped.getByText(/Select an operation and execute it/)).toBeTruthy()
 
     // Executing B for real still works and renders B's own response.
     await userEvent.click(await scoped.findByText('Execute'))
     expect(await scoped.findByText('op')).toBeTruthy()
     expect(await scoped.findByText(/"B"/)).toBeTruthy()
-    expect(scoped.queryByText(/A-stale/)).toBeFalsy()
+    expect(scoped.queryByText(/A-STALE-MARKER-9182/)).toBeFalsy()
   })
 })
