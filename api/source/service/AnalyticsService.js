@@ -11,9 +11,10 @@ module.exports.postEvents = async function (userId, events) {
     e.path ?? null,
     e.eventName ?? null,
     e.metadata ? JSON.stringify(e.metadata) : null,
+    e.deviceClass ?? null,
   ])
   await dbUtils.pool.query(
-    `INSERT INTO analytics_events (userId, eventType, routeName, path, eventName, metadata)
+    `INSERT INTO analytics_events (userId, eventType, routeName, path, eventName, metadata, deviceClass)
      VALUES ?`,
     [values]
   )
