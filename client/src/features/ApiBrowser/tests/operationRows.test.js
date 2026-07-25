@@ -60,7 +60,7 @@ describe('buildOperationRows', () => {
     expect(EXCLUDED_OPERATION_IDS.has('streamStateSse')).toBe(true)
   })
 
-  it('projects tag, path, summary and a param count', () => {
+  it('projects tag, path and summary', () => {
     const rows = buildOperationRows(fixtureMap())
     const row = rows.find(r => r.operationId === 'getVillage')
     expect(row).toEqual({
@@ -69,7 +69,6 @@ describe('buildOperationRows', () => {
       tag: 'Village',
       path: '/villages/{villageId}',
       summary: 'Return a Village',
-      paramCount: 2,
     })
   })
 

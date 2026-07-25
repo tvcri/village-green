@@ -19,7 +19,7 @@ export const EXCLUDED_OPERATION_IDS = new Set(['streamStateSse'])
  * @param {Map<string, {path: string, method: string, params: object, summary?: string, tags?: string[], elevationRequired?: boolean}>} operationMap
  * @param {object} [options]
  * @param {boolean} [options.canElevate] - when false, elevation-required operations are omitted
- * @returns {Array<{operationId: string, method: string, tag: string, path: string, summary: string, paramCount: number}>}
+ * @returns {Array<{operationId: string, method: string, tag: string, path: string, summary: string}>}
  */
 export function buildOperationRows(operationMap, { canElevate = false } = {}) {
   const rows = []
@@ -33,7 +33,6 @@ export function buildOperationRows(operationMap, { canElevate = false } = {}) {
       tag: op.tags?.[0] ?? '',
       path: op.path,
       summary: op.summary ?? '',
-      paramCount: Object.keys(op.params ?? {}).length,
     })
   }
   return rows.sort((a, b) => a.tag.localeCompare(b.tag) || a.path.localeCompare(b.path))
