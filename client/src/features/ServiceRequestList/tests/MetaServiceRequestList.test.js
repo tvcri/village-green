@@ -66,18 +66,37 @@ vi.mock('../../../shared/lib/csvUtils.js', async (importOriginal) => ({
 
 describe('MetaServiceRequestList CSV download', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    // NOT clearAllMocks: that would strip the getServiceRequests mock
+    // implementation and every fetch would resolve undefined.
+    vi.mocked(downloadCsv).mockClear()
     // jsdom has no matchMedia; PrimeVue Select uses it on mount
     window.matchMedia = () => ({
       matches: false,
       addEventListener: () => {},
       removeEventListener: () => {}
     })
+    // jsdom has no ResizeObserver; PrimeVue TabList observes its tabs on mount
+    globalThis.ResizeObserver = class {
+      observe () {}
+      unobserve () {}
+      disconnect () {}
+    }
   })
 
   // vitest `globals` is off in vite.config.js, so Testing Library's automatic
   // cleanup never registers and mounted components leak between tests.
   afterEach(() => { cleanup() })
+
+  it('fetches the Active tab on mount and never requests draft', async () => {
+    const { getServiceRequests } = await import('../api/serviceRequestApi.js')
+    getServiceRequests.mockClear()
+    render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await waitFor(() => expect(getServiceRequests).toHaveBeenCalled())
+    const firstArgs = getServiceRequests.mock.calls[0][0]
+    expect(firstArgs.status).toEqual(['open', 'confirmed'])
+    expect(firstArgs.status).not.toContain('draft')
+    expect(firstArgs.serviceDateEnd).toBeUndefined()
+  })
 
   it('downloads only the rows matching the active ID filter', async () => {
     render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
