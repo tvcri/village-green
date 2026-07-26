@@ -49,6 +49,11 @@ watch([fromDate, toDate, userIdFilter], onFilterChange)
       <Column field="mobileVisits" header="Mobile" sortable />
       <Column field="tabletVisits" header="Tablet" sortable />
       <Column field="desktopVisits" header="Desktop" sortable />
+      <!-- Shown even though it is usually 0: the four device columns partition
+           totalVisits, so hiding one makes the arithmetic look wrong. Covers
+           both pre-feature rows (NULL) and devices the cascade could not
+           resolve. -->
+      <Column field="unknownVisits" header="Unknown" sortable />
       <Column field="lastVisited" header="Last Visited" sortable>
         <template #body="{ data }">
           {{ data.lastVisited ? new Date(data.lastVisited).toLocaleString() : '—' }}

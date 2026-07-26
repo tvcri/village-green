@@ -5425,6 +5425,11 @@ components:
         deviceClass:
           type: string
           enum: [mobile, tablet, desktop, unknown]
+      # Tightened deliberately. Without this a misspelled property name is
+      # accepted and silently dropped with a 204, and useAnalytics swallows
+      # post errors, so the data loss is invisible. Safe for cached older
+      # bundles: useAnalytics is the only producer and sends exactly this
+      # field set, so an older client sends a subset, never an extra.
       additionalProperties: false
     AnalyticsSummaryRow:
       type: object

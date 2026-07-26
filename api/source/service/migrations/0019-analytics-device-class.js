@@ -8,10 +8,18 @@ const logger = require('../../utils/logger')
 // — deliberately distinct from the 'unknown' class, which means tracking ran
 // and could not resolve a device.
 //
-// idx_analytics_route_time is redefined rather than supplemented: the summary
-// query groups by (routeName, deviceClass) under eventType and createdAt
-// predicates, so the wider index serves every query the narrow one did. A
-// second overlapping index would cost writes on an append-heavy table for no
+// idx_analytics_route_time is redefined rather than supplemented, to keep the
+// index COVERING for the summary query. That query groups by routeName alone
+// and pivots device counts with SUM(deviceClass = ...) conditionals — so
+// without deviceClass in the index it reads the table for every row; with it,
+// EXPLAIN reports using_index: true.
+//
+// The trailing createdAt is not reachable as a range here (routeName sits
+// between it and the equality on eventType), so from/to still filter after the
+// scan — but that was equally true of the narrow index this replaces. Verified
+// with EXPLAIN: eventType is the only used_key_part under all orderings.
+//
+// A second overlapping index would cost writes on an append-heavy table for no
 // read benefit.
 module.exports = {
   up: async (pool) => {
