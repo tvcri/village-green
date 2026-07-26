@@ -1,10 +1,12 @@
 <script setup>
 import { computed } from 'vue'
 import Button from 'primevue/button'
+import SplitButton from 'primevue/splitbutton'
 import { useToast } from 'primevue/usetoast'
 import ParamField from './ParamField.vue'
 import { isOmitted } from '../lib/paramValues.js'
 import { toCurl } from '../lib/curl.js'
+import { toPython } from '../lib/python.js'
 
 const props = defineProps({
   // Empty until the user picks a row. The panel stays MOUNTED in that state so
@@ -37,6 +39,32 @@ async function copy(text, what) {
     toast.add({ severity: 'error', summary: `Could not copy ${what.toLowerCase()}`, life: 3000 })
   }
 }
+
+// Copy URL is the primary click — it's the most-used of the three (pasted into
+// a browser, a ticket, a message) — with the code generators behind the
+// chevron. Matches ExportButton.vue, where the common action fires on click.
+//
+// No method is passed: buildOperationRows lists GET operations only, so both
+// generators' defaults are correct. They accept a method for when write
+// operations are eventually supported.
+//
+// Adding a language later is one entry here plus one generator module.
+const copyItems = computed(() => [
+  {
+    label: 'Copy as curl',
+    // pi-desktop, NOT pi-terminal: there is no pi-terminal in PrimeIcons 7, so
+    // that class rendered an empty box and left this label misaligned against
+    // the Python entry's icon. Verify names against
+    // node_modules/primeicons/primeicons.css before using them.
+    icon: 'pi pi-desktop',
+    command: () => copy(toCurl(props.resolved.url), 'curl command'),
+  },
+  {
+    label: 'Copy as Python',
+    icon: 'pi pi-code',
+    command: () => copy(toPython(props.resolved.url), 'Python snippet'),
+  },
+])
 </script>
 
 <template>
@@ -59,23 +87,16 @@ async function copy(text, what) {
     <div class="url-bar">
       <code v-if="resolved.url" class="url-text">{{ resolved.url }}</code>
       <code v-else class="url-text muted">{{ resolved.hint || '—' }}</code>
-      <Button
+      <SplitButton
+        label="Copy"
         icon="pi pi-copy"
         severity="secondary"
         text
-        aria-label="Copy URL"
-        v-tooltip.bottom="'Copy URL'"
+        size="small"
+        :model="copyItems"
         :disabled="!resolved.url"
+        v-tooltip.bottom="'Copy URL — or pick curl / Python (token never included)'"
         @click="copy(resolved.url, 'URL')"
-      />
-      <Button
-        label="curl"
-        icon="pi pi-terminal"
-        severity="secondary"
-        text
-        v-tooltip.bottom="'Copy as curl (token redacted as $TOKEN)'"
-        :disabled="!resolved.url"
-        @click="copy(toCurl(resolved.url), 'curl command')"
       />
     </div>
 
@@ -143,6 +164,11 @@ async function copy(text, what) {
   align-items: center;
   gap: 0.25rem;
   min-width: 0;
+}
+/* The URL text is the flexible element (flex: 1 1 auto below); the copy
+   control must not be squeezed to fit it when the pane is dragged narrow. */
+.url-bar :deep(.p-splitbutton) {
+  flex: 0 0 auto;
 }
 .url-text {
   flex: 1 1 auto;
