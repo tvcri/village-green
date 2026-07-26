@@ -85,8 +85,7 @@ const statusChartData = computed(() => {
 const statusChartOptions = {
   indexAxis: 'y',
   responsive: true,
-  maintainAspectRatio: true,
-  aspectRatio: 1.8,
+  maintainAspectRatio: false, // height owned by .status-chart; canvas-driven sizing never re-expands
   plugins: { legend: { display: false } },
   scales: { x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } },
 }
@@ -161,7 +160,7 @@ const canSeeVolunteers = computed(() => hasPermission('volunteer:read', villageI
       <section class="metrics-section">
         <h2>Totals</h2>
         <p class="headline">{{ metrics.totals.totalRequests }} requests in range</p>
-        <div class="chart-container">
+        <div class="chart-container status-chart">
           <Chart type="bar" :data="statusChartData" :options="statusChartOptions" />
         </div>
       </section>
@@ -216,6 +215,11 @@ const canSeeVolunteers = computed(() => hasPermission('volunteer:read', villageI
   padding: 1rem;
   max-width: 720px;
 }
+/* The container must own both dimensions and the chart must fill it: if the
+   canvas sizes its own wrapper, Chart.js reads back the shrunken size and the
+   chart never re-expands after a viewport shrink. */
+.chart-container :deep(.p-chart) { width: 100%; height: 100%; }
+.status-chart { height: 400px; }
 .people-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
