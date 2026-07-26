@@ -8,6 +8,15 @@ const normalizeService = (s) => s?.toLowerCase().replace(/:\s*/g, ': ').trim()
 const sortedUnique = (rows, key) =>
   Array.from(new Set((rows ?? []).map(r => r[key]).filter(Boolean))).sort()
 
+// Rows carry the raw DB status ('Open', 'Member cancelled', …) while the
+// filter keys are lowercase. 'cancelled' is one key covering three DB values
+// (member/volunteer/hub), so it matches on substring the way the previous
+// per-component filters did.
+const matchesStatus = (rowStatus, key) => {
+  const s = (rowStatus ?? '').toLowerCase()
+  return key === 'cancelled' ? s.includes('cancelled') : s === key
+}
+
 // Service options collapse to one entry per normalized name, keeping the first
 // spelling seen — otherwise two dropdown entries would select identical rows.
 const sortedUniqueServices = (rows) => {
@@ -30,6 +39,9 @@ export function useServiceRequestFilters (rows) {
   const selectedVolunteer = ref('')
   const selectedService = ref('')
   const idSearch = ref('')
+  // [] = no status filter (show everything the tab fetched), matching the
+  // previous behavior when a user unchecked every box.
+  const selectedStatuses = ref([])
 
   const safeRows = computed(() => Array.isArray(rows.value) ? rows.value : [])
 
@@ -38,6 +50,8 @@ export function useServiceRequestFilters (rows) {
   const serviceNames = computed(() => sortedUniqueServices(safeRows.value))
 
   const matches = (r) => {
+    if (selectedStatuses.value.length &&
+        !selectedStatuses.value.some(k => matchesStatus(r.status, k))) return false
     if (selectedMember.value && r.memberFullName !== selectedMember.value) return false
     if (selectedVolunteer.value && r.volunteerFullName !== selectedVolunteer.value) return false
     if (selectedService.value &&
@@ -54,10 +68,11 @@ export function useServiceRequestFilters (rows) {
     selectedVolunteer.value = ''
     selectedService.value = ''
     idSearch.value = ''
+    selectedStatuses.value = []
   }
 
   return {
-    selectedMember, selectedVolunteer, selectedService, idSearch,
+    selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
     memberNames, volunteerNames, serviceNames,
     matches, filteredRows, clearAll
   }

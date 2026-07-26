@@ -72,6 +72,13 @@ describe('useServiceRequestTabs', () => {
     expect(fetcher.mock.calls[0][0].status).toEqual(['completed', 'unmatched', 'cancelled'])
   })
 
+  it('offers exactly the statuses the visible tab fetched', () => {
+    const t = useServiceRequestTabs({ fetcher: vi.fn().mockResolvedValue([]), today: '2026-07-26' })
+    expect(t.statusOptions.value).toEqual(['open', 'confirmed'])
+    t.activeTab.value = 'historic'
+    expect(t.statusOptions.value).toEqual(['completed', 'unmatched', 'cancelled'])
+  })
+
   it('captures a fetch rejection in error and clears isLoading', async () => {
     const boom = new Error('network down')
     const fetcher = vi.fn().mockRejectedValue(boom)

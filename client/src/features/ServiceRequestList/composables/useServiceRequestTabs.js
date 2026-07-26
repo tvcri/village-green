@@ -70,9 +70,14 @@ export function useServiceRequestTabs ({ fetcher, historicDays = 60, today = tod
   const currentRows = computed(() =>
     activeTab.value === 'active' ? activeRows.value : historicRows.value)
 
+  // The status checkboxes a tab may offer are exactly the statuses it fetched:
+  // narrowing is client-side, so offering more could only ever match nothing.
+  const statusOptions = computed(() =>
+    activeTab.value === 'active' ? ACTIVE_STATUSES : HISTORIC_STATUSES)
+
   return {
     activeTab,
-    ACTIVE_STATUSES, HISTORIC_STATUSES,
+    ACTIVE_STATUSES, HISTORIC_STATUSES, statusOptions,
     historicStart, historicEnd,
     activeRows, historicRows, currentRows,
     isLoading, error,

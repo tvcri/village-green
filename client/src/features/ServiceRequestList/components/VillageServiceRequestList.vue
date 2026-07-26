@@ -3,6 +3,7 @@ import { computed, ref, watch, onMounted, onActivated, onDeactivated } from 'vue
 import { useRouter, useRoute } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -56,15 +57,19 @@ const tabs = useServiceRequestTabs({
   fetcher: (params) => getVillageServiceRequests(villageId.value, params)
 })
 const {
-  activeTab, historicStart, historicEnd,
+  activeTab, historicStart, historicEnd, statusOptions,
   currentRows: requests, isLoading, error, fetchCurrent
 } = tabs
 
 const {
-  selectedMember, selectedVolunteer, selectedService, idSearch,
+  selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
   memberNames, volunteerNames, serviceNames,
   filteredRows: filteredRequests, clearAll
 } = useServiceRequestFilters(requests)
+
+// Each tab offers its own status set, so a selection made on one tab would
+// match nothing on the other. Reset it when the tab changes.
+watch(activeTab, () => { selectedStatuses.value = [] })
 
 // `requests` is a computed over the visible tab, so write through to the
 // underlying ref that tab is backed by.
@@ -166,6 +171,7 @@ const activeFilterCount = computed(() => {
   if (selectedVolunteer.value) count++
   if (selectedService.value) count++
   if (idSearch.value.trim()) count++
+  if (selectedStatuses.value.length) count++
   return count
 })
 
@@ -271,6 +277,15 @@ const clearFilters = () => {
       <AutoComplete v-model="memberInput" :suggestions="memberSuggestions" placeholder="Member" show-clear force-selection fluid @complete="filterMemberSuggestions" @item-select="onMemberSelect" />
       <AutoComplete v-model="volunteerInput" :suggestions="volunteerSuggestions" placeholder="Volunteer" show-clear force-selection fluid @complete="filterVolunteerSuggestions" @item-select="onVolunteerSelect" />
       <Select v-model="serviceChoice" :options="serviceOptions" placeholder="Service" />
+      <MultiSelect
+        v-model="selectedStatuses"
+        :options="statusOptions"
+        :option-label="s => s.charAt(0).toUpperCase() + s.slice(1)"
+        placeholder="Status"
+        :max-selected-labels="5"
+        selected-items-label="{0} statuses"
+        show-clear
+      />
       <InputText v-model="idSearch" placeholder="Request #" />
       <Button v-if="activeFilterCount > 0" icon="pi pi-times" text rounded v-tooltip="'Clear filters'" @click="clearFilters" />
     </div>

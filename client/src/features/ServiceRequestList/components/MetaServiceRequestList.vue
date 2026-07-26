@@ -78,16 +78,20 @@ const tabs = useServiceRequestTabs({
   })
 })
 const {
-  activeTab, historicStart, historicEnd,
+  activeTab, historicStart, historicEnd, statusOptions,
   currentRows: requests, isLoading, error, fetchCurrent
 } = tabs
 
 const shared = useServiceRequestFilters(requests)
 const {
-  selectedMember, selectedVolunteer, selectedService, idSearch,
+  selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
   memberNames: memberOptions, volunteerNames: volunteerOptions,
   serviceNames: serviceOptions, clearAll
 } = shared
+
+// Each tab offers its own status set, so a selection made on one tab would
+// match nothing on the other. Reset it when the tab changes.
+watch(activeTab, () => { selectedStatuses.value = [] })
 
 // The Selects use null as "no filter" (so show-clear only appears for a real
 // selection); the composable uses ''. Bridge the two representations.
@@ -161,6 +165,7 @@ const historicWindowNarrowed = computed(() =>
 const activeFilterCount = computed(() => {
   let count = 0
   if (historicWindowNarrowed.value) count++
+  if (selectedStatuses.value.length) count++
   if (selectedMember.value) count++
   if (selectedVolunteer.value) count++
   if (selectedService.value) count++
@@ -320,7 +325,12 @@ const clearFilters = () => {
 
         <div v-if="!filtersCollapsed" class="filters-content">
           <div class="status-filter-group">
+            <label class="filter-group-label">Status:</label>
             <div class="status-filters">
+              <div v-for="status in statusOptions" :key="status" class="status-filter">
+                <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
+                <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
+              </div>
               <div class="status-filter">
                 <Checkbox v-model="vssSignupOnly" input-id="vss-signup-filter" binary />
                 <label for="vss-signup-filter">VSS Signup</label>

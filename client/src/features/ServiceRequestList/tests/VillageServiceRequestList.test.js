@@ -22,7 +22,7 @@ vi.mock('../api/serviceRequestApi.js', () => {
     {
       serviceRequestId: 1,
       displayNumber: 101,
-      status: 'open',
+      status: 'Open',
       serviceName: 'Ride to Clinic',
       memberFullName: 'Alice Anderson',
       volunteerFullName: 'Vera Volunteer',
@@ -33,7 +33,7 @@ vi.mock('../api/serviceRequestApi.js', () => {
     {
       serviceRequestId: 2,
       displayNumber: 102,
-      status: 'completed',
+      status: 'Completed',
       serviceName: 'Grocery Run',
       memberFullName: 'Bob Baker',
       volunteerFullName: 'Wally Volunteer',
@@ -43,10 +43,11 @@ vi.mock('../api/serviceRequestApi.js', () => {
     }
   ]
   return {
+    // Rows carry the raw DB status ('Open'); the status param is lowercase.
     getVillageServiceRequests: vi.fn((_villageId, params = {}) =>
       Promise.resolve(
         params.status?.length
-          ? allRows.filter(r => params.status.includes(r.status))
+          ? allRows.filter(r => params.status.includes(r.status.toLowerCase()))
           : allRows
       )
     ),
