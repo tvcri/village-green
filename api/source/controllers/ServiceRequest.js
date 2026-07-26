@@ -9,6 +9,8 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
     const status = req.query.status
     const villageId = req.query.villageId
     const hasNotifications = req.query.hasNotifications
+    const serviceDateStart = req.query.serviceDateStart
+    const serviceDateEnd = req.query.serviceDateEnd
     if (villageId?.length) {
       if (!villageId.every(vid => hasPermission(req.userObject, 'sr:read', { villageId: vid }))) {
         throw new SmError.PrivilegeError()
@@ -27,7 +29,9 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
       villageIdsGranted,
       status,
       villageId,
-      hasNotifications
+      hasNotifications,
+      serviceDateStart,
+      serviceDateEnd
     })
     res.json(response)
   }
