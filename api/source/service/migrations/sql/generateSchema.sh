@@ -72,9 +72,15 @@ fi
 # The '--no-create-db' flag prevents the inclusion of CREATE DATABASE statements in the dump.
 # Views (active_member / active_volunteer) are included by mysqldump, so fresh
 # installs get them without migration 0006 ever running.
+#
+# The DEFINER sed strips ANY definer, not just `vg`@`%`: objects created by
+# another account (vg_reminder_enqueue was created by hand in production as
+# `root`@`%`) would otherwise carry that definer into the scaffold, and a fresh
+# install connecting as `vg` fails with "you need SUPER or SET_ANY_DEFINER".
+# Stripping it lets each install own the objects it creates.
 mysqldump -h 127.0.0.1 -P 3306 -u root -prootpw --routines --events --no-data --no-create-db vg |
   sed --expression='s/ AUTO_INCREMENT=[0-9]\+//'  \
-      --expression='s/DEFINER=`vg`@`%` *//' \
+      --expression='s/DEFINER=`[^`]*`@`[^`]*` *//' \
       --expression '/SQL SECURITY DEFINER/d' \
       --expression='s/;;/$/g' |
   awk 'tolower($0) !~ /character_set|set names/' > 10-vg-tables.sql
