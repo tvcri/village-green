@@ -46,7 +46,10 @@ test('missing audience claim -> 401 under audience enforcement', async () => {
 // role 2 — village-scoped read-only), and an unfiltered list is now a
 // federation-wide query -> 403 by ROLE. Filtering to the granted village keeps
 // these probes reachable, so only the claim/scope under test can fail.
-const grantedVillage = { villageId: String(villages.quahog.id) }
+// serviceDateStart is required on the SR list; '2000-01-01' spans all fixtures.
+// The 401 probes above deliberately omit it: security handlers run before
+// parameter validation, so an unauthenticated bare call is still a clean 401.
+const grantedVillage = { villageId: String(villages.quahog.id), serviceDateStart: '2000-01-01' }
 
 test('foreign issuer claim is ACCEPTED (characterization: iss is never validated)', async () => {
   // The API trusts any token whose signature verifies against the discovered
