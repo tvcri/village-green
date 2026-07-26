@@ -152,7 +152,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   return rows[0] ?? null
 }
 
-module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications }) {
+module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications, serviceDateStart, serviceDateEnd }) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.requestNumber',
@@ -251,6 +251,18 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
     predicates.statements.push(
       'NOT EXISTS (SELECT 1 FROM notification_event ne WHERE ne.serviceRequestId = sr.id) AND sr.requestNumber IS NULL'
     )
+  }
+
+  // serviceDate is a DATE column holding a wall-clock civil date; both bounds
+  // are inclusive and compared as plain 'YYYY-MM-DD' strings. serviceDateEnd
+  // omitted means no upper bound — future-dated requests still match.
+  if (serviceDateStart) {
+    predicates.statements.push('sr.serviceDate >= ?')
+    predicates.binds.push(serviceDateStart)
+  }
+  if (serviceDateEnd) {
+    predicates.statements.push('sr.serviceDate <= ?')
+    predicates.binds.push(serviceDateEnd)
   }
 
   const orderBy = ['sr.serviceDate DESC', 'sr.startTime DESC']
