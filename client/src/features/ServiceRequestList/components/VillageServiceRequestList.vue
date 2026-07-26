@@ -287,6 +287,7 @@ const clearFilters = () => {
         placeholder="Status"
         :max-selected-labels="5"
         selected-items-label="{0} statuses"
+        :show-toggle-all="false"
         show-clear
       />
       <InputText v-model="idSearch" placeholder="Request #" />
