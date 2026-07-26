@@ -152,7 +152,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   return rows[0] ?? null
 }
 
-module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications, serviceDateStart, serviceDateEnd }) {
+module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications, serviceDateStart, serviceDateEnd, excludeHubCancelled = false }) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.requestNumber',
@@ -246,6 +246,11 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
       predicates.statements.push('sr.status IN ?')
       predicates.binds.push([dbStatuses])
     }
+  }
+  if (excludeHubCancelled) {
+    // Village-scoped callers share the metrics business rule: 'Hub cancelled'
+    // requests are treated as if they never existed. The meta list keeps them.
+    predicates.statements.push("sr.status <> 'Hub cancelled'")
   }
   if (hasNotifications === false) {
     predicates.statements.push(

@@ -396,9 +396,11 @@ const clearFilters = () => {
         <TabPanel value="historic">
           <div class="historic-range">
             <label for="historic-start">From</label>
-            <input id="historic-start" v-model="historicStart" type="date" >
+            <!-- .lazy: commit on change, not per keystroke-segment — typing a
+                 year would otherwise fire fetches for values like 0002-… -->
+            <input id="historic-start" v-model.lazy="historicStart" type="date" >
             <label for="historic-end">To</label>
-            <input id="historic-end" v-model="historicEnd" type="date" >
+            <input id="historic-end" v-model.lazy="historicEnd" type="date" >
             <small>Leave “To” empty for no upper bound.</small>
           </div>
           <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">

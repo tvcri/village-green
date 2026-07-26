@@ -88,6 +88,31 @@ describe('useServiceRequestTabs', () => {
     expect(t.isLoading.value).toBe(false)
   })
 
+  it('does not fetch Historic when the From date is cleared', async () => {
+    // serviceDateStart is required by the endpoint; a cleared input must not
+    // fire a doomed request that lands the tab in an error state.
+    const fetcher = vi.fn().mockResolvedValue([])
+    const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
+    t.historicStart.value = ''
+    await t.fetchHistoric()
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('discards an out-of-order response', async () => {
+    let resolveFirst, resolveSecond
+    const fetcher = vi.fn()
+      .mockImplementationOnce(() => new Promise(r => { resolveFirst = r }))
+      .mockImplementationOnce(() => new Promise(r => { resolveSecond = r }))
+    const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
+    const first = t.fetchHistoric()
+    const second = t.fetchHistoric()
+    resolveSecond([{ serviceRequestId: 'newer' }])
+    await second
+    resolveFirst([{ serviceRequestId: 'stale' }])
+    await first
+    expect(t.historicRows.value.map(r => r.serviceRequestId)).toEqual(['newer'])
+  })
+
   it('crossing a month boundary shifts the window on the civil calendar', () => {
     // 60 days before 2026-03-01 is 2025-12-31 — no local timezone may shift it.
     const { historicStart } = useServiceRequestTabs({

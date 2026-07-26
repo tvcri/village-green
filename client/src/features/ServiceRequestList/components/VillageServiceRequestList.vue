@@ -105,10 +105,13 @@ const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => rou
   clearAll()
   memberInput.value = ''
   volunteerInput.value = ''
-  activeTab.value = 'active'
   tabs.activeRows.value = null
   tabs.historicRows.value = null
-  tabs.fetchActive()
+  // If we're on Historic, switching the tab back is enough: the tab-change
+  // watcher sees the nulled rows and fetches. Calling fetchActive() here too
+  // would double-fetch.
+  if (activeTab.value === 'active') tabs.fetchActive()
+  else activeTab.value = 'active'
   village.value = null
 })
 
@@ -314,9 +317,11 @@ const clearFilters = () => {
         <TabPanel value="historic">
           <div class="historic-range">
             <label for="historic-start">From</label>
-            <input id="historic-start" v-model="historicStart" type="date" >
+            <!-- .lazy: commit on change, not per keystroke-segment — typing a
+                 year would otherwise fire fetches for values like 0002-… -->
+            <input id="historic-start" v-model.lazy="historicStart" type="date" >
             <label for="historic-end">To</label>
-            <input id="historic-end" v-model="historicEnd" type="date" >
+            <input id="historic-end" v-model.lazy="historicEnd" type="date" >
             <small>Leave “To” empty for no upper bound.</small>
           </div>
           <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">

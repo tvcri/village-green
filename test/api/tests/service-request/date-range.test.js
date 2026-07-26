@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
-import { serviceRequests as sr } from '../../setup/fixtures.js'
+import { serviceRequests as sr, villages, persons } from '../../setup/fixtures.js'
 
 // serviceDateStart/serviceDateEnd are inclusive bounds on a wall-clock civil
 // date, compared as plain 'YYYY-MM-DD' strings.
@@ -64,4 +64,42 @@ test('village SR list honours the date window', async () => {
   assert.equal(status, 200)
   assert.ok(!idsOf(json).includes(String(sr.srV1.id)),
     'srV1 (2026-07-10) is before the window')
+})
+
+test('Hub cancelled requests are hidden at village scope, visible at meta scope', async () => {
+  // Village lists follow the metrics business rule: Hub cancelled requests
+  // are treated as if they never existed. The meta list keeps them.
+  const created = await vgCall('createServiceRequest', {}, {
+    token: tokens.users.sc,
+    body: {
+      villageId: String(villages.quahog.id),
+      memberPersonId: String(persons.quahogMember.id),
+      serviceDate: '2026-07-11'
+    }
+  })
+  assert.equal(created.status, 201)
+  const serviceRequestId = created.json.serviceRequestId
+  try {
+    const patched = await vgCall('patchServiceRequest', { serviceRequestId }, {
+      token: tokens.users.sc,
+      body: { status: 'Hub cancelled' }
+    })
+    assert.equal(patched.status, 200)
+    assert.equal(patched.json.status, 'Hub cancelled')
+
+    const village = await vgCall('getVillageServiceRequests',
+      { villageId: String(villages.quahog.id), serviceDateStart: '2000-01-01' },
+      { token: tokens.users.admin })
+    assert.equal(village.status, 200)
+    assert.ok(!idsOf(village.json).includes(String(serviceRequestId)),
+      'village list must hide Hub cancelled requests')
+
+    const meta = await vgCall('getServiceRequests',
+      { serviceDateStart: '2000-01-01' }, { token: tokens.users.admin })
+    assert.equal(meta.status, 200)
+    assert.ok(idsOf(meta.json).includes(String(serviceRequestId)),
+      'meta list must keep Hub cancelled requests')
+  } finally {
+    await vgCall('deleteServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  }
 })

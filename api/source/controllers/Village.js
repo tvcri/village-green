@@ -214,7 +214,10 @@ module.exports.getVillageServiceRequests = async function getVillageServiceReque
       villageId: [villageId],
       status: req.query.status,
       serviceDateStart: req.query.serviceDateStart,
-      serviceDateEnd: req.query.serviceDateEnd
+      serviceDateEnd: req.query.serviceDateEnd,
+      // Village view follows the metrics business rule: Hub cancelled
+      // requests are never shown at village scope.
+      excludeHubCancelled: true
     })
     res.json(response)
   }

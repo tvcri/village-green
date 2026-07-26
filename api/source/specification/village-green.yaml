@@ -2308,6 +2308,9 @@ paths:
   /villages/{villageId}/service-requests:
     get:
       summary: List service requests for a village
+      description: >-
+        Hub cancelled requests are never returned at village scope — they are
+        treated as if they never existed, matching the metrics endpoint.
       tags:
       - Village
       operationId: getVillageServiceRequests
