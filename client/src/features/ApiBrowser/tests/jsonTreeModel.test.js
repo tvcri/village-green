@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { childNodes, isContainer, pathsToDepth, sizeOf, summaryOf, typeOf } from '../lib/jsonTreeModel.js'
+import { PREVIEW_ENTRIES, PREVIEW_VALUE_CHARS, childNodes, isContainer, pathsToDepth, previewOf, sizeOf, summaryOf, typeOf } from '../lib/jsonTreeModel.js'
 
 describe('typeOf', () => {
   it('distinguishes null, array and object', () => {
@@ -77,5 +77,59 @@ describe('pathsToDepth', () => {
     expect(paths.has('$.second')).toBe(true)
     expect(paths.has('$.first.x')).toBe(true)
     expect(paths.has('$.second.x')).toBe(true)
+  })
+})
+
+describe('previewOf', () => {
+  it('previews a small object with keys and values', () => {
+    expect(previewOf({ villageId: '1', villageName: 'Aquidneck' }))
+      .toBe('{villageId: "1", villageName: "Aquidneck"}')
+  })
+
+  it('omits indices for arrays — position implies them', () => {
+    expect(previewOf([1, 2])).toBe('[1, 2]')
+  })
+
+  it('collapses nested containers to a glyph rather than recursing', () => {
+    expect(previewOf({ a: { b: 1 }, c: [1, 2] })).toBe('{a: {…}, c: […]}')
+  })
+
+  it('marks omission with an ellipsis when entries remain', () => {
+    // One more entry than the cap allows, so something is always omitted —
+    // derived from the constant rather than hardcoded, so tuning the budget
+    // does not silently invalidate the assertion.
+    const obj = Object.fromEntries(
+      Array.from({ length: PREVIEW_ENTRIES + 1 }, (_, i) => [`k${i}`, i]),
+    )
+    const out = previewOf(obj)
+    expect(out).toMatch(/, …\}$/)
+    expect(out).not.toContain(`k${PREVIEW_ENTRIES}:`)
+  })
+
+  it('adds no ellipsis when every entry is shown', () => {
+    expect(previewOf({ a: 1 })).toBe('{a: 1}')
+  })
+
+  it('clamps a long value so it cannot crowd out its siblings', () => {
+    const out = previewOf({ note: 'x'.repeat(200), b: 2, c: 3 })
+    // The long value is clipped, and b/c still make it in — the whole point
+    // of the per-value clamp.
+    expect(out).toBe(`{note: "${'x'.repeat(PREVIEW_VALUE_CHARS)}…", b: 2, c: 3}`)
+    expect(out).toContain('b: 2')
+    expect(out).toContain('c: 3')
+  })
+
+  it('never truncates mid-token', () => {
+    const out = previewOf({ alpha: 'aaaaaaaaaaaaaaa', beta: 'bbbbbbbbbbbbbbb', gamma: 'ccccccccccccccc' })
+    // Whatever was included must be complete: no dangling quote or half key.
+    const inner = out.slice(1, -1).replace(/, …$/, '')
+    for (const part of inner.split(', ')) expect(part).toMatch(/^\w+: ".*"$/)
+  })
+
+  it('returns empty for non-containers and empty containers', () => {
+    expect(previewOf(null)).toBe('')
+    expect(previewOf('hi')).toBe('')
+    expect(previewOf({})).toBe('')
+    expect(previewOf([])).toBe('')
   })
 })

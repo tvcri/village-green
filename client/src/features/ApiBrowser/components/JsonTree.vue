@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { childNodes, isContainer, summaryOf, typeOf } from '../lib/jsonTreeModel.js'
+import { childNodes, isContainer, previewOf, summaryOf, typeOf } from '../lib/jsonTreeModel.js'
 
 defineOptions({ name: 'JsonTree' })
 
@@ -24,6 +24,10 @@ const limit = computed(() => props.limits.get(props.path) ?? DEFAULT_LIMIT)
 const children = computed(() => (container.value ? childNodes(props.value, props.path, limit.value) : { nodes: [], hidden: 0 }))
 
 const valueType = computed(() => typeOf(props.value))
+
+// Only while collapsed: an expanded node shows its real contents right below,
+// so a preview beside it would be redundant noise.
+const preview = computed(() => (container.value && !open.value ? previewOf(props.value) : ''))
 const isLongString = computed(() => valueType.value === 'string' && props.value.length > LONG_STRING)
 const displayValue = computed(() => {
   if (valueType.value === 'string') {
@@ -52,8 +56,15 @@ const displayValue = computed(() => {
       <span v-if="label" class="jt-key">{{ label }}</span>
       <span v-if="label" class="jt-sep">:</span>
 
-      <span v-if="container" class="jt-size">{{ summaryOf(value) }}</span>
-      <span v-else-if="valueType === 'array' || valueType === 'object'" class="jt-size">{{ summaryOf(value) || (valueType === 'array' ? '[]' : '{}') }}</span>
+      <!-- Containers: count, then a preview while collapsed. The preview is a
+           SEPARATE element, not part of the chain below — splicing it into the
+           v-else-if made the empty-container branch fire on expanded nodes and
+           render the count a second time ({7} {7}). -->
+      <template v-if="container">
+        <span class="jt-size">{{ summaryOf(value) }}</span>
+        <span v-if="preview" class="jt-preview">{{ preview }}</span>
+      </template>
+      <span v-else-if="valueType === 'array' || valueType === 'object'" class="jt-size">{{ valueType === 'array' ? '[]' : '{}' }}</span>
       <span v-else class="jt-value" :class="`jt-${valueType}`">{{ displayValue }}</span>
 
       <button v-if="isLongString" class="jt-more" @click="showFullString = !showFullString">
@@ -119,6 +130,19 @@ const displayValue = computed(() => {
 }
 .jt-size {
   color: var(--color-text-dim);
+}
+/* Subordinate to real values: this is a hint about what's inside, not the
+   data itself, so it must not compete with the type-colored values below it
+   once the node is expanded. Clipped rather than wrapped — a preview that
+   wraps to a second line defeats the purpose of a one-line summary. */
+.jt-preview {
+  color: var(--color-text-dim);
+  opacity: 0.75;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .jt-string { color: var(--jt-string); }
 .jt-number { color: var(--jt-number); }
