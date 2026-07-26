@@ -1,6 +1,7 @@
 'use strict';
 
 const VillageService = require('../service/VillageService')
+const ServiceRequestService = require('../service/ServiceRequestService')
 const SmError = require('../utils/error')
 const { hasPermission, hasElevatedPermission } = require('../utils/authz')
 const { validateRoleGrants } = require('./User')
@@ -200,13 +201,21 @@ module.exports.getVillageServiceRequests = async function getVillageServiceReque
     if (!hasPermission(req.userObject, 'sr:read', { villageId })) {
       throw new SmError.PrivilegeError()
     }
-    const status = req.query.status
     const existing = await VillageService.getVillage(villageId)
     if (!existing) {
       throw new SmError.NotFoundError()
     }
-
-    const response = await VillageService.getVillageServiceRequests(villageId, status)
+    // Delegates to the shared SR query so this endpoint cannot drift from
+    // /service-requests again. villageIdsGranted is null because the
+    // permission check above already authorized this specific village —
+    // passing the caller's granted list would double-filter to [].
+    const response = await ServiceRequestService.getServiceRequests({
+      villageIdsGranted: null,
+      villageId: [villageId],
+      status: req.query.status,
+      serviceDateStart: req.query.serviceDateStart,
+      serviceDateEnd: req.query.serviceDateEnd
+    })
     res.json(response)
   }
   catch (err) {
