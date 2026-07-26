@@ -248,7 +248,10 @@ const tableProps = computed(() => ({
   isLoading: isLoading.value,
   hasLoadedOnce: hasLoadedOnce.value,
   error: error.value,
-  flashRowId: flashRowId.value
+  flashRowId: flashRowId.value,
+  // Active lists upcoming work soonest-first; Historic is an archive, so the
+  // most recent records belong at the top.
+  sortOrder: activeTab.value === 'historic' ? -1 : 1
 }))
 
 const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)
