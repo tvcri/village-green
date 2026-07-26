@@ -11,10 +11,9 @@ const isGrantless = computed(() => buildAccessTags(props.user).length === 0)
 </script>
 
 <template>
-  <div class="my-access">
+  <div v-if="!isGrantless" class="my-access">
     <div class="my-access-title">My access</div>
-    <div v-if="isGrantless" class="my-access-empty">No access grants</div>
-    <AccessTags v-else :user="user" />
+    <AccessTags :user="user" />
   </div>
 </template>
 
@@ -30,10 +29,5 @@ const isGrantless = computed(() => buildAccessTags(props.user).length === 0)
   font-weight: 600;
   color: var(--color-text-primary);
   margin-bottom: 0.35rem;
-}
-
-.my-access-empty {
-  color: var(--color-text-dim);
-  font-style: italic;
 }
 </style>

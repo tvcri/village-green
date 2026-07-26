@@ -65,3 +65,11 @@ test('KeycloakService exports findUserByUsername, updateUsername, and deleteUser
   assert.equal(typeof svc.updateUsername, 'function')
   assert.equal(typeof svc.deleteUser, 'function')
 })
+
+test('buildResetPasswordPayload marks the password temporary', () => {
+  assert.deepEqual(svc.buildResetPasswordPayload('s3cret'), {
+    type: 'password',
+    value: 's3cret',
+    temporary: true
+  })
+})

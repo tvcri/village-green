@@ -65,10 +65,10 @@ const upMigration = [
 
   `INSERT INTO community (name) VALUES ('Pride'), ('Veteran')`,
 
-  // Follow STIGMAN convention: boolean-intent columns are BIT(1), not
-  // tinyint(1). mysql2 reads/writes BIT(1) as a JS boolean via the pool's
-  // existing typeCast; JSON_OBJECT() embedding still requires an explicit
-  // `!= 0` cast regardless of column type (see PersonService.js memberDetail).
+  // Boolean-intent columns are BIT(1), not tinyint(1). mysql2 reads/writes
+  // BIT(1) as a JS boolean via the pool's existing typeCast; JSON_OBJECT()
+  // embedding still requires an explicit `!= 0` cast regardless of column
+  // type (see PersonService.js memberDetail).
   `ALTER TABLE person MODIFY COLUMN computerUse BIT(1) DEFAULT NULL`,
   `ALTER TABLE person MODIFY COLUMN smartphone BIT(1) DEFAULT NULL`,
   `ALTER TABLE member MODIFY COLUMN printedNewsletter BIT(1) DEFAULT NULL`,

@@ -1,0 +1,178 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { vgCall } from '../../lib/ops.js'
+import { tokens } from '../../lib/context.js'
+import { users, villages } from '../../setup/fixtures.js'
+
+// Privacy rules lifecycle + the API-side acknowledgement gate (PR #31).
+//
+// ORDER MATTERS — suite-wide side effects. Publishing rules arms a fail-closed
+// gate in the auth layer: every endpoint except GET /user, GET /privacy/rules,
+// and POST /privacy/acknowledgements returns 403 `privacy_ack_required` for any
+// user who hasn't acknowledged the CURRENT version. seed.js truncates the
+// privacy tables, so no rules exist until this file publishes some — and the
+// FINAL test acknowledges on behalf of every canonical user so the files that
+// run after this one (service-request/, users/, villages/, ...) are unaffected.
+// The special tokens share full_v1's identity, so acking full_v1 covers them.
+//
+// Post-#56: publish/patchCurrent require app:admin + elevate=true, and blocked-
+// user probes must target endpoints the probed user can OTHERWISE reach (e.g.
+// full_v1 probes getServiceRequests with its granted villageId) — a plain list
+// call now 403s on PrivilegeError, which would mask the privacy discriminator
+// and make the post-ack "unblocked -> 200" probes impossible.
+
+const v1Scope = { villageId: [String(villages.quahog.id)] } // full_v1's granted village
+
+async function currentRulesId () {
+  const { status, json } = await vgCall('getPrivacyRules', {}, { token: tokens.users.admin })
+  assert.equal(status, 200, 'precondition: rules published')
+  return json.id
+}
+
+// ---- before anything is published ----
+
+test('GET /privacy/rules with no token -> 401', async () => {
+  const { status } = await vgCall('getPrivacyRules')
+  assert.equal(status, 401)
+})
+
+test('GET /privacy/rules before any publish -> 404', async () => {
+  const { status } = await vgCall('getPrivacyRules', {}, { token: tokens.users.full_v1 })
+  assert.equal(status, 404)
+})
+
+test('PATCH /privacy/rules/current before any publish -> 404', async () => {
+  // elevate so the request clears the app:admin gate and reaches the 404.
+  const { status } = await vgCall('patchPrivacyRulesCurrent', { elevate: 'true' }, {
+    token: tokens.users.admin, body: { content: 'nothing to correct' },
+  })
+  assert.equal(status, 404)
+})
+
+test('publish and correct need app:admin + elevate -> 403 for a non-admin, and for admin without elevate', async () => {
+  const post = await vgCall('publishPrivacyRules', {}, {
+    token: tokens.users.full_v1, body: { content: 'not allowed' },
+  })
+  assert.equal(post.status, 403)
+  const patch = await vgCall('patchPrivacyRulesCurrent', {}, {
+    token: tokens.users.full_v1, body: { content: 'not allowed' },
+  })
+  assert.equal(patch.status, 403)
+  // admin holds app:admin but did not elevate -> still 403
+  const unelevated = await vgCall('publishPrivacyRules', {}, {
+    token: tokens.users.admin, body: { content: 'not allowed' },
+  })
+  assert.equal(unelevated.status, 403)
+})
+
+// ---- publish v1 (arms the gate for everyone but the publisher) ----
+
+test('publishPrivacyRules creates v1 and auto-acknowledges the publisher', async () => {
+  const { status, json } = await vgCall('publishPrivacyRules', { elevate: 'true' }, {
+    token: tokens.users.admin, body: { content: 'VG Privacy Rules v1' },
+  })
+  assert.equal(status, 201)
+  assert.ok(json.id, 'rules have an id')
+  assert.equal(json.content, 'VG Privacy Rules v1')
+  assert.equal(String(json.publishedByUserId), String(users.admin.userId))
+  assert.equal(json.modifiedAt, null, 'fresh version has no correction')
+
+  // publisher auto-ack: the admin is not locked out of the API it just gated
+  const probe = await vgCall('getServiceRequests', {}, { token: tokens.users.admin })
+  assert.equal(probe.status, 200)
+})
+
+test('unacknowledged users are blocked outside the allowlist', async () => {
+  const blocked = await vgCall('getServiceRequests', v1Scope, { token: tokens.users.full_v1 })
+  assert.equal(blocked.status, 403)
+  assert.equal(blocked.json?.error, 'privacy_ack_required',
+    `expected the privacy_ack_required discriminator, got ${blocked.text}`)
+})
+
+test('the allowlist stays reachable while blocked: GET /user, GET rules, POST ack', async () => {
+  const self = await vgCall('getUser', {}, { token: tokens.users.full_v1 })
+  assert.equal(self.status, 200)
+  assert.ok('privacyStatus' in self.json, 'GET /user always projects privacyStatus')
+
+  const rules = await vgCall('getPrivacyRules', {}, { token: tokens.users.full_v1 })
+  assert.equal(rules.status, 200, 'the modal can fetch the agreement text')
+})
+
+test('acknowledging the current rules clears the block', async () => {
+  const rulesId = await currentRulesId()
+  const ack = await vgCall('createPrivacyAcknowledgement', {}, {
+    token: tokens.users.full_v1, body: { rulesId },
+  })
+  assert.equal(ack.status, 201)
+  assert.equal(ack.json.rulesId, rulesId)
+  assert.ok(ack.json.acknowledgedAt, 'acknowledgement is timestamped')
+
+  const probe = await vgCall('getServiceRequests', v1Scope, { token: tokens.users.full_v1 })
+  assert.equal(probe.status, 200, 'full_v1 unblocked after acking')
+})
+
+// ---- correction vs. new version ----
+
+test('PATCH /privacy/rules/current corrects in place without re-blocking', async () => {
+  const before = await currentRulesId()
+  const { status, json } = await vgCall('patchPrivacyRulesCurrent', { elevate: 'true' }, {
+    token: tokens.users.admin, body: { content: 'VG Privacy Rules v1 (corrected)' },
+  })
+  assert.equal(status, 200)
+  assert.equal(json.id, before, 'correction keeps the same version id')
+  assert.equal(json.content, 'VG Privacy Rules v1 (corrected)')
+  assert.equal(String(json.modifiedByUserId), String(users.admin.userId))
+  assert.ok(json.modifiedAt, 'correction is timestamped')
+
+  const probe = await vgCall('getServiceRequests', v1Scope, { token: tokens.users.full_v1 })
+  assert.equal(probe.status, 200, 'existing acknowledgements stay valid after a correction')
+})
+
+test('publishing a new version re-blocks; acking a STALE version does not clear it', async () => {
+  const v1 = await currentRulesId()
+  const v2 = await vgCall('publishPrivacyRules', { elevate: 'true' }, {
+    token: tokens.users.admin, body: { content: 'VG Privacy Rules v2' },
+  })
+  assert.equal(v2.status, 201)
+  assert.ok(v2.json.id > v1, 'new publish gets a new id')
+
+  const blocked = await vgCall('getServiceRequests', v1Scope, { token: tokens.users.full_v1 })
+  assert.equal(blocked.status, 403, 'v1 ack does not cover v2')
+
+  // re-acking the outdated version must not clear the gate
+  await vgCall('createPrivacyAcknowledgement', {}, { token: tokens.users.full_v1, body: { rulesId: v1 } })
+  const stillBlocked = await vgCall('getServiceRequests', v1Scope, { token: tokens.users.full_v1 })
+  assert.equal(stillBlocked.status, 403, 'stale-version ack leaves the gate armed')
+
+  const ack = await vgCall('createPrivacyAcknowledgement', {}, {
+    token: tokens.users.full_v1, body: { rulesId: v2.json.id },
+  })
+  assert.equal(ack.status, 201)
+  const probe = await vgCall('getServiceRequests', v1Scope, { token: tokens.users.full_v1 })
+  assert.equal(probe.status, 200, 'current-version ack clears it')
+})
+
+// ---- suite-state restore: every canonical user acks the current version ----
+// This runs even if earlier assertions failed (node:test continues past
+// failures), so the post-privacy test files always start unblocked.
+
+test('all canonical users acknowledge the current rules', async () => {
+  const rulesId = await currentRulesId()
+  // Ack every user first, assert afterward: asserting inside the loop would
+  // stop at the first failure and leave the remaining users blocked, turning
+  // one bad ack into privacy_ack_required failures across every later file.
+  const results = []
+  for (const [role, token] of Object.entries(tokens.users)) {
+    const { status } = await vgCall('createPrivacyAcknowledgement', {}, { token, body: { rulesId } })
+    results.push({ role, status })
+  }
+  for (const { role, status } of results) {
+    assert.equal(status, 201, `${role} acknowledged`)
+  }
+  // Spot-check with a granted user on a non-allowlisted endpoint: a 200
+  // proves the gate is cleared. (A grantless user won't do here — the
+  // deny-by-default staff gate in utils/accessGates.js 403s them on
+  // getVillages whether or not they are privacy-blocked.)
+  const probe = await vgCall('getVillages', {}, { token: tokens.users.full_v3 })
+  assert.equal(probe.status, 200, 'spot check: full_v3 unblocked')
+})

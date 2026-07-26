@@ -1,6 +1,7 @@
 # NodeJS #
 .nyc_output/
 coverage/
+.test-report.tap
 node_modules/
 npm-debug.log
 test/*.log

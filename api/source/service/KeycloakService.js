@@ -193,12 +193,54 @@ async function deleteUser({ username }) {
   }
 }
 
+function buildResetPasswordPayload(password) {
+  // temporary: true triggers Keycloak's UPDATE_PASSWORD required action on
+  // the user's next login.
+  return { type: 'password', value: password, temporary: true }
+}
+
+async function setTemporaryPassword({ id, username, password }) {
+  let userId = id
+  if (!userId) {
+    const existing = await findUserByUsername(username)
+    if (!existing) {
+      const error = new Error(`No Keycloak user found with username: ${username}`)
+      error.status = 404
+      throw error
+    }
+    userId = existing.id
+  }
+
+  const token = await ensureFreshToken()
+  const { baseUrl, realm } = parseAuthority(config.oauth.authority)
+  const url = `${baseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/reset-password`
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(buildResetPasswordPayload(password))
+  })
+
+  if (!res.ok) {
+    const text = await safeReadBody(res)
+    const error = new Error(`Keycloak reset-password failed (${res.status}): ${text}`)
+    error.status = res.status
+    error.body = text
+    throw error
+  }
+}
+
 module.exports = {
   parseAuthority,
   buildCreateUserPayload,
+  buildResetPasswordPayload,
   ensureFreshToken,
   createUser,
   findUserByUsername,
   updateUsername,
-  deleteUser
+  deleteUser,
+  setTemporaryPassword
 }

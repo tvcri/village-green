@@ -7,20 +7,20 @@ import { OpenApiOps } from '../api/openApiOps.js'
 const definition = {
   servers: [{ url: 'http://localhost/api' }],
   paths: {
-    '/stigs/{benchmarkId}': {
+    '/villages/{villageId}': {
       get: {
-        operationId: 'getStig',
+        operationId: 'getVillage',
         parameters: [
-          { name: 'benchmarkId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'villageId', in: 'path', required: true, schema: { type: 'string' } },
         ],
       },
     },
-    '/findings': {
+    '/persons': {
       get: {
-        operationId: 'getFindings',
+        operationId: 'getPersons',
         parameters: [
-          { name: 'benchmarkId', in: 'query', schema: { type: 'string' } },
-          { name: 'aggregator', in: 'query', schema: { type: 'string' } },
+          { name: 'lastName', in: 'query', schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string' } },
           { name: 'projection', in: 'query', schema: { type: 'array', items: { type: 'string' } } },
         ],
       },
@@ -32,43 +32,43 @@ describe('OpenApiOps URL building', () => {
   const ops = new OpenApiOps({ definition })
 
   it('encodes spaces in query values as %20 (not +)', () => {
-    const url = ops.getUrl('getFindings', {
-      benchmarkId: 'VMware Aria Operations 8.x Apache',
+    const url = ops.getUrl('getPersons', {
+      lastName: 'Van Der Berg Family',
     })
-    expect(url).toBe('http://localhost/api/findings?benchmarkId=VMware%20Aria%20Operations%208.x%20Apache')
+    expect(url).toBe('http://localhost/api/persons?lastName=Van%20Der%20Berg%20Family')
     expect(url).not.toContain('+')
   })
 
   it('encodes literal + in query values as %2B', () => {
-    const url = ops.getUrl('getFindings', { benchmarkId: '1+1' })
-    expect(url).toBe('http://localhost/api/findings?benchmarkId=1%2B1')
+    const url = ops.getUrl('getPersons', { lastName: '1+1' })
+    expect(url).toBe('http://localhost/api/persons?lastName=1%2B1')
   })
 
   it('serializes array query values with repeated keys (explode form)', () => {
-    const url = ops.getUrl('getFindings', { projection: ['stigs', 'metadata', 'rule'] })
-    expect(url).toBe('http://localhost/api/findings?projection=stigs&projection=metadata&projection=rule')
+    const url = ops.getUrl('getPersons', { projection: ['member', 'volunteer', 'friend'] })
+    expect(url).toBe('http://localhost/api/persons?projection=member&projection=volunteer&projection=friend')
   })
 
   it('encodes spaces in each element of an array query value', () => {
-    const url = ops.getUrl('getFindings', {
+    const url = ops.getUrl('getPersons', {
       projection: ['with space', 'plain'],
     })
-    expect(url).toBe('http://localhost/api/findings?projection=with%20space&projection=plain')
+    expect(url).toBe('http://localhost/api/persons?projection=with%20space&projection=plain')
   })
 
   it('produces clean URLs for plain ASCII values (no over-encoding)', () => {
-    const url = ops.getUrl('getFindings', { aggregator: 'groupId', benchmarkId: 'CAN_Ubuntu_18-04_STIG' })
-    expect(url).toBe('http://localhost/api/findings?aggregator=groupId&benchmarkId=CAN_Ubuntu_18-04_STIG')
+    const url = ops.getUrl('getPersons', { status: 'Active', lastName: 'Providence_Volunteer_Corps' })
+    expect(url).toBe('http://localhost/api/persons?status=Active&lastName=Providence_Volunteer_Corps')
   })
 
   it('encodes path-param values with spaces as %20 (regression guard)', () => {
-    const url = ops.getUrl('getStig', { benchmarkId: 'VMware Aria Operations 8.x Apache' })
-    expect(url).toBe('http://localhost/api/stigs/VMware%20Aria%20Operations%208.x%20Apache')
+    const url = ops.getUrl('getVillage', { villageId: 'Rhode Island Old Colony' })
+    expect(url).toBe('http://localhost/api/villages/Rhode%20Island%20Old%20Colony')
   })
 
   it('omits the ? when there are no query params', () => {
-    const url = ops.getUrl('getStig', { benchmarkId: 'CAN_Ubuntu' })
-    expect(url).toBe('http://localhost/api/stigs/CAN_Ubuntu')
+    const url = ops.getUrl('getVillage', { villageId: 'Providence_Downtown' })
+    expect(url).toBe('http://localhost/api/villages/Providence_Downtown')
     expect(url).not.toContain('?')
   })
 })

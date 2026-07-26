@@ -130,9 +130,9 @@ function getBaseUrl() {
  *  - rawBody: FormData/Blob/etc
  *  - responseType: 'json' | 'blob' | 'text'
  * EXAMPLE CALL:
- * apiFetch('/stigs', { method: 'GET' })
- * api.get('/stigs')
- * api.post('/stigs', { name: 'test' })
+ * apiFetch('/villages', { method: 'GET' })
+ * api.get('/villages')
+ * api.post('/villages', { name: 'Innsmouth' })
  */
 export async function apiFetch(path, opts = {}) {
   if (reloadIfExpired()) {
@@ -193,10 +193,10 @@ export async function apiFetch(path, opts = {}) {
 
 /**
  * EXAMPLE CALL:
- * apiCall('getStigById', { id: 1 })
- * apiCall('createStig', { id: 1 }, { name: 'test' })
- * apiCall('updateStig', { id: 1 }, { name: 'test' })
- * apiCall('deleteStig', { id: 1 })
+ * apiCall('getServiceRequest', { serviceRequestId: 1 })
+ * apiCall('createServiceRequest', {}, { villageId: 1, description: 'Ride to pharmacy' })
+ * apiCall('patchServiceRequest', { serviceRequestId: 1 }, { status: 'Completed' })
+ * apiCall('deleteServiceRequest', { serviceRequestId: 1 })
  */
 export async function apiCall(operationId, params = {}, body = undefined, opts = {}) {
   if (!apiSpecObj) {

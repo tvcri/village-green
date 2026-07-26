@@ -72,6 +72,18 @@ exports.queryUsers = async function (inProjection, inPredicates, userObject) {
     columns.push(`ud.webPreferences`)
   }
 
+  if (inProjection?.includes('volunteer')) {
+    // isVolunteer predicts the runtime VSS grant: true iff ANY person whose
+    // email matches the username is an active volunteer (shared household
+    // email => several persons). Built on the shared dbUtils fragment so it
+    // cannot drift from the access-gate semantics. cast(... as json) yields a
+    // real JSON boolean.
+    columns.push(`cast(if(
+      ${dbUtils.sqlIsActiveVolunteerForUsername('ud.username')},
+      'true', 'false'
+    ) as json) as isVolunteer`)
+  }
+
   if (inProjection?.includes('privacyStatus')) {
     // Correlated subqueries — one round-trip, no JS merge. needsAck is true
     // unless the user's latest ack is of the current rules version AND within
@@ -599,6 +611,12 @@ exports.getUserObject = async function (username) {
     lastAccess,
     lastClaims,
     status,
+    -- Runtime identity (VSS multi-volunteer, spec 2026-07-21 as amended):
+    -- the ACTIVE VOLUNTEERS whose person email matches the username, as a
+    -- JSON id array ('[]' when none). person is only the email key; a
+    -- deactivated volunteer drops out of the set (and every VSS surface) on
+    -- the next request. Single source of truth is dbUtils.sqlResolvedPersonIds.
+    ${dbUtils.sqlResolvedPersonIds('ud.username')} as personIds,
     -- Privacy acknowledgement gate (auth-layer boolean only). True when rules are
     -- published and the user has no acknowledgement of the current version within
     -- the configured interval. Ordered by id (monotonic) — not acknowledgedAt.
@@ -622,6 +640,9 @@ exports.getUserObject = async function (username) {
   const [rows] = await dbUtils.pool.query(sql, [config.privacy.ackIntervalDays, username])
   const row = rows[0]
   if (row) {
+    // Normalize to strings once; every ownership comparison downstream is
+    // string-vs-string (StringIntId bodies, CAST(... AS CHAR) columns).
+    row.personIds = (row.personIds ?? []).map(String)
     row.privacyAckRequired = row.privacyAckRequired === 1
     const { computeEffective } = require('../utils/authz')
     const roleData = await _this.getUserRoleData(row.userId)
@@ -748,4 +769,68 @@ exports.deleteUserGrant = async function (userId, grantId) {
 
   const grants = await exports.getUserGrants(userId)
   return grants[0] || { grantId }
+}
+
+// ─── VSS identity link ──────────────────────────────────────────────────────
+
+// A volunteer's village is their person's village. active_volunteer is the
+// correct source here: this feeds authorization, and inactive volunteers
+// must lose the surface.
+exports.getVolunteerVillages = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    `SELECT CAST(p.villageId AS CHAR) AS villageId, v.name
+     FROM active_volunteer av
+     JOIN person p ON av.personId = p.id
+     JOIN village v ON p.villageId = v.id
+     WHERE av.personId = ?`,
+    [personId]
+  )
+  return rows
+}
+
+// The capability names the caller's active volunteer holds. Names (not ids)
+// because the sole consumer — the VSS Service filter — matches serviceName
+// prefixes by capability label. active_volunteer for the same reason as
+// getVolunteerVillages: an inactivated volunteer loses the VSS surface.
+exports.getVolunteerCapabilities = async function (personId) {
+  const [rows] = await dbUtils.pool.query(
+    `SELECT c.name
+     FROM active_volunteer av
+     JOIN volunteer_capability vc ON vc.volunteerId = av.id
+     JOIN capability c ON c.id = vc.capabilityId
+     WHERE av.personId = ?
+     ORDER BY c.name`,
+    [personId]
+  )
+  return rows.map(r => r.name)
+}
+
+// The caller's active volunteers, one entry per resolved person that has an
+// active volunteer row (shared household email => several entries). Carries
+// what the VSS client needs: display name (the "Who is this for?" picker and
+// the My-commitments Volunteer column) plus per-person villages/capabilities.
+// DISTINCT guards the out-of-scope person-with-multiple-volunteer-rows case.
+// name is the generated "Last, First" fullName — the tabular display
+// convention (Volunteer column, picker list), matching Member columns.
+// firstName/lastName ride along so the client can compose the informal
+// "First Last" where the name sits inside a sentence (confirm dialog,
+// Confirmed banner, toasts).
+exports.getVolunteers = async function (personIds) {
+  if (!personIds?.length) return []
+  const [rows] = await dbUtils.pool.query(
+    `SELECT DISTINCT CAST(av.personId AS CHAR) AS personId,
+       p.fullName AS name, p.firstName, p.lastName
+     FROM active_volunteer av
+     JOIN person p ON av.personId = p.id
+     WHERE av.personId IN (?)
+     ORDER BY p.fullName`,
+    [personIds]
+  )
+  return Promise.all(rows.map(async row => {
+    const [villages, capabilities] = await Promise.all([
+      exports.getVolunteerVillages(row.personId),
+      exports.getVolunteerCapabilities(row.personId),
+    ])
+    return { personId: row.personId, name: row.name, firstName: row.firstName, lastName: row.lastName, villages, capabilities }
+  }))
 }

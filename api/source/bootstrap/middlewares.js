@@ -7,6 +7,7 @@ const { middleware: openApiMiddleware } = require('express-openapi-validator')
 const config = require('../utils/config')
 const { modulePathResolver, buildResponseValidationConfig } = require('./bootstrapUtils')
 const auth = require('../utils/auth')
+const accessGates = require('../utils/accessGates')
 const configureErrorHandlers = require('./errorHandlers')
 const { requestLogger } = require('../utils/logger')
 const state = require('../utils/state')
@@ -79,6 +80,11 @@ function configureAuth(app) {
   app.use('/api', auth.validateToken)
   app.use('/api', auth.setupUser)
   app.use('/api', auth.requirePrivacyAck)
+  // VSS gates (design spec §2): the volunteer gate authorizes its own
+  // namespace; the staff gate denies everything else by default.
+  // This mount is the ONLY authorization on /volunteer-requests; it is exempt from the staff gate below (see accessGates.js STAFF_GATE_EXEMPT_PREFIXES) — do not remove without also re-adding staff-gate coverage.
+  app.use('/api/volunteer-requests', accessGates.requireVolunteerAccess)
+  app.use('/api', accessGates.requireStaffAccess)
 }
 
 function configureExpress(app) {

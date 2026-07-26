@@ -63,6 +63,18 @@ const routes = [
     meta: { requiresPermission: 'sr:read', villageScoped: true },
   },
   {
+    path: '/volunteer',
+    name: 'volunteer',
+    component: () => import('../features/VolunteerHome/components/VolunteerHome.vue'),
+    meta: { requiresVolunteer: true },
+  },
+  {
+    path: '/volunteer/requests/:id',
+    name: 'volunteer-request-detail',
+    component: () => import('../features/VolunteerHome/components/VolunteerRequestDetail.vue'),
+    meta: { requiresVolunteer: true },
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('../features/Admin/components/AdminHub.vue'),
@@ -164,6 +176,12 @@ const routes = [
     path: '/meta/friends',
     name: 'meta-friends',
     component: () => import('../features/FriendList/components/FriendList.vue'),
+  },
+  {
+    path: '/meta/mailing-labels',
+    name: 'meta-mailing-labels',
+    component: () => import('../features/MailingLabels/components/MailingLabels.vue'),
+    meta: { requiresPermission: 'person:read' },
   },
   {
     path: '/:pathMatch(.*)*',

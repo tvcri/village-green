@@ -103,7 +103,7 @@ class MockOidc {
 
   getToken({
     privileges = ['create_collection', 'admin'],
-    scope = 'stig-manager',
+    scope = 'village-green',
     audience,
     username = 'admin',
     expiresIn = '1h',
@@ -294,8 +294,8 @@ class MockOidc {
           'expiresIn': '60s',
           'refreshExpiresIn': '180s',
           'sessionExpiresIn': '*unimplemented*',
-          'audience': 'stig-manager',
-          'scope': 'stig-manager',
+          'audience': 'village-green',
+          'scope': 'village-green',
           'scopeClaim': 'scope',
           'algorithm': 'RS256',
           'kid': '0'

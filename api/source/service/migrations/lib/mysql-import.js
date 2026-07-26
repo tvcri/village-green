@@ -367,7 +367,10 @@ class queryParser{
 		}
 
 		this.checkQuote(char);
-		this.checkEndOfQuery();
+		// Not while seeking a new delimiter: the delimiter being DECLARED (e.g.
+		// the `;` in `DELIMITER ;`) would otherwise be matched as a terminator
+		// against the OLD delimiter, corrupting every statement after it.
+		if (!this.seekingDelimiter) this.checkEndOfQuery();
 	}
 	
 	// Check if the current char has been escaped

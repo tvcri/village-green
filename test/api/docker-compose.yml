@@ -1,0 +1,20 @@
+# Disposable MySQL 8 for the Village Green API test suite.
+# The API auto-scaffolds the schema on first boot (setupSchema), so this just
+# needs to come up empty with the right db/user. Brought up/down by run.js.
+services:
+  mysql:
+    image: mysql:8
+    # Storage lives only in the container layer; `docker compose down -v` between
+    # runs gives every run a pristine, freshly-scaffolded schema.
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: vg_test
+      MYSQL_USER: vg
+      MYSQL_PASSWORD: vg
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpw"]
+      interval: 3s
+      timeout: 5s
+      retries: 40

@@ -5,7 +5,7 @@ vi.mock('./apiClient.js', () => ({
 }))
 
 import { apiCall } from './apiClient.js'
-import { createUser, updateUser, deleteUser } from './userApi.js'
+import { createUser, updateUser, deleteUser, getUsersWithGrants } from './userApi.js'
 
 describe('userApi', () => {
   beforeEach(() => {
@@ -33,5 +33,14 @@ describe('userApi', () => {
     const result = await deleteUser(5)
     expect(apiCall).toHaveBeenCalledWith('deleteUser', { userId: 5, elevate: true, projection: ['statistics'] })
     expect(result).toEqual({ userId: 5, status: 'unavailable' })
+  })
+
+  it('getUsersWithGrants requests the grants and volunteer projections', async () => {
+    apiCall.mockResolvedValue([])
+    await getUsersWithGrants()
+    expect(apiCall).toHaveBeenCalledWith(
+      'getUsers',
+      expect.objectContaining({ projection: ['grants', 'volunteer'] })
+    )
   })
 })

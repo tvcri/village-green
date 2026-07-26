@@ -114,8 +114,8 @@ Three main approaches:
 #### 1. **Operation-Based Calls** (Recommended)
 ```javascript
 // Uses OpenAPI spec to build URLs and methods
-apiCall('getStigById', { id: 1 })
-apiCall('createCollection', { }, { name: 'Test' })
+apiCall('getVillage', { villageId: 1 })
+apiCall('createServiceRequest', { }, { villageId: 1, description: 'Ride to pharmacy' })
 ```
 - Requires API spec to be configured (done in `main.js`)
 - Routes through `apiCall()` → `apiFetch()` → `doFetch()`
@@ -125,7 +125,7 @@ apiCall('createCollection', { }, { name: 'Test' })
 ```javascript
 api.get('/op/definition')
 api.post('/user', { name: 'John' })
-api.del('/collection/5')
+api.del('/villages/5')
 ```
 - Direct HTTP verbs (get, post, put, patch, del)
 - Routes through `apiFetch()` → `doFetch()`
@@ -255,8 +255,9 @@ fetch(`${VG.Env.apiBase}/user?projection=webPreferences`, {
 
 ### Router Integration
 - **Navigation Guard:** `navigationGuard()` in `client/src/router/navigationGuards.js`
-- **Checks:** Collection grants, admin status, route requirements
-- **Uses:** `VG.curUser` from bootstrap to validate permissions
+- **Checks:** volunteer-only routing, `meta.requiresPermission` (optionally village-scoped),
+  federation access for `/meta` routes, and village-grant access for other village-scoped routes
+- **Uses:** `VG.curUser` (via `useCurrentUser()`) from bootstrap to validate permissions
 
 ---
 
@@ -376,14 +377,14 @@ graph TB
 
 ---
 
-## Potential Issues / Hybrid Code State
+## Potential Issues / Notes
 
-This codebase is a **merge of STIGMAN (ExtJS client) and VG (Vue client)** architectures:
+VG was originally forked from STIG Manager (an ExtJS client); the client has since been rebuilt
+around VG's own domain and patterns. A few structural quirks remain from that history:
 
-1. **State Management Inconsistency**
-   - `globalAuthStore` exists but is unused; `useOidcWorker()` composable is the actual source
-   - `globalAppStore` is populated but rarely consumed
-   - No centralized store pattern (no Pinia)
+1. **State Management**
+   - No centralized store pattern (no Pinia) — global state lives in write-once `VG.*` globals
+     plus reactive composables (`useOidcWorker()`, `useStateWorker()`, `useCurrentUser()`)
 
 2. **Token Handling Asymmetry**
    - `init.js` uses raw `fetch()` to get user object
@@ -454,4 +455,4 @@ The client architecture is **worker-centric** and **cross-tab aware**:
 - **Components** remain stateless and consume reactive refs from composables
 - **No polling** — all updates are event-driven via workers and BroadcastChannels
 
-The codebase shows signs of **STIGMAN → VG migration** (unused stores, dual token access patterns), but the current flow is functional and follows Vue 3 composition API patterns.
+The current flow is functional and follows Vue 3 composition API patterns throughout.

@@ -12,6 +12,7 @@ const router = useRouter()
       <Button label="Persons" @click="router.push({ name: 'meta-persons' })" />
       <Button label="Service Requests" @click="router.push({ name: 'meta-service-requests' })" />
       <Button label="Friends" @click="router.push({ name: 'meta-friends' })" />
+      <Button label="Mailing Labels" @click="router.push({ name: 'meta-mailing-labels' })" />
     </div>
   </div>
 </template>

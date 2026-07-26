@@ -1,0 +1,121 @@
+name: API tests
+
+# Black-box API integration tests (test/api). Runs the real server against a
+# disposable MySQL 8 + the mock OIDC provider — see test/api/README.md.
+#
+# Both jobs are green and safe to make REQUIRED checks:
+#
+#   - `api-tests`: the findings it was originally written to characterize have
+#     all landed upstream (see test/api/SECURITY-FINDINGS.md). If a new
+#     deliberate RED is ever characterized, it goes red by design and a note
+#     to that effect should come back.
+#
+#   - `response-validation`: the 8 pre-existing spec-drift violations it once
+#     surfaced were fixed in PR #73. A nonzero count here now means a response
+#     that violates the OpenAPI spec — a real regression.
+#
+# The run is instrumented (`npm run test:coverage`) and the c8 report is always
+# uploaded. The API child runs with VG_DEV_RESPONSE_VALIDATION=logOnly (set by
+# run.js), and a follow-up job fails if any responseValidation entries appear in
+# the API log, uploading a jq-extracted report of the violations — same pattern
+# as STIG Manager's api-audit-test-coverage-response workflow.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+# Don't pile up runs for the same PR/branch — cancel the previous one.
+concurrency:
+  group: api-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest # GitHub-hosted runners ship Docker + Compose v2
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            api/source/package-lock.json
+            test/utils/package-lock.json
+            test/api/package-lock.json
+
+      # run.js installs deps (api/source, test/utils, test/api), brings up MySQL
+      # via docker compose, starts mock OIDC + the API (NODE_V8_COVERAGE
+      # instrumented), seeds, runs the tests, and tears everything down —
+      # generating the c8 report even on a red run. The job's pass/fail reflects
+      # the suite result.
+      - name: Run API test suite with coverage
+        working-directory: test/api
+        run: npm run test:coverage
+
+      # The API log (JSON lines) feeds the response-validation job; the TAP
+      # report makes a red run diagnosable without re-running.
+      - name: Upload logs and test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-artifacts
+          path: |
+            test/api/.api.log
+            test/api/.test-report.tap
+          include-hidden-files: true # dotfiles; off by default in v4
+          if-no-files-found: ignore
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: test/api/.coverage
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  response-validation:
+    name: Response validation
+    needs: api-tests
+    if: always() # audit the responses served even when the suite itself fails
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download API log artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: api-test-artifacts
+          path: ./logs
+
+      # Each responseValidation entry is a response the API served that violates
+      # the OpenAPI spec. Extract them to a report and fail if there are any.
+      # (grep pre-filters non-JSON lines so a crash traceback can't break jq;
+      # `|| true` because zero JSON lines is still a valid — if alarming — log.)
+      # The violations are printed to the job log (a summary line per violation,
+      # plus the full report in a collapsed group) so failures are diagnosable
+      # without downloading the artifact.
+      - name: Test for response validation messages
+        working-directory: ./logs
+        run: |
+          grep '^{' .api.log > json-lines.jsonl || true
+          jq -s 'map(select(.type=="responseValidation")|{method:.data.request.method,url:.data.request.url,errors:.data.error.errors,body:.data.body})' json-lines.jsonl > response-validation.json
+          count=$(jq 'length' response-validation.json)
+          echo "responseValidation entries: $count"
+          if [ "$count" -gt 0 ]; then
+            jq -r '.[] | "\(.method) \(.url) — " + ([.errors[]? | "\(.path // "?"): \(.message // tojson)"] | join("; "))' response-validation.json
+            echo "::group::Full report (response-validation.json)"
+            jq . response-validation.json
+            echo "::endgroup::"
+          fi
+          exit "$count"
+
+      - name: Upload response validation artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: response-validation
+          path: ./logs/response-validation.json

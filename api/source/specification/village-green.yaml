@@ -799,6 +799,158 @@ paths:
       security:
       - oauth:
         - vg:user:read
+  /enrollment/request:
+    post:
+      tags:
+      - Enrollment
+      summary: Request an enrollment PIN for a registered volunteer email
+      description: >-
+        Public endpoint. Always returns the identical response regardless of
+        whether the email is registered, holds which roles, or already has an
+        account (enumeration defense). Truthful branching happens only after
+        PIN verification.
+      operationId: requestEnrollment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+      responses:
+        '200':
+          description: >-
+            Uniform empty acknowledgement (enumeration defense). Carries no
+            outcome and no display text - the acknowledgement shown to the user
+            is client-owned copy.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+  /enrollment/verify:
+    post:
+      tags:
+      - Enrollment
+      summary: Verify an emailed PIN; create the account or report it exists
+      operationId: verifyEnrollment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              - pin
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                pin:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+      responses:
+        '200':
+          description: PIN accepted; truthful account state
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - loginUrl
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - created
+                    - exists
+                  tempPassword:
+                    type: string
+                  loginUrl:
+                    type: string
+        '400':
+          description: Invalid, expired, consumed, or attempt-capped PIN
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - invalid
+  /enrollment/reset-password:
+    post:
+      tags:
+      - Enrollment
+      summary: Re-issue a temporary password to a PIN-verified existing account
+      description: >-
+        Gated by the just-consumed enrollment row: requires the same email and
+        PIN that passed /enrollment/verify within the last 10 minutes, once.
+      operationId: resetEnrollmentPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - email
+              - pin
+              properties:
+                email:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                pin:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+      responses:
+        '200':
+          description: New temporary password issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                - tempPassword
+                - loginUrl
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - reset
+                  tempPassword:
+                    type: string
+                  loginUrl:
+                    type: string
+        '400':
+          description: No eligible consumed row or PIN mismatch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - invalid
   /users:
     parameters:
     - $ref: '#/components/parameters/ElevateQuery'
@@ -1015,6 +1167,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/UserGroupProjected'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       security:
       - oauth:
         - vg:user:read
@@ -1696,6 +1854,144 @@ paths:
       security:
       - oauth:
         - vg:service-request
+  /volunteer-requests:
+    get:
+      summary: List service requests visible to the requesting volunteer
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequests
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          description: open = pickable requests across all villages; mine = the caller's upcoming (Confirmed) commitments; history = the caller's past (Completed) requests
+          schema:
+            type: string
+            enum:
+            - open
+            - mine
+            - history
+      responses:
+        '200':
+          description: List of volunteer-scoped service requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/villages:
+    get:
+      summary: List all villages, for volunteer-facing filter UIs
+      description: Unfiltered by grants (the caller is a volunteer, not staff) — the full current village list, id and name only.
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequestVillages
+      responses:
+        '200':
+          description: List of villages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolunteerVillage'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/{serviceRequestId}:
+    get:
+      summary: Get a single service request visible to the requesting volunteer (deep-link landing)
+      tags:
+      - VolunteerRequest
+      operationId: getVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: The service request, if it is Open (any village) or one of the caller's own Confirmed/Completed requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible to this volunteer)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request:read
+  /volunteer-requests/{serviceRequestId}/sign-up:
+    post:
+      summary: Commit the requesting volunteer to an open service request
+      tags:
+      - VolunteerRequest
+      operationId: signUpVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerSignUpPost'
+      responses:
+        '200':
+          description: The confirmed service request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible, 409 not open / committed to another account volunteer, 422 selection required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
+  /volunteer-requests/{serviceRequestId}/release:
+    post:
+      summary: Release the requesting volunteer's commitment, reopening the request
+      tags:
+      - VolunteerRequest
+      operationId: releaseVolunteerRequest
+      parameters:
+        - $ref: '#/components/parameters/ServiceRequestIdPath'
+      responses:
+        '200':
+          description: The reopened service request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerServiceRequest'
+        default:
+          description: error (404 not visible, 409 not the caller's confirmed request)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:service-request
   /friends:
     get:
       summary: List Friendly Calls & Visits submissions
@@ -2293,6 +2589,119 @@ paths:
       - oauth:
         - vg:user:write
       x-elevation-required: true
+  /mailing-labels:
+    get:
+      summary: Generate mailing labels for an audience
+      tags:
+      - MailingLabel
+      operationId: getMailingLabels
+      parameters:
+      - name: audience
+        in: query
+        required: true
+        description: Audience id from /mailing-labels/audiences
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Label-ready address groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audience:
+                    type: string
+                  labels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        street:
+                          type: string
+                        unit:
+                          type: string
+                          nullable: true
+                        city:
+                          type: string
+                          nullable: true
+                        state:
+                          type: string
+                          nullable: true
+                        zip:
+                          type: string
+                          nullable: true
+                        sortLastName:
+                          type: string
+                          nullable: true
+                          description: Primary recipient's last name, for client-side sorting
+                  summary:
+                    type: object
+                    properties:
+                      recipientCount:
+                        type: integer
+                      labelCount:
+                        type: integer
+                      mergedCount:
+                        type: integer
+                  warnings:
+                    type: object
+                    properties:
+                      unmailable:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            reason:
+                              type: string
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person:read
+  /mailing-labels/audiences:
+    get:
+      summary: List mailing-label audiences available to the requesting user
+      tags:
+      - MailingLabel
+      operationId: getMailingLabelAudiences
+      responses:
+        '200':
+          description: Available audiences
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    label:
+                      type: string
+                    description:
+                      type: string
+                    params:
+                      type: array
+                      items:
+                        type: object
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:person:read
 components:
   schemas:
     ApiClassification:
@@ -2377,6 +2786,9 @@ components:
         errands:
           type: integer
           minimum: 0
+        friends:
+          type: integer
+          minimum: 0
         rides:
           type: integer
           minimum: 0
@@ -2388,6 +2800,7 @@ components:
           minimum: 0
       required:
       - errands
+      - friends
       - rides
       - homeHelp
       - techSupport
@@ -2471,7 +2884,13 @@ components:
       type: object
       properties:
         ui:
-          type: string
+          type: object
+          additionalProperties: false
+          properties:
+            current:
+              type: string
+            next:
+              type: string
     CeDump:
       type: object
       additionalProperties: false
@@ -2485,7 +2904,9 @@ components:
       type: object
       properties:
         detail:
-          type: string
+          oneOf:
+          - type: string
+          - type: object
         error:
           type: string
         stack:
@@ -2870,6 +3291,7 @@ components:
         joinDate:
           type: string
           format: date
+          nullable: true
     MemberId:
       $ref: '#/components/schemas/StringIntId'
     MemberPatch:
@@ -3116,7 +3538,16 @@ components:
           maxLength: 200
           nullable: true
         village:
-          $ref: '#/components/schemas/Village'
+          # Always an object (built inline via JSON_OBJECT), but a villageless
+          # (global) person yields null members — a LEFT JOIN with no village.
+          type: object
+          nullable: true
+          properties:
+            villageId:
+              $ref: '#/components/schemas/VillageIdNullable'
+            name:
+              type: string
+              nullable: true
         activeAs:
           $ref: '#/components/schemas/ActiveAs'
         member:
@@ -3508,6 +3939,24 @@ components:
           type: string
           maxLength: 255
           nullable: true
+        modifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        modifiedUserId:
+          $ref: '#/components/schemas/UserIdNullable'
+        modifiedByUsername:
+          type: string
+          maxLength: 255
+          nullable: true
+        modifiedByDisplayName:
+          type: string
+          maxLength: 255
+          nullable: true
+        # TEMPORARY: derived from modifiedUserId IS NOT NULL — valid only
+        # while VSS signup/release are the sole writers of modifiedUserId.
+        vssSignup:
+          type: boolean
         serviceDate:
           type: string
           format: date
@@ -3526,6 +3975,9 @@ components:
           type: string
           nullable: true
         description:
+          type: string
+          nullable: true
+        start:
           type: string
           nullable: true
         destination:
@@ -3555,6 +4007,25 @@ components:
           pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
+          type: string
+          maxLength: 50
+          nullable: true
+        startAddress:
+          type: string
+          nullable: true
+        startCity:
+          type: string
+          maxLength: 100
+          nullable: true
+        startState:
+          type: string
+          maxLength: 50
+          nullable: true
+        startZip:
+          type: string
+          maxLength: 20
+          nullable: true
+        startPhone:
           type: string
           maxLength: 50
           nullable: true
@@ -3595,7 +4066,7 @@ components:
           maxLength: 10
           minLength: 1
           pattern: ^[0-9]{1,10}$
-          nullable: true
+          nullable: false
         volunteerPersonId:
           type: string
           maxLength: 10
@@ -3646,6 +4117,9 @@ components:
         description:
           type: string
           nullable: true
+        start:
+          type: string
+          nullable: true
         destination:
           type: string
           nullable: true
@@ -3676,11 +4150,31 @@ components:
           type: string
           maxLength: 50
           nullable: true
+        startAddress:
+          type: string
+          nullable: true
+        startCity:
+          type: string
+          maxLength: 100
+          nullable: true
+        startState:
+          type: string
+          maxLength: 50
+          nullable: true
+        startZip:
+          type: string
+          maxLength: 20
+          nullable: true
+        startPhone:
+          type: string
+          maxLength: 50
+          nullable: true
     ServiceRequestPost:
       additionalProperties: false
       type: object
       required:
       - villageId
+      - memberPersonId
       properties:
         requestNumber:
           type: integer
@@ -3691,7 +4185,7 @@ components:
           maxLength: 10
           minLength: 1
           pattern: ^[0-9]{1,10}$
-          nullable: true
+          nullable: false
         volunteerPersonId:
           type: string
           maxLength: 10
@@ -3738,6 +4232,9 @@ components:
         description:
           type: string
           nullable: true
+        start:
+          type: string
+          nullable: true
         destination:
           type: string
           nullable: true
@@ -3765,6 +4262,25 @@ components:
           pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
         state:
+          type: string
+          maxLength: 50
+          nullable: true
+        startAddress:
+          type: string
+          nullable: true
+        startCity:
+          type: string
+          maxLength: 100
+          nullable: true
+        startState:
+          type: string
+          maxLength: 50
+          nullable: true
+        startZip:
+          type: string
+          maxLength: 20
+          nullable: true
+        startPhone:
           type: string
           maxLength: 50
           nullable: true
@@ -4081,6 +4597,53 @@ components:
           $ref: '#/components/schemas/WebPreferences'
         privacyStatus:
           $ref: '#/components/schemas/PrivacyStatus'
+        isVolunteer:
+          type: boolean
+          description: >-
+            Present only with the `volunteer` projection. True iff the runtime
+            would grant this user VSS access — i.e. at least one person's email
+            matches the username and that person is an active volunteer.
+        volunteers:
+          type: array
+          description: >-
+            The caller's active volunteers, one entry per resolved person
+            (shared household email may map one account to several). Empty
+            array when none. Populated on GET /user only.
+          items:
+            additionalProperties: false
+            type: object
+            properties:
+              personId:
+                $ref: '#/components/schemas/StringIntId'
+              name:
+                description: Tabular display form ("Last, First" fullName)
+                type: string
+                nullable: true
+              firstName:
+                type: string
+              lastName:
+                type: string
+              villages:
+                type: array
+                items:
+                  additionalProperties: false
+                  type: object
+                  properties:
+                    villageId:
+                      $ref: '#/components/schemas/StringIntId'
+                    name:
+                      type: string
+              capabilities:
+                type: array
+                items:
+                  type: string
+            required:
+            - personId
+            - name
+            - firstName
+            - lastName
+            - villages
+            - capabilities
       required:
       - userId
       - username
@@ -4170,6 +4733,41 @@ components:
         '
       pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$
       type: string
+    VillageGrants:
+      description: >-
+        Role grants scoped to this village, from the ?projection=grants option
+        on getVillage. Each entry pairs a roleId with either a user or a
+        user-group grantee (never both). Shape mirrors the JSON the grants
+        projection SQL emits in VillageService.queryVillages.
+      type: array
+      items:
+        additionalProperties: false
+        type: object
+        properties:
+          roleId:
+            type: integer
+          user:
+            additionalProperties: false
+            type: object
+            properties:
+              userId:
+                $ref: '#/components/schemas/StringIntId'
+              username:
+                type: string
+              displayName:
+                type: string
+                nullable: true
+          userGroup:
+            additionalProperties: false
+            type: object
+            properties:
+              userGroupId:
+                $ref: '#/components/schemas/StringIntId'
+              name:
+                type: string
+              description:
+                type: string
+                nullable: true
     Village:
       additionalProperties: false
       type: object
@@ -4187,6 +4785,8 @@ components:
           $ref: '#/components/schemas/ServiceRequestStatusCounts'
         statistics:
           $ref: '#/components/schemas/VillageStatistics'
+        grants:
+          $ref: '#/components/schemas/VillageGrants'
       required:
       - villageId
       - name
@@ -4524,6 +5124,174 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+    VolunteerMemberContact:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        fullName:
+          description: Tabular display form ("Last, First")
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        cell:
+          type: string
+          nullable: true
+    VolunteerEmergencyContact:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        relationship:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+    VolunteerOwnAddress:
+      nullable: true
+      additionalProperties: false
+      type: object
+      properties:
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+    VolunteerVillage:
+      additionalProperties: false
+      type: object
+      properties:
+        villageId:
+          $ref: '#/components/schemas/StringIntId'
+        name:
+          type: string
+      required:
+      - villageId
+      - name
+    VolunteerSignUpPost:
+      additionalProperties: false
+      type: object
+      properties:
+        personId:
+          $ref: '#/components/schemas/StringIntId'
+    VolunteerServiceRequest:
+      additionalProperties: false
+      type: object
+      properties:
+        serviceRequestId:
+          $ref: '#/components/schemas/StringIntId'
+        villageId:
+          $ref: '#/components/schemas/StringIntId'
+        villageName:
+          type: string
+          nullable: true
+        requestNumber:
+          description: >-
+            The CE-legacy human-readable number; null for VG-native requests
+            (the client shows `requestNumber ?? serviceRequestId`).
+          type: integer
+          nullable: true
+        status:
+          type: string
+        serviceName:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        instructions:
+          type: string
+          nullable: true
+        transportationType:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          nullable: true
+        serviceDate:
+          type: string
+          format: date
+          nullable: true
+        timesFlexible:
+          type: boolean
+        startTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        finishTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        apptTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        returnTime:
+          type: string
+          pattern: '^\d{2}:\d{2}:\d{2}$'
+          nullable: true
+        destination:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        zip:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        member:
+          $ref: '#/components/schemas/VolunteerMemberContact'
+        emergencyContact:
+          $ref: '#/components/schemas/VolunteerEmergencyContact'
+        volunteerAddress:
+          $ref: '#/components/schemas/VolunteerOwnAddress'
+        volunteerPersonId:
+          type: string
+          nullable: true
+      required:
+      - serviceRequestId
+      - villageId
+      - status
     WebPreferences:
       type: object
       properties:
@@ -4654,6 +5422,15 @@ components:
           type: object
           nullable: true
           additionalProperties: true
+        deviceClass:
+          type: string
+          enum: [mobile, tablet, desktop, unknown]
+      # Tightened deliberately. Without this a misspelled property name is
+      # accepted and silently dropped with a 204, and useAnalytics swallows
+      # post errors, so the data loss is invisible. Safe for cached older
+      # bundles: useAnalytics is the only producer and sends exactly this
+      # field set, so an older client sends a subset, never an extra.
+      additionalProperties: false
     AnalyticsSummaryRow:
       type: object
       properties:
@@ -4668,6 +5445,14 @@ components:
           type: string
           format: date-time
           nullable: true
+        mobileVisits:
+          type: integer
+        tabletVisits:
+          type: integer
+        desktopVisits:
+          type: integer
+        unknownVisits:
+          type: integer
   parameters:
     AppDataFormatQuery:
       name: format
@@ -4864,6 +5649,7 @@ components:
           - privacyStatus
           - userGroups
           - webPreferences
+          - volunteer
     UserStatusQuery:
       name: status
       in: query

@@ -10,7 +10,7 @@ export const getUsers = () => {
 
 export const getUsersWithGrants = () => {
   const { elevate } = useElevate()
-  return apiCall('getUsers', { elevate: elevate.value ?? true, projection: ['grants'] })
+  return apiCall('getUsers', { elevate: elevate.value ?? true, projection: ['grants', 'volunteer'] })
 }
 
 export const createUser = (body) => {

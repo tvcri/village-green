@@ -150,6 +150,14 @@ module.exports.getUser = async function getUser (req, res, next) {
 
     let response = await UserService.getUserByUserId(req.userObject.userId, projection)
     response.canElevate = holdsAnyElevatable(req.userObject)
+
+    // Volunteers block (VSS): identity-derived from the caller's resolved
+    // person set (shared household email => several volunteers). Empty array
+    // when no resolved person is an ACTIVE volunteer — the same gate the
+    // /volunteer-requests access gate applies, so the client never offers a
+    // surface the API 403s.
+    response.volunteers = await UserService.getVolunteers(req.userObject.personIds)
+
     res.json(response)
 }
   catch(err) {

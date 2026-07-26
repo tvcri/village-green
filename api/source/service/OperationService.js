@@ -15,21 +15,25 @@ const path = require('path')
  * Return version information
  *
  * returns ApiVersion
+ *
+ * NOTE: the STIG-Manager-era `config` key/value table was not carried into
+ * the VG schema (see migrations/sql/current). There is currently no
+ * persisted config store, so this returns an empty object rather than
+ * querying a table that does not exist. Reachable live via GET /op/configuration.
  **/
 exports.getConfiguration = async function() {
-  const sql = `SELECT * from config`
-  const [rows] = await dbUtils.pool.query(sql)
-  const config = {}
-  for (const row of rows) {
-    config[row.key] = row.value
-  }
-  return (config)
+  return {}
 }
 
+/**
+ * NOTE: see getConfiguration() above — the `config` table does not exist in
+ * the VG schema, so this is a no-op rather than a write to a nonexistent
+ * table. Called conditionally from bootstrap/server.js when
+ * config.settings.setClassification is set; that setting currently has no
+ * env var binding in utils/config.js, so the call site is presently unreachable too.
+ */
 exports.setConfigurationItem = async function (key, value) {
-  const sql = 'INSERT INTO config (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)'
-  await dbUtils.pool.query(sql, [key, value])
-  return (true)
+  return true
 }
 
 exports.getCeDump = async function() {
@@ -49,23 +53,17 @@ exports.getCeDump = async function() {
  * @returns {undefined}
  * @example Abbreviated example of JSONL which is streamed to the response:
  *  {"version":"1.4.13","commit":{"branch":"na","sha":"na","tag":"na","describe":"na"},"date":"2024-08-18T15:29:16.784Z","lastMigration":33}\n
-    {"tables":[{"table":"stig","rowCount":4}, ... ], "totalRows": 4}\n
-    {"table":"stig","columns":"`benchmarkId`, `title`","rowCount":4}\n
-    ["RHEL_7_STIG_TEST","Red Hat Enterprise Linux 7 Security Technical Implementation Guide"]\n
-    ["VPN_SRG_TEST","Virtual Private Network (VPN) Security Requirements Guide"]\n
-    ["VPN_SRG_Rule-fingerprint-match-test","Virtual Private Network (VPN) Security Requirements Guide - replaced"]\n
-    ["Windows_10_STIG_TEST","Windows 10 Security Technical Implementation Guide"]\n ...
+    {"tables":[{"table":"village","rowCount":4}, ... ], "totalRows": 4}\n
+    {"table":"village","columns":"`id`, `name`","rowCount":4}\n
+    ["1","Quahog Senior Village"]\n
+    ["2","Innsmouth Senior Village"]\n
+    ["3","Miskatonic Senior Village"]\n
+    ["4","Arkham Senior Village"]\n ...
  */
 exports.getAppData = async function (res, format) {
   /** @type {string[]} tables to exclude from the appdata file */
   const excludedTables = [
-    '_migrations', 
-    'config',
-    'job',
-    'job_run',
-    'job_task_map',
-    'task',
-    'task_output'
+    '_migrations'
   ]
 
   let sink
@@ -106,14 +104,14 @@ exports.getAppData = async function (res, format) {
    * @type {Object.<string, {columns:string, rowCount?:number}>} object pivoted from tableRows[]
    * @example
    * '{
-        "asset": {
-          "columns": "`assetId`,`name`,`fqdn`, ... "
+        "person": {
+          "columns": "`id`,`firstName`,`lastName`, ... "
         },
-        "check_content": {
-          "columns": "`ccId`,`content`"
+        "village": {
+          "columns": "`id`,`name`"
         },
-        "collection": {
-          "columns": "`collectionId`,`name`,`description`, ... "
+        "service_request": {
+          "columns": "`id`,`serviceDate`,`status`, ... "
         }
       }'
    */
@@ -478,8 +476,8 @@ exports.replaceAppData = async function (buffer, contentType, progressCb = () =>
 
 exports.getAppInfo = async function(options = {}) {
   const { includeRowCounts } = options
-  const schema = 'village-green-appinfo-v1.1'
-  const sqlAnalyze = `ANALYZE TABLE collection, asset, review, review_history, user`
+  const schema = 'village-green-appinfo-v1.2'
+  const sqlAnalyze = `ANALYZE TABLE service_request, person, volunteer, user_data`
   const sqlInfoSchema = `
   SELECT
     TABLE_NAME as tableName,
@@ -498,171 +496,33 @@ exports.getAppInfo = async function(options = {}) {
     and TABLE_TYPE='BASE TABLE'
   ORDER BY
     TABLE_NAME`
-  const sqlCollectionAssetStigs = `
-  SELECT
-    CAST(sub.collectionId as char) as collectionId,
-    sum(case when sub.assetId is not null and sub.stigAssetCnt = 0 then 1 else 0 end) as range00,
-    sum(case when sub.stigAssetCnt >= 1 and sub.stigAssetCnt <= 5 then 1 else 0 end) as range01to05,
-    sum(case when sub.stigAssetCnt >= 6 and sub.stigAssetCnt <= 10 then 1 else 0 end) as range06to10,
-    sum(case when sub.stigAssetCnt >= 11 and sub.stigAssetCnt <= 15 then 1 else 0 end) as range11to15,
-    sum(case when sub.stigAssetCnt >= 16 then 1 else 0 end) as range16plus
-  FROM
-  (SELECT
-    c.collectionId,
-    c.name,
-    a.assetId,
-    COUNT(sa.assetId) as stigAssetCnt
-  FROM
-    collection c
-    LEFT JOIN asset a on a.collectionId = c.collectionId and a.state = "enabled"
-    LEFT JOIN stig_asset_map sa on sa.assetId = a.assetId 
-  GROUP BY
-    c.collectionId,
-    c.name,
-    a.assetId) as sub
-  GROUP BY
-    sub.collectionId
-  ORDER BY
-    sub.collectionId
-  `
-  const sqlCountsByCollection = `
-  SELECT
-    cast(c.collectionId as char) as collectionId,
-    c.name,
-    c.state,
-    c.settings,
-	  count(distinct if(a.state = "enabled", a.assetId, null)) as assets,
-    count(distinct if(a.state = "disabled", a.assetId, null)) as assetsDisabled,
-    count(distinct if(a.state = "enabled", sa.benchmarkId, null)) as uniqueStigs,
-    sum(if(a.state = "enabled" and sa.saId, 1, 0)) as stigAssignments,
-    sum(if(a.state = "enabled",rev.ruleCount,0)) as rules,
-    sum(if(a.state = "enabled", (sa.pass + sa.fail + sa.notapplicable + sa.notchecked + sa.notselected + sa.informational + sa.fixed + sa.unknown + sa.error), 0)) as reviews,
-    sum(if(a.state = "disabled", (sa.pass + sa.fail + sa.notapplicable + sa.notchecked + sa.notselected + sa.informational + sa.fixed + sa.unknown + sa.error), 0)) as reviewsDisabled
-  FROM
-    collection c
-    left join asset a on c.collectionId = a.collectionId
-    left join stig_asset_map sa on a.assetId = sa.assetId
-    left join default_rev dr on c.collectionId = dr.collectionId and sa.benchmarkId = dr.benchmarkId
-    left join revision rev on dr.revId = rev.revId
-  GROUP BY
-    c.collectionId
-  ORDER BY
-    c.collectionId
-  `
-  const sqlLabelCountsByCollection = `
-  SELECT
-    cast(c.collectionId as char) as collectionId,
-    count(distinct cl.clId) as collectionLabels,
-    count(distinct clam.assetId) as labeledAssets,
-    count(distinct clam.claId) as assetLabels
-  FROM
-    collection c
-    left join collection_label cl on cl.collectionId = c.collectionId
-    left join collection_label_asset_map clam on clam.clId = cl.clId
-    left join asset a on clam.assetId = a.assetId and a.state = "enabled"
-  GROUP BY
-    c.collectionId
-  `  
-  const sqlGrantsByCollection = `
-  with ctePerGrantee as (
-    select
-      cg.collectionId, 
-      json_object(
-        'grantId', cg.grantId,
-        'grantee', json_object(
-          'userId', cg.userId,
-          'userGroupId', cg.userGroupId
-        ),
-        'ruleCounts', json_object(
-          'rw', SUM(CASE WHEN cga.access = 'rw' THEN 1 ELSE 0 END),
-          'r', SUM(CASE WHEN cga.access = 'r' THEN 1 ELSE 0 END),
-          'none', SUM(CASE WHEN cga.access = 'none' THEN 1 ELSE 0 END)
-        ), 
-        'uniqueAssets', count(distinct if(a.state = 'enabled', sam.assetId, null)),
-        'uniqueAssetsDisabled', count(distinct if(a.state = 'disabled', sam.assetId, null)),
-        'uniqueStigs', count(distinct if(a.state = 'enabled', sam.benchmarkId, null)),
-        'uniqueStigsDisabled', count(distinct if(a.state = 'disabled', sam.benchmarkId, null)),
-        'role', 
-          case when cg.roleId = 1 then 'restricted' else 
-            case when cg.roleId = 2 then 'full' else
-              case when cg.roleId = 3 then 'manage' else
-                case when cg.roleId = 4 then 'owner'
-                end
-              end
-            end
-          end
-      ) as perGrantee
-    from 
-      collection_grant cg
-      left join collection_grant_acl cga ON cg.grantId = cga.grantId
-      left join stig_asset_map sam on sam.assetId=cga.assetId and sam.benchmarkId=cga.benchmarkId
-      left join asset a on a.assetId = sam.assetId
-    group by
-      cg.grantId)
-    select 
-      collectionId, 
-      json_arrayagg(perGrantee) as grants
-    from 
-      ctePerGrantee
-    group by 
-      collectionId`
-  const sqlRoleCountsByCollection = `
-  SELECT 
-    collectionId,
-    SUM(CASE WHEN roleId = 1 THEN 1 ELSE 0 END) AS restricted,
-    SUM(CASE WHEN roleId = 2 THEN 1 ELSE 0 END) AS full,
-    SUM(CASE WHEN roleId = 3 THEN 1 ELSE 0 END) AS manage,
-    SUM(CASE WHEN roleId = 4 THEN 1 ELSE 0 END) AS owner
-  FROM 
-    collection_grant
-  GROUP BY 
-    collectionId
-  ORDER BY 
-    collectionId
-  `
   const sqlUserInfo = `
-  select 
+  select
     ud.userId,
     ud.username,
-    ud.created, 
+    ud.created,
     ud.lastAccess,
     coalesce(
       JSON_EXTRACT(ud.lastClaims, '$.${config.oauth.claims.privileges}'),
       json_array()
-    ) as privileges,
-    json_object(
-		  "restricted", sum(case when cg.roleId = 1 then 1 else 0 end),
-      "full", sum(case when cg.roleId = 2 then 1 else 0 end),
-		  "manage", sum(case when cg.roleId = 3 then 1 else 0 end),
-      "owner", sum(case when cg.roleId = 4 then 1 else 0 end)
-	  ) as roles
-  from 
+    ) as privileges
+  from
     user_data ud
-    left join collection_grant cg using (userId)
-  group by
-	  ud.userId
   `
 
   const sqlUserGroupInfo = `
-  select 
+  select
     ug.userGroupId,
     ug.name,
     count(distinct ugum.userId) as members,
-    ug.createdDate as created, 
-    ug.modifiedDate, 
-    json_object(
-        "restricted", count(distinct case when cg.roleId = 1 then cg.collectionId else null end),
-        "full", count(distinct case when cg.roleId = 2 then cg.collectionId else null end),
-        "manage", count(distinct case when cg.roleId = 3 then cg.collectionId else null end),
-        "owner", count(distinct case when cg.roleId = 4 then cg.collectionId else null end)
-    ) as roles
-  from 
+    ug.createdDate as created,
+    ug.modifiedDate
+  from
     user_group ug
-    left join collection_grant cg on cg.userGroupId = ug.userGroupId
 	  left join user_group_user_map ugum ON ugum.userGroupId = ug.userGroupId
   group by
 	  ug.userGroupId
-  `  
+  `
   const sqlMySqlVersion = `SELECT VERSION() as version`
 
   const mySqlVariablesOnly = [
@@ -804,11 +664,6 @@ exports.getAppInfo = async function(options = {}) {
   const tables = createObjectFromKeyValue(schemaInfoArray, "tableName")
 
   const queries = [
-    dbUtils.pool.query(sqlCollectionAssetStigs),
-    dbUtils.pool.query(sqlCountsByCollection),
-    dbUtils.pool.query(sqlLabelCountsByCollection),
-    dbUtils.pool.query(sqlGrantsByCollection),
-    dbUtils.pool.query(sqlRoleCountsByCollection),
     dbUtils.pool.query(sqlUserInfo),
     dbUtils.pool.query(sqlUserGroupInfo),
     dbUtils.pool.query(sqlMySqlVersion),
@@ -828,11 +683,6 @@ exports.getAppInfo = async function(options = {}) {
   const results = await Promise.all(queries)
   
   let [
-    [assetStigByCollection],
-    [countsByCollection],
-    [labelCountsByCollection],
-    [grantsByCollection],
-    [roleCountsByCollection],
     [userInfo],
     [userGroupInfo],
     [mySqlVersion],
@@ -867,53 +717,10 @@ exports.getAppInfo = async function(options = {}) {
 
   requests.operationIds = sortObjectByKeys(requests.operationIds)
 
-  // Create objects keyed by collectionId from arrays of objects
-  countsByCollection = createObjectFromKeyValue(countsByCollection, "collectionId")
-  labelCountsByCollection = createObjectFromKeyValue(labelCountsByCollection, "collectionId")
-  assetStigByCollection = createObjectFromKeyValue(assetStigByCollection, "collectionId")
-  grantsByCollection = createObjectFromKeyValue(grantsByCollection, "collectionId")
-  roleCountsByCollection = createObjectFromKeyValue(roleCountsByCollection, "collectionId")
-
-  // Bundle "byCollection" stats together by collectionId
-  for(const collectionId in countsByCollection) {
-    if (assetStigByCollection[collectionId]) {
-      countsByCollection[collectionId].assetStigRanges = assetStigByCollection[collectionId]
-    }
-    if (grantsByCollection[collectionId]) {
-      const grants = {}
-      
-      // For each ACL in the collection's array of ACLs
-      for (const grant of grantsByCollection[collectionId].grants) {
-          grants[grant.grantId] = grant
-          delete grant.grantId
-      }
-      
-      countsByCollection[collectionId].grants = grants
-    }
-    else {
-      countsByCollection[collectionId].grants = {}
-    }
-    if (roleCountsByCollection[collectionId]) {
-      countsByCollection[collectionId].roleCounts = roleCountsByCollection[collectionId]
-    }
-    else {
-      countsByCollection[collectionId].roleCounts = {
-        restricted: 0,
-        full: 0,
-        manage: 0,
-        owner: 0
-      }
-    }    
-    if (labelCountsByCollection[collectionId]) {
-      countsByCollection[collectionId].labelCounts = labelCountsByCollection[collectionId]
-    }
-  }
-
   const returnObj = {
     date: new Date().toISOString(),
     schema,
     version: config.version,
-    collections: countsByCollection,
     requests,
     users: {
       userInfo: createObjectFromKeyValue(userInfo, "userId", null),
@@ -987,7 +794,7 @@ exports.getAppInfo = async function(options = {}) {
     
     const environment = {}
     for (const [key, value] of Object.entries(environmentVariables)) {
-      if (/^(NODE|STIGMAN)_/.test(key)) {
+      if (/^(NODE|VG)_/.test(key)) {
         environment[key] = key === 'VG_DB_PASSWORD' ? '***' : value
       }
     }

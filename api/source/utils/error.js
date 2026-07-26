@@ -62,6 +62,14 @@ class UnprocessableError extends SmError {
   }
 }
 
+class ConflictError extends SmError {
+  constructor(detail) {
+    super('Conflict.')
+    this.status = 409
+    this.detail = detail
+  }
+}
+
 class InternalError extends SmError {
   constructor(error) {
     super(error.message)
@@ -174,6 +182,7 @@ module.exports = {
   NotFoundError,
   ClientError,
   UnprocessableError,
+  ConflictError,
   OIDCProviderError,
   SigningKeyNotFoundError,
   NoTokenError,

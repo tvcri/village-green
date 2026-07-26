@@ -76,10 +76,11 @@ CREATE TABLE `analytics_events` (
   `path` varchar(512) DEFAULT NULL,
   `eventName` varchar(64) DEFAULT NULL,
   `metadata` json DEFAULT NULL,
+  `deviceClass` varchar(16) DEFAULT NULL,
   `createdAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_analytics_user_time` (`userId`,`createdAt`),
-  KEY `idx_analytics_route_time` (`eventType`,`routeName`,`createdAt`)
+  KEY `idx_analytics_route_time` (`eventType`,`routeName`,`deviceClass`,`createdAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -126,6 +127,30 @@ CREATE TABLE `disability` (
   `name` varchar(100) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `enrollment_request`
+--
+
+DROP TABLE IF EXISTS `enrollment_request`;
+CREATE TABLE `enrollment_request` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `email` varchar(200) NOT NULL,
+  `personId` int DEFAULT NULL,
+  `pinHash` char(60) DEFAULT NULL,
+  `kind` varchar(32) DEFAULT NULL COMMENT 'new | existing_account',
+  `outcome` varchar(32) NOT NULL COMMENT 'pin_sent | superseded | ineligible_member | not_found | kc_unavailable',
+  `attempts` int NOT NULL DEFAULT '0',
+  `resetAttempts` int NOT NULL DEFAULT '0',
+  `expiresAt` datetime DEFAULT NULL,
+  `consumedAt` datetime DEFAULT NULL,
+  `resetAt` datetime DEFAULT NULL,
+  `createdAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `INDEX_er_email` (`email`),
+  KEY `fk_enrollment_request_person` (`personId`),
+  CONSTRAINT `fk_enrollment_request_person` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -199,11 +224,12 @@ DROP TABLE IF EXISTS `notification_event`;
 CREATE TABLE `notification_event` (
   `id` int NOT NULL AUTO_INCREMENT,
   `eventType` varchar(32) NOT NULL COMMENT 'open | confirmed | cancelled | reminder',
-  `serviceRequestId` int NOT NULL,
+  `serviceRequestId` int DEFAULT NULL,
   `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `sentAt` timestamp NULL DEFAULT NULL,
   `recipients` json DEFAULT NULL COMMENT 'Array of person ids notified, written by sidecar on send',
   `failedAt` timestamp NULL DEFAULT NULL,
+  `payload` json DEFAULT NULL COMMENT 'Event-type-specific data for events not tied to a service request',
   PRIMARY KEY (`id`),
   KEY `fk_email_event_sr` (`serviceRequestId`),
   KEY `idx_email_event_pending` (`sentAt`,`createdAt`),
@@ -244,6 +270,7 @@ CREATE TABLE `person` (
   `comments` text,
   PRIMARY KEY (`id`),
   KEY `person_ibfk_1` (`villageId`),
+  KEY `INDEX_email` (`email`),
   CONSTRAINT `person_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
   CONSTRAINT `person_names_non_empty` CHECK (((`lastName` <> _utf8mb4'') and (`firstName` <> _utf8mb4'')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -398,12 +425,23 @@ CREATE TABLE `service_request` (
   `state` varchar(50) DEFAULT NULL,
   `zip` varchar(20) DEFAULT NULL,
   `createdUserId` int DEFAULT NULL,
+  `modifiedUserId` int DEFAULT NULL,
+  `modifiedAt` datetime DEFAULT NULL,
+  `start` text,
+  `startAddress` text,
+  `startCity` varchar(100) DEFAULT NULL,
+  `startState` varchar(50) DEFAULT NULL,
+  `startZip` varchar(20) DEFAULT NULL,
+  `startPhone` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `village_id` (`villageId`),
   KEY `member_person_id` (`memberPersonId`),
   KEY `volunteer_person_id` (`volunteerPersonId`),
   KEY `fk_service_request_created_user` (`createdUserId`),
+  KEY `idx_sr_village_date_status` (`villageId`,`serviceDate`,`status`),
+  KEY `fk_service_request_modified_user` (`modifiedUserId`),
   CONSTRAINT `fk_service_request_created_user` FOREIGN KEY (`createdUserId`) REFERENCES `user_data` (`userId`),
+  CONSTRAINT `fk_service_request_modified_user` FOREIGN KEY (`modifiedUserId`) REFERENCES `user_data` (`userId`),
   CONSTRAINT `service_request_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
   CONSTRAINT `service_request_ibfk_2` FOREIGN KEY (`memberPersonId`) REFERENCES `person` (`id`),
   CONSTRAINT `service_request_ibfk_3` FOREIGN KEY (`volunteerPersonId`) REFERENCES `person` (`id`)
@@ -580,6 +618,27 @@ DELIMITER $
 /*!50003 SET time_zone             = @saved_time_zone */ $
 /*!50003 SET sql_mode              = @saved_sql_mode */ $
 /*!50003 SET collation_connection  = @saved_col_connection */ $
+/*!50106 DROP EVENT IF EXISTS `vg_reminder_enqueue` */$
+DELIMITER $
+/*!50003 SET @saved_col_connection = @@collation_connection */ $
+/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ $
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ $
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ $
+/*!50003 SET @saved_time_zone      = @@time_zone */ $
+/*!50003 SET time_zone             = 'SYSTEM' */ $
+/*!50106 CREATE*/ /*!50117 */ /*!50106 EVENT `vg_reminder_enqueue` ON SCHEDULE EVERY 1 DAY STARTS '2026-07-24 11:00:00' ON COMPLETION NOT PRESERVE ENABLE DO INSERT INTO notification_event (eventType, serviceRequestId)
+  SELECT 'reminder', sr.id
+  FROM service_request sr
+  WHERE sr.status = 'Confirmed'
+    AND sr.volunteerPersonId IS NOT NULL
+    AND sr.serviceDate = DATE(NOW()) + INTERVAL 2 DAY
+    AND NOT EXISTS (
+      SELECT 1 FROM notification_event ne
+      WHERE ne.serviceRequestId = sr.id
+        AND ne.eventType = 'reminder') */ $
+/*!50003 SET time_zone             = @saved_time_zone */ $
+/*!50003 SET sql_mode              = @saved_sql_mode */ $
+/*!50003 SET collation_connection  = @saved_col_connection */ $
 DELIMITER ;
 /*!50106 SET TIME_ZONE= @save_time_zone */ ;
 
@@ -616,4 +675,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-13  3:34:39
+-- Dump completed on 2026-07-25 23:25:08

@@ -100,3 +100,11 @@ test('holdsAnyElevatable', () => {
   assert.equal(holdsAnyElevatable(user(['*'])), true)
   assert.equal(holdsAnyElevatable(user(['sr:read'], { 3: ['member:read'] })), false)
 })
+
+test('permission checks fail closed on a user with no permissions object', () => {
+  for (const u of [undefined, null, {}, { username: 'phantom' }]) {
+    assert.equal(hasPermission(u, 'sr:read'), false)
+    assert.equal(hasPermission(u, 'sr:read', { villageId: 3 }), false)
+    assert.equal(holdsAnyElevatable(u), false)
+  }
+})

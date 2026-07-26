@@ -252,6 +252,11 @@ const upFn = async (pool) => {
     // ---------------------------------------------------------------------
     // active_member / active_volunteer views
     // ---------------------------------------------------------------------
+    // IMPORTANT: MySQL expands SELECT * at view-creation time and stores an
+    // explicit column list internally. Any future migration that adds a column
+    // to `member` or `volunteer` MUST also re-run CREATE OR REPLACE VIEW for
+    // the corresponding view here, or the new column will be invisible through
+    // the view and services querying it will silently return NULL for that field.
     await run(connection,
       `CREATE OR REPLACE VIEW active_member AS
          SELECT * FROM member WHERE status = 'Active'`)

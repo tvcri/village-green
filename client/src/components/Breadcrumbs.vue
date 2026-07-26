@@ -6,10 +6,16 @@ import { getVillages } from '../features/VillageList/api/villageApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
 import { setPendingHighlight } from '../shared/lib/pendingHighlight.js'
+import { useCurrentUser } from '../shared/composables/useCurrentUser.js'
 import Menu from 'primevue/menu'
 
 const router = useRouter()
 const route = useRoute()
+
+// A grantless user (no village or federation grants) is a self-signup-only
+// volunteer: their breadcrumb root is the VSS home ("Home"), not the villages
+// list they can't use.
+const { isGrantless } = useCurrentUser()
 
 const menuRefs = new Map()
 
@@ -56,9 +62,9 @@ watch(() => route.name, (routeName) => {
 }, { immediate: true })
 
 const breadcrumbs = computed(() => {
-  const crumbs = [
-    { label: 'Villages', route: { name: 'villages' } }
-  ]
+  const crumbs = isGrantless.value
+    ? [{ label: 'Home', route: { name: 'volunteer' } }]
+    : [{ label: 'Villages', route: { name: 'villages' } }]
 
   // Handle admin routes first (to avoid adding village breadcrumb twice)
   if (route.name && route.name.startsWith('admin')) {
@@ -147,7 +153,8 @@ const breadcrumbs = computed(() => {
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Service Requests', siblings: [
         { label: 'Persons', route: { name: 'meta-persons' } },
-        { label: 'Friends', route: { name: 'meta-friends' } }
+        { label: 'Friends', route: { name: 'meta-friends' } },
+        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
       ]})
       break
     case 'meta-service-request-create':
@@ -160,14 +167,24 @@ const breadcrumbs = computed(() => {
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', siblings: [
         { label: 'Service Requests', route: { name: 'meta-service-requests' } },
-        { label: 'Friends', route: { name: 'meta-friends' } }
+        { label: 'Friends', route: { name: 'meta-friends' } },
+        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
       ]})
       break
     case 'meta-friends':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Friends', siblings: [
         { label: 'Persons', route: { name: 'meta-persons' } },
-        { label: 'Service Requests', route: { name: 'meta-service-requests' } }
+        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
+        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
+      ]})
+      break
+    case 'meta-mailing-labels':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Mailing Labels', siblings: [
+        { label: 'Persons', route: { name: 'meta-persons' } },
+        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
+        { label: 'Friends', route: { name: 'meta-friends' } }
       ]})
       break
     case 'friends':
@@ -231,6 +248,11 @@ const breadcrumbs = computed(() => {
       break
     case 'metrics':
       crumbs.push({ label: 'Metrics', siblings: getSiblings('metrics', { villageId: vId }) })
+      break
+    case 'volunteer-request-detail':
+      // Grantless VSS volunteer viewing a request: root is "Home" (set above),
+      // this is its "Request" child.
+      crumbs.push({ label: 'Request' })
       break
   }
 
