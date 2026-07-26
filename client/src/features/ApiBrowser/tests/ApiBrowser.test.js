@@ -100,6 +100,26 @@ describe('ApiBrowser', () => {
     expect(scoped.queryByText(/Select an operation to try it out/)).toBeNull()
   })
 
+  // The copy control's PRIMARY click only. The curl/Python menu entries are
+  // deliberately not driven here: PrimeVue teleports the SplitButton menu into
+  // an overlay outside the component's container, which is awkward to assert
+  // against in jsdom, and both generators are covered directly by
+  // curl.test.js / python.test.js.
+  it('copies the resolved URL on the copy button primary click', async () => {
+    const writeText = vi.fn(() => Promise.resolve())
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText }, configurable: true, writable: true,
+    })
+
+    const { container } = renderBrowser()
+    const scoped = within(container)
+
+    await userEvent.click(scoped.getAllByText('getVillages')[0])
+    await userEvent.click(await scoped.findByText('Copy'))
+
+    expect(writeText).toHaveBeenCalledWith('http://test.local/api/villages/1')
+  })
+
   it('renders a 403 as a normal result rather than throwing', async () => {
     mockApiCall.mockRejectedValue({
       name: 'ApiError', message: 'HTTP 403', status: 403,
@@ -157,7 +177,34 @@ describe('ApiBrowser', () => {
     expect(row.getAttribute('aria-selected')).toBe('true')
   })
 
-  it('discards a stale response when the user switches operations mid-flight', async () => {
+  // The response pane is not slaved to the table selection: browsing
+  // operations is how the user reads the spec, and the response they just
+  // fetched must survive that browsing until the NEXT fetch replaces it.
+  it('keeps the last response when the selection changes, and labels whose it is', async () => {
+    mockApiCall.mockResolvedValue({
+      status: 200, statusText: 'OK',
+      headers: { get: name => (name === 'content-type' ? 'application/json' : null) },
+      text: () => Promise.resolve('{"marker":"KEEP-ME-4471"}'),
+    })
+
+    const { container } = renderBrowser()
+    const scoped = within(container)
+
+    await userEvent.click(scoped.getAllByText('getVillages')[0])
+    await userEvent.click(await scoped.findByText('Fetch'))
+    expect(await scoped.findByText(/KEEP-ME-4471/)).toBeTruthy()
+
+    // Switch to a different operation — the response must persist.
+    await userEvent.click(scoped.getAllByText('getFriends')[0])
+
+    expect(scoped.getByText(/KEEP-ME-4471/)).toBeTruthy()
+    expect(scoped.queryByText(/Select an operation and fetch it/)).toBeFalsy()
+    // ...but it must be attributed to the op that produced it, so it is not
+    // misread as getFriends' response.
+    expect(scoped.getByText('getVillages', { selector: 'code' })).toBeTruthy()
+  })
+
+  it('attributes a response that lands after the user switches operations', async () => {
     let resolveA
     const pendingA = new Promise(resolve => { resolveA = resolve })
     mockApiCall.mockImplementationOnce(() => pendingA)
@@ -183,29 +230,29 @@ describe('ApiBrowser', () => {
     // Now let A resolve, with a status/body that appears nowhere else in this
     // fixture. Flush enough microtask ticks that useAsyncState's `await`
     // chain (res.text() -> metaFromResponse -> state.value = result) actually
-    // runs and WRITES result.value with A's meta while B is still selected —
-    // otherwise this assertion would hold vacuously whether or not the
-    // discard guard (`resultForSelection`) exists, since there'd be nothing
-    // stale to wrongly render in the first place.
+    // runs and WRITES result.value with A's meta while B is still selected.
     resolveA({
       status: 418, statusText: "I'm a teapot",
       headers: { get: name => (name === 'content-type' ? 'application/json' : null) },
-      text: () => Promise.resolve('{"marker":"A-STALE-MARKER-9182"}'),
+      text: () => Promise.resolve('{"marker":"A-LATE-MARKER-9182"}'),
     })
     await vi.waitFor(() => expect(mockApiCall).toHaveBeenCalledTimes(1))
     // Give the res.text()/JSON.parse/state.value write chain time to settle.
     for (let i = 0; i < 10; i++) await Promise.resolve()
 
-    // A's distinctive marker must never render under B, and the panel must
-    // show the empty/prompt state for the newly-selected op — not A's 418.
-    expect(scoped.queryByText(/A-STALE-MARKER-9182/)).toBeFalsy()
-    expect(scoped.queryByText('418')).toBeFalsy()
-    expect(scoped.getByText(/Select an operation and fetch it/)).toBeTruthy()
+    // A's response renders — responses are no longer discarded on a
+    // selection change — but it is labelled as A's, so it cannot be misread
+    // as B's. That label is the whole guarantee here: without it, A's 418
+    // would sit under a B selection with nothing marking it.
+    expect(await scoped.findByText(/A-LATE-MARKER-9182/)).toBeTruthy()
+    expect(scoped.getByText('418')).toBeTruthy()
+    expect(scoped.getByText('getVillages', { selector: 'code' })).toBeTruthy()
 
-    // Executing B for real still works and renders B's own response.
+    // Executing B for real replaces it, and the label goes away since the
+    // response now belongs to the selected operation.
     await userEvent.click(await scoped.findByText('Fetch'))
-    expect(await scoped.findByText('op')).toBeTruthy()
     expect(await scoped.findByText(/"B"/)).toBeTruthy()
-    expect(scoped.queryByText(/A-STALE-MARKER-9182/)).toBeFalsy()
+    expect(scoped.queryByText(/A-LATE-MARKER-9182/)).toBeFalsy()
+    expect(scoped.queryByText('getVillages', { selector: 'code' })).toBeFalsy()
   })
 })

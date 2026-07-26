@@ -71,6 +71,15 @@ const sizeLabel = computed(() => {
 
 const tooBig = computed(() => (props.result?.bytes ?? 0) > MAX_TREE_BYTES)
 
+// The response outlives the selection that produced it, so when the user has
+// moved on to another operation the panel must say whose response this is.
+// Without the label a persisted body reads as the newly-selected operation's.
+const staleForOperationId = computed(() => {
+  const owner = props.result?.forOperationId
+  if (!owner || !props.operationId) return ''
+  return owner === props.operationId ? '' : owner
+})
+
 function download() {
   const text = props.result.isJson ? JSON.stringify(props.result.body, null, 2) : props.result.raw
   const blob = new Blob([text], { type: props.result.contentType || 'application/json' })
@@ -96,6 +105,10 @@ function download() {
         <span class="spacer" />
         <Button label="Download" icon="pi pi-download" size="small" severity="secondary" @click="download" />
       </div>
+
+      <p v-if="staleForOperationId" class="stale-note">
+        Response from <code>{{ staleForOperationId }}</code> — fetch to update
+      </p>
 
       <p v-if="result.transport" class="transport-error">{{ result.statusText }}</p>
 
@@ -172,6 +185,14 @@ function download() {
 }
 .transport-error {
   color: var(--color-status-error-text);
+}
+.stale-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-dim);
+}
+.stale-note code {
+  font-family: ui-monospace, monospace;
 }
 .tree-region {
   flex: 1 1 auto;

@@ -90,14 +90,17 @@ const { state: result, isLoading, execute } = useAsyncState(
   { immediate: false, onError: null },
 )
 
-// A response for an operation the user has since switched away from is
-// discarded rather than displayed — it's stale, not just old.
-const resultForSelection = computed(() => {
-  const r = result.value
-  if (!r) return null
-  return r.forOperationId === selectedOperationId.value ? r : null
-})
-
+// The last settled response persists until the NEXT fetch replaces it —
+// changing the selection does not clear it. Browsing the operation table is
+// how the user reads the spec, and wiping the response they just fetched
+// every time they click another row makes the two panes unusable together.
+// The response is labelled with the operation it belongs to (see
+// ResponsePanel) so a persisted result is never read as the selected op's.
+//
+// A request that settles AFTER the user switched away is no longer
+// discarded either — `result.forOperationId` attributes it to the operation
+// that actually issued it, which is the honest rendering of what happened.
+//
 // The spinner must only appear to belong to the currently-selected
 // operation. isLoading alone would keep spinning for the OLD operation's
 // still-in-flight request after the user has switched to a new one that was
@@ -105,9 +108,6 @@ const resultForSelection = computed(() => {
 const isLoadingForSelection = computed(
   () => isLoading.value && inFlightOperationId.value === selectedOperationId.value
 )
-
-// Clear a stale response when the selection changes.
-watch(selectedOperationId, () => { result.value = null })
 </script>
 
 <template>
@@ -149,7 +149,7 @@ watch(selectedOperationId, () => { result.value = null })
       <SplitterPanel class="split-panel" :size="45" :min-size="25">
         <div class="response-column">
           <ResponsePanel
-            :result="resultForSelection"
+            :result="result"
             :is-loading="isLoadingForSelection"
             :operation-id="selectedOperationId"
           />
