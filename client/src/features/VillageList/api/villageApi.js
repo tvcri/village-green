@@ -10,5 +10,10 @@ export const getVillageMembers = (villageId) => apiCall('getVillageMembers', { v
 
 export const getVillageVolunteers = (villageId) => apiCall('getVillageVolunteers', { villageId })
 
-export const getVillageServiceRequests = (villageId, status) =>
-  apiCall('getVillageServiceRequests', { villageId, ...(status?.length && { status }) })
+export const getVillageServiceRequests = (villageId, { status, serviceDateStart, serviceDateEnd } = {}) =>
+  apiCall('getVillageServiceRequests', {
+    villageId,
+    ...(status?.length && { status }),
+    ...(serviceDateStart && { serviceDateStart }),
+    ...(serviceDateEnd && { serviceDateEnd })
+  })
