@@ -76,10 +76,11 @@ CREATE TABLE `analytics_events` (
   `path` varchar(512) DEFAULT NULL,
   `eventName` varchar(64) DEFAULT NULL,
   `metadata` json DEFAULT NULL,
+  `deviceClass` varchar(16) DEFAULT NULL,
   `createdAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_analytics_user_time` (`userId`,`createdAt`),
-  KEY `idx_analytics_route_time` (`eventType`,`routeName`,`createdAt`)
+  KEY `idx_analytics_route_time` (`eventType`,`routeName`,`deviceClass`,`createdAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -617,6 +618,27 @@ DELIMITER $
 /*!50003 SET time_zone             = @saved_time_zone */ $
 /*!50003 SET sql_mode              = @saved_sql_mode */ $
 /*!50003 SET collation_connection  = @saved_col_connection */ $
+/*!50106 DROP EVENT IF EXISTS `vg_reminder_enqueue` */$
+DELIMITER $
+/*!50003 SET @saved_col_connection = @@collation_connection */ $
+/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ $
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ $
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ $
+/*!50003 SET @saved_time_zone      = @@time_zone */ $
+/*!50003 SET time_zone             = 'SYSTEM' */ $
+/*!50106 CREATE*/ /*!50117 */ /*!50106 EVENT `vg_reminder_enqueue` ON SCHEDULE EVERY 1 DAY STARTS '2026-07-24 11:00:00' ON COMPLETION NOT PRESERVE ENABLE DO INSERT INTO notification_event (eventType, serviceRequestId)
+  SELECT 'reminder', sr.id
+  FROM service_request sr
+  WHERE sr.status = 'Confirmed'
+    AND sr.volunteerPersonId IS NOT NULL
+    AND sr.serviceDate = DATE(NOW()) + INTERVAL 2 DAY
+    AND NOT EXISTS (
+      SELECT 1 FROM notification_event ne
+      WHERE ne.serviceRequestId = sr.id
+        AND ne.eventType = 'reminder') */ $
+/*!50003 SET time_zone             = @saved_time_zone */ $
+/*!50003 SET sql_mode              = @saved_sql_mode */ $
+/*!50003 SET collation_connection  = @saved_col_connection */ $
 DELIMITER ;
 /*!50106 SET TIME_ZONE= @save_time_zone */ ;
 
@@ -653,4 +675,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-23  1:04:47
+-- Dump completed on 2026-07-25 23:25:08

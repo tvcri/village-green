@@ -11,9 +11,10 @@ module.exports.postEvents = async function (userId, events) {
     e.path ?? null,
     e.eventName ?? null,
     e.metadata ? JSON.stringify(e.metadata) : null,
+    e.deviceClass ?? null,
   ])
   await dbUtils.pool.query(
-    `INSERT INTO analytics_events (userId, eventType, routeName, path, eventName, metadata)
+    `INSERT INTO analytics_events (userId, eventType, routeName, path, eventName, metadata, deviceClass)
      VALUES ?`,
     [values]
   )
@@ -38,12 +39,28 @@ module.exports.getSummary = async function ({ from, to, userId } = {}) {
 
   const where = predicates.length ? `WHERE ${predicates.join(' AND ')}` : ''
 
+  // Device counts are pre-pivoted into fixed columns rather than aggregated
+  // into JSON: the class set is closed, and an explicit response schema means
+  // a new bucket cannot reach clients without the spec acknowledging it.
+  //
+  // NULL deviceClass (rows written before device tracking existed) folds into
+  // unknownVisits so the four columns always sum to totalVisits.
+  //
+  // SUM() returns NEWDECIMAL on the wire, which mysql2 surfaces as a STRING by
+  // default — but the pool sets decimalNumbers: true (service/utils.js), so
+  // these arrive as numbers and no CAST is needed. A test asserts the type, so
+  // if that pool option is ever dropped this fails loudly instead of silently
+  // shipping "5" where the spec promises an integer.
   const sql = `
     SELECT
       routeName,
       COUNT(*) AS totalVisits,
       COUNT(DISTINCT userId) AS uniqueUsers,
-      MAX(createdAt) AS lastVisited
+      MAX(createdAt) AS lastVisited,
+      SUM(deviceClass = 'mobile') AS mobileVisits,
+      SUM(deviceClass = 'tablet') AS tabletVisits,
+      SUM(deviceClass = 'desktop') AS desktopVisits,
+      SUM(deviceClass IS NULL OR deviceClass = 'unknown') AS unknownVisits
     FROM analytics_events
     ${where}
     GROUP BY routeName
