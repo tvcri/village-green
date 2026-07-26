@@ -121,6 +121,18 @@ const displayValue = computed(() => {
   width: 14px;
   flex: 0 0 auto;
 }
+/* A key is an identifier, so it must never break mid-word — a wrapped
+   "conte / nt" reads as a different key than the one that's there.
+   Both declarations are load-bearing: .jt-line sets word-break: break-word
+   (which the key would otherwise inherit), AND these are flex items that
+   default to flex-shrink:1, so without flex:0 0 auto they get squeezed below
+   their content width by a long sibling value. The value keeps the break —
+   that is what stops a 200-char string blowing out the pane. */
+.jt-key,
+.jt-sep {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
 .jt-key {
   color: var(--jt-key);
   font-weight: 600;
@@ -128,7 +140,10 @@ const displayValue = computed(() => {
 .jt-sep {
   color: var(--color-text-dim);
 }
+/* Same reasoning as the key: "[1331]" splitting across lines is nonsense. */
 .jt-size {
+  flex: 0 0 auto;
+  white-space: nowrap;
   color: var(--color-text-dim);
 }
 /* Subordinate to real values: this is a hint about what's inside, not the
@@ -142,6 +157,14 @@ const displayValue = computed(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+/* The value is the ONLY element that yields: now that key/sep/size refuse to
+   shrink, it absorbs the remaining width and wraps within it. min-width:0 is
+   required — a flex item defaults to min-width:auto and would push the row
+   into horizontal overflow rather than wrapping. */
+.jt-value {
+  flex: 1 1 auto;
   min-width: 0;
 }
 .jt-string { color: var(--jt-string); }
