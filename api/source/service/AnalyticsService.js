@@ -46,18 +46,21 @@ module.exports.getSummary = async function ({ from, to, userId } = {}) {
   // NULL deviceClass (rows written before device tracking existed) folds into
   // unknownVisits so the four columns always sum to totalVisits.
   //
-  // CAST because SUM() over a comparison yields DECIMAL, which the driver
-  // returns as a string and which would fail the integer response schema.
+  // SUM() returns NEWDECIMAL on the wire, which mysql2 surfaces as a STRING by
+  // default — but the pool sets decimalNumbers: true (service/utils.js), so
+  // these arrive as numbers and no CAST is needed. A test asserts the type, so
+  // if that pool option is ever dropped this fails loudly instead of silently
+  // shipping "5" where the spec promises an integer.
   const sql = `
     SELECT
       routeName,
       COUNT(*) AS totalVisits,
       COUNT(DISTINCT userId) AS uniqueUsers,
       MAX(createdAt) AS lastVisited,
-      CAST(SUM(deviceClass = 'mobile') AS SIGNED) AS mobileVisits,
-      CAST(SUM(deviceClass = 'tablet') AS SIGNED) AS tabletVisits,
-      CAST(SUM(deviceClass = 'desktop') AS SIGNED) AS desktopVisits,
-      CAST(SUM(deviceClass IS NULL OR deviceClass = 'unknown') AS SIGNED) AS unknownVisits
+      SUM(deviceClass = 'mobile') AS mobileVisits,
+      SUM(deviceClass = 'tablet') AS tabletVisits,
+      SUM(deviceClass = 'desktop') AS desktopVisits,
+      SUM(deviceClass IS NULL OR deviceClass = 'unknown') AS unknownVisits
     FROM analytics_events
     ${where}
     GROUP BY routeName

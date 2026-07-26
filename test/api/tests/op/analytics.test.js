@@ -65,8 +65,11 @@ test('GET /op/analytics/summary returns per-device counts that sum to totalVisit
   )
 })
 
-// Guards the CAST: without it MySQL returns DECIMAL, which the driver
-// surfaces as a string and which fails the integer response schema.
+// SUM() returns NEWDECIMAL, which mysql2 surfaces as a string unless the pool
+// sets decimalNumbers: true — which service/utils.js does. This guards that
+// setting from a distance: drop it and these counts silently become strings,
+// violating the integer response schema and making client-side addition
+// concatenate ("5" + "12" = "512").
 test('GET /op/analytics/summary returns device counts as numbers, not strings', async () => {
   const { status, json } = await vgCall('getSummary',
     { elevate: 'true' },
