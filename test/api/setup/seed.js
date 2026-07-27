@@ -28,7 +28,7 @@ const EXPECTED_COLUMNS = {
   volunteer: ['id', 'personId', 'active'],
   volunteer_capability: ['volunteerId', 'capabilityId'],
   service_request: ['id', 'requestNumber', 'villageId', 'memberPersonId', 'volunteerPersonId',
-    'status', 'serviceName', 'destination', 'createdAt', 'serviceDate', 'finishTime'],
+    'status', 'serviceName', 'destination', 'transportationType', 'createdAt', 'serviceDate', 'finishTime'],
   fcv_submission: ['id', 'villageId', 'volunteerPersonId', 'memberPersonId', 'visitDate',
     'timeSpentMinutes', 'contactType', 'activityTypes', 'notes', 'submittedAt'],
 }
@@ -186,10 +186,10 @@ export async function seed () {
       await conn.query(
         `INSERT INTO service_request
            (id, requestNumber, villageId, memberPersonId, volunteerPersonId,
-            status, serviceName, destination, createdAt, serviceDate, finishTime)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
+            status, serviceName, destination, transportationType, createdAt, serviceDate, finishTime)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
         [sr.id, sr.requestNumber, sr.villageId, sr.memberPersonId, sr.volunteerPersonId,
-          sr.status, sr.serviceName, sr.destination, sr.serviceDate, sr.finishTime],
+          sr.status, sr.serviceName, sr.destination, sr.transportationType ?? null, sr.serviceDate, sr.finishTime],
       )
     }
 

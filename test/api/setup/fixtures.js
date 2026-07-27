@@ -185,16 +185,18 @@ export const serviceRequests = {
   },
   // Metrics matrix rows (all quahog). Dates cluster in 2026-06 so metrics
   // tests can use a range that excludes srV1 (2026-07-10) when convenient.
-  srM1: {
+  srM1: { // completed round-trip RIDE: the one row that counts as 2 legs
     id: 4, villageId: villages.quahog.id, requestNumber: 102,
     memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
     status: 'Completed', serviceName: 'Ride: Medical Appnt', destination: 'Clinic',
+    transportationType: 'Round Trip',
     serviceDate: '2026-06-01', finishTime: '09:00:00',
   },
-  srM2: {
+  srM2: { // completed one-way ride: never a leg double
     id: 5, villageId: villages.quahog.id, requestNumber: 103,
     memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
     status: 'Completed', serviceName: 'Ride: Medical Appnt', destination: 'Clinic',
+    transportationType: 'One Way',
     serviceDate: '2026-06-02', finishTime: '09:00:00',
   },
   srM3: {
@@ -230,6 +232,15 @@ export const serviceRequests = {
     memberPersonId: persons.quahogMember.id, volunteerPersonId: null,
     status: 'Completed', serviceName: 'Tech Support', destination: null,
     serviceDate: '2025-01-15', finishTime: '11:00:00',
+  },
+  srM8: { // completed round-trip ERRAND: live data has these (404 rows) and
+    // the legacy legs rule (rides only) must NOT count it — load-bearing for
+    // the completedRoundTrips ride condition.
+    id: 11, villageId: villages.quahog.id, requestNumber: 109,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
+    status: 'Completed', serviceName: 'Errand: Shopping', destination: 'Market',
+    transportationType: 'Round Trip',
+    serviceDate: '2026-06-07', finishTime: '12:00:00',
   },
 }
 
