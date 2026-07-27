@@ -346,6 +346,12 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
     'volunteerCancelled', COALESCE(SUM(${alias}.status = 'Volunteer cancelled'), 0)
   )`
   const categoryCase = dbUtils.buildServiceNameCategoryCase('sr.serviceName')
+  const ridePrefix = dbUtils.SERVICE_CATEGORIES.find(c => c.category === 'Rides').match.prefix
+  // Legacy "2 legs" basis for the client-side legs toggle: completed
+  // round-trip RIDES only — the sheet's counter never doubled non-ride
+  // round trips, which do exist in live data.
+  const roundTripSum = (alias) =>
+    `COALESCE(SUM(${alias}.status = 'Completed' AND ${alias}.transportationType = 'Round Trip' AND ${alias}.serviceName LIKE '${ridePrefix}%'), 0)`
   const sql = `
     SELECT
       CAST(v.id AS CHAR) AS villageId,
@@ -355,12 +361,17 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
         WHERE sr.villageId = v.id
           AND sr.status != 'Hub cancelled'
           AND sr.serviceDate BETWEEN ? AND ?) AS byStatus,
+      (SELECT ${roundTripSum('sr')}
+        FROM service_request sr
+        WHERE sr.villageId = v.id
+          AND sr.status != 'Hub cancelled'
+          AND sr.serviceDate BETWEEN ? AND ?) AS totalsRoundTrips,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
-            value: `JSON_OBJECT('serviceName', t.serviceName, 'category', t.category, 'byStatus', t.statusCounts)`,
+            value: `JSON_OBJECT('serviceName', t.serviceName, 'category', t.category, 'byStatus', t.statusCounts, 'completedRoundTrips', t.rt)`,
             orderBy: `JSON_EXTRACT(t.statusCounts, '$.completed') DESC, t.serviceName`
           })}, JSON_ARRAY())
-        FROM (SELECT sr.serviceName, ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts
+        FROM (SELECT sr.serviceName, ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
                 AND sr.status != 'Hub cancelled'
@@ -369,10 +380,10 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
               GROUP BY sr.serviceName) t) AS byServiceType,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
-            value: `JSON_OBJECT('category', t.category, 'byStatus', t.statusCounts)`,
+            value: `JSON_OBJECT('category', t.category, 'byStatus', t.statusCounts, 'completedRoundTrips', t.rt)`,
             orderBy: 't.category'
           })}, JSON_ARRAY())
-        FROM (SELECT ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts
+        FROM (SELECT ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
                 AND sr.status != 'Hub cancelled'
@@ -382,10 +393,10 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
               HAVING category IS NOT NULL) t) AS byCategoryRaw,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
-            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt, 'completedRoundTrips', t.rt)`,
             orderBy: 'p.fullName'
           })}, JSON_ARRAY())
-        FROM (SELECT sr.memberPersonId AS pid, COUNT(*) AS cnt
+        FROM (SELECT sr.memberPersonId AS pid, COUNT(*) AS cnt, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
                 AND sr.status = 'Completed'
@@ -395,10 +406,10 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
         JOIN person p ON p.id = t.pid) AS byMember,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
-            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt, 'completedRoundTrips', t.rt)`,
             orderBy: 'p.fullName'
           })}, JSON_ARRAY())
-        FROM (SELECT sr.volunteerPersonId AS pid, COUNT(*) AS cnt
+        FROM (SELECT sr.volunteerPersonId AS pid, COUNT(*) AS cnt, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
                 AND sr.status = 'Completed'
@@ -409,7 +420,7 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
     FROM village v
     WHERE v.id = ?
   `
-  const binds = [start, end, start, end, start, end, start, end, start, end, villageId]
+  const binds = [start, end, start, end, start, end, start, end, start, end, start, end, villageId]
   const [rows] = await dbUtils.pool.query(sql, binds)
   if (!rows[0]) return null
   const row = rows[0]
@@ -417,15 +428,17 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
   // and shapes stay stable regardless of which categories have data.
   const zeroStatus = { draft: 0, open: 0, confirmed: 0, completed: 0,
     unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
-  const found = new Map((row.byCategoryRaw ?? []).map(e => [e.category, e.byStatus]))
-  const byCategory = dbUtils.SERVICE_CATEGORIES.map(({ category }) =>
-    ({ category, byStatus: found.get(category) ?? { ...zeroStatus } }))
+  const found = new Map((row.byCategoryRaw ?? []).map(e => [e.category, e]))
+  const byCategory = dbUtils.SERVICE_CATEGORIES.map(({ category }) => {
+    const e = found.get(category)
+    return { category, byStatus: e?.byStatus ?? { ...zeroStatus }, completedRoundTrips: e?.completedRoundTrips ?? 0 }
+  })
   const totalRequests = Object.values(row.byStatus).reduce((a, b) => a + b, 0)
   return {
     villageId: row.villageId,
     villageName: row.villageName,
     range: { start, end },
-    totals: { totalRequests, byStatus: row.byStatus },
+    totals: { totalRequests, byStatus: row.byStatus, completedRoundTrips: row.totalsRoundTrips },
     byCategory,
     byServiceType: row.byServiceType,
     byMember: row.byMember,

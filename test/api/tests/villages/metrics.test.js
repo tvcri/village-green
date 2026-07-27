@@ -32,7 +32,24 @@ test('byCategory: per-status counts aggregate across serviceNames', async () => 
   // srM1+srM2 Completed, srM3 Member cancelled
   assert.deepEqual(rides, { ...ZERO, completed: 2, memberCancelled: 1 })
   const errands = byCategory.find(c => c.category === 'Errands').byStatus
-  assert.deepEqual(errands, { ...ZERO, open: 1 })
+  // srM4 Open, srM8 Completed round-trip errand
+  assert.deepEqual(errands, { ...ZERO, open: 1, completed: 1 })
+})
+
+test('completedRoundTrips counts completed round-trip RIDES only, at every site', async () => {
+  const m = await getMetrics()
+  // srM1 is the only qualifying row: srM2 is One Way, srM3 isn't Completed,
+  // srM8 is a completed Round Trip but an Errand (the legacy counter never
+  // doubled non-ride round trips).
+  assert.equal(m.totals.completedRoundTrips, 1)
+  assert.equal(m.byCategory.find(c => c.category === 'Rides').completedRoundTrips, 1)
+  assert.equal(m.byCategory.find(c => c.category === 'Errands').completedRoundTrips, 0)
+  assert.equal(m.byCategory.find(c => c.category === 'Tech Support').completedRoundTrips, 0)
+  assert.equal(m.byServiceType.find(e => e.serviceName === 'Ride: Medical Appnt').completedRoundTrips, 1)
+  assert.equal(m.byServiceType.find(e => e.serviceName === 'Errand: Shopping').completedRoundTrips, 0)
+  // People sites carry it too (quahog member/volunteer share srM1)
+  assert.equal(m.byMember[0].completedRoundTrips, 1)
+  assert.equal(m.byVolunteer[0].completedRoundTrips, 1)
 })
 
 test('byServiceType: per-status matrix, derived category, non-Completed rows included', async () => {
@@ -41,17 +58,17 @@ test('byServiceType: per-status matrix, derived category, non-Completed rows inc
   assert.equal(medical.category, 'Rides')
   assert.deepEqual(medical.byStatus, { ...ZERO, completed: 2, memberCancelled: 1 })
   assert.equal('count' in medical, false)
-  // Open-only serviceName appears (previously Completed-only would drop it)
+  // Open-only... plus srM8's completed round-trip errand in the same group
   const errand = byServiceType.find(e => e.serviceName === 'Errand: Shopping')
-  assert.deepEqual(errand.byStatus, { ...ZERO, open: 1 })
+  assert.deepEqual(errand.byStatus, { ...ZERO, open: 1, completed: 1 })
   // sort: completed desc puts the 2-completed Ride first
   assert.equal(byServiceType[0].serviceName, 'Ride: Medical Appnt')
 })
 
 test('Hub cancelled is excluded from totals, byCategory, and byServiceType', async () => {
   const m = await getMetrics()
-  assert.equal(m.totals.byStatus.completed, 3) // srM1, srM2, srM5
-  assert.equal(m.totals.totalRequests, 5)      // srM1-5; srM6 hub-cancelled invisible
+  assert.equal(m.totals.byStatus.completed, 4) // srM1, srM2, srM5, srM8
+  assert.equal(m.totals.totalRequests, 6)      // srM1-5 + srM8; srM6 hub-cancelled invisible
   const rides = m.byCategory.find(c => c.category === 'Rides').byStatus
   assert.equal(Object.values(rides).reduce((a, b) => a + b, 0), 3)
 
