@@ -4,20 +4,17 @@ const mysql = require('mysql2/promise')
 const dbUtils = require('./utils')
 const ServiceRequestService = require('./ServiceRequestService')
 
-// The fixed capability -> serviceName-prefix map. The serviceName vocabulary
-// is a closed, developer-controlled set; a request is pickable under a
-// capability iff its serviceName starts with that capability's prefix. The
+// Capability -> serviceName prefix map derived from the shared SERVICE_CATEGORIES
+// vocabulary in dbUtils (see utils.js). A request is pickable under a capability
+// iff its serviceName matches that capability's prefix or exact match. The
 // colon-terminated prefixes ('Ride:', 'Errand:') cover every subtype AND absorb
-// the legacy whitespace-after-colon variants (Errand:Shopping / Errand: Shopping),
-// since the match cut is at the colon. Capabilities with no service type
-// (Friends, Steering Committee) derive to NULL and match nothing.
+// the legacy whitespace-after-colon variants, since the match cut is at the colon.
+// Capabilities with no service type (Friends, Steering Committee) derive to NULL.
 module.exports.buildCapabilityPrefixCase = function () {
-  return `CASE c.name` +
-    ` WHEN 'Rides'        THEN 'Ride:'` +
-    ` WHEN 'Errands'      THEN 'Errand:'` +
-    ` WHEN 'Home Help'    THEN 'Household Chores/Handy Help'` +
-    ` WHEN 'Tech Support' THEN 'Tech Support'` +
-    ` ELSE NULL END`
+  const whens = dbUtils.SERVICE_CATEGORIES
+    .filter(c => c.capability)
+    .map(c => ` WHEN '${c.capability}'${' '.repeat(13 - c.capability.length)}THEN '${c.match.prefix ?? c.match.exact}'`)
+  return `CASE c.name` + whens.join('') + ` ELSE NULL END`
 }
 
 // Renders a person-id set for SQL IN (...). Escaped inline (not `?` binds) so
