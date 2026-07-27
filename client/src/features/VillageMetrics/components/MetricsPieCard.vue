@@ -22,9 +22,12 @@ const chartData = computed(() => ({
 
 // Legend plugin is off — the rows table to the right is the legend. Tooltip
 // carries label + value + pct since that identity/detail pairing isn't on the chart itself.
+// No `animation` key: Chart.js's defaults (1000ms, easeOutQuart) apply. Note
+// `animation: true` is NOT a supported value — it replaces the default config
+// OBJECT with a boolean, leaving no duration, so the pie appears with no sweep.
+// Only `false` (disable) or a config object are meaningful here.
 const chartOptions = {
   maintainAspectRatio: false,
-  animation: false,
   plugins: {
     legend: { display: false },
     tooltip: {
