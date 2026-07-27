@@ -41,6 +41,13 @@ const todayCivil = dateToServiceDate(new Date())
 const villageId = computed(() => String(route.params.villageId))
 const range = computed(() => ({ start: route.query.start, end: route.query.end }))
 
+// Identity-stable watch source. `range` returns a NEW object literal each evaluation, and
+// watch compares non-deep sources with Object.is — so watching `range` refetches on ANY
+// navigation, including a tab-only one (vue-router builds a fresh query object per
+// navigation, which invalidates the computed even when start/end are unchanged).
+// A primitive string collapses that to a real value comparison.
+const rangeKey = computed(() => `${route.query.start}|${route.query.end}`)
+
 // Normalize the URL to a valid range (default = this-year) whenever it is missing/invalid.
 // Spreads the existing query so a normalize doesn't drop the `tab` selection.
 function normalizeRange () {
@@ -62,11 +69,11 @@ function fetchIfValid () {
   if (normalizeRange()) execute()
 }
 
-// Refetch on any villageId or range change. `range` is a computed over the two
-// query keys we care about (start/end), so this fires exactly when those actually
+// Refetch on any villageId or range change. Watches `rangeKey` (a primitive) rather
+// than `range` (an object literal), so this fires exactly when start/end actually
 // change — notably NOT when only `tab` changes. It does not fire on initial mount
 // (watch is lazy by default).
-useRefetchOnChange([villageId, range], fetchIfValid)
+useRefetchOnChange([villageId, rangeKey], fetchIfValid)
 
 // The single mount trigger. onMounted fires once; fetchIfValid either executes
 // (valid query) or router.replaces the default — and that replace changes route.query,

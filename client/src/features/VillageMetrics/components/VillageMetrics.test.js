@@ -1,11 +1,23 @@
 // @vitest-environment jsdom
 import { render, screen, cleanup, waitFor } from '@testing-library/vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { reactive, nextTick } from 'vue'
 import PrimeVue from 'primevue/config'
 
 // --- module mocks (must be declared before importing the component under test) ---
-const mockRouter = { replace: vi.fn(), push: vi.fn() }
-let mockRoute
+// mockRoute is REACTIVE and mockRouter.replace WRITES BACK into it, assigning a brand new
+// query object exactly as vue-router 4 does per navigation. An inert replace() that never
+// mutates the route cannot observe query-driven re-renders or refetches, which is precisely
+// how a green suite once missed "every tab click refetches".
+const mockRoute = reactive({ params: {}, query: {} })
+
+const mockRouter = {
+  replace: vi.fn(({ query }) => {
+    // fresh object per navigation — this is what invalidates route.query-derived computeds
+    mockRoute.query = { ...query }
+  }),
+  push: vi.fn(),
+}
 
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
@@ -99,12 +111,12 @@ describe('VillageMetrics container', () => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }))
-    mockRoute = {
-      params: { villageId: '1' },
-      query: { start: '2026-01-01', end: '2026-12-31' },
-    }
-    mockRouter.replace.mockReset()
-    mockRouter.push.mockReset()
+    // reset the reactive route in place (it is a const reactive, not reassignable)
+    mockRoute.params = { villageId: '1' }
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31' }
+    // mockClear, not mockReset: mockReset would strip replace()'s write-back implementation
+    mockRouter.replace.mockClear()
+    mockRouter.push.mockClear()
     getVillageMetrics.mockReset()
     getVillageMetrics.mockResolvedValue(METRICS)
   })
@@ -131,8 +143,40 @@ describe('VillageMetrics container', () => {
     expect(query.tab).toBe('people')
     expect(query.start).toBeTruthy()
     expect(query.end).toBeTruthy()
-    // no fetch until the range is valid
-    expect(getVillageMetrics).not.toHaveBeenCalled()
+    // The write-back makes the range valid, so exactly one real fetch follows the
+    // normalize — never two (no double-fetch, no replace loop).
+    await waitFor(() => expect(getVillageMetrics).toHaveBeenCalledTimes(1))
+    expect(getVillageMetrics).toHaveBeenCalledWith('1', query.start, query.end)
+    expect(mockRouter.replace).toHaveBeenCalledTimes(1)
+  })
+
+  // --- regression: tab navigation must not refetch -------------------------------
+  // `range` is a computed returning a new object literal each evaluation, and watch
+  // compares non-deep sources with Object.is. Watching it refetched on EVERY navigation,
+  // including tab-only ones. The container watches a primitive `rangeKey` instead.
+  it('does not refetch when only the tab changes', async () => {
+    await renderLoaded()
+    expect(getVillageMetrics).toHaveBeenCalledTimes(1) // mount
+
+    screen.getByText('People').click()
+    await waitFor(() => expect(mockRoute.query.tab).toBe('people'))
+    await nextTick()
+    expect(getVillageMetrics).toHaveBeenCalledTimes(1) // still 1 — no refetch
+
+    screen.getByText('Outcomes').click()
+    await waitFor(() => expect(mockRoute.query.tab).toBe('outcomes'))
+    await nextTick()
+    expect(getVillageMetrics).toHaveBeenCalledTimes(1) // still 1 after a second click
+  })
+
+  it('does refetch when the range actually changes', async () => {
+    await renderLoaded()
+    expect(getVillageMetrics).toHaveBeenCalledTimes(1)
+
+    // simulate the range picker emitting a new range through the same router path
+    mockRoute.query = { ...mockRoute.query, start: '2025-01-01', end: '2025-12-31' }
+    await waitFor(() => expect(getVillageMetrics).toHaveBeenCalledTimes(2))
+    expect(getVillageMetrics).toHaveBeenLastCalledWith('1', '2025-01-01', '2025-12-31')
   })
 
   it('applies the legs bump to the summary strip by default (toggle ON)', async () => {
