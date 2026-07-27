@@ -12,7 +12,6 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { getVillageMetrics } from '../api/villageMetricsApi.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
-import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { presetRange, isValidRange } from '../lib/rangePresets.js'
 import {
   STATUS_LABELS,
@@ -33,7 +32,6 @@ defineOptions({ name: 'VillageMetrics' })
 
 const route = useRoute()
 const router = useRouter()
-const { hasPermission } = useCurrentUser()
 
 // "today" as a civil string — reading the clock is allowed; parsing a stored value is not.
 const todayCivil = dateToServiceDate(new Date())
@@ -156,8 +154,6 @@ function adjustPeople (rows) {
 const memberRows = computed(() => (hasData.value ? adjustPeople(metrics.value.byMember) : []))
 const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value.byVolunteer) : []))
 
-const canSeeMembers = computed(() => hasPermission('member:read', villageId.value))
-const canSeeVolunteers = computed(() => hasPermission('volunteer:read', villageId.value))
 </script>
 
 <template>
@@ -237,22 +233,12 @@ const canSeeVolunteers = computed(() => hasPermission('volunteer:read', villageI
               <section class="metrics-section">
                 <h2>By member</h2>
                 <p class="caption">Completed requests only.</p>
-                <MetricsCountTable
-                  :rows="memberRows"
-                  nameHeader="Member"
-                  :villageId="villageId"
-                  :linkRouteName="canSeeMembers ? 'member-detail' : null"
-                />
+                <MetricsCountTable :rows="memberRows" nameHeader="Member" />
               </section>
               <section class="metrics-section">
                 <h2>By volunteer</h2>
                 <p class="caption">Completed requests only.</p>
-                <MetricsCountTable
-                  :rows="volunteerRows"
-                  nameHeader="Volunteer"
-                  :villageId="villageId"
-                  :linkRouteName="canSeeVolunteers ? 'volunteer-detail' : null"
-                />
+                <MetricsCountTable :rows="volunteerRows" nameHeader="Volunteer" />
               </section>
             </div>
           </TabPanel>

@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import MetricsCountTable from './MetricsCountTable.vue'
-
-const push = vi.fn()
-vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 
 const ROWS = [
   { personId: '11', fullName: 'Anderson, Alice', count: 5 },
@@ -14,7 +11,7 @@ const ROWS = [
 
 function mountTable (props) {
   return render(MetricsCountTable, {
-    props: { rows: ROWS, nameHeader: 'Member', villageId: '42', linkRouteName: null, ...props },
+    props: { rows: ROWS, nameHeader: 'Member', ...props },
     global: { plugins: [PrimeVue] },
   })
 }
@@ -39,10 +36,12 @@ describe('MetricsCountTable', () => {
     expect(screen.getByText('No completed requests in this range.')).toBeTruthy()
   })
 
-  it('renders plain text (no navigation) when linkRouteName is null', async () => {
-    mountTable({ linkRouteName: null })
-    await fireEvent.click(screen.getByText('Anderson, Alice'))
-    expect(push).not.toHaveBeenCalled()
+  // Names are deliberately plain text, not links: the anchors used href="#",
+  // which broke middle-click and open-in-new-tab.
+  it('renders names as plain text, not links', () => {
+    const { container } = mountTable({})
+    expect(screen.getByText('Anderson, Alice')).toBeTruthy()
+    expect(container.querySelector('tbody a')).toBeNull()
   })
 
   // 5/3/12 rather than single digits so the assertion pins a real reordering
@@ -80,13 +79,8 @@ describe('MetricsCountTable', () => {
     })
   })
 
-  it('navigates with villageId+personId when linkRouteName is set', async () => {
-    push.mockClear()
-    mountTable({ linkRouteName: 'member-detail' })
-    await fireEvent.click(screen.getByText('Anderson, Alice'))
-    await waitFor(() => expect(push).toHaveBeenCalledWith({
-      name: 'member-detail',
-      params: { villageId: '42', personId: '11' },
-    }))
+  it('right-aligns the Completed column', () => {
+    const { container } = mountTable({})
+    expect(container.querySelector('tbody tr').cells[1].classList.contains('count-cell')).toBe(true)
   })
 })
