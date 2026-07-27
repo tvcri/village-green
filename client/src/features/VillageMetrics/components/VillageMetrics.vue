@@ -8,6 +8,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { presetRange, isValidRange } from '../lib/rangePresets.js'
+import { STATUS_LABELS, STATUS_ORDER } from '../lib/metricsView.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
 import MetricsRangePicker from './MetricsRangePicker.vue'
 import MetricsCountTable from './MetricsCountTable.vue'
@@ -61,12 +62,6 @@ function onRangeUpdate ({ start, end }) {
 }
 
 // ---- chart configs ----
-const STATUS_LABELS = {
-  draft: 'Draft', open: 'Open', confirmed: 'Confirmed', completed: 'Completed',
-  unmatched: 'Unmatched', memberCancelled: 'Member cancelled', volunteerCancelled: 'Volunteer cancelled',
-}
-const STATUS_ORDER = ['draft', 'open', 'confirmed', 'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled']
-
 const statusChartData = computed(() => {
   const by = metrics.value?.totals?.byStatus
   if (!by) return null
