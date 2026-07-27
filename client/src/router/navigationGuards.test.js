@@ -43,6 +43,12 @@ function createTestRouter() {
         meta: { requiresPermission: 'user:admin' },
       },
       {
+        path: '/api-browser',
+        name: 'api-browser',
+        component: Stub,
+        meta: { requiresAnyGrant: true },
+      },
+      {
         path: '/villages/:villageId/service-requests',
         name: 'service-requests',
         component: Stub,
@@ -197,5 +203,31 @@ describe('volunteer surface', () => {
     mockIsGrantless.value = true
     const result = navigationGuard({ name: 'volunteer-request-detail', path: '/volunteer/requests/2303', params: { id: '2303' }, meta: { requiresVolunteer: true } })
     expect(result).toBeUndefined()
+  })
+})
+
+describe('requiresAnyGrant', () => {
+  beforeEach(() => {
+    mockHasPermission.mockReturnValue(false)
+    mockHasVillageAccess.mockReturnValue(false)
+    mockHasFederationAccess.value = false
+    mockIsGrantless.value = false
+    globalThis.VG = { curUser: null }
+  })
+
+  it('redirects a grantless user to villages', async () => {
+    const router = createTestRouter()
+    await router.push('/')
+    mockIsGrantless.value = true
+    const to = router.resolve({ name: 'api-browser' })
+    expect(navigationGuard(to)).toEqual({ name: 'villages' })
+  })
+
+  it('allows a user with any grant', async () => {
+    const router = createTestRouter()
+    await router.push('/')
+    mockIsGrantless.value = false
+    const to = router.resolve({ name: 'api-browser' })
+    expect(navigationGuard(to)).toBeUndefined()
   })
 })

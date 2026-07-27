@@ -74,16 +74,18 @@
   /* Error Colors */
   --color-text-error: #f16969;
 
-  /* Status Indicator Colors (success/warning/error) — banners, badges, etc. */
+  /* Status Indicator Colors (success/warning/error) — banners, badges, etc.
+     -text tokens are only used against a light (near-white) background in
+     :root — see the app-dark block below for the pale, dark-tuned pair. */
   --color-status-success-bg: color-mix(in srgb, #166534 18%, var(--color-background-dark));
   --color-status-success-border: #4ade80;
   --color-status-success-text: #86efac;
   --color-status-warning-bg: color-mix(in srgb, #92400e 18%, var(--color-background-dark));
   --color-status-warning-border: #fbbf24;
-  --color-status-warning-text: #fcd34d;
+  --color-status-warning-text: #b45309;
   --color-status-error-bg: color-mix(in srgb, #7f1d1d 18%, var(--color-background-dark));
   --color-status-error-border: #f87171;
-  --color-status-error-text: #fca5a5;
+  --color-status-error-text: #dc2626;
 
   /* Result Status Colors */
   --result-pass: hsl(120 84% 42% / 1);
@@ -292,6 +294,11 @@ textarea:focus {
   --color-status-success-bg: color-mix(in srgb, #166534 18%, var(--color-background-dark));
   --color-status-warning-bg: color-mix(in srgb, #92400e 18%, var(--color-background-dark));
   --color-status-error-bg: color-mix(in srgb, #7f1d1d 18%, var(--color-background-dark));
+
+  /* -text tokens read against the dark surfaces above (--color-background-dark
+     etc.), so the light theme's pale values are re-paired here for contrast. */
+  --color-status-warning-text: #fcd34d;
+  --color-status-error-text: #fca5a5;
 }
 
 :root.app-dark body {
