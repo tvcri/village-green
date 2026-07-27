@@ -13,7 +13,7 @@ const ServiceRequestService = require('./ServiceRequestService')
 module.exports.buildCapabilityPrefixCase = function () {
   const whens = dbUtils.SERVICE_CATEGORIES
     .filter(c => c.capability)
-    .map(c => ` WHEN '${c.capability}'${' '.repeat(13 - c.capability.length)}THEN '${c.match.prefix ?? c.match.exact}'`)
+    .map(c => ` WHEN '${c.capability}' THEN '${c.match.prefix ?? c.match.exact}'`)
   return `CASE c.name` + whens.join('') + ` ELSE NULL END`
 }
 

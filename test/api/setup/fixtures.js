@@ -215,10 +215,14 @@ export const serviceRequests = {
     status: 'Completed', serviceName: 'Household Chores/Handy Help', destination: null,
     serviceDate: '2026-06-05', finishTime: '10:00:00',
   },
-  srM6: { // Hub cancelled: must be invisible to every metrics section
+  srM6: { // Hub cancelled: must be invisible to every metrics section. A
+    // distinct serviceName (Tech Support, not shared with srM1-3's Ride) so
+    // the exclusion is load-bearing: if the status filter were ever dropped,
+    // this row would surface as its own visible byServiceType entry instead
+    // of silently merging into an existing group.
     id: 9, villageId: villages.quahog.id, requestNumber: 107,
     memberPersonId: persons.quahogMember.id, volunteerPersonId: null,
-    status: 'Hub cancelled', serviceName: 'Ride: Medical Appnt', destination: 'Clinic',
+    status: 'Hub cancelled', serviceName: 'Tech Support', destination: null,
     serviceDate: '2026-06-06', finishTime: null,
   },
   srM7: { // outside the metrics test range

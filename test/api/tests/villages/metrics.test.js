@@ -29,7 +29,7 @@ test('byCategory: always all 5 categories in fixed order, zero-filled', async ()
 test('byCategory: per-status counts aggregate across serviceNames', async () => {
   const { byCategory } = await getMetrics()
   const rides = byCategory.find(c => c.category === 'Rides').byStatus
-  // srM1+srM2 Completed, srM3 Member cancelled; srM6 (Hub cancelled) invisible
+  // srM1+srM2 Completed, srM3 Member cancelled
   assert.deepEqual(rides, { ...ZERO, completed: 2, memberCancelled: 1 })
   const errands = byCategory.find(c => c.category === 'Errands').byStatus
   assert.deepEqual(errands, { ...ZERO, open: 1 })
@@ -53,7 +53,19 @@ test('Hub cancelled is excluded from totals, byCategory, and byServiceType', asy
   assert.equal(m.totals.byStatus.completed, 3) // srM1, srM2, srM5
   assert.equal(m.totals.totalRequests, 5)      // srM1-5; srM6 hub-cancelled invisible
   const rides = m.byCategory.find(c => c.category === 'Rides').byStatus
-  assert.equal(Object.values(rides).reduce((a, b) => a + b, 0), 3) // not 4
+  assert.equal(Object.values(rides).reduce((a, b) => a + b, 0), 3)
+
+  // srM6 is a Hub-cancelled Tech Support row with no other in-range Tech
+  // Support rows, so its exclusion is load-bearing here: if the status
+  // filter were ever dropped from VillageService, this row would surface as
+  // its own visible byServiceType entry (it can't hide by merging into an
+  // existing group, unlike a Hub-cancelled Ride would among srM1-3).
+  assert.equal(m.byServiceType.find(e => e.serviceName === 'Tech Support'), undefined)
+  // Only the 3 non-hub-cancelled serviceNames from srM1-5 are present.
+  assert.equal(m.byServiceType.length, 3)
+  // Tech Support still appears in byCategory (fixed 5-category shape) but
+  // entirely zero-filled, since srM6 is its only would-be contributor.
+  assert.deepEqual(m.byCategory.find(c => c.category === 'Tech Support').byStatus, ZERO)
 })
 
 test('a serviceName outside the vocabulary yields category null (validated)', async () => {
