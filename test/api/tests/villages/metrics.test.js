@@ -68,12 +68,16 @@ test('Hub cancelled is excluded from totals, byCategory, and byServiceType', asy
   assert.deepEqual(m.byCategory.find(c => c.category === 'Tech Support').byStatus, ZERO)
 })
 
-test('a serviceName outside the vocabulary yields category null (validated)', async () => {
+test('a serviceName outside the vocabulary yields category null', async () => {
   // srV1 'Ride to pharmacy' (2026-07-10) is unmapped: 'Ride to' != 'Ride:'.
+  // OAS conformance of the null category (nullable: true) is not asserted
+  // here — the API runs logOnly, so a schema violation would still 200.
+  // It's enforced by the run-level responseValidation log scan (run.js and
+  // the CI job it mirrors), which fails the run on any logged violation.
   const { status, json } = await vgCall('getVillageMetrics',
     { villageId: villages.quahog.id, start: '2026-07-10', end: '2026-07-10' },
     { token: tokens.users.full_v1 })
-  assert.equal(status, 200) // response validation accepts nullable category
+  assert.equal(status, 200)
   const legacy = json.byServiceType.find(e => e.serviceName === 'Ride to pharmacy')
   assert.equal(legacy.category, null)
   // ...and it contributes to NO byCategory bucket
