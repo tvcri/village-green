@@ -72,6 +72,26 @@ describe('useServiceRequestTabs', () => {
     expect(fetcher.mock.calls[0][0].status).toEqual(['completed', 'unmatched', 'cancelled'])
   })
 
+  it('makes no request while canFetch is false, keeping the last rows', async () => {
+    const fetcher = vi.fn().mockResolvedValue([{ serviceRequestId: 'a' }])
+    let allowed = true
+    const t = useServiceRequestTabs({
+      fetcher, canFetch: () => allowed, today: '2026-07-26'
+    })
+    await t.fetchActive()
+    await flush()
+    expect(t.currentRows.value.map(r => r.serviceRequestId)).toEqual(['a'])
+
+    // e.g. the route's :villageId went away on navigation
+    allowed = false
+    fetcher.mockClear()
+    await t.fetchActive()
+    await t.fetchHistoric()
+    expect(fetcher).not.toHaveBeenCalled()
+    // rows survive rather than blanking
+    expect(t.currentRows.value.map(r => r.serviceRequestId)).toEqual(['a'])
+  })
+
   it('offers exactly the statuses the visible tab fetched', () => {
     const t = useServiceRequestTabs({ fetcher: vi.fn().mockResolvedValue([]), today: '2026-07-26' })
     expect(t.statusOptions.value).toEqual(['open', 'confirmed'])

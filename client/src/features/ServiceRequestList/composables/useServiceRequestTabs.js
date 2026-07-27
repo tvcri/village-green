@@ -34,10 +34,12 @@ const localToday = () => dateToServiceDate(new Date())
  *
  * @param {object} opts
  * @param {(params: {status: string[], serviceDateStart: string, serviceDateEnd: string|undefined}) => Promise<Array>} opts.fetcher
+ * @param {() => boolean} [opts.canFetch] guard: when it returns false no request
+ *   is made and the last-fetched rows are kept (e.g. a route param went away)
  * @param {number} [opts.historicDays] size of the default historic window
  * @param {string} [opts.today] 'YYYY-MM-DD' override for tests
  */
-export function useServiceRequestTabs ({ fetcher, historicDays = 60, today = localToday() }) {
+export function useServiceRequestTabs ({ fetcher, canFetch, historicDays = 60, today = localToday() }) {
   const activeTab = ref('active')
 
   const historicStart = ref(shiftDays(today, -historicDays))
@@ -60,8 +62,16 @@ export function useServiceRequestTabs ({ fetcher, historicDays = 60, today = loc
     { immediate: false }
   )
 
-  const fetchActive = () => active.execute()
+  // A guarded fetch never runs, so the tab keeps its last-fetched rows rather
+  // than blanking them.
+  const blocked = () => canFetch && !canFetch()
+
+  const fetchActive = () => {
+    if (blocked()) return Promise.resolve(null)
+    return active.execute()
+  }
   const fetchHistoric = () => {
+    if (blocked()) return Promise.resolve(null)
     // serviceDateStart is required by the endpoint; a cleared "From" input
     // must not fire a doomed request. Keep showing the last-fetched rows.
     if (!historicStart.value) return Promise.resolve(null)

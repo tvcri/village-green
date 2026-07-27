@@ -54,7 +54,12 @@ const openHistory = (row) => {
 }
 
 const tabs = useServiceRequestTabs({
-  fetcher: (params) => getVillageServiceRequests(villageId.value, params)
+  fetcher: (params) => getVillageServiceRequests(villageId.value, params),
+  // This component is kept alive, so navigating to a route without a
+  // :villageId (e.g. the village list) leaves villageId undefined while the
+  // watchers below still fire. Building a URL from that throws
+  // "path requires parameter {villageId}".
+  canFetch: () => !!villageId.value
 })
 const {
   activeTab, historicStart, historicEnd, statusOptions,
@@ -101,7 +106,11 @@ watch([historicStart, historicEnd], () => {
 
 onMounted(() => { if (villageId.value) tabs.fetchActive() })
 
-const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
+const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, (newVillageId) => {
+  // Navigating to a route without a :villageId (the village list) also fires
+  // this watcher. There is no new village to load, so leave state intact
+  // rather than clearing it and firing a fetch that cannot be built.
+  if (!newVillageId) return
   clearAll()
   memberInput.value = ''
   volunteerInput.value = ''
