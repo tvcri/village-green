@@ -21,12 +21,12 @@ defineOptions({ name: 'MetricsSummaryStrip' })
       <div class="stat-value">{{ stats.completed }}</div>
     </div>
     <div class="stat-card">
-      <label class="stat-label">Unmatched</label>
-      <div class="stat-value">{{ stats.unmatched }}</div>
-    </div>
-    <div class="stat-card">
       <label class="stat-label">Cancelled</label>
       <div class="stat-value">{{ stats.cancelled }}</div>
+    </div>
+    <div class="stat-card">
+      <label class="stat-label">Unmatched</label>
+      <div class="stat-value">{{ stats.unmatched }}</div>
     </div>
   </div>
 </template>

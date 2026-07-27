@@ -23,13 +23,13 @@ function goToPerson (row) {
     <template #empty>
       <span>No completed requests in this range.</span>
     </template>
-    <Column field="fullName" :header="nameHeader">
+    <Column field="fullName" :header="nameHeader" sortable>
       <template #body="{ data }">
         <a v-if="linkRouteName" href="#" class="person-link" @click.prevent="goToPerson(data)">{{ data.fullName }}</a>
         <span v-else>{{ data.fullName }}</span>
       </template>
     </Column>
-    <Column field="count" header="Completed" style="width: 8rem" />
+    <Column field="count" header="Completed" sortable style="width: 8rem" />
   </DataTable>
 </template>
 
