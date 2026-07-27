@@ -24,6 +24,7 @@ const chartData = computed(() => ({
 // carries label + value + pct since that identity/detail pairing isn't on the chart itself.
 const chartOptions = {
   maintainAspectRatio: false,
+  animation: false,
   plugins: {
     legend: { display: false },
     tooltip: {

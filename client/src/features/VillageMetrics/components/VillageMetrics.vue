@@ -184,7 +184,7 @@ const canSeeVolunteers = computed(() => hasPermission('volunteer:read', villageI
         <label for="legsToggle">Count round trips as 2 legs</label>
       </div>
 
-      <Tabs v-model:value="tab">
+      <Tabs v-model:value="tab" lazy>
         <TabList>
           <Tab value="categories">Categories</Tab>
           <Tab value="services">Services</Tab>
