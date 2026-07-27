@@ -6,13 +6,20 @@ const LINE_HEIGHT = 11
 
 // Four lines fit comfortably in a 1in label at 10pt. Unit is omitted when
 // absent, collapsing to three.
+//
+// Unit goes ABOVE street, at customer request (2026-07-27). USPS Pub 28
+// prefers the secondary designator appended to the delivery address line
+// ("123 Main St Apt 4B") and treats the line-above form as the alternate,
+// intended for when the combined line will not fit. This is a deliberate
+// deviation, not an oversight — do not "correct" it to the Pub 28 default
+// without asking the customer.
 function labelLines (label) {
   const cityLine = [
     [label.city, label.state].filter(Boolean).join(', '),
     label.zip,
   ].filter(Boolean).join(' ')
 
-  return [label.name, label.street, label.unit, cityLine].filter(Boolean)
+  return [label.name, label.unit, label.street, cityLine].filter(Boolean)
 }
 
 // Standard Helvetica encodes WinAnsi only; one character outside it makes
