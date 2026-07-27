@@ -333,39 +333,53 @@ module.exports.getVillageServiceRequests = async function (villageId, status) {
 
 module.exports.getVillageMetrics = async function (villageId, start, end) {
   // Business rule: 'Hub cancelled' requests are treated as if they never
-  // existed — excluded from every section. Breakdown sections count
-  // Completed requests only; the full status mix appears only in byStatus.
-  // Breakdown arrays are ordered in SQL (jsonArrayAgg orderBy): byServiceType
-  // by count desc then name; person lists by fullName.
+  // existed — excluded from every section. byMember/byVolunteer count
+  // Completed only; byStatus/byServiceType/byCategory carry the full mix.
+  // Breakdown arrays are ordered in SQL (jsonArrayAgg orderBy).
+  const statusJson = (alias) => `JSON_OBJECT(
+    'draft',              COALESCE(SUM(${alias}.status = 'Draft'), 0),
+    'open',               COALESCE(SUM(${alias}.status = 'Open'), 0),
+    'confirmed',          COALESCE(SUM(${alias}.status = 'Confirmed'), 0),
+    'completed',          COALESCE(SUM(${alias}.status = 'Completed'), 0),
+    'unmatched',          COALESCE(SUM(${alias}.status = 'Unmatched'), 0),
+    'memberCancelled',    COALESCE(SUM(${alias}.status = 'Member cancelled'), 0),
+    'volunteerCancelled', COALESCE(SUM(${alias}.status = 'Volunteer cancelled'), 0)
+  )`
+  const categoryCase = dbUtils.buildServiceNameCategoryCase('sr.serviceName')
   const sql = `
     SELECT
       CAST(v.id AS CHAR) AS villageId,
       v.name AS villageName,
-      (SELECT JSON_OBJECT(
-          'draft',              COALESCE(SUM(sr.status = 'Draft'), 0),
-          'open',               COALESCE(SUM(sr.status = 'Open'), 0),
-          'confirmed',          COALESCE(SUM(sr.status = 'Confirmed'), 0),
-          'completed',          COALESCE(SUM(sr.status = 'Completed'), 0),
-          'unmatched',          COALESCE(SUM(sr.status = 'Unmatched'), 0),
-          'memberCancelled',    COALESCE(SUM(sr.status = 'Member cancelled'), 0),
-          'volunteerCancelled', COALESCE(SUM(sr.status = 'Volunteer cancelled'), 0)
-        )
+      (SELECT ${statusJson('sr')}
         FROM service_request sr
         WHERE sr.villageId = v.id
           AND sr.status != 'Hub cancelled'
           AND sr.serviceDate BETWEEN ? AND ?) AS byStatus,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
-            value: `JSON_OBJECT('serviceName', t.serviceName, 'count', t.cnt)`,
-            orderBy: 't.cnt desc, t.serviceName'
+            value: `JSON_OBJECT('serviceName', t.serviceName, 'category', t.category, 'byStatus', t.statusCounts)`,
+            orderBy: `JSON_EXTRACT(t.statusCounts, '$.completed') DESC, t.serviceName`
           })}, JSON_ARRAY())
-        FROM (SELECT sr.serviceName, COUNT(*) AS cnt
+        FROM (SELECT sr.serviceName, ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts
               FROM service_request sr
               WHERE sr.villageId = v.id
-                AND sr.status = 'Completed'
+                AND sr.status != 'Hub cancelled'
                 AND sr.serviceName IS NOT NULL
                 AND sr.serviceDate BETWEEN ? AND ?
               GROUP BY sr.serviceName) t) AS byServiceType,
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('category', t.category, 'byStatus', t.statusCounts)`,
+            orderBy: 't.category'
+          })}, JSON_ARRAY())
+        FROM (SELECT ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts
+              FROM service_request sr
+              WHERE sr.villageId = v.id
+                AND sr.status != 'Hub cancelled'
+                AND sr.serviceName IS NOT NULL
+                AND sr.serviceDate BETWEEN ? AND ?
+              GROUP BY 1
+              HAVING category IS NOT NULL) t) AS byCategoryRaw,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
             value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
@@ -395,18 +409,24 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
     FROM village v
     WHERE v.id = ?
   `
-  const binds = [start, end, start, end, start, end, start, end, villageId]
+  const binds = [start, end, start, end, start, end, start, end, start, end, villageId]
   const [rows] = await dbUtils.pool.query(sql, binds)
   if (!rows[0]) return null
   const row = rows[0]
-  // mysql2 hydrates the JSON columns into JS objects/arrays with numeric
-  // counts already (JSON numbers), so no coercion is needed here.
+  // Fixed 5-entry byCategory in vocabulary order, zero-filled: chart colors
+  // and shapes stay stable regardless of which categories have data.
+  const zeroStatus = { draft: 0, open: 0, confirmed: 0, completed: 0,
+    unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
+  const found = new Map((row.byCategoryRaw ?? []).map(e => [e.category, e.byStatus]))
+  const byCategory = dbUtils.SERVICE_CATEGORIES.map(({ category }) =>
+    ({ category, byStatus: found.get(category) ?? { ...zeroStatus } }))
   const totalRequests = Object.values(row.byStatus).reduce((a, b) => a + b, 0)
   return {
     villageId: row.villageId,
     villageName: row.villageName,
     range: { start, end },
     totals: { totalRequests, byStatus: row.byStatus },
+    byCategory,
     byServiceType: row.byServiceType,
     byMember: row.byMember,
     byVolunteer: row.byVolunteer
