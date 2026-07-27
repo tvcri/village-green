@@ -59,7 +59,7 @@ export function legsApply (sel, legs) {
 
 export function adjustedCount (entry, sel, legs) {
   const base = statusCount(entry.byStatus, sel)
-  return base + (legsApply(sel, legs) ? entry.completedRoundTrips : 0)
+  return base + (legsApply(sel, legs) ? (entry.completedRoundTrips ?? 0) : 0)
 }
 
 export function categoryPie (byCategory, sel, legs) {
@@ -123,7 +123,7 @@ export function servicePie (byServiceType, sel, cat, legs, otherPct = 0.02) {
 export function outcomesPie (totals, legs) {
   const rows = OUTCOME_SPECS.map(spec => ({
     label: spec.label,
-    value: totals.byStatus[spec.statusKey] + (spec.legs && legs ? totals.completedRoundTrips : 0),
+    value: totals.byStatus[spec.statusKey] + (spec.legs && legs ? (totals.completedRoundTrips ?? 0) : 0),
     color: spec.color,
   }))
   const total = rows.reduce((sum, r) => sum + r.value, 0)
@@ -136,7 +136,7 @@ export function outcomesPie (totals, legs) {
 
 export function stripStats (metrics, legs) {
   const { totals, byCategory } = metrics
-  const legsBump = legs ? totals.completedRoundTrips : 0
+  const legsBump = legs ? (totals.completedRoundTrips ?? 0) : 0
 
   const requests = totals.totalRequests + legsBump
   const completed = totals.byStatus.completed + legsBump
@@ -145,7 +145,7 @@ export function stripStats (metrics, legs) {
   let topCategory = '—'
   let topValue = 0
   byCategory.forEach((entry) => {
-    const value = entry.byStatus.completed + (legs ? entry.completedRoundTrips : 0)
+    const value = entry.byStatus.completed + (legs ? (entry.completedRoundTrips ?? 0) : 0)
     if (value > topValue) {
       topValue = value
       topCategory = entry.category

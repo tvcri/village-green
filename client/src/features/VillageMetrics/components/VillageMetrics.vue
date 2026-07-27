@@ -150,7 +150,7 @@ const outcomesView = computed(() => {
 // People counts are "completed" counts, so the legs bump always applies when the
 // toggle is on. Done here, not inside the (unchanged) MetricsCountTable.
 function adjustPeople (rows) {
-  return rows.map(r => ({ ...r, count: r.count + (legs.value ? r.completedRoundTrips : 0) }))
+  return rows.map(r => ({ ...r, count: r.count + (legs.value ? (r.completedRoundTrips ?? 0) : 0) }))
 }
 
 const memberRows = computed(() => (hasData.value ? adjustPeople(metrics.value.byMember) : []))

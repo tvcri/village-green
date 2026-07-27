@@ -174,6 +174,26 @@ describe('categoryPie', () => {
     expect(slices).toEqual([])
     expect(rows.every(r => r.pct === 0)).toBe(true)
   })
+
+  // Version-skew defense: an older/mismatched API response can omit completedRoundTrips
+  // even though the OAS schema marks it required. With legs ON, `base + undefined` used to
+  // produce NaN, which the `r.value > 0` slice filter then silently dropped — every slice
+  // vanished and the pie rendered a false "No completed requests" empty state over real data.
+  it('legs on + missing completedRoundTrips: values stay finite and real slices survive', () => {
+    const categoriesMissingField = [
+      { category: 'Rides', byStatus: { ...emptyStatus(), completed: 40 } }, // no completedRoundTrips key
+      { category: 'Errands', byStatus: { ...emptyStatus(), completed: 20 } },
+      { category: 'Home Help', byStatus: emptyStatus() },
+      { category: 'Tech Support', byStatus: emptyStatus() },
+      { category: 'Member Added', byStatus: emptyStatus() },
+    ]
+    const { slices, rows } = categoryPie(categoriesMissingField, 'completed', true)
+    expect(rows.every(r => Number.isFinite(r.value) && Number.isFinite(r.pct))).toBe(true)
+    expect(slices).toEqual([
+      { label: 'Rides', value: 40, color: '#22c55e' },
+      { label: 'Errands', value: 20, color: '#f59e0b' },
+    ])
+  })
 })
 
 describe('servicePie', () => {
@@ -260,6 +280,28 @@ describe('outcomesPie', () => {
     expect(slices.find(s => s.label === 'Unmatched')).toBeUndefined()
     expect(slices).toHaveLength(3)
   })
+
+  it('all-zero total yields pct 0 for every row (div-by-zero guard)', () => {
+    const zeroTotals = {
+      totalRequests: 0,
+      byStatus: { draft: 0, open: 0, confirmed: 0, completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
+      completedRoundTrips: 0,
+    }
+    const { slices, rows } = outcomesPie(zeroTotals, false)
+    expect(slices).toEqual([])
+    expect(rows.every(r => r.pct === 0)).toBe(true)
+  })
+
+  // Version-skew defense: legs ON but the API response omits completedRoundTrips.
+  it('legs on + missing completedRoundTrips: Completed stays finite, not NaN', () => {
+    const { totalRequests, byStatus } = totals
+    const totalsMissingField = { totalRequests, byStatus } // no completedRoundTrips key
+    const { rows, slices } = outcomesPie(totalsMissingField, true)
+    const completedRow = rows.find(r => r.label === 'Completed')
+    expect(Number.isFinite(completedRow.value)).toBe(true)
+    expect(completedRow.value).toBe(70) // 70 + 0, not 70 + undefined
+    expect(slices.find(s => s.label === 'Completed')).toBeTruthy() // slice not dropped
+  })
 })
 
 describe('stripStats', () => {
@@ -302,5 +344,23 @@ describe('stripStats', () => {
     }
     expect(stripStats(zeroMetrics, false).topCategory).toBe('—')
     expect(stripStats(zeroMetrics, true).topCategory).toBe('—')
+  })
+
+  // Version-skew defense: legs ON but the API response omits completedRoundTrips at both
+  // the totals level and the byCategory level. Previously `100 + undefined` -> NaN, which
+  // rendered literal "NaN" in the summary strip.
+  it('legs on + missing completedRoundTrips (totals and byCategory): finite numbers, real top category', () => {
+    const { totalRequests, byStatus } = metrics.totals
+    const metricsMissingField = {
+      ...metrics,
+      totals: { totalRequests, byStatus }, // no completedRoundTrips key
+      byCategory: metrics.byCategory.map(({ category, byStatus: bs }) => ({ category, byStatus: bs })), // no completedRoundTrips key
+    }
+    const stats = stripStats(metricsMissingField, true)
+    expect(Number.isFinite(stats.requests)).toBe(true)
+    expect(Number.isFinite(stats.completed)).toBe(true)
+    expect(stats.requests).toBe(100) // 100 + 0, not 100 + undefined
+    expect(stats.completed).toBe(70)
+    expect(stats.topCategory).toBe('Rides') // still resolves a real top category, not NaN-broken
   })
 })
