@@ -4804,6 +4804,32 @@ components:
       $ref: '#/components/schemas/StringIntIdNullable'
     VillageName:
       $ref: '#/components/schemas/String45'
+    MetricsStatusCounts:
+      type: object
+      additionalProperties: false
+      required:
+      - draft
+      - open
+      - confirmed
+      - completed
+      - unmatched
+      - memberCancelled
+      - volunteerCancelled
+      properties:
+        draft:
+          type: integer
+        open:
+          type: integer
+        confirmed:
+          type: integer
+        completed:
+          type: integer
+        unmatched:
+          type: integer
+        memberCancelled:
+          type: integer
+        volunteerCancelled:
+          type: integer
     VillageMetrics:
       type: object
       additionalProperties: false
@@ -4812,6 +4838,7 @@ components:
       - villageName
       - range
       - totals
+      - byCategory
       - byServiceType
       - byMember
       - byVolunteer
@@ -4843,31 +4870,21 @@ components:
             totalRequests:
               type: integer
             byStatus:
-              type: object
-              additionalProperties: false
-              required:
-              - draft
-              - open
-              - confirmed
-              - completed
-              - unmatched
-              - memberCancelled
-              - volunteerCancelled
-              properties:
-                draft:
-                  type: integer
-                open:
-                  type: integer
-                confirmed:
-                  type: integer
-                completed:
-                  type: integer
-                unmatched:
-                  type: integer
-                memberCancelled:
-                  type: integer
-                volunteerCancelled:
-                  type: integer
+              $ref: '#/components/schemas/MetricsStatusCounts'
+        byCategory:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - category
+            - byStatus
+            properties:
+              category:
+                type: string
+                maxLength: 40
+              byStatus:
+                $ref: '#/components/schemas/MetricsStatusCounts'
         byServiceType:
           type: array
           items:
@@ -4875,13 +4892,18 @@ components:
             additionalProperties: false
             required:
             - serviceName
-            - count
+            - category
+            - byStatus
             properties:
               serviceName:
                 type: string
                 maxLength: 200
-              count:
-                type: integer
+              category:
+                type: string
+                maxLength: 40
+                nullable: true
+              byStatus:
+                $ref: '#/components/schemas/MetricsStatusCounts'
         byMember:
           type: array
           items:

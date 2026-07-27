@@ -167,3 +167,24 @@ test('jsonArrayAgg honors distinct and orderBy options', () => {
     `cast(concat('[', group_concat(v order by v asc), ']') as json)`
   )
 })
+
+test('SERVICE_CATEGORIES is the fixed 5-category vocabulary in display order', () => {
+  assert.deepEqual(dbUtils.SERVICE_CATEGORIES.map(c => c.category),
+    ['Rides', 'Errands', 'Home Help', 'Tech Support', 'Member Added'])
+  // Member Added is a metrics category but not a volunteer capability
+  assert.equal(dbUtils.SERVICE_CATEGORIES.find(c => c.category === 'Member Added').capability, null)
+  assert.equal(dbUtils.SERVICE_CATEGORIES.find(c => c.category === 'Rides').match.prefix, 'Ride:')
+  assert.equal(dbUtils.SERVICE_CATEGORIES.find(c => c.category === 'Errands').match.prefix, 'Errand:')
+  assert.equal(dbUtils.SERVICE_CATEGORIES.find(c => c.category === 'Home Help').match.exact,
+    'Household Chores/Handy Help')
+})
+
+test('buildServiceNameCategoryCase maps prefixes and exact names, else NULL', () => {
+  const sql = dbUtils.buildServiceNameCategoryCase('sr.serviceName')
+  assert.ok(sql.includes(`WHEN sr.serviceName LIKE 'Ride:%' THEN 'Rides'`))
+  assert.ok(sql.includes(`WHEN sr.serviceName LIKE 'Errand:%' THEN 'Errands'`))
+  assert.ok(sql.includes(`WHEN sr.serviceName = 'Household Chores/Handy Help' THEN 'Home Help'`))
+  assert.ok(sql.includes(`WHEN sr.serviceName = 'Tech Support' THEN 'Tech Support'`))
+  assert.ok(sql.includes(`WHEN sr.serviceName = 'Member Added' THEN 'Member Added'`))
+  assert.ok(sql.trim().endsWith('ELSE NULL END'))
+})

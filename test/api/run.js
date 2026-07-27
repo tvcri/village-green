@@ -132,6 +132,7 @@ function startApi () {
   const out = createWriteStream(config.paths.apiLog)
   child.stdout.pipe(out)
   child.stderr.pipe(out)
+  child.logDone = new Promise((resolve) => out.on('close', resolve))
   child.exited = false
   child.on('exit', (code) => { child.exited = true; child.exitCode_ = code })
   return child
@@ -188,6 +189,30 @@ function generateCoverage () {
   } catch (e) {
     log(`coverage report failed: ${e.message}`)
   }
+}
+
+async function checkResponseValidation () {
+  // Local mirror of the CI response-validation job (.github/workflows/
+  // api-tests.yml): the API runs with VG_DEV_RESPONSE_VALIDATION=logOnly,
+  // which logs OAS-violating responses but still serves them — so schema
+  // drift never fails a test directly. Any responseValidation entry in the
+  // API log fails the run, the same way CI fails it after the fact.
+  let raw
+  try { raw = await fs.readFile(config.paths.apiLog, 'utf8') } catch { return 0 }
+  const violations = raw.split('\n').filter(l => l.startsWith('{')).flatMap(l => {
+    try {
+      const entry = JSON.parse(l)
+      return entry.type === 'responseValidation' ? [entry] : []
+    } catch { return [] }
+  })
+  for (const v of violations) {
+    log(`\x1b[31mresponseValidation:\x1b[0m ${v.data?.request?.method} ${v.data?.request?.url} ` +
+      JSON.stringify(v.data?.error?.errors))
+  }
+  if (violations.length) {
+    log(`\x1b[31m${violations.length} response(s) violated the served OAS\x1b[0m — failing the run (details: ${path.relative(config.repoRoot, config.paths.apiLog)})`)
+  }
+  return violations.length
 }
 
 function runTests () {
@@ -268,6 +293,12 @@ async function main () {
 
       log('running tests ...\n')
       exitCode = await runTests()
+
+      // Stop the API and wait for its log to flush before scanning it for
+      // response-validation violations (stopApi in the finally is a no-op then).
+      await stopApi(apiChild)
+      await Promise.race([apiChild.logDone, sleep(2000)])
+      if (await checkResponseValidation() > 0) exitCode = exitCode || 1
     }
   } catch (e) {
     log(`\x1b[31mERROR:\x1b[0m ${e.message}`)
