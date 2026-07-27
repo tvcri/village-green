@@ -308,11 +308,11 @@ describe('stripStats', () => {
   // (emptyStatus is defined once, above, and reused here via closure)
   const metrics = makeMetrics()
 
-  it('legs off: raw totals, top category by completed, cancelled sum', () => {
+  it('legs off: raw totals, unmatched, cancelled sum', () => {
     const stats = stripStats(metrics, false)
     expect(stats.requests).toBe(100)
     expect(stats.completed).toBe(70)
-    expect(stats.topCategory).toBe('Rides') // 40 > 20 > 10
+    expect(stats.unmatched).toBe(4)
     expect(stats.cancelled).toBe(16) // 10 + 6
   })
 
@@ -320,47 +320,22 @@ describe('stripStats', () => {
     const stats = stripStats(metrics, true)
     expect(stats.requests).toBe(108)
     expect(stats.completed).toBe(78)
+    expect(stats.unmatched).toBe(4) // legs-independent
     expect(stats.cancelled).toBe(16) // legs-independent
   })
 
-  it('topCategory tie breaks to the earlier array entry', () => {
-    const tiedMetrics = {
-      ...metrics,
-      byCategory: [
-        { category: 'Rides', byStatus: { ...emptyStatus(), completed: 15 }, completedRoundTrips: 0 },
-        { category: 'Errands', byStatus: { ...emptyStatus(), completed: 15 }, completedRoundTrips: 0 },
-        { category: 'Home Help', byStatus: { ...emptyStatus(), completed: 5 }, completedRoundTrips: 0 },
-        { category: 'Tech Support', byStatus: emptyStatus(), completedRoundTrips: 0 },
-        { category: 'Member Added', byStatus: emptyStatus(), completedRoundTrips: 0 },
-      ],
-    }
-    expect(stripStats(tiedMetrics, false).topCategory).toBe('Rides')
-  })
-
-  it('topCategory is em dash when every category is zero', () => {
-    const zeroMetrics = {
-      ...metrics,
-      byCategory: metrics.byCategory.map(c => ({ ...c, byStatus: emptyStatus(), completedRoundTrips: 0 })),
-    }
-    expect(stripStats(zeroMetrics, false).topCategory).toBe('—')
-    expect(stripStats(zeroMetrics, true).topCategory).toBe('—')
-  })
-
-  // Version-skew defense: legs ON but the API response omits completedRoundTrips at both
-  // the totals level and the byCategory level. Previously `100 + undefined` -> NaN, which
-  // rendered literal "NaN" in the summary strip.
-  it('legs on + missing completedRoundTrips (totals and byCategory): finite numbers, real top category', () => {
+  // Version-skew defense: legs ON but the API response omits completedRoundTrips.
+  // Previously `100 + undefined` -> NaN, which rendered literal "NaN" in the summary strip.
+  it('legs on + missing completedRoundTrips: finite numbers, not NaN', () => {
     const { totalRequests, byStatus } = metrics.totals
     const metricsMissingField = {
       ...metrics,
       totals: { totalRequests, byStatus }, // no completedRoundTrips key
-      byCategory: metrics.byCategory.map(({ category, byStatus: bs }) => ({ category, byStatus: bs })), // no completedRoundTrips key
     }
     const stats = stripStats(metricsMissingField, true)
     expect(Number.isFinite(stats.requests)).toBe(true)
     expect(Number.isFinite(stats.completed)).toBe(true)
     expect(stats.requests).toBe(100) // 100 + 0, not 100 + undefined
     expect(stats.completed).toBe(70)
-    expect(stats.topCategory).toBe('Rides') // still resolves a real top category, not NaN-broken
   })
 })

@@ -3,7 +3,7 @@ defineProps({
   stats: {
     type: Object,
     required: true,
-    // { requests, completed, topCategory, cancelled }
+    // { requests, completed, unmatched, cancelled }
   },
 })
 
@@ -21,8 +21,8 @@ defineOptions({ name: 'MetricsSummaryStrip' })
       <div class="stat-value">{{ stats.completed }}</div>
     </div>
     <div class="stat-card">
-      <label class="stat-label">Top category</label>
-      <div class="stat-value">{{ stats.topCategory }}</div>
+      <label class="stat-label">Unmatched</label>
+      <div class="stat-value">{{ stats.unmatched }}</div>
     </div>
     <div class="stat-card">
       <label class="stat-label">Cancelled</label>

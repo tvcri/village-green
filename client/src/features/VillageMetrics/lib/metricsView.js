@@ -135,22 +135,14 @@ export function outcomesPie (totals, legs) {
 }
 
 export function stripStats (metrics, legs) {
-  const { totals, byCategory } = metrics
+  const { totals } = metrics
   const legsBump = legs ? (totals.completedRoundTrips ?? 0) : 0
 
   const requests = totals.totalRequests + legsBump
   const completed = totals.byStatus.completed + legsBump
+  // Neither of these includes completed requests, so the legs bump never applies.
+  const unmatched = totals.byStatus.unmatched
   const cancelled = totals.byStatus.memberCancelled + totals.byStatus.volunteerCancelled
 
-  let topCategory = '—'
-  let topValue = 0
-  byCategory.forEach((entry) => {
-    const value = entry.byStatus.completed + (legs ? (entry.completedRoundTrips ?? 0) : 0)
-    if (value > topValue) {
-      topValue = value
-      topCategory = entry.category
-    }
-  })
-
-  return { requests, completed, topCategory, cancelled }
+  return { requests, completed, unmatched, cancelled }
 }

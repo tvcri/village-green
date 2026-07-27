@@ -12,7 +12,7 @@ describe('MetricsSummaryStrip', () => {
     const stats = {
       requests: 42,
       completed: 18,
-      topCategory: 'Rides',
+      unmatched: 7,
       cancelled: 5,
     }
     render(MetricsSummaryStrip, {
@@ -22,27 +22,21 @@ describe('MetricsSummaryStrip', () => {
     // Check labels
     expect(screen.getByText('Requests')).toBeTruthy()
     expect(screen.getByText('Completed')).toBeTruthy()
-    expect(screen.getByText('Top category')).toBeTruthy()
+    expect(screen.getByText('Unmatched')).toBeTruthy()
     expect(screen.getByText('Cancelled')).toBeTruthy()
 
-    // Check values
+    // Check values — distinct numbers, so each ties to its own stat
     expect(screen.getByText('42')).toBeTruthy()
     expect(screen.getByText('18')).toBeTruthy()
-    expect(screen.getByText('Rides')).toBeTruthy()
+    expect(screen.getByText('7')).toBeTruthy()
     expect(screen.getByText('5')).toBeTruthy()
   })
 
-  it('displays em-dash when topCategory is em-dash', () => {
-    const stats = {
-      requests: 10,
-      completed: 5,
-      topCategory: '—',
-      cancelled: 2,
-    }
+  it('renders zero counts rather than blanking them', () => {
     render(MetricsSummaryStrip, {
-      props: { stats },
+      props: { stats: { requests: 0, completed: 0, unmatched: 0, cancelled: 0 } },
     })
 
-    expect(screen.getByText('—')).toBeTruthy()
+    expect(screen.getAllByText('0')).toHaveLength(4)
   })
 })
