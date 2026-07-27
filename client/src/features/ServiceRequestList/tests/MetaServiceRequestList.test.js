@@ -23,7 +23,7 @@ vi.mock('../api/serviceRequestApi.js', () => ({
     {
       serviceRequestId: 1,
       displayNumber: 101,
-      status: 'open',
+      status: 'Open',
       serviceName: 'Ride to Clinic',
       memberFullName: 'Alice Anderson',
       volunteerFullName: 'Vera Volunteer',
@@ -36,7 +36,7 @@ vi.mock('../api/serviceRequestApi.js', () => ({
     {
       serviceRequestId: 2,
       displayNumber: 202,
-      status: 'open',
+      status: 'Confirmed',
       serviceName: 'Grocery Run',
       memberFullName: 'Bob Baker',
       volunteerFullName: 'Wally Volunteer',
@@ -66,18 +66,37 @@ vi.mock('../../../shared/lib/csvUtils.js', async (importOriginal) => ({
 
 describe('MetaServiceRequestList CSV download', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    // NOT clearAllMocks: that would strip the getServiceRequests mock
+    // implementation and every fetch would resolve undefined.
+    vi.mocked(downloadCsv).mockClear()
     // jsdom has no matchMedia; PrimeVue Select uses it on mount
     window.matchMedia = () => ({
       matches: false,
       addEventListener: () => {},
       removeEventListener: () => {}
     })
+    // jsdom has no ResizeObserver; PrimeVue TabList observes its tabs on mount
+    globalThis.ResizeObserver = class {
+      observe () {}
+      unobserve () {}
+      disconnect () {}
+    }
   })
 
   // vitest `globals` is off in vite.config.js, so Testing Library's automatic
   // cleanup never registers and mounted components leak between tests.
   afterEach(() => { cleanup() })
+
+  it('fetches the Active tab on mount and never requests draft', async () => {
+    const { getServiceRequests } = await import('../api/serviceRequestApi.js')
+    getServiceRequests.mockClear()
+    render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await waitFor(() => expect(getServiceRequests).toHaveBeenCalled())
+    const firstArgs = getServiceRequests.mock.calls[0][0]
+    expect(firstArgs.status).toEqual(['open', 'confirmed'])
+    expect(firstArgs.status).not.toContain('draft')
+    expect(firstArgs.serviceDateEnd).toBeUndefined()
+  })
 
   it('downloads only the rows matching the active ID filter', async () => {
     render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
@@ -99,6 +118,23 @@ describe('MetaServiceRequestList CSV download', () => {
     expect(filename).toBe('service-requests.csv')
     expect(csv).toContain('Alice Anderson')
     expect(csv).not.toContain('Bob Baker')
+  })
+
+  it('narrows the visible rows by status without refetching', async () => {
+    const { getServiceRequests } = await import('../api/serviceRequestApi.js')
+    render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+
+    await screen.findAllByText('Alice Anderson')
+    getServiceRequests.mockClear()
+
+    // Alice is Open, Bob is Confirmed (both fetched by the Active tab).
+    await fireEvent.click(screen.getByText('Filters'))
+    await fireEvent.click(screen.getByLabelText('Confirmed'))
+
+    await waitFor(() => expect(screen.queryAllByText('Alice Anderson')).toHaveLength(0))
+    expect(screen.getAllByText('Bob Baker').length).toBeGreaterThan(0)
+    // Client-side: narrowing must not hit the network.
+    expect(getServiceRequests).not.toHaveBeenCalled()
   })
 
   it('shows only VSS signup rows when the VSS Signup checkbox is checked', async () => {

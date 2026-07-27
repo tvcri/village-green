@@ -10,11 +10,16 @@ import { villages, serviceRequests as sr, persons } from '../../setup/fixtures.j
 // RED findings #1/#2 are fixed by #56), so everything goes through vgCall.
 const idsOf = (rows) => rows.map(r => r.serviceRequestId)
 
+// serviceDateStart is required; this window spans all SR fixtures (2026-07-10..12).
+// Denial tests pass it so the request clears OAS validation and reaches the
+// controller's privilege check — a bare call 400s before authz runs.
+const ALL_DATES = { serviceDateStart: '2000-01-01' }
+
 // ---- list endpoint: village users must scope with villageId ----
 
 test('full_v1 list scoped to Quahog shows only Quahog requests', async () => {
   const { status, json } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.quahog.id)] },
+    { villageId: [String(villages.quahog.id)], ...ALL_DATES },
     { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   const ids = idsOf(json)
@@ -25,7 +30,7 @@ test('full_v1 list scoped to Quahog shows only Quahog requests', async () => {
 
 test('full_v2 list scoped to Innsmouth shows only Innsmouth requests', async () => {
   const { status, json } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.innsmouth.id)] },
+    { villageId: [String(villages.innsmouth.id)], ...ALL_DATES },
     { token: tokens.users.full_v2 })
   assert.equal(status, 200)
   const ids = idsOf(json)
@@ -34,12 +39,21 @@ test('full_v2 list scoped to Innsmouth shows only Innsmouth requests', async () 
 })
 
 test('village user without a villageId filter -> 403 (no filter = federation-wide query)', async () => {
-  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.users.full_v1 })
+  const { status } = await vgCall('getServiceRequests', { ...ALL_DATES }, { token: tokens.users.full_v1 })
   assert.equal(status, 403)
 })
 
+test('a bare call (no serviceDateStart) is rejected by OAS validation before authz', async () => {
+  // Contract note: serviceDateStart is a required param, and
+  // express-openapi-validator runs before operationHandlers dispatch. So an
+  // unprivileged caller who also omits the date sees 400, not 403 — the
+  // privilege check never runs. 401 is unaffected (security handlers run first).
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.users.full_v1 })
+  assert.equal(status, 400)
+})
+
 test('admin sees every village on a plain call (federation wildcard, no elevate)', async () => {
-  const { status, json } = await vgCall('getServiceRequests', {}, { token: tokens.users.admin })
+  const { status, json } = await vgCall('getServiceRequests', { ...ALL_DATES }, { token: tokens.users.admin })
   assert.equal(status, 200)
   const ids = idsOf(json)
   assert.ok(ids.includes(String(sr.srV1.id)))
@@ -48,10 +62,10 @@ test('admin sees every village on a plain call (federation wildcard, no elevate)
 })
 
 test('nogrants user -> 403, filtered or not', async () => {
-  const plain = await vgCall('getServiceRequests', {}, { token: tokens.users.nogrants })
+  const plain = await vgCall('getServiceRequests', { ...ALL_DATES }, { token: tokens.users.nogrants })
   assert.equal(plain.status, 403)
   const filtered = await vgCall('getServiceRequests',
-    { villageId: [String(villages.quahog.id)] },
+    { villageId: [String(villages.quahog.id)], ...ALL_DATES },
     { token: tokens.users.nogrants })
   assert.equal(filtered.status, 403)
 })
@@ -87,7 +101,7 @@ test('full_v1 cannot pull an Innsmouth member address via projection', async () 
 // ---- nested route: per-village perm checked BEFORE existence -> 403 ----
 
 test('full_v1 gets 403 for an ungranted village nested route', async () => {
-  const { status } = await vgCall('getVillageServiceRequests', { villageId: villages.innsmouth.id }, {
+  const { status } = await vgCall('getVillageServiceRequests', { villageId: villages.innsmouth.id, ...ALL_DATES }, {
     token: tokens.users.full_v1,
   })
   assert.equal(status, 403)

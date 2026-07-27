@@ -21,7 +21,8 @@ import { users, villages } from '../../setup/fixtures.js'
 // call now 403s on PrivilegeError, which would mask the privacy discriminator
 // and make the post-ack "unblocked -> 200" probes impossible.
 
-const v1Scope = { villageId: [String(villages.quahog.id)] } // full_v1's granted village
+// serviceDateStart is required on the SR list; '2000-01-01' spans all fixtures.
+const v1Scope = { villageId: [String(villages.quahog.id)], serviceDateStart: '2000-01-01' } // full_v1's granted village
 
 async function currentRulesId () {
   const { status, json } = await vgCall('getPrivacyRules', {}, { token: tokens.users.admin })
@@ -78,7 +79,7 @@ test('publishPrivacyRules creates v1 and auto-acknowledges the publisher', async
   assert.equal(json.modifiedAt, null, 'fresh version has no correction')
 
   // publisher auto-ack: the admin is not locked out of the API it just gated
-  const probe = await vgCall('getServiceRequests', {}, { token: tokens.users.admin })
+  const probe = await vgCall('getServiceRequests', { serviceDateStart: '2000-01-01' }, { token: tokens.users.admin })
   assert.equal(probe.status, 200)
 })
 

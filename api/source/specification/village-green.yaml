@@ -1722,6 +1722,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ServiceRequestStatusQuery'
         - $ref: '#/components/parameters/HasNotificationsQuery'
+        - $ref: '#/components/parameters/ServiceDateStartQuery'
+        - $ref: '#/components/parameters/ServiceDateEndQuery'
         - name: villageId
           in: query
           description: Filter to specific villages (omit for all granted villages)
@@ -2306,12 +2308,17 @@ paths:
   /villages/{villageId}/service-requests:
     get:
       summary: List service requests for a village
+      description: >-
+        Hub cancelled requests are never returned at village scope — they are
+        treated as if they never existed, matching the metrics endpoint.
       tags:
       - Village
       operationId: getVillageServiceRequests
       parameters:
       - $ref: '#/components/parameters/VillageIdPath'
       - $ref: '#/components/parameters/ServiceRequestStatusQuery'
+      - $ref: '#/components/parameters/ServiceDateStartQuery'
+      - $ref: '#/components/parameters/ServiceDateEndQuery'
       responses:
         '200':
           description: Service request list for village
@@ -5602,6 +5609,26 @@ components:
           - completed
           - unmatched
           - cancelled
+    ServiceDateStartQuery:
+      name: serviceDateStart
+      in: query
+      required: true
+      description: >-
+        Inclusive lower bound on serviceDate. Required: these lists can span
+        the full historic archive, so callers must state their window.
+      schema:
+        type: string
+        format: date
+    ServiceDateEndQuery:
+      name: serviceDateEnd
+      in: query
+      required: false
+      description: >-
+        Inclusive upper bound on serviceDate. Omit for no upper bound
+        (future-dated requests are returned).
+      schema:
+        type: string
+        format: date
     ServiceRequestProjectionQuery:
       name: projection
       in: query

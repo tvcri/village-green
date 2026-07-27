@@ -14,8 +14,15 @@ import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getServiceRequests } from '../api/serviceRequestApi.js'
+import { useServiceRequestFilters } from '../composables/useServiceRequestFilters.js'
+import { useServiceRequestTabs } from '../composables/useServiceRequestTabs.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { toCsv, downloadCsv, withLocalDateTimeColumns } from '../../../shared/lib/csvUtils.js'
@@ -40,10 +47,6 @@ useScrollRestore(
 const selectedVillage = ref(null)
 const isCreatingSheet = ref(false)
 const filtersCollapsed = ref(true)
-const selectedMember = ref(null)
-const selectedVolunteer = ref(null)
-const selectedService = ref(null)
-const idSearch = ref('')
 const notificationFilter = ref(null)
 // TECH DEBT: `vssSignup` is an API-side proxy derived from modifiedUserId
 // being non-null; see the board item on recording VSS signup explicitly.
@@ -60,32 +63,57 @@ const openHistory = (row) => {
   historyDialogVisible.value = true
 }
 
+const { state: allVillages } = useAsyncState(
+  () => getVillages(),
+  { immediate: true }
+)
+
+const tabs = useServiceRequestTabs({
+  fetcher: (params) => getServiceRequests({
+    ...params,
+    villageId: selectedVillage.value
+      ? [(allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId].filter(Boolean)
+      : [],
+    hasNotifications: notificationFilter.value === 'Not notified' ? false : undefined
+  })
+})
+const {
+  activeTab, historicStart, historicEnd, statusOptions,
+  currentRows: requests, isLoading, error, hasLoadedOnce, fetchCurrent
+} = tabs
+
+const shared = useServiceRequestFilters(requests)
+const {
+  selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
+  memberNames: memberOptions, volunteerNames: volunteerOptions,
+  serviceNames: serviceOptions, clearAll
+} = shared
+
+// Each tab offers its own status set, so a selection made on one tab would
+// match nothing on the other. Reset it when the tab changes.
+watch(activeTab, () => { selectedStatuses.value = [] })
+
+// The Selects use null as "no filter" (so show-clear only appears for a real
+// selection); the composable uses ''. Bridge the two representations.
+const nullable = (r) => computed({
+  get: () => r.value || null,
+  set: (val) => { r.value = val ?? '' }
+})
+const memberChoice = nullable(selectedMember)
+const volunteerChoice = nullable(selectedVolunteer)
+const serviceChoice = nullable(selectedService)
+
+// `requests` is a computed over the visible tab, so write through to the
+// underlying ref that tab is backed by.
 const onNotified = (updated) => {
-  requests.value = requests.value.map(r =>
+  const target = activeTab.value === 'active' ? tabs.activeRows : tabs.historicRows
+  if (!Array.isArray(target.value)) return
+  target.value = target.value.map(r =>
     r.serviceRequestId === updated.serviceRequestId
       ? { ...r, notifications: updated.notificationHistory?.map(e => e.eventType) ?? [] }
       : r
   )
 }
-
-const DEFAULT_STATUSES = ['open', 'confirmed']
-const selectedStatuses = ref([...DEFAULT_STATUSES])
-
-const { state: requests, isLoading, error, execute: fetchRequests } = useAsyncState(
-  () => getServiceRequests({
-    status: selectedStatuses.value,
-    villageId: selectedVillage.value
-      ? [(allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId].filter(Boolean)
-      : [],
-    hasNotifications: notificationFilter.value === 'Not notified' ? false : undefined
-  }),
-  { immediate: true }
-)
-
-const { state: allVillages } = useAsyncState(
-  () => getVillages(),
-  { immediate: true }
-)
 
 const hasActivatedOnce = ref(false)
 const flashRowId = ref(null)
@@ -96,7 +124,7 @@ onActivated(async () => {
     hasActivatedOnce.value = true
     return
   }
-  await fetchRequests()
+  await fetchCurrent()
   const id = consumePendingHighlight()
   if (id) {
     flashRowId.value = id
@@ -105,68 +133,36 @@ onActivated(async () => {
   }
 })
 
-watch([selectedStatuses, selectedVillage, notificationFilter], () => { fetchRequests() })
-
-const hasLoadedOnce = ref(false)
-watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
-
-const statusOptions = ['open', 'confirmed', 'completed', 'unmatched', 'cancelled'] // draft is temporarily removed
-
-const memberOptions = computed(() => {
-  if (!Array.isArray(requests.value)) return []
-  const members = new Set(requests.value.map(r => r.memberFullName).filter(Boolean))
-  return Array.from(members).sort()
+// Refetch the visible tab when it is first shown, or when the historic window moves.
+watch(activeTab, () => { if (requests.value === null) fetchCurrent() })
+watch([historicStart, historicEnd], () => {
+  if (activeTab.value === 'historic') fetchCurrent()
 })
 
-const volunteerOptions = computed(() => {
-  if (!Array.isArray(requests.value)) return []
-  const volunteers = new Set(requests.value.map(r => r.volunteerFullName).filter(Boolean))
-  return Array.from(volunteers).sort()
+// Village and notification filters are server-side, so both cached tabs are
+// stale when they change.
+watch([selectedVillage, notificationFilter], () => {
+  tabs.activeRows.value = null
+  tabs.historicRows.value = null
+  fetchCurrent()
 })
 
-const serviceOptions = computed(() => {
-  if (!Array.isArray(requests.value)) return []
-  const services = new Set(requests.value.map(r => r.serviceName).filter(Boolean))
-  return Array.from(services).sort()
-})
+onMounted(() => { tabs.fetchActive() })
 
-const filteredRequests = computed(() => {
-  if (!Array.isArray(requests.value)) return []
-  return requests.value.filter(r => {
-    let memberMatch = true
-    if (selectedMember.value) {
-      memberMatch = r.memberFullName === selectedMember.value
-    }
-    let volunteerMatch = true
-    if (selectedVolunteer.value) {
-      volunteerMatch = r.volunteerFullName === selectedVolunteer.value
-    }
-    let serviceMatch = true
-    if (selectedService.value) {
-      serviceMatch = r.serviceName === selectedService.value
-    }
-    let idMatch = true
-    const idQuery = idSearch.value.trim().toLowerCase()
-    if (idQuery) {
-      const displayedId = String(r.displayNumber ?? '').toLowerCase()
-      idMatch = displayedId.includes(idQuery)
-    }
-    let vssMatch = true
-    if (vssSignupOnly.value) {
-      vssMatch = r.vssSignup === true
-    }
-    return memberMatch && volunteerMatch && serviceMatch && idMatch && vssMatch
-  })
-})
+// vssSignup is meta-only, so it composes on top of the shared predicate.
+const filteredRequests = computed(() =>
+  shared.filteredRows.value.filter(r => !vssSignupOnly.value || r.vssSignup === true))
 
-const statusesAtDefault = computed(() =>
-  selectedStatuses.value.length === DEFAULT_STATUSES.length &&
-  DEFAULT_STATUSES.every(s => selectedStatuses.value.includes(s))
-)
+// The historic window counts as a filter only when narrowed from its default.
+const historicStartDefault = historicStart.value
+const historicWindowNarrowed = computed(() =>
+  activeTab.value === 'historic' &&
+  (historicStart.value !== historicStartDefault || !!historicEnd.value))
 
 const activeFilterCount = computed(() => {
   let count = 0
-  if (!statusesAtDefault.value) count++
+  if (historicWindowNarrowed.value) count++
+  if (selectedStatuses.value.length) count++
   if (selectedMember.value) count++
   if (selectedVolunteer.value) count++
   if (selectedService.value) count++
@@ -255,15 +251,28 @@ const navigateToEditRequest = (serviceRequestId) => {
   router.push({ name: 'meta-service-request-edit', params: { id: serviceRequestId } })
 }
 
+// Both tab panels render the same table; bind one prop object so they cannot drift.
+const tableProps = computed(() => ({
+  rows: filteredRequests.value,
+  isLoading: isLoading.value,
+  hasLoadedOnce: hasLoadedOnce.value,
+  error: error.value,
+  showVillageColumn: true,
+  flashRowId: flashRowId.value,
+  // Active lists upcoming work soonest-first; Historic is an archive, so the
+  // most recent records belong at the top.
+  sortOrder: activeTab.value === 'historic' ? -1 : 1
+}))
+
+const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)
+
 const clearFilters = () => {
-  selectedMember.value = null
-  selectedVolunteer.value = null
-  selectedService.value = null
-  selectedStatuses.value = [...DEFAULT_STATUSES]
+  clearAll()
   selectedVillage.value = null
-  idSearch.value = ''
   notificationFilter.value = null
   vssSignupOnly.value = false
+  historicStart.value = historicStartDefault
+  historicEnd.value = ''
 }
 </script>
 
@@ -339,15 +348,15 @@ const clearFilters = () => {
           </div>
           <div class="search-box">
             <label>Member:</label>
-            <Select v-model="selectedMember" :options="memberOptions" placeholder="All members" show-clear />
+            <Select v-model="memberChoice" :options="memberOptions" placeholder="All members" show-clear />
           </div>
           <div class="search-box">
             <label>Volunteer:</label>
-            <Select v-model="selectedVolunteer" :options="volunteerOptions" placeholder="All volunteers" show-clear />
+            <Select v-model="volunteerChoice" :options="volunteerOptions" placeholder="All volunteers" show-clear />
           </div>
           <div class="search-box">
             <label>Service:</label>
-            <Select v-model="selectedService" :options="serviceOptions" placeholder="All services" show-clear />
+            <Select v-model="serviceChoice" :options="serviceOptions" placeholder="All services" show-clear />
           </div>
           <div class="search-box">
             <label>Notifications:</label>
@@ -364,35 +373,45 @@ const clearFilters = () => {
       </div>
     </div>
 
-    <ServiceRequestTable
-      :rows="filteredRequests"
-      :is-loading="isLoading"
-      :has-loaded-once="hasLoadedOnce"
-      :error="error"
-      :show-village-column="true"
-      :flash-row-id="flashRowId"
-      @row-click="(event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)"
-    >
-      <template #actions="{ data }">
-        <span class="bell-wrapper">
-          <Button
-            icon="pi pi-bell"
-            v-tooltip="'Show Notifications'"
-            class="p-button-rounded p-button-text p-button-sm"
-            aria-label="Notification history"
-            @click.stop="openHistory(data)"
-          />
-          <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
-        </span>
-        <Button
-          v-if="canWriteSr"
-          icon="pi pi-pencil"
-          v-tooltip="'Edit Request'"
-          class="p-button-rounded p-button-text p-button-sm"
-          @click.stop="navigateToEditRequest(data.serviceRequestId)"
-        />
-      </template>
-    </ServiceRequestTable>
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="active">Active</Tab>
+        <Tab value="historic">Historic</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="active">
+          <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
+            <template #actions="{ data }">
+              <span class="bell-wrapper">
+                <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
+                <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
+              </span>
+              <Button v-if="canWriteSr" icon="pi pi-pencil" v-tooltip="'Edit Request'" class="p-button-rounded p-button-text p-button-sm" @click.stop="navigateToEditRequest(data.serviceRequestId)" />
+            </template>
+          </ServiceRequestTable>
+        </TabPanel>
+        <TabPanel value="historic">
+          <div class="historic-range">
+            <label for="historic-start">From</label>
+            <!-- .lazy: commit on change, not per keystroke-segment — typing a
+                 year would otherwise fire fetches for values like 0002-… -->
+            <input id="historic-start" v-model.lazy="historicStart" type="date" >
+            <label for="historic-end">To</label>
+            <input id="historic-end" v-model.lazy="historicEnd" type="date" >
+            <small>Leave “To” empty for no upper bound.</small>
+          </div>
+          <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
+            <template #actions="{ data }">
+              <span class="bell-wrapper">
+                <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
+                <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
+              </span>
+              <Button v-if="canWriteSr" icon="pi pi-pencil" v-tooltip="'Edit Request'" class="p-button-rounded p-button-text p-button-sm" @click.stop="navigateToEditRequest(data.serviceRequestId)" />
+            </template>
+          </ServiceRequestTable>
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
 
     <NotificationHistoryDialog
       v-model:visible="historyDialogVisible"
@@ -437,6 +456,10 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
 }
+.historic-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.historic-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
+.historic-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
+.historic-range small { color: var(--color-text-secondary, #777); }
 .bell-wrapper { position: relative; display: inline-flex; }
 .bell-alert-icon { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #ff9800; color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>

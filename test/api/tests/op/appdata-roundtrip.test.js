@@ -59,7 +59,8 @@ test('appdata export -> import -> re-export round-trips losslessly', async () =>
 test('canonical fixtures are still served after the round-trip import', async () => {
   // Post-#56 a village user must scope the list to a granted village.
   const srs = await vgCall('getServiceRequests',
-    { villageId: [String(villages.quahog.id)] }, { token: tokens.users.full_v1 })
+    { villageId: [String(villages.quahog.id)], serviceDateStart: '2000-01-01' },
+    { token: tokens.users.full_v1 })
   assert.equal(srs.status, 200)
   assert.ok(srs.json.map(r => r.serviceRequestId).includes(String(sr.srV1.id)),
     'srV1 still visible to full_v1')

@@ -152,7 +152,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   return rows[0] ?? null
 }
 
-module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications }) {
+module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications, serviceDateStart, serviceDateEnd, excludeHubCancelled = false }) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.requestNumber',
@@ -247,10 +247,35 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
       predicates.binds.push([dbStatuses])
     }
   }
+  if (excludeHubCancelled) {
+    // Village-scoped callers share the metrics business rule: 'Hub cancelled'
+    // requests are treated as if they never existed. The meta list keeps them.
+    predicates.statements.push("sr.status <> 'Hub cancelled'")
+  }
   if (hasNotifications === false) {
     predicates.statements.push(
       'NOT EXISTS (SELECT 1 FROM notification_event ne WHERE ne.serviceRequestId = sr.id) AND sr.requestNumber IS NULL'
     )
+  }
+
+  // serviceDate is a DATE column holding a wall-clock civil date; both bounds
+  // are inclusive and compared as plain 'YYYY-MM-DD' strings. serviceDateEnd
+  // omitted means no upper bound — future-dated requests still match.
+  //
+  // Known and accepted: serviceDate is nullable, and `>= ?` evaluates UNKNOWN
+  // for a NULL, so an undated request matches no window and is unreachable
+  // from any list. This is not a live defect — the column is nullable only to
+  // serve the abandoned Draft workflow (see migration 0015), and the Draft
+  // write path in ServiceRequestCreateEdit.vue is the sole way to create such
+  // a row. Production carries zero of them. Stripping Draft should also make
+  // serviceDate NOT NULL and retire this note.
+  if (serviceDateStart) {
+    predicates.statements.push('sr.serviceDate >= ?')
+    predicates.binds.push(serviceDateStart)
+  }
+  if (serviceDateEnd) {
+    predicates.statements.push('sr.serviceDate <= ?')
+    predicates.binds.push(serviceDateEnd)
   }
 
   const orderBy = ['sr.serviceDate DESC', 'sr.startTime DESC']
