@@ -79,7 +79,7 @@ const tabs = useServiceRequestTabs({
 })
 const {
   activeTab, historicStart, historicEnd, statusOptions,
-  currentRows: requests, isLoading, error, fetchCurrent
+  currentRows: requests, isLoading, error, hasLoadedOnce, fetchCurrent
 } = tabs
 
 const shared = useServiceRequestFilters(requests)
@@ -148,9 +148,6 @@ watch([selectedVillage, notificationFilter], () => {
 })
 
 onMounted(() => { tabs.fetchActive() })
-
-const hasLoadedOnce = ref(false)
-watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
 
 // vssSignup is meta-only, so it composes on top of the shared predicate.
 const filteredRequests = computed(() =>

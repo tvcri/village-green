@@ -261,6 +261,14 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
   // serviceDate is a DATE column holding a wall-clock civil date; both bounds
   // are inclusive and compared as plain 'YYYY-MM-DD' strings. serviceDateEnd
   // omitted means no upper bound — future-dated requests still match.
+  //
+  // Known and accepted: serviceDate is nullable, and `>= ?` evaluates UNKNOWN
+  // for a NULL, so an undated request matches no window and is unreachable
+  // from any list. This is not a live defect — the column is nullable only to
+  // serve the abandoned Draft workflow (see migration 0015), and the Draft
+  // write path in ServiceRequestCreateEdit.vue is the sole way to create such
+  // a row. Production carries zero of them. Stripping Draft should also make
+  // serviceDate NOT NULL and retire this note.
   if (serviceDateStart) {
     predicates.statements.push('sr.serviceDate >= ?')
     predicates.binds.push(serviceDateStart)

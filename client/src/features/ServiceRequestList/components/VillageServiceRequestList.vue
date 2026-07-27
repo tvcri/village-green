@@ -63,7 +63,7 @@ const tabs = useServiceRequestTabs({
 })
 const {
   activeTab, historicStart, historicEnd, statusOptions,
-  currentRows: requests, isLoading, error, fetchCurrent
+  currentRows: requests, isLoading, error, hasLoadedOnce, fetchCurrent
 } = tabs
 
 const {
@@ -149,9 +149,6 @@ onActivated(async () => {
   }
 })
 
-const hasLoadedOnce = ref(false)
-watch(requests, (val) => { if (val !== null) hasLoadedOnce.value = true })
-
 const filterMemberSuggestions = (event) => {
   const q = event.query.toLowerCase()
   memberSuggestions.value = memberNames.value.filter(n => n.toLowerCase().includes(q))
@@ -177,8 +174,15 @@ const serviceChoice = computed({
   set: (val) => { selectedService.value = val === 'All services' ? '' : val }
 })
 
+// The historic window counts as a filter only when narrowed from its default.
+const historicStartDefault = historicStart.value
+const historicWindowNarrowed = computed(() =>
+  activeTab.value === 'historic' &&
+  (historicStart.value !== historicStartDefault || !!historicEnd.value))
+
 const activeFilterCount = computed(() => {
   let count = 0
+  if (historicWindowNarrowed.value) count++
   if (selectedMember.value) count++
   if (selectedVolunteer.value) count++
   if (selectedService.value) count++
@@ -277,6 +281,8 @@ const clearFilters = () => {
   clearAll()
   memberInput.value = ''
   volunteerInput.value = ''
+  historicStart.value = historicStartDefault
+  historicEnd.value = ''
 }
 </script>
 

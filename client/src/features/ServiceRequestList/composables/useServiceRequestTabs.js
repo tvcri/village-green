@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { dateToServiceDate } from '../lib/timeFields.js'
 
@@ -73,8 +73,14 @@ export function useServiceRequestTabs ({ fetcher, canFetch, historicDays = 60, t
   const fetchHistoric = () => {
     if (blocked()) return Promise.resolve(null)
     // serviceDateStart is required by the endpoint; a cleared "From" input
-    // must not fire a doomed request. Keep showing the last-fetched rows.
-    if (!historicStart.value) return Promise.resolve(null)
+    // must not fire a doomed request. Drop the stale rows rather than leaving
+    // the previous window's data under a blank date control — the table's
+    // empty state is honest, and an export can't ship a window the user
+    // isn't looking at.
+    if (!historicStart.value) {
+      historic.state.value = null
+      return Promise.resolve(null)
+    }
     return historic.execute()
   }
   const fetchCurrent = () =>
@@ -85,6 +91,17 @@ export function useServiceRequestTabs ({ fetcher, canFetch, historicDays = 60, t
   const currentRows = computed(() => currentTab().state.value)
   const isLoading = computed(() => currentTab().isLoading.value)
   const error = computed(() => currentTab().error.value)
+
+  // Tracked per tab: a single shared flag would let Active's first load mark
+  // Historic as "loaded", so Historic's own first fetch would render the
+  // "no requests found" empty state instead of a spinner — and an outright
+  // failure would render it too, hiding the error.
+  const activeLoadedOnce = ref(false)
+  const historicLoadedOnce = ref(false)
+  watch(active.state, (val) => { if (val !== null) activeLoadedOnce.value = true })
+  watch(historic.state, (val) => { if (val !== null) historicLoadedOnce.value = true })
+  const hasLoadedOnce = computed(() =>
+    activeTab.value === 'active' ? activeLoadedOnce.value : historicLoadedOnce.value)
 
   // The status checkboxes a tab may offer are exactly the statuses it fetched:
   // narrowing is client-side, so offering more could only ever match nothing.
@@ -98,7 +115,7 @@ export function useServiceRequestTabs ({ fetcher, canFetch, historicDays = 60, t
     // The state refs stay exposed (and writable) so components can null a tab
     // to force a refetch, or write a row update through (e.g. onNotified).
     activeRows: active.state, historicRows: historic.state,
-    currentRows, isLoading, error,
+    currentRows, isLoading, error, hasLoadedOnce,
     fetchActive, fetchHistoric, fetchCurrent
   }
 }

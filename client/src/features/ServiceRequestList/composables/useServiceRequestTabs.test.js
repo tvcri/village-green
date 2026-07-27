@@ -118,6 +118,52 @@ describe('useServiceRequestTabs', () => {
     expect(fetcher).not.toHaveBeenCalled()
   })
 
+  it('drops stale rows when the From date is cleared', async () => {
+    // Leaving the previous window's rows under a blank date control would
+    // misrepresent them as the current window — and an export would ship a
+    // window the user isn't looking at.
+    const fetcher = vi.fn().mockResolvedValue([{ serviceRequestId: 'old' }])
+    const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
+    t.activeTab.value = 'historic'
+    await t.fetchHistoric()
+    await flush()
+    expect(t.currentRows.value.map(r => r.serviceRequestId)).toEqual(['old'])
+
+    t.historicStart.value = ''
+    await t.fetchHistoric()
+    await flush()
+    expect(t.currentRows.value).toBe(null)
+  })
+
+  it('tracks hasLoadedOnce per tab', async () => {
+    // A shared flag would let Active's load mark Historic as loaded, so
+    // Historic's first fetch would render "no requests found" over a spinner.
+    const fetcher = vi.fn().mockResolvedValue([])
+    const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
+    expect(t.hasLoadedOnce.value).toBe(false)
+
+    await t.fetchActive()
+    await flush()
+    expect(t.hasLoadedOnce.value).toBe(true)
+
+    t.activeTab.value = 'historic'
+    expect(t.hasLoadedOnce.value).toBe(false)
+
+    await t.fetchHistoric()
+    await flush()
+    expect(t.hasLoadedOnce.value).toBe(true)
+  })
+
+  it("leaves hasLoadedOnce false when a tab's first fetch fails", async () => {
+    // Otherwise the table shows the empty state instead of the error.
+    const fetcher = vi.fn().mockRejectedValue(new Error('network down'))
+    const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
+    await t.fetchActive()
+    await flush()
+    expect(t.hasLoadedOnce.value).toBe(false)
+    expect(t.error.value).toBeTruthy()
+  })
+
   it('discards an out-of-order response', async () => {
     let resolveFirst, resolveSecond
     const fetcher = vi.fn()
