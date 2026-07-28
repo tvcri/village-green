@@ -59,17 +59,17 @@ test('create returns 201, derives Open (no volunteer), and round-trips civil sch
 })
 
 test('notify=true records an open notification_event; omitting notify records none', async () => {
-  const withNotify = await create({ villageId: quahog, memberPersonId: member, notify: true })
+  const withNotify = await create({ villageId: quahog, memberPersonId: member, notify: true, serviceDate: '2026-08-01' })
   assert.equal(withNotify.status, 201)
   assert.deepEqual(await notificationEvents(withNotify.json.serviceRequestId), ['open'])
 
-  const withoutNotify = await create({ villageId: quahog, memberPersonId: member })
+  const withoutNotify = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
   assert.equal(withoutNotify.status, 201)
   assert.equal((await notificationEvents(withoutNotify.json.serviceRequestId)).length, 0)
 })
 
 test('assigning a volunteer via patch derives Confirmed status', async () => {
-  const created = await create({ villageId: quahog, memberPersonId: member })
+  const created = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
   assert.equal(created.status, 201)
   assert.equal(created.json.status, 'Open')
 

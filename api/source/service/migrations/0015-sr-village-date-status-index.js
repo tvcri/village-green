@@ -5,9 +5,9 @@ const logger = require('../../utils/logger')
 // (villageId, serviceDate range, status). Without a composite index the only
 // usable key is single-column villageId, so each subquery fetches every row
 // for a village and post-filters serviceDate/status. This index serves the
-// range and status predicates directly. (serviceDate stays NULLable to
-// preserve the Draft workflow, which may create a request before a date is
-// set; NULLs index fine and simply sort at the low end.)
+// range and status predicates directly. (serviceDate was NULLable when this
+// index was added; migration 0021 made it NOT NULL after the Draft workflow
+// was excised. NULLs indexed fine either way.)
 module.exports = {
   up: async (pool) => {
     const migrationName = path.basename(__filename, '.js')

@@ -9,7 +9,7 @@ import { villages } from '../../setup/fixtures.js'
 // Range 2026-06 isolates the srM* fixture rows (srV1 is 2026-07-10).
 const RANGE = { start: '2026-06-01', end: '2026-06-30' }
 const CATEGORIES = ['Rides', 'Errands', 'Home Help', 'Tech Support', 'Member Added']
-const ZERO = { draft: 0, open: 0, confirmed: 0, completed: 0,
+const ZERO = { open: 0, confirmed: 0, completed: 0,
   unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
 
 async function getMetrics () {
