@@ -4217,7 +4217,6 @@ components:
         serviceDate:
           type: string
           format: date
-          nullable: true
         timesFlexible:
           type: boolean
         startTime:

@@ -173,6 +173,29 @@ test('creating a service request without serviceDate is rejected with 400', asyn
   assert.equal(res.status, 400)
 })
 
+// `required` only mandates the key be PRESENT — an explicit `serviceDate:
+// null` still satisfies `required` and previously satisfied `nullable: true`
+// too, sliding past spec validation to a NULL INSERT that violates migration
+// 0021's NOT NULL (500). serviceDate is no longer nullable in
+// ServiceRequestPost, so this must now 400 at the spec boundary as well.
+test('creating a service request with serviceDate explicitly null is rejected with 400', async () => {
+  const res = await vgCall('createServiceRequest', {}, {
+    token: tokens.users.sc,
+    body: {
+      villageId: String(villages.quahog.id),
+      memberPersonId: String(persons.quahogMember.id),
+      serviceName: 'null serviceDate probe',
+      serviceDate: null,
+    },
+  })
+  if (res.status === 201 && res.json?.serviceRequestId) {
+    await vgCall('deleteServiceRequest', { serviceRequestId: res.json.serviceRequestId }, {
+      token: tokens.users.sc,
+    })
+  }
+  assert.equal(res.status, 400)
+})
+
 test('full_v1 cannot patch an Innsmouth request', async () => {
   const { status } = await vgCall('patchServiceRequest', { serviceRequestId: sr.srV2.id }, {
     token: tokens.users.full_v1,
