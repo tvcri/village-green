@@ -12,14 +12,14 @@ const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub canc
 const NAME_CLAIM_PATH = mysql.escape(`$.${config.oauth.claims.name}`)
 
 function deriveStatus(clientStatus, volunteerPersonId) {
-  if (clientStatus === 'Draft' || clientStatus === 'Completed' || CANCELLED_STATUSES.includes(clientStatus)) {
+  if (clientStatus === 'Completed' || CANCELLED_STATUSES.includes(clientStatus)) {
     return clientStatus
   }
   return volunteerPersonId ? 'Confirmed' : 'Open'
 }
 
 async function writeNotificationEvent(connection, serviceRequestId, resolvedStatus) {
-  if (resolvedStatus === 'Draft' || resolvedStatus === 'Completed') {
+  if (resolvedStatus === 'Completed') {
     throw new SmError.UnprocessableError()
   }
   let eventType
@@ -152,7 +152,7 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
   return rows[0] ?? null
 }
 
-module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications }) {
+module.exports.getServiceRequests = async function ({ villageIdsGranted, status, villageId, hasNotifications, serviceDateStart, serviceDateEnd, excludeHubCancelled = false }) {
   const columns = [
     'CAST(sr.id AS CHAR) AS serviceRequestId',
     'sr.requestNumber',
@@ -235,7 +235,6 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
     for (const s of status) {
       if (s === 'open') dbStatuses.push('Open')
       else if (s === 'confirmed') dbStatuses.push('Confirmed')
-      else if (s === 'draft') dbStatuses.push('Draft')
       else if (s === 'completed') dbStatuses.push('Completed')
       else if (s === 'unmatched') dbStatuses.push('Unmatched')
       else if (s === 'cancelled') {
@@ -247,10 +246,27 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
       predicates.binds.push([dbStatuses])
     }
   }
+  if (excludeHubCancelled) {
+    // Village-scoped callers share the metrics business rule: 'Hub cancelled'
+    // requests are treated as if they never existed. The meta list keeps them.
+    predicates.statements.push("sr.status <> 'Hub cancelled'")
+  }
   if (hasNotifications === false) {
     predicates.statements.push(
       'NOT EXISTS (SELECT 1 FROM notification_event ne WHERE ne.serviceRequestId = sr.id) AND sr.requestNumber IS NULL'
     )
+  }
+
+  // serviceDate is a DATE column holding a wall-clock civil date; both bounds
+  // are inclusive and compared as plain 'YYYY-MM-DD' strings. serviceDateEnd
+  // omitted means no upper bound — future-dated requests still match.
+  if (serviceDateStart) {
+    predicates.statements.push('sr.serviceDate >= ?')
+    predicates.binds.push(serviceDateStart)
+  }
+  if (serviceDateEnd) {
+    predicates.statements.push('sr.serviceDate <= ?')
+    predicates.binds.push(serviceDateEnd)
   }
 
   const orderBy = ['sr.serviceDate DESC', 'sr.startTime DESC']

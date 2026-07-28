@@ -14,9 +14,14 @@ import { villages, serviceRequests as sr } from '../../setup/fixtures.js'
 
 const idsOf = (rows) => rows.map(r => r.serviceRequestId)
 
+// serviceDateStart is required; this window spans all SR fixtures (2026-07-10..12).
+// Denial tests pass it so the request clears OAS validation and reaches the
+// controller's privilege check — a bare call 400s before authz runs.
+const ALL_DATES = { serviceDateStart: '2000-01-01' }
+
 test('multi-grant roll-up: villageId=[both granted] = union, excludes others', async () => {
   const { status, json } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.quahog.id), String(villages.innsmouth.id)] },
+    { villageId: [String(villages.quahog.id), String(villages.innsmouth.id)], ...ALL_DATES },
     { token: tokens.users.multi })
   assert.equal(status, 200)
   const ids = idsOf(json)
@@ -29,13 +34,13 @@ test('multi-grant roll-up: villageId=[both granted] = union, excludes others', a
 })
 
 test('multi-grant user without a villageId filter -> 403 (federation-wide query)', async () => {
-  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.users.multi })
+  const { status } = await vgCall('getServiceRequests', { ...ALL_DATES }, { token: tokens.users.multi })
   assert.equal(status, 403)
 })
 
 test('client villageId narrows within grants (single granted village)', async () => {
   const { status, json } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.quahog.id)] },
+    { villageId: [String(villages.quahog.id)], ...ALL_DATES },
     { token: tokens.users.multi })
   assert.equal(status, 200)
   assert.ok(json.every(r => r.villageId === String(villages.quahog.id)), 'only Quahog rows')
@@ -44,21 +49,21 @@ test('client villageId narrows within grants (single granted village)', async ()
 
 test('filter mixing granted + UNgranted villages -> 403 (any ungranted id denies)', async () => {
   const { status } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.quahog.id), String(villages.miskatonic.id)] },
+    { villageId: [String(villages.quahog.id), String(villages.miskatonic.id)], ...ALL_DATES },
     { token: tokens.users.multi })
   assert.equal(status, 403)
 })
 
 test('filter of only an ungranted village -> 403', async () => {
   const { status } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.miskatonic.id)] },
+    { villageId: [String(villages.miskatonic.id)], ...ALL_DATES },
     { token: tokens.users.multi })
   assert.equal(status, 403)
 })
 
 test('single-grant user cannot reach another village via villageId -> 403', async () => {
   const { status } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.innsmouth.id)] },
+    { villageId: [String(villages.innsmouth.id)], ...ALL_DATES },
     { token: tokens.users.full_v1 })
   assert.equal(status, 403)
 })

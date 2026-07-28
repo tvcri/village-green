@@ -17,7 +17,11 @@ const props = defineProps({
   hasLoadedOnce: { type: Boolean, required: true },
   error: { required: true },
   showVillageColumn: { type: Boolean, default: false },
-  flashRowId: { type: [String, Number], default: null }
+  flashRowId: { type: [String, Number], default: null },
+  // Initial serviceDate sort: 1 = ascending (soonest work first, right for
+  // upcoming requests), -1 = descending (most recent first, right for an
+  // archive view). Users can still re-sort by clicking a column header.
+  sortOrder: { type: Number, default: 1 }
 })
 
 const emit = defineEmits(['row-click'])
@@ -26,6 +30,14 @@ const { trackEvent } = useAnalytics()
 const { getStatusSeverity } = useStatusSeverity()
 
 const pageRows = ref(10)
+
+// The DataTable sorts internally; the mobile cards iterate `rows` directly, so
+// sort here too or the two views disagree about ordering.
+const sortedRows = computed(() => {
+  const by = props.sortOrder
+  return [...props.rows].sort((a, b) =>
+    by * String(a.serviceDate ?? '').localeCompare(String(b.serviceDate ?? '')))
+})
 
 const rowClass = computed(() => {
   const id = props.flashRowId
@@ -53,7 +65,7 @@ const rowClass = computed(() => {
       paginator
       :rows="pageRows"
       sort-field="serviceDate"
-      :sort-order="1"
+      :sort-order="sortOrder"
       class="request-table-responsive desktop-only"
       :row-class="rowClass"
       :pt="{
@@ -105,7 +117,7 @@ const rowClass = computed(() => {
 
     <div class="request-cards mobile-only">
       <div
-        v-for="request in rows"
+        v-for="request in sortedRows"
         :key="request.serviceRequestId"
         class="request-card"
         :class="{ 'row-flash': String(request.serviceRequestId) === String(flashRowId) }"

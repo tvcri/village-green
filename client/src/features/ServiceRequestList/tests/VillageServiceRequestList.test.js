@@ -14,12 +14,15 @@ vi.mock('primevue/usetoast', () => ({
   useToast: () => ({ add: vi.fn() })
 }))
 
-vi.mock('../api/serviceRequestApi.js', () => ({
-  getVillageServiceRequests: vi.fn().mockResolvedValue([
+// Status filtering is now the SERVER's job (the tab picks the status set), so
+// the mock honours the requested statuses instead of returning everything.
+// Rows are declared inside the factory because vi.mock is hoisted.
+vi.mock('../api/serviceRequestApi.js', () => {
+  const allRows = [
     {
       serviceRequestId: 1,
       displayNumber: 101,
-      status: 'open',
+      status: 'Open',
       serviceName: 'Ride to Clinic',
       memberFullName: 'Alice Anderson',
       volunteerFullName: 'Vera Volunteer',
@@ -30,7 +33,7 @@ vi.mock('../api/serviceRequestApi.js', () => ({
     {
       serviceRequestId: 2,
       displayNumber: 102,
-      status: 'completed',
+      status: 'Completed',
       serviceName: 'Grocery Run',
       memberFullName: 'Bob Baker',
       volunteerFullName: 'Wally Volunteer',
@@ -38,10 +41,20 @@ vi.mock('../api/serviceRequestApi.js', () => ({
       city: 'Springfield',
       createdAt: '2026-07-02T12:00:00Z'
     }
-  ]),
-  getServiceRequest: vi.fn(),
-  updateServiceRequest: vi.fn()
-}))
+  ]
+  return {
+    // Rows carry the raw DB status ('Open'); the status param is lowercase.
+    getVillageServiceRequests: vi.fn((_villageId, params = {}) =>
+      Promise.resolve(
+        params.status?.length
+          ? allRows.filter(r => params.status.includes(r.status.toLowerCase()))
+          : allRows
+      )
+    ),
+    getServiceRequest: vi.fn(),
+    updateServiceRequest: vi.fn()
+  }
+})
 
 vi.mock('../../../shared/api/apiClient.js', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -59,24 +72,44 @@ vi.mock('../../../shared/lib/csvUtils.js', async (importOriginal) => ({
 
 describe('VillageServiceRequestList CSV download', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    // NOT clearAllMocks: that would strip the getVillageServiceRequests
+    // factory implementation and every fetch would resolve undefined.
+    vi.mocked(downloadCsv).mockClear()
     // jsdom has no matchMedia; PrimeVue Select uses it on mount
     window.matchMedia = () => ({
       matches: false,
       addEventListener: () => {},
       removeEventListener: () => {}
     })
+    // jsdom has no ResizeObserver; PrimeVue TabList observes its tabs on mount
+    globalThis.ResizeObserver = class {
+      observe () {}
+      unobserve () {}
+      disconnect () {}
+    }
   })
 
-  it('downloads only the rows matching the active status filter', async () => {
+  it('fetches the Active tab on mount with open+confirmed', async () => {
+    const { getVillageServiceRequests } = await import('../api/serviceRequestApi.js')
+    getVillageServiceRequests.mockClear()
+    render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await waitFor(() => expect(getVillageServiceRequests).toHaveBeenCalled())
+    const params = getVillageServiceRequests.mock.calls[0][1]
+    expect(params.status).toEqual(['open', 'confirmed'])
+    expect(params.status).not.toContain('draft')
+    expect(params.serviceDateEnd).toBeUndefined()
+  })
+
+  it('downloads only the rows the Active tab fetched', async () => {
     render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
 
-    // default status filter is ['open', 'confirmed'], so the completed
-    // request is hidden from the table from the start
+    // The Active tab requests open+confirmed, so the completed request is
+    // never fetched — the server, not a client filter, excludes it.
     await screen.findAllByText('Alice Anderson')
     expect(screen.queryAllByText('Bob Baker')).toHaveLength(0)
 
-    await fireEvent.click(screen.getByText('Download'))
+    // Both tab panels render an ExportButton, so target the visible one.
+    await fireEvent.click(screen.getAllByText('Download')[0])
 
     await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
     const [csv, filename] = downloadCsv.mock.calls[0]

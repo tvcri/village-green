@@ -14,6 +14,7 @@ test('any sr:write holder can delete, not just the creator', async () => {
       villageId: String(villages.quahog.id),
       memberPersonId: String(persons.quahogMember.id),
       serviceName: 'Disposable ride',
+      serviceDate: '2026-07-11',
     },
   })
   assert.equal(created.status, 201)
@@ -34,6 +35,7 @@ test('village user cannot delete a request in its own village', async () => {
       villageId: String(villages.quahog.id),
       memberPersonId: String(persons.quahogMember.id),
       serviceName: 'Delete-denial probe',
+      serviceDate: '2026-07-11',
     },
   })
   assert.equal(created.status, 201)

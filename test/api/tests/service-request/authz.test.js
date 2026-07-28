@@ -10,11 +10,16 @@ import { villages, serviceRequests as sr, persons } from '../../setup/fixtures.j
 // RED findings #1/#2 are fixed by #56), so everything goes through vgCall.
 const idsOf = (rows) => rows.map(r => r.serviceRequestId)
 
+// serviceDateStart is required; this window spans all SR fixtures (2026-07-10..12).
+// Denial tests pass it so the request clears OAS validation and reaches the
+// controller's privilege check — a bare call 400s before authz runs.
+const ALL_DATES = { serviceDateStart: '2000-01-01' }
+
 // ---- list endpoint: village users must scope with villageId ----
 
 test('full_v1 list scoped to Quahog shows only Quahog requests', async () => {
   const { status, json } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.quahog.id)] },
+    { villageId: [String(villages.quahog.id)], ...ALL_DATES },
     { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   const ids = idsOf(json)
@@ -25,7 +30,7 @@ test('full_v1 list scoped to Quahog shows only Quahog requests', async () => {
 
 test('full_v2 list scoped to Innsmouth shows only Innsmouth requests', async () => {
   const { status, json } = await vgCall('getServiceRequests',
-    { villageId: [String(villages.innsmouth.id)] },
+    { villageId: [String(villages.innsmouth.id)], ...ALL_DATES },
     { token: tokens.users.full_v2 })
   assert.equal(status, 200)
   const ids = idsOf(json)
@@ -34,12 +39,21 @@ test('full_v2 list scoped to Innsmouth shows only Innsmouth requests', async () 
 })
 
 test('village user without a villageId filter -> 403 (no filter = federation-wide query)', async () => {
-  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.users.full_v1 })
+  const { status } = await vgCall('getServiceRequests', { ...ALL_DATES }, { token: tokens.users.full_v1 })
   assert.equal(status, 403)
 })
 
+test('a bare call (no serviceDateStart) is rejected by OAS validation before authz', async () => {
+  // Contract note: serviceDateStart is a required param, and
+  // express-openapi-validator runs before operationHandlers dispatch. So an
+  // unprivileged caller who also omits the date sees 400, not 403 — the
+  // privilege check never runs. 401 is unaffected (security handlers run first).
+  const { status } = await vgCall('getServiceRequests', {}, { token: tokens.users.full_v1 })
+  assert.equal(status, 400)
+})
+
 test('admin sees every village on a plain call (federation wildcard, no elevate)', async () => {
-  const { status, json } = await vgCall('getServiceRequests', {}, { token: tokens.users.admin })
+  const { status, json } = await vgCall('getServiceRequests', { ...ALL_DATES }, { token: tokens.users.admin })
   assert.equal(status, 200)
   const ids = idsOf(json)
   assert.ok(ids.includes(String(sr.srV1.id)))
@@ -48,10 +62,10 @@ test('admin sees every village on a plain call (federation wildcard, no elevate)
 })
 
 test('nogrants user -> 403, filtered or not', async () => {
-  const plain = await vgCall('getServiceRequests', {}, { token: tokens.users.nogrants })
+  const plain = await vgCall('getServiceRequests', { ...ALL_DATES }, { token: tokens.users.nogrants })
   assert.equal(plain.status, 403)
   const filtered = await vgCall('getServiceRequests',
-    { villageId: [String(villages.quahog.id)] },
+    { villageId: [String(villages.quahog.id)], ...ALL_DATES },
     { token: tokens.users.nogrants })
   assert.equal(filtered.status, 403)
 })
@@ -87,7 +101,7 @@ test('full_v1 cannot pull an Innsmouth member address via projection', async () 
 // ---- nested route: per-village perm checked BEFORE existence -> 403 ----
 
 test('full_v1 gets 403 for an ungranted village nested route', async () => {
-  const { status } = await vgCall('getVillageServiceRequests', { villageId: villages.innsmouth.id }, {
+  const { status } = await vgCall('getVillageServiceRequests', { villageId: villages.innsmouth.id, ...ALL_DATES }, {
     token: tokens.users.full_v1,
   })
   assert.equal(status, 403)
@@ -101,11 +115,12 @@ test('full_v1 cannot create a request in Innsmouth', async () => {
   const res = await vgCall('createServiceRequest', {}, {
     token: tokens.users.full_v1,
     body: {
-      // status is server-derived (POST only accepts 'Draft'); omit it so the body
+      // status is server-derived; omit it so the body
       // is schema-valid and the request actually exercises the authz path.
       villageId: String(villages.innsmouth.id),
       memberPersonId: String(persons.innsmouthMember.id),
       serviceName: 'cross-village create attempt',
+      serviceDate: '2026-07-11',
     },
   })
   // Undo a regression (write slipping through) so no stray Innsmouth request
@@ -125,6 +140,7 @@ test('full_v1 cannot create a request even in its OWN granted village', async ()
       villageId: String(villages.quahog.id),
       memberPersonId: String(persons.quahogMember.id),
       serviceName: 'read-only role create attempt',
+      serviceDate: '2026-07-11',
     },
   })
   if (res.status === 201 && res.json?.serviceRequestId) {
@@ -133,6 +149,66 @@ test('full_v1 cannot create a request even in its OWN granted village', async ()
     })
   }
   assert.equal(res.status, 403)
+})
+
+// serviceDate became NOT NULL in migration 0021 (Draft-status excision) and
+// is now required in the ServiceRequestPost schema too — an omission must be
+// rejected at the spec boundary (400), not fall through to a 500 at the
+// INSERT. vgCall/vgFetch send the body verbatim (no client-side schema
+// validation), so this genuinely reaches the API with the field missing.
+test('creating a service request without serviceDate is rejected with 400', async () => {
+  const res = await vgCall('createServiceRequest', {}, {
+    token: tokens.users.sc,
+    body: {
+      villageId: String(villages.quahog.id),
+      memberPersonId: String(persons.quahogMember.id),
+      serviceName: 'missing serviceDate probe',
+    },
+  })
+  if (res.status === 201 && res.json?.serviceRequestId) {
+    await vgCall('deleteServiceRequest', { serviceRequestId: res.json.serviceRequestId }, {
+      token: tokens.users.sc,
+    })
+  }
+  assert.equal(res.status, 400)
+})
+
+// `required` only mandates the key be PRESENT — an explicit `serviceDate:
+// null` still satisfies `required` and previously satisfied `nullable: true`
+// too, sliding past spec validation to a NULL INSERT that violates migration
+// 0021's NOT NULL (500). serviceDate is no longer nullable in
+// ServiceRequestPost, so this must now 400 at the spec boundary as well.
+test('creating a service request with serviceDate explicitly null is rejected with 400', async () => {
+  const res = await vgCall('createServiceRequest', {}, {
+    token: tokens.users.sc,
+    body: {
+      villageId: String(villages.quahog.id),
+      memberPersonId: String(persons.quahogMember.id),
+      serviceName: 'null serviceDate probe',
+      serviceDate: null,
+    },
+  })
+  if (res.status === 201 && res.json?.serviceRequestId) {
+    await vgCall('deleteServiceRequest', { serviceRequestId: res.json.serviceRequestId }, {
+      token: tokens.users.sc,
+    })
+  }
+  assert.equal(res.status, 400)
+})
+
+// Same hole, PATCH side: ServiceRequestPatch's serviceDate was still
+// nullable:true, so an explicit `serviceDate: null` passed validation,
+// ServiceRequestService's `!== undefined` guard let the null through (unlike
+// its sibling string fields' `|| null` coalescing), and the UPDATE hit the
+// NOT NULL column -> 500. No `required` was added here — omitting
+// serviceDate on PATCH remains the normal, correctly-handled partial-update
+// case; only the explicit-null path is now rejected.
+test('patching a service request with serviceDate explicitly null is rejected with 400', async () => {
+  const res = await vgCall('patchServiceRequest', { serviceRequestId: sr.srV1.id }, {
+    token: tokens.users.sc,
+    body: { serviceDate: null },
+  })
+  assert.equal(res.status, 400)
 })
 
 test('full_v1 cannot patch an Innsmouth request', async () => {

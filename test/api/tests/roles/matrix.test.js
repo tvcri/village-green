@@ -16,6 +16,9 @@ import { villages, serviceRequests as sr, persons } from '../../setup/fixtures.j
 //     7 Service Coordinator — reads + person:read_confidential; sr:write is its ONLY write
 // Writes are federation-only: no village role can write anything.
 
+// serviceDateStart is required; this window spans all SR fixtures (2026-07-10..12).
+const ALL_DATES = { serviceDateStart: '2000-01-01' }
+
 const quahog = String(villages.quahog.id)
 const innsmouth = String(villages.innsmouth.id)
 // key -> label; owner_v1 = role 3, full_v1 = role 2, restricted_v1 = role 1 (all Quahog)
@@ -26,8 +29,8 @@ const villageRoleUsers = {
 }
 
 test('roles 1 and 2 are identical read bundles (same SR + person view of Quahog)', async () => {
-  const r = await vgCall('getServiceRequests', { villageId: [quahog] }, { token: tokens.users.restricted_v1 })
-  const f = await vgCall('getServiceRequests', { villageId: [quahog] }, { token: tokens.users.full_v1 })
+  const r = await vgCall('getServiceRequests', { villageId: [quahog], ...ALL_DATES }, { token: tokens.users.restricted_v1 })
+  const f = await vgCall('getServiceRequests', { villageId: [quahog], ...ALL_DATES }, { token: tokens.users.full_v1 })
   assert.equal(r.status, 200)
   assert.equal(f.status, 200)
   assert.deepEqual(
@@ -53,8 +56,10 @@ test('every village role is confined to its granted village', async () => {
     // per-village perm is checked BEFORE existence: ungranted -> 403, not 404
     const cross = await vgCall('getVillage', { villageId: innsmouth }, { token })
     assert.equal(cross.status, 403, `${label}: ungranted village denied`)
-    // no villageId filter = federation-wide query -> denied for village users
-    const unfiltered = await vgCall('getServiceRequests', {}, { token })
+    // no villageId filter = federation-wide query -> denied for village users.
+    // Dates are supplied so the request clears OAS validation and actually
+    // reaches the controller's privilege check (a bare call now 400s first).
+    const unfiltered = await vgCall('getServiceRequests', { ...ALL_DATES }, { token })
     assert.equal(unfiltered.status, 403, `${label}: unfiltered list requires a federation read`)
     // any ungranted villageId in the filter -> 403, not an empty result
     const crossFilter = await vgCall('getPersons', { villageId: [innsmouth] }, { token })
@@ -72,6 +77,7 @@ test('no village role can write: SR create denied even for Village Lead (fixed b
         villageId: quahog,
         memberPersonId: String(persons.quahogMember.id),
         serviceName: `${key} write attempt`,
+        serviceDate: '2026-07-11',
       },
     })
     if (res.status === 201 && res.json?.serviceRequestId) {
@@ -85,7 +91,7 @@ test('no village role can write: SR create denied even for Village Lead (fixed b
 test('federation readers (staff/board/sc) see every village without a filter', async () => {
   for (const key of ['staff', 'board', 'sc']) {
     const token = tokens.users[key]
-    const list = await vgCall('getServiceRequests', {}, { token })
+    const list = await vgCall('getServiceRequests', { ...ALL_DATES }, { token })
     assert.equal(list.status, 200, `${key}: federation-wide list allowed`)
     const ids = list.json.map(r => r.serviceRequestId)
     for (const s of [sr.srV1, sr.srV2, sr.srV3]) {
@@ -101,6 +107,7 @@ test('sr:write is federation-only: sc and staff can create, board cannot', async
     villageId: quahog,
     memberPersonId: String(persons.quahogMember.id),
     serviceName: 'matrix sr:write probe',
+    serviceDate: '2026-07-11',
   }
   const denied = await vgCall('createServiceRequest', {}, { token: tokens.users.board, body })
   assert.equal(denied.status, 403, 'board reads everything, writes nothing')
