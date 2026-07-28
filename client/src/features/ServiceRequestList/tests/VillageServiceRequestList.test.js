@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { reactive } from 'vue'
 import PrimeVue from 'primevue/config'
 import VillageServiceRequestList from '../components/VillageServiceRequestList.vue'
 import { downloadCsv } from '../../../shared/lib/csvUtils.js'
 
+// `params` is reactive so a test can drive village navigation, which the
+// component watches. Tests that don't navigate see a stable villageId of '42'.
+const routeParams = reactive({ villageId: '42' })
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), afterEach: () => () => {} }),
-  useRoute: () => ({ params: { villageId: '42' } })
+  useRoute: () => ({ params: routeParams })
 }))
 
 vi.mock('primevue/usetoast', () => ({
@@ -77,6 +82,8 @@ describe('VillageServiceRequestList CSV download', () => {
     // NOT clearAllMocks: that would strip the getVillageServiceRequests
     // factory implementation and every fetch would resolve undefined.
     vi.mocked(downloadCsv).mockClear()
+    // routeParams is module-scoped, so a navigation test would leak into later ones
+    routeParams.villageId = '42'
     // jsdom has no matchMedia; PrimeVue Select uses it on mount
     window.matchMedia = () => ({
       matches: false,
@@ -164,6 +171,29 @@ describe('VillageServiceRequestList CSV download', () => {
     await waitFor(() => expect(queryAllByText('V-2').length).toBeGreaterThan(0))
     expect(queryAllByText('V-1').length).toBeGreaterThan(0)
     expect(fromInput.value).toBe(defaultFrom)
+  })
+
+  it('keeps the open+confirmed default when navigating to another village', async () => {
+    // A village switch is a fresh load, not a "clear filters" click: clearing
+    // the member/volunteer/service filters is right, but dropping the status
+    // default would silently show cancelled and completed work in village B
+    // after village A showed only active work.
+    const { getVillageServiceRequests } = await import('../api/serviceRequestApi.js')
+    render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await screen.findAllByText('Alice Anderson')
+    expect(screen.queryAllByText('Bob Baker')).toHaveLength(0)
+
+    getVillageServiceRequests.mockClear()
+    routeParams.villageId = '99'
+    // The refetch confirms the village watcher actually ran; without it this
+    // test would pass vacuously on the pre-navigation render.
+    await waitFor(() => expect(getVillageServiceRequests).toHaveBeenCalled())
+    expect(getVillageServiceRequests.mock.calls[0][0]).toBe('99')
+
+    // Bob is Completed. If the watcher left selectedStatuses empty, every
+    // status would show and Bob would appear.
+    await waitFor(() => expect(screen.queryAllByText('Alice Anderson').length).toBeGreaterThan(0))
+    expect(screen.queryAllByText('Bob Baker')).toHaveLength(0)
   })
 
   it('downloads only the rows visible under the default status filter', async () => {

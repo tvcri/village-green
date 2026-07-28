@@ -60,11 +60,15 @@ const {
   canFetch: () => !!villageId.value
 })
 
+// The status selection the list opens with. It is a real, clearable filter —
+// the clear button empties it — but every fresh load of a village starts here.
+const DEFAULT_STATUSES = ['open', 'confirmed']
+
 const {
   selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
   memberNames, volunteerNames, serviceNames,
   filteredRows: filteredRequests, clearAll
-} = useServiceRequestFilters(requests, { initialStatuses: ['open', 'confirmed'] })
+} = useServiceRequestFilters(requests, { initialStatuses: DEFAULT_STATUSES })
 
 const onNotified = (updated) => {
   if (!Array.isArray(requests.value)) return
@@ -95,7 +99,11 @@ const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => rou
   // this watcher. There is no new village to load, so leave state intact
   // rather than clearing it and firing a fetch that cannot be built.
   if (!newVillageId) return
+  // Names and IDs from the previous village mean nothing here, so clear them —
+  // but a village switch is a fresh load, not a "clear filters" click, so the
+  // status default comes back rather than leaving every status showing.
   clearAll()
+  selectedStatuses.value = [...DEFAULT_STATUSES]
   memberInput.value = ''
   volunteerInput.value = ''
   requests.value = null
