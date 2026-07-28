@@ -120,6 +120,7 @@ test('full_v1 cannot create a request in Innsmouth', async () => {
       villageId: String(villages.innsmouth.id),
       memberPersonId: String(persons.innsmouthMember.id),
       serviceName: 'cross-village create attempt',
+      serviceDate: '2026-07-11',
     },
   })
   // Undo a regression (write slipping through) so no stray Innsmouth request
@@ -139,6 +140,7 @@ test('full_v1 cannot create a request even in its OWN granted village', async ()
       villageId: String(villages.quahog.id),
       memberPersonId: String(persons.quahogMember.id),
       serviceName: 'read-only role create attempt',
+      serviceDate: '2026-07-11',
     },
   })
   if (res.status === 201 && res.json?.serviceRequestId) {
@@ -147,6 +149,28 @@ test('full_v1 cannot create a request even in its OWN granted village', async ()
     })
   }
   assert.equal(res.status, 403)
+})
+
+// serviceDate became NOT NULL in migration 0021 (Draft-status excision) and
+// is now required in the ServiceRequestPost schema too — an omission must be
+// rejected at the spec boundary (400), not fall through to a 500 at the
+// INSERT. vgCall/vgFetch send the body verbatim (no client-side schema
+// validation), so this genuinely reaches the API with the field missing.
+test('creating a service request without serviceDate is rejected with 400', async () => {
+  const res = await vgCall('createServiceRequest', {}, {
+    token: tokens.users.sc,
+    body: {
+      villageId: String(villages.quahog.id),
+      memberPersonId: String(persons.quahogMember.id),
+      serviceName: 'missing serviceDate probe',
+    },
+  })
+  if (res.status === 201 && res.json?.serviceRequestId) {
+    await vgCall('deleteServiceRequest', { serviceRequestId: res.json.serviceRequestId }, {
+      token: tokens.users.sc,
+    })
+  }
+  assert.equal(res.status, 400)
 })
 
 test('full_v1 cannot patch an Innsmouth request', async () => {

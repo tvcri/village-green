@@ -77,6 +77,7 @@ test('no village role can write: SR create denied even for Village Lead (fixed b
         villageId: quahog,
         memberPersonId: String(persons.quahogMember.id),
         serviceName: `${key} write attempt`,
+        serviceDate: '2026-07-11',
       },
     })
     if (res.status === 201 && res.json?.serviceRequestId) {
@@ -106,6 +107,7 @@ test('sr:write is federation-only: sc and staff can create, board cannot', async
     villageId: quahog,
     memberPersonId: String(persons.quahogMember.id),
     serviceName: 'matrix sr:write probe',
+    serviceDate: '2026-07-11',
   }
   const denied = await vgCall('createServiceRequest', {}, { token: tokens.users.board, body })
   assert.equal(denied.status, 403, 'board reads everything, writes nothing')

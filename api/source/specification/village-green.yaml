@@ -4181,6 +4181,7 @@ components:
       required:
       - villageId
       - memberPersonId
+      - serviceDate
       properties:
         requestNumber:
           type: integer
