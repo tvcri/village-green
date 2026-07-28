@@ -18,12 +18,10 @@ const props = defineProps({
   error: { required: true },
   showVillageColumn: { type: Boolean, default: false },
   flashRowId: { type: [String, Number], default: null },
-  // Initial serviceDate sort: -1 = descending (newest first), 1 = ascending.
-  // The lists default to descending: the window is anchored 30 days back and
-  // open work clusters at today-and-forward, so newest-first puts imminent
-  // work near the top with recent closed work trailing. Users can still
-  // re-sort by clicking a column header.
-  sortOrder: { type: Number, default: -1 }
+  // Initial serviceDate sort: 1 = ascending (soonest first), -1 = descending.
+  // The lists default to ascending so upcoming work reads in the order it will
+  // happen. Users can still re-sort by clicking a column header.
+  sortOrder: { type: Number, default: 1 }
 })
 
 const emit = defineEmits(['row-click'])

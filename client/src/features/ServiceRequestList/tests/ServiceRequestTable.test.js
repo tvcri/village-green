@@ -68,7 +68,7 @@ describe('ServiceRequestTable serviceDate ordering', () => {
     expect(rows.map(r => r.serviceRequestId)).toEqual(['1', '2', '3'])
   })
 
-  it('defaults to newest-first when no sortOrder is passed', () => {
+  it('defaults to soonest-first when no sortOrder is passed', () => {
     const rows = [
       { serviceRequestId: 1, serviceDate: '2026-07-01', displayNumber: 'A-1', status: 'Open' },
       { serviceRequestId: 2, serviceDate: '2026-07-20', displayNumber: 'A-2', status: 'Open' }
@@ -78,6 +78,6 @@ describe('ServiceRequestTable serviceDate ordering', () => {
       global: { plugins: [PrimeVue] }
     })
     const text = container.textContent
-    expect(text.indexOf('A-2')).toBeLessThan(text.indexOf('A-1'))
+    expect(text.indexOf('A-1')).toBeLessThan(text.indexOf('A-2'))
   })
 })
