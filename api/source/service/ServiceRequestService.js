@@ -12,14 +12,14 @@ const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub canc
 const NAME_CLAIM_PATH = mysql.escape(`$.${config.oauth.claims.name}`)
 
 function deriveStatus(clientStatus, volunteerPersonId) {
-  if (clientStatus === 'Draft' || clientStatus === 'Completed' || CANCELLED_STATUSES.includes(clientStatus)) {
+  if (clientStatus === 'Completed' || CANCELLED_STATUSES.includes(clientStatus)) {
     return clientStatus
   }
   return volunteerPersonId ? 'Confirmed' : 'Open'
 }
 
 async function writeNotificationEvent(connection, serviceRequestId, resolvedStatus) {
-  if (resolvedStatus === 'Draft' || resolvedStatus === 'Completed') {
+  if (resolvedStatus === 'Completed') {
     throw new SmError.UnprocessableError()
   }
   let eventType
@@ -235,7 +235,6 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
     for (const s of status) {
       if (s === 'open') dbStatuses.push('Open')
       else if (s === 'confirmed') dbStatuses.push('Confirmed')
-      else if (s === 'draft') dbStatuses.push('Draft')
       else if (s === 'completed') dbStatuses.push('Completed')
       else if (s === 'unmatched') dbStatuses.push('Unmatched')
       else if (s === 'cancelled') {
@@ -261,14 +260,6 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
   // serviceDate is a DATE column holding a wall-clock civil date; both bounds
   // are inclusive and compared as plain 'YYYY-MM-DD' strings. serviceDateEnd
   // omitted means no upper bound — future-dated requests still match.
-  //
-  // Known and accepted: serviceDate is nullable, and `>= ?` evaluates UNKNOWN
-  // for a NULL, so an undated request matches no window and is unreachable
-  // from any list. This is not a live defect — the column is nullable only to
-  // serve the abandoned Draft workflow (see migration 0015), and the Draft
-  // write path in ServiceRequestCreateEdit.vue is the sole way to create such
-  // a row. Production carries zero of them. Stripping Draft should also make
-  // serviceDate NOT NULL and retire this note.
   if (serviceDateStart) {
     predicates.statements.push('sr.serviceDate >= ?')
     predicates.binds.push(serviceDateStart)
