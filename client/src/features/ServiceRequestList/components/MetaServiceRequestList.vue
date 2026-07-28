@@ -78,7 +78,7 @@ const tabs = useServiceRequestTabs({
   })
 })
 const {
-  activeTab, historicStart, historicEnd, statusOptions,
+  activeTab, closedStart, closedEnd, statusOptions,
   currentRows: requests, isLoading, error, hasLoadedOnce, fetchCurrent
 } = tabs
 
@@ -106,7 +106,7 @@ const serviceChoice = nullable(selectedService)
 // `requests` is a computed over the visible tab, so write through to the
 // underlying ref that tab is backed by.
 const onNotified = (updated) => {
-  const target = activeTab.value === 'active' ? tabs.activeRows : tabs.historicRows
+  const target = activeTab.value === 'active' ? tabs.activeRows : tabs.closedRows
   if (!Array.isArray(target.value)) return
   target.value = target.value.map(r =>
     r.serviceRequestId === updated.serviceRequestId
@@ -133,17 +133,17 @@ onActivated(async () => {
   }
 })
 
-// Refetch the visible tab when it is first shown, or when the historic window moves.
+// Refetch the visible tab when it is first shown, or when the Closed window moves.
 watch(activeTab, () => { if (requests.value === null) fetchCurrent() })
-watch([historicStart, historicEnd], () => {
-  if (activeTab.value === 'historic') fetchCurrent()
+watch([closedStart, closedEnd], () => {
+  if (activeTab.value === 'closed') fetchCurrent()
 })
 
 // Village and notification filters are server-side, so both cached tabs are
 // stale when they change.
 watch([selectedVillage, notificationFilter], () => {
   tabs.activeRows.value = null
-  tabs.historicRows.value = null
+  tabs.closedRows.value = null
   fetchCurrent()
 })
 
@@ -153,15 +153,15 @@ onMounted(() => { tabs.fetchActive() })
 const filteredRequests = computed(() =>
   shared.filteredRows.value.filter(r => !vssSignupOnly.value || r.vssSignup === true))
 
-// The historic window counts as a filter only when narrowed from its default.
-const historicStartDefault = historicStart.value
-const historicWindowNarrowed = computed(() =>
-  activeTab.value === 'historic' &&
-  (historicStart.value !== historicStartDefault || !!historicEnd.value))
+// The Closed window counts as a filter only when narrowed from its default.
+const closedStartDefault = closedStart.value
+const closedWindowNarrowed = computed(() =>
+  activeTab.value === 'closed' &&
+  (closedStart.value !== closedStartDefault || !!closedEnd.value))
 
 const activeFilterCount = computed(() => {
   let count = 0
-  if (historicWindowNarrowed.value) count++
+  if (closedWindowNarrowed.value) count++
   if (selectedStatuses.value.length) count++
   if (selectedMember.value) count++
   if (selectedVolunteer.value) count++
@@ -259,9 +259,9 @@ const tableProps = computed(() => ({
   error: error.value,
   showVillageColumn: true,
   flashRowId: flashRowId.value,
-  // Active lists upcoming work soonest-first; Historic is an archive, so the
+  // Active lists upcoming work soonest-first; Closed is a settled record, so the
   // most recent records belong at the top.
-  sortOrder: activeTab.value === 'historic' ? -1 : 1
+  sortOrder: activeTab.value === 'closed' ? -1 : 1
 }))
 
 const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)
@@ -271,8 +271,8 @@ const clearFilters = () => {
   selectedVillage.value = null
   notificationFilter.value = null
   vssSignupOnly.value = false
-  historicStart.value = historicStartDefault
-  historicEnd.value = ''
+  closedStart.value = closedStartDefault
+  closedEnd.value = ''
 }
 </script>
 
@@ -376,7 +376,7 @@ const clearFilters = () => {
     <Tabs v-model:value="activeTab">
       <TabList>
         <Tab value="active">Active</Tab>
-        <Tab value="historic">Historic</Tab>
+        <Tab value="closed">Closed</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="active">
@@ -390,14 +390,14 @@ const clearFilters = () => {
             </template>
           </ServiceRequestTable>
         </TabPanel>
-        <TabPanel value="historic">
-          <div class="historic-range">
-            <label for="historic-start">From</label>
+        <TabPanel value="closed">
+          <div class="closed-range">
+            <label for="closed-start">From</label>
             <!-- .lazy: commit on change, not per keystroke-segment — typing a
                  year would otherwise fire fetches for values like 0002-… -->
-            <input id="historic-start" v-model.lazy="historicStart" type="date" >
-            <label for="historic-end">To</label>
-            <input id="historic-end" v-model.lazy="historicEnd" type="date" >
+            <input id="closed-start" v-model.lazy="closedStart" type="date" >
+            <label for="closed-end">To</label>
+            <input id="closed-end" v-model.lazy="closedEnd" type="date" >
             <small>Leave “To” empty for no upper bound.</small>
           </div>
           <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
@@ -456,10 +456,10 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
 }
-.historic-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.historic-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
-.historic-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
-.historic-range small { color: var(--color-text-secondary, #777); }
+.closed-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.closed-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
+.closed-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
+.closed-range small { color: var(--color-text-secondary, #777); }
 .bell-wrapper { position: relative; display: inline-flex; }
 .bell-alert-icon { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #ff9800; color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>

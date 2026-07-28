@@ -10,7 +10,7 @@ const rows = () => ref([
 ])
 
 // The API returns the raw DB status, so 'cancelled' spans three values.
-const historicRows = () => ref([
+const closedRows = () => ref([
   { serviceRequestId: '10', displayNumber: 1, status: 'Completed' },
   { serviceRequestId: '11', displayNumber: 2, status: 'Unmatched' },
   { serviceRequestId: '12', displayNumber: 3, status: 'Member cancelled' },
@@ -103,13 +103,13 @@ describe('useServiceRequestFilters', () => {
     })
 
     it('matches all three cancelled db statuses under one "cancelled" key', () => {
-      const { selectedStatuses, filteredRows } = useServiceRequestFilters(historicRows())
+      const { selectedStatuses, filteredRows } = useServiceRequestFilters(closedRows())
       selectedStatuses.value = ['cancelled']
       expect(filteredRows.value.map(r => r.serviceRequestId)).toEqual(['12', '13', '14'])
     })
 
     it('does not confuse completed with cancelled', () => {
-      const { selectedStatuses, filteredRows } = useServiceRequestFilters(historicRows())
+      const { selectedStatuses, filteredRows } = useServiceRequestFilters(closedRows())
       selectedStatuses.value = ['completed']
       expect(filteredRows.value.map(r => r.serviceRequestId)).toEqual(['10'])
     })

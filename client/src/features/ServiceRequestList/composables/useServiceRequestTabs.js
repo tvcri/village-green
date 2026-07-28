@@ -2,10 +2,14 @@ import { computed, ref, watch } from 'vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { dateToServiceDate } from '../lib/timeFields.js'
 
+// The tabs split on lifecycle, not time: Active holds the statuses a request
+// can still move out of, Closed holds the terminal ones. Deliberately not a
+// date split — a request cancelled for a future service date is closed, and
+// calling that "historic" made a time claim that was plainly false.
 export const ACTIVE_STATUSES = ['open', 'confirmed']
-// 'draft' is deliberately absent: it is neither an actionable worklist item
-// nor a terminal archive record, and the UI keeps it hidden today.
-export const HISTORIC_STATUSES = ['completed', 'unmatched', 'cancelled']
+// 'unmatched' is terminal: it is only reached by the service date passing with
+// no volunteer, so there is nothing left to act on.
+export const CLOSED_STATUSES = ['completed', 'unmatched', 'cancelled']
 
 // The Active tab needs no lower bound — the nightly
 // evt_auto_complete_service_requests sweep already caps open/confirmed to
@@ -26,7 +30,7 @@ const shiftDays = (isoDate, days) => {
 const localToday = () => dateToServiceDate(new Date())
 
 /**
- * Active/Historic tab state and fetches for a service request list.
+ * Active/Closed tab state and fetches for a service request list.
  *
  * Each tab fetches through its own useAsyncState so an out-of-order response
  * can never overwrite a newer one, and failures raise the global error modal
@@ -36,14 +40,14 @@ const localToday = () => dateToServiceDate(new Date())
  * @param {(params: {status: string[], serviceDateStart: string, serviceDateEnd: string|undefined}) => Promise<Array>} opts.fetcher
  * @param {() => boolean} [opts.canFetch] guard: when it returns false no request
  *   is made and the last-fetched rows are kept (e.g. a route param went away)
- * @param {number} [opts.historicDays] size of the default historic window
+ * @param {number} [opts.closedDays] size of the default Closed-tab window
  * @param {string} [opts.today] 'YYYY-MM-DD' override for tests
  */
-export function useServiceRequestTabs ({ fetcher, canFetch, historicDays = 60, today = localToday() }) {
+export function useServiceRequestTabs ({ fetcher, canFetch, closedDays = 60, today = localToday() }) {
   const activeTab = ref('active')
 
-  const historicStart = ref(shiftDays(today, -historicDays))
-  const historicEnd = ref('') // '' = unbounded
+  const closedStart = ref(shiftDays(today, -closedDays))
+  const closedEnd = ref('') // '' = unbounded
 
   const active = useAsyncState(
     () => fetcher({
@@ -53,11 +57,11 @@ export function useServiceRequestTabs ({ fetcher, canFetch, historicDays = 60, t
     }),
     { immediate: false }
   )
-  const historic = useAsyncState(
+  const closed = useAsyncState(
     () => fetcher({
-      status: HISTORIC_STATUSES,
-      serviceDateStart: historicStart.value,
-      serviceDateEnd: historicEnd.value || undefined
+      status: CLOSED_STATUSES,
+      serviceDateStart: closedStart.value,
+      serviceDateEnd: closedEnd.value || undefined
     }),
     { immediate: false }
   )
@@ -70,52 +74,52 @@ export function useServiceRequestTabs ({ fetcher, canFetch, historicDays = 60, t
     if (blocked()) return Promise.resolve(null)
     return active.execute()
   }
-  const fetchHistoric = () => {
+  const fetchClosed = () => {
     if (blocked()) return Promise.resolve(null)
     // serviceDateStart is required by the endpoint; a cleared "From" input
     // must not fire a doomed request. Drop the stale rows rather than leaving
     // the previous window's data under a blank date control — the table's
     // empty state is honest, and an export can't ship a window the user
     // isn't looking at.
-    if (!historicStart.value) {
-      historic.state.value = null
+    if (!closedStart.value) {
+      closed.state.value = null
       return Promise.resolve(null)
     }
-    return historic.execute()
+    return closed.execute()
   }
   const fetchCurrent = () =>
-    activeTab.value === 'active' ? fetchActive() : fetchHistoric()
+    activeTab.value === 'active' ? fetchActive() : fetchClosed()
 
-  const currentTab = () => activeTab.value === 'active' ? active : historic
+  const currentTab = () => activeTab.value === 'active' ? active : closed
 
   const currentRows = computed(() => currentTab().state.value)
   const isLoading = computed(() => currentTab().isLoading.value)
   const error = computed(() => currentTab().error.value)
 
   // Tracked per tab: a single shared flag would let Active's first load mark
-  // Historic as "loaded", so Historic's own first fetch would render the
+  // Closed as "loaded", so Closed's own first fetch would render the
   // "no requests found" empty state instead of a spinner — and an outright
   // failure would render it too, hiding the error.
   const activeLoadedOnce = ref(false)
-  const historicLoadedOnce = ref(false)
+  const closedLoadedOnce = ref(false)
   watch(active.state, (val) => { if (val !== null) activeLoadedOnce.value = true })
-  watch(historic.state, (val) => { if (val !== null) historicLoadedOnce.value = true })
+  watch(closed.state, (val) => { if (val !== null) closedLoadedOnce.value = true })
   const hasLoadedOnce = computed(() =>
-    activeTab.value === 'active' ? activeLoadedOnce.value : historicLoadedOnce.value)
+    activeTab.value === 'active' ? activeLoadedOnce.value : closedLoadedOnce.value)
 
   // The status checkboxes a tab may offer are exactly the statuses it fetched:
   // narrowing is client-side, so offering more could only ever match nothing.
   const statusOptions = computed(() =>
-    activeTab.value === 'active' ? ACTIVE_STATUSES : HISTORIC_STATUSES)
+    activeTab.value === 'active' ? ACTIVE_STATUSES : CLOSED_STATUSES)
 
   return {
     activeTab,
-    ACTIVE_STATUSES, HISTORIC_STATUSES, statusOptions,
-    historicStart, historicEnd,
+    ACTIVE_STATUSES, CLOSED_STATUSES, statusOptions,
+    closedStart, closedEnd,
     // The state refs stay exposed (and writable) so components can null a tab
     // to force a refetch, or write a row update through (e.g. onNotified).
-    activeRows: active.state, historicRows: historic.state,
+    activeRows: active.state, closedRows: closed.state,
     currentRows, isLoading, error, hasLoadedOnce,
-    fetchActive, fetchHistoric, fetchCurrent
+    fetchActive, fetchClosed, fetchCurrent
   }
 }
