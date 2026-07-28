@@ -8,7 +8,7 @@ import {
 // A hand-built fixture matching the VillageMetrics API payload shape
 // (api/source/specification/village-green.yaml components.schemas.VillageMetrics).
 function emptyStatus () {
-  return { draft: 0, open: 0, confirmed: 0, completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
+  return { open: 0, confirmed: 0, completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
 }
 
 function makeMetrics () {
@@ -18,7 +18,7 @@ function makeMetrics () {
     range: { start: '2026-01-01', end: '2026-07-13' },
     totals: {
       totalRequests: 100,
-      byStatus: { draft: 2, open: 5, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
+      byStatus: { open: 7, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
       completedRoundTrips: 8,
     },
     byCategory: [
@@ -42,15 +42,14 @@ function makeMetrics () {
 }
 
 describe('STATUS_ORDER / STATUS_LABELS / STATUS_OPTIONS', () => {
-  it('has the 7-key canonical order', () => {
+  it('has the 6-key canonical order', () => {
     expect(STATUS_ORDER).toEqual([
-      'draft', 'open', 'confirmed', 'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled',
+      'open', 'confirmed', 'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled',
     ])
   })
 
   it('labels every status', () => {
     expect(STATUS_LABELS).toEqual({
-      draft: 'Draft',
       open: 'Open',
       confirmed: 'Confirmed',
       completed: 'Completed',
@@ -63,7 +62,6 @@ describe('STATUS_ORDER / STATUS_LABELS / STATUS_OPTIONS', () => {
   it('STATUS_OPTIONS leads with All statuses then mirrors STATUS_ORDER', () => {
     expect(STATUS_OPTIONS).toEqual([
       { label: 'All statuses', value: 'all' },
-      { label: 'Draft', value: 'draft' },
       { label: 'Open', value: 'open' },
       { label: 'Confirmed', value: 'confirmed' },
       { label: 'Completed', value: 'completed' },
@@ -87,15 +85,15 @@ describe('CATEGORY_COLORS', () => {
 })
 
 describe('statusCount', () => {
-  const by = { draft: 2, open: 5, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 }
+  const by = { open: 7, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 }
 
-  it('all sums the 7 keys', () => {
+  it('all sums the 6 keys', () => {
     expect(statusCount(by, 'all')).toBe(100)
   })
 
   it('single status returns that key', () => {
     expect(statusCount(by, 'completed')).toBe(70)
-    expect(statusCount(by, 'draft')).toBe(2)
+    expect(statusCount(by, 'confirmed')).toBe(3)
   })
 })
 
@@ -106,12 +104,12 @@ describe('legsApply', () => {
     expect(legsApply('all', false)).toBe(false)
     expect(legsApply('completed', false)).toBe(false)
     expect(legsApply('open', true)).toBe(false)
-    expect(legsApply('draft', true)).toBe(false)
+    expect(legsApply('unmatched', true)).toBe(false)
   })
 })
 
 describe('adjustedCount', () => {
-  const entry = { byStatus: { draft: 2, open: 5, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 }, completedRoundTrips: 8 }
+  const entry = { byStatus: { open: 7, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 }, completedRoundTrips: 8 }
 
   it('adds completedRoundTrips when legs applies (all)', () => {
     expect(adjustedCount(entry, 'all', true)).toBe(108)
@@ -122,7 +120,7 @@ describe('adjustedCount', () => {
   })
 
   it('does not add legs for a non-completed selection', () => {
-    expect(adjustedCount(entry, 'open', true)).toBe(5)
+    expect(adjustedCount(entry, 'open', true)).toBe(7)
   })
 
   it('does not add legs when legs is off', () => {
@@ -170,7 +168,7 @@ describe('categoryPie', () => {
       { category: 'Tech Support', byStatus: emptyStatus(), completedRoundTrips: 0 },
       { category: 'Member Added', byStatus: emptyStatus(), completedRoundTrips: 0 },
     ]
-    const { slices, rows } = categoryPie(zeroCategories, 'draft', false)
+    const { slices, rows } = categoryPie(zeroCategories, 'unmatched', false)
     expect(slices).toEqual([])
     expect(rows.every(r => r.pct === 0)).toBe(true)
   })
@@ -255,7 +253,7 @@ describe('servicePie', () => {
 describe('outcomesPie', () => {
   const totals = {
     totalRequests: 100,
-    byStatus: { draft: 2, open: 5, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
+    byStatus: { open: 7, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
     completedRoundTrips: 8,
   }
 
@@ -284,7 +282,7 @@ describe('outcomesPie', () => {
   it('all-zero total yields pct 0 for every row (div-by-zero guard)', () => {
     const zeroTotals = {
       totalRequests: 0,
-      byStatus: { draft: 0, open: 0, confirmed: 0, completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
+      byStatus: { open: 0, confirmed: 0, completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
       completedRoundTrips: 0,
     }
     const { slices, rows } = outcomesPie(zeroTotals, false)

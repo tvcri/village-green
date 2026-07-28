@@ -410,7 +410,7 @@ CREATE TABLE `service_request` (
   `serviceName` varchar(200) DEFAULT NULL,
   `transportationType` varchar(100) DEFAULT NULL,
   `createdAt` datetime DEFAULT NULL,
-  `serviceDate` date DEFAULT NULL,
+  `serviceDate` date NOT NULL,
   `timesFlexible` tinyint(1) NOT NULL DEFAULT '0',
   `startTime` time DEFAULT NULL,
   `finishTime` time DEFAULT NULL,
@@ -675,4 +675,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-25 23:25:08
+-- Dump completed on 2026-07-28  1:25:31

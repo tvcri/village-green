@@ -115,11 +115,12 @@ test('full_v1 cannot create a request in Innsmouth', async () => {
   const res = await vgCall('createServiceRequest', {}, {
     token: tokens.users.full_v1,
     body: {
-      // status is server-derived (POST only accepts 'Draft'); omit it so the body
+      // status is server-derived; omit it so the body
       // is schema-valid and the request actually exercises the authz path.
       villageId: String(villages.innsmouth.id),
       memberPersonId: String(persons.innsmouthMember.id),
       serviceName: 'cross-village create attempt',
+      serviceDate: '2026-07-11',
     },
   })
   // Undo a regression (write slipping through) so no stray Innsmouth request
@@ -139,6 +140,7 @@ test('full_v1 cannot create a request even in its OWN granted village', async ()
       villageId: String(villages.quahog.id),
       memberPersonId: String(persons.quahogMember.id),
       serviceName: 'read-only role create attempt',
+      serviceDate: '2026-07-11',
     },
   })
   if (res.status === 201 && res.json?.serviceRequestId) {
@@ -147,6 +149,66 @@ test('full_v1 cannot create a request even in its OWN granted village', async ()
     })
   }
   assert.equal(res.status, 403)
+})
+
+// serviceDate became NOT NULL in migration 0021 (Draft-status excision) and
+// is now required in the ServiceRequestPost schema too — an omission must be
+// rejected at the spec boundary (400), not fall through to a 500 at the
+// INSERT. vgCall/vgFetch send the body verbatim (no client-side schema
+// validation), so this genuinely reaches the API with the field missing.
+test('creating a service request without serviceDate is rejected with 400', async () => {
+  const res = await vgCall('createServiceRequest', {}, {
+    token: tokens.users.sc,
+    body: {
+      villageId: String(villages.quahog.id),
+      memberPersonId: String(persons.quahogMember.id),
+      serviceName: 'missing serviceDate probe',
+    },
+  })
+  if (res.status === 201 && res.json?.serviceRequestId) {
+    await vgCall('deleteServiceRequest', { serviceRequestId: res.json.serviceRequestId }, {
+      token: tokens.users.sc,
+    })
+  }
+  assert.equal(res.status, 400)
+})
+
+// `required` only mandates the key be PRESENT — an explicit `serviceDate:
+// null` still satisfies `required` and previously satisfied `nullable: true`
+// too, sliding past spec validation to a NULL INSERT that violates migration
+// 0021's NOT NULL (500). serviceDate is no longer nullable in
+// ServiceRequestPost, so this must now 400 at the spec boundary as well.
+test('creating a service request with serviceDate explicitly null is rejected with 400', async () => {
+  const res = await vgCall('createServiceRequest', {}, {
+    token: tokens.users.sc,
+    body: {
+      villageId: String(villages.quahog.id),
+      memberPersonId: String(persons.quahogMember.id),
+      serviceName: 'null serviceDate probe',
+      serviceDate: null,
+    },
+  })
+  if (res.status === 201 && res.json?.serviceRequestId) {
+    await vgCall('deleteServiceRequest', { serviceRequestId: res.json.serviceRequestId }, {
+      token: tokens.users.sc,
+    })
+  }
+  assert.equal(res.status, 400)
+})
+
+// Same hole, PATCH side: ServiceRequestPatch's serviceDate was still
+// nullable:true, so an explicit `serviceDate: null` passed validation,
+// ServiceRequestService's `!== undefined` guard let the null through (unlike
+// its sibling string fields' `|| null` coalescing), and the UPDATE hit the
+// NOT NULL column -> 500. No `required` was added here — omitting
+// serviceDate on PATCH remains the normal, correctly-handled partial-update
+// case; only the explicit-null path is now rejected.
+test('patching a service request with serviceDate explicitly null is rejected with 400', async () => {
+  const res = await vgCall('patchServiceRequest', { serviceRequestId: sr.srV1.id }, {
+    token: tokens.users.sc,
+    body: { serviceDate: null },
+  })
+  assert.equal(res.status, 400)
 })
 
 test('full_v1 cannot patch an Innsmouth request', async () => {
