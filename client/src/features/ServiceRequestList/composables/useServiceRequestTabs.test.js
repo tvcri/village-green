@@ -25,24 +25,24 @@ describe('useServiceRequestTabs', () => {
     const fetcher = vi.fn().mockResolvedValue([])
     const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
     await t.fetchActive()
-    await t.fetchHistoric()
+    await t.fetchClosed()
     for (const call of fetcher.mock.calls) {
       expect(call[0].status).not.toContain('draft')
     }
   })
 
-  it('defaults the historic window to the last 60 days ending today', () => {
-    const { historicStart, historicEnd } = useServiceRequestTabs({
+  it('defaults the Closed window to the last 60 days ending today', () => {
+    const { closedStart, closedEnd } = useServiceRequestTabs({
       fetcher: vi.fn().mockResolvedValue([]), today: '2026-07-26'
     })
-    expect(historicStart.value).toBe('2026-05-27')
-    expect(historicEnd.value).toBe('')
+    expect(closedStart.value).toBe('2026-05-27')
+    expect(closedEnd.value).toBe('')
   })
 
-  it('fetches Historic with terminal statuses and the window', async () => {
+  it('fetches Closed with terminal statuses and the window', async () => {
     const fetcher = vi.fn().mockResolvedValue([])
-    const { fetchHistoric } = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
-    await fetchHistoric()
+    const { fetchClosed } = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
+    await fetchClosed()
     expect(fetcher).toHaveBeenCalledWith(expect.objectContaining({
       status: ['completed', 'unmatched', 'cancelled'],
       serviceDateStart: '2026-05-27'
@@ -57,8 +57,8 @@ describe('useServiceRequestTabs', () => {
     await t.fetchActive()
     await flush()
     expect(t.currentRows.value.map(r => r.serviceRequestId)).toEqual(['a'])
-    t.activeTab.value = 'historic'
-    await t.fetchHistoric()
+    t.activeTab.value = 'closed'
+    await t.fetchClosed()
     await flush()
     expect(t.currentRows.value.map(r => r.serviceRequestId)).toEqual(['b'])
   })
@@ -66,7 +66,7 @@ describe('useServiceRequestTabs', () => {
   it('fetchCurrent refetches only the visible tab', async () => {
     const fetcher = vi.fn().mockResolvedValue([])
     const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
-    t.activeTab.value = 'historic'
+    t.activeTab.value = 'closed'
     await t.fetchCurrent()
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(fetcher.mock.calls[0][0].status).toEqual(['completed', 'unmatched', 'cancelled'])
@@ -86,7 +86,7 @@ describe('useServiceRequestTabs', () => {
     allowed = false
     fetcher.mockClear()
     await t.fetchActive()
-    await t.fetchHistoric()
+    await t.fetchClosed()
     expect(fetcher).not.toHaveBeenCalled()
     // rows survive rather than blanking
     expect(t.currentRows.value.map(r => r.serviceRequestId)).toEqual(['a'])
@@ -95,7 +95,7 @@ describe('useServiceRequestTabs', () => {
   it('offers exactly the statuses the visible tab fetched', () => {
     const t = useServiceRequestTabs({ fetcher: vi.fn().mockResolvedValue([]), today: '2026-07-26' })
     expect(t.statusOptions.value).toEqual(['open', 'confirmed'])
-    t.activeTab.value = 'historic'
+    t.activeTab.value = 'closed'
     expect(t.statusOptions.value).toEqual(['completed', 'unmatched', 'cancelled'])
   })
 
@@ -108,13 +108,13 @@ describe('useServiceRequestTabs', () => {
     expect(t.isLoading.value).toBe(false)
   })
 
-  it('does not fetch Historic when the From date is cleared', async () => {
+  it('does not fetch Closed when the From date is cleared', async () => {
     // serviceDateStart is required by the endpoint; a cleared input must not
     // fire a doomed request that lands the tab in an error state.
     const fetcher = vi.fn().mockResolvedValue([])
     const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
-    t.historicStart.value = ''
-    await t.fetchHistoric()
+    t.closedStart.value = ''
+    await t.fetchClosed()
     expect(fetcher).not.toHaveBeenCalled()
   })
 
@@ -124,20 +124,20 @@ describe('useServiceRequestTabs', () => {
     // window the user isn't looking at.
     const fetcher = vi.fn().mockResolvedValue([{ serviceRequestId: 'old' }])
     const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
-    t.activeTab.value = 'historic'
-    await t.fetchHistoric()
+    t.activeTab.value = 'closed'
+    await t.fetchClosed()
     await flush()
     expect(t.currentRows.value.map(r => r.serviceRequestId)).toEqual(['old'])
 
-    t.historicStart.value = ''
-    await t.fetchHistoric()
+    t.closedStart.value = ''
+    await t.fetchClosed()
     await flush()
     expect(t.currentRows.value).toBe(null)
   })
 
   it('tracks hasLoadedOnce per tab', async () => {
-    // A shared flag would let Active's load mark Historic as loaded, so
-    // Historic's first fetch would render "no requests found" over a spinner.
+    // A shared flag would let Active's load mark Closed as loaded, so
+    // Closed's first fetch would render "no requests found" over a spinner.
     const fetcher = vi.fn().mockResolvedValue([])
     const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
     expect(t.hasLoadedOnce.value).toBe(false)
@@ -146,10 +146,10 @@ describe('useServiceRequestTabs', () => {
     await flush()
     expect(t.hasLoadedOnce.value).toBe(true)
 
-    t.activeTab.value = 'historic'
+    t.activeTab.value = 'closed'
     expect(t.hasLoadedOnce.value).toBe(false)
 
-    await t.fetchHistoric()
+    await t.fetchClosed()
     await flush()
     expect(t.hasLoadedOnce.value).toBe(true)
   })
@@ -170,20 +170,20 @@ describe('useServiceRequestTabs', () => {
       .mockImplementationOnce(() => new Promise(r => { resolveFirst = r }))
       .mockImplementationOnce(() => new Promise(r => { resolveSecond = r }))
     const t = useServiceRequestTabs({ fetcher, today: '2026-07-26' })
-    const first = t.fetchHistoric()
-    const second = t.fetchHistoric()
+    const first = t.fetchClosed()
+    const second = t.fetchClosed()
     resolveSecond([{ serviceRequestId: 'newer' }])
     await second
     resolveFirst([{ serviceRequestId: 'stale' }])
     await first
-    expect(t.historicRows.value.map(r => r.serviceRequestId)).toEqual(['newer'])
+    expect(t.closedRows.value.map(r => r.serviceRequestId)).toEqual(['newer'])
   })
 
   it('crossing a month boundary shifts the window on the civil calendar', () => {
     // 60 days before 2026-03-01 is 2025-12-31 — no local timezone may shift it.
-    const { historicStart } = useServiceRequestTabs({
+    const { closedStart } = useServiceRequestTabs({
       fetcher: vi.fn().mockResolvedValue([]), today: '2026-03-01'
     })
-    expect(historicStart.value).toBe('2025-12-31')
+    expect(closedStart.value).toBe('2025-12-31')
   })
 })
