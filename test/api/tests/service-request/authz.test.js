@@ -196,6 +196,21 @@ test('creating a service request with serviceDate explicitly null is rejected wi
   assert.equal(res.status, 400)
 })
 
+// Same hole, PATCH side: ServiceRequestPatch's serviceDate was still
+// nullable:true, so an explicit `serviceDate: null` passed validation,
+// ServiceRequestService's `!== undefined` guard let the null through (unlike
+// its sibling string fields' `|| null` coalescing), and the UPDATE hit the
+// NOT NULL column -> 500. No `required` was added here — omitting
+// serviceDate on PATCH remains the normal, correctly-handled partial-update
+// case; only the explicit-null path is now rejected.
+test('patching a service request with serviceDate explicitly null is rejected with 400', async () => {
+  const res = await vgCall('patchServiceRequest', { serviceRequestId: sr.srV1.id }, {
+    token: tokens.users.sc,
+    body: { serviceDate: null },
+  })
+  assert.equal(res.status, 400)
+})
+
 test('full_v1 cannot patch an Innsmouth request', async () => {
   const { status } = await vgCall('patchServiceRequest', { serviceRequestId: sr.srV2.id }, {
     token: tokens.users.full_v1,
