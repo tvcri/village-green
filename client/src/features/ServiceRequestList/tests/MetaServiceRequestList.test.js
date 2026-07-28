@@ -160,8 +160,6 @@ describe('MetaServiceRequestList CSV download', () => {
     await findAllByText('M-1')
     expect(queryAllByText('M-2')).toHaveLength(0)
 
-    // Open the collapsed filter panel to reach the date window inputs.
-    await fireEvent.click(screen.getByText('Filters'))
     const fromInput = container.querySelector('#window-start')
     const defaultFrom = fromInput.value
     await fireEvent.update(fromInput, '2026-06-01')

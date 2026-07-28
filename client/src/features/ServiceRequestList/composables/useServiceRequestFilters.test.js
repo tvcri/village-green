@@ -163,5 +163,22 @@ describe('useServiceRequestFilters', () => {
       selectedStatuses.value.push('confirmed')
       expect(seed).toEqual(['open'])
     })
+
+    // Deliberate: dropdown options are derived from every fetched row in the
+    // date window, not from status-filtered rows. Otherwise a member whose
+    // only requests are e.g. Completed would vanish from the Member dropdown
+    // under the default open+confirmed filter, and the option list would
+    // churn as the user toggles statuses.
+    it('keeps a status-filtered-out member in memberNames', () => {
+      const rows = ref([
+        { serviceRequestId: 1, memberFullName: 'Completed Carl', status: 'Completed' },
+        { serviceRequestId: 2, memberFullName: 'Open Olivia', status: 'Open' }
+      ])
+      const { filteredRows, memberNames } = useServiceRequestFilters(rows, {
+        initialStatuses: ['open', 'confirmed']
+      })
+      expect(filteredRows.value.map(r => r.serviceRequestId)).toEqual([2])
+      expect(memberNames.value).toContain('Completed Carl')
+    })
   })
 })
