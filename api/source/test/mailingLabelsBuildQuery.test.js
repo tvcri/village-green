@@ -74,3 +74,12 @@ test('every shape selects the seven label columns with padded zip', () => {
 test('an unknown role throws rather than emitting join-less SQL', () => {
   assert.throws(() => buildRecipientQuery({ role: 'nobody' }), /unknown role/i)
 })
+
+test('a role-only audience omits WHERE entirely rather than dangling it', () => {
+  // "Adding an audience is one row" — and the most natural next row is an
+  // unqualified "all active members", with no village and no predicates.
+  // A dangling WHERE is an ER_PARSE_ERROR at request time, not a bad result.
+  const { sql, binds } = buildRecipientQuery({ role: 'member' })
+  assert.ok(!/WHERE/.test(sql), `role-only SQL must not contain WHERE:\n${sql}`)
+  assert.deepEqual(binds, [])
+})

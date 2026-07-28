@@ -56,10 +56,13 @@ function buildRecipientQuery ({ role, village = null, predicates = [] } = {}) {
   }
   where.push(...predicates)
 
-  const sql = `${SELECT_HEAD}
-    ${joins.join('\n    ')}
-    WHERE ${where.join(' AND ')}
-  `
+  // A role-only audience ("all active members") has nothing to filter on, and
+  // an unconditional WHERE would emit a dangling clause — ER_PARSE_ERROR at
+  // request time rather than a wrong result.
+  const clauses = [SELECT_HEAD, `    ${joins.join('\n    ')}`]
+  if (where.length) clauses.push(`    WHERE ${where.join(' AND ')}`)
+
+  const sql = `${clauses.join('\n')}\n  `
   return { sql, binds }
 }
 
