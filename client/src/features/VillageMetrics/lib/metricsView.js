@@ -4,11 +4,10 @@
 // in this feature to render.
 
 export const STATUS_ORDER = [
-  'draft', 'open', 'confirmed', 'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled',
+  'open', 'confirmed', 'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled',
 ]
 
 export const STATUS_LABELS = {
-  draft: 'Draft',
   open: 'Open',
   confirmed: 'Confirmed',
   completed: 'Completed',
