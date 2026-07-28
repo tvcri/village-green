@@ -42,9 +42,9 @@ describe('ServiceRequestTable serviceDate ordering', () => {
   })
   afterEach(() => { cleanup() })
 
-  it('defaults to ascending (soonest first) in both views', () => {
+  it('sorts ascending (soonest first) in both views when sortOrder is 1', () => {
     const { container } = render(ServiceRequestTable, {
-      props: baseProps, global: { plugins: [PrimeVue] }
+      props: { ...baseProps, sortOrder: 1 }, global: { plugins: [PrimeVue] }
     })
     expect(desktopOrder(container)).toEqual(['Oldest', 'Middle', 'Newest'])
     expect(mobileOrder(container)).toEqual(['Oldest', 'Middle', 'Newest'])
@@ -66,5 +66,18 @@ describe('ServiceRequestTable serviceDate ordering', () => {
       global: { plugins: [PrimeVue] }
     })
     expect(rows.map(r => r.serviceRequestId)).toEqual(['1', '2', '3'])
+  })
+
+  it('defaults to soonest-first when no sortOrder is passed', () => {
+    const rows = [
+      { serviceRequestId: 1, serviceDate: '2026-07-01', displayNumber: 'A-1', status: 'Open' },
+      { serviceRequestId: 2, serviceDate: '2026-07-20', displayNumber: 'A-2', status: 'Open' }
+    ]
+    const { container } = render(ServiceRequestTable, {
+      props: { rows, isLoading: false, hasLoadedOnce: true, error: null },
+      global: { plugins: [PrimeVue] }
+    })
+    const text = container.textContent
+    expect(text.indexOf('A-1')).toBeLessThan(text.indexOf('A-2'))
   })
 })

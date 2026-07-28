@@ -14,15 +14,10 @@ import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getServiceRequests } from '../api/serviceRequestApi.js'
 import { useServiceRequestFilters } from '../composables/useServiceRequestFilters.js'
-import { useServiceRequestTabs } from '../composables/useServiceRequestTabs.js'
+import { useServiceRequestWindow, ALL_STATUSES } from '../composables/useServiceRequestWindow.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { toCsv, downloadCsv, withLocalDateTimeColumns } from '../../../shared/lib/csvUtils.js'
@@ -68,7 +63,10 @@ const { state: allVillages } = useAsyncState(
   { immediate: true }
 )
 
-const tabs = useServiceRequestTabs({
+const {
+  windowStart, windowEnd,
+  rows: requests, isLoading, error, hasLoadedOnce, fetchRows
+} = useServiceRequestWindow({
   fetcher: (params) => getServiceRequests({
     ...params,
     villageId: selectedVillage.value
@@ -77,21 +75,13 @@ const tabs = useServiceRequestTabs({
     hasNotifications: notificationFilter.value === 'Not notified' ? false : undefined
   })
 })
-const {
-  activeTab, closedStart, closedEnd, statusOptions,
-  currentRows: requests, isLoading, error, hasLoadedOnce, fetchCurrent
-} = tabs
 
-const shared = useServiceRequestFilters(requests)
+const shared = useServiceRequestFilters(requests, { initialStatuses: ['open', 'confirmed'] })
 const {
   selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
   memberNames: memberOptions, volunteerNames: volunteerOptions,
   serviceNames: serviceOptions, clearAll
 } = shared
-
-// Each tab offers its own status set, so a selection made on one tab would
-// match nothing on the other. Reset it when the tab changes.
-watch(activeTab, () => { selectedStatuses.value = [] })
 
 // The Selects use null as "no filter" (so show-clear only appears for a real
 // selection); the composable uses ''. Bridge the two representations.
@@ -103,12 +93,9 @@ const memberChoice = nullable(selectedMember)
 const volunteerChoice = nullable(selectedVolunteer)
 const serviceChoice = nullable(selectedService)
 
-// `requests` is a computed over the visible tab, so write through to the
-// underlying ref that tab is backed by.
 const onNotified = (updated) => {
-  const target = activeTab.value === 'active' ? tabs.activeRows : tabs.closedRows
-  if (!Array.isArray(target.value)) return
-  target.value = target.value.map(r =>
+  if (!Array.isArray(requests.value)) return
+  requests.value = requests.value.map(r =>
     r.serviceRequestId === updated.serviceRequestId
       ? { ...r, notifications: updated.notificationHistory?.map(e => e.eventType) ?? [] }
       : r
@@ -124,7 +111,7 @@ onActivated(async () => {
     hasActivatedOnce.value = true
     return
   }
-  await fetchCurrent()
+  await fetchRows()
   const id = consumePendingHighlight()
   if (id) {
     flashRowId.value = id
@@ -133,35 +120,28 @@ onActivated(async () => {
   }
 })
 
-// Refetch the visible tab when it is first shown, or when the Closed window moves.
-watch(activeTab, () => { if (requests.value === null) fetchCurrent() })
-watch([closedStart, closedEnd], () => {
-  if (activeTab.value === 'closed') fetchCurrent()
-})
+// The window is the only server-side narrowing, so moving it refetches.
+watch([windowStart, windowEnd], () => { fetchRows() })
 
-// Village and notification filters are server-side, so both cached tabs are
-// stale when they change.
+// Village and notification filters are server-side too, so the cached rows
+// are stale when they change.
 watch([selectedVillage, notificationFilter], () => {
-  tabs.activeRows.value = null
-  tabs.closedRows.value = null
-  fetchCurrent()
+  requests.value = null
+  fetchRows()
 })
 
-onMounted(() => { tabs.fetchActive() })
+onMounted(() => { fetchRows() })
 
 // vssSignup is meta-only, so it composes on top of the shared predicate.
 const filteredRequests = computed(() =>
   shared.filteredRows.value.filter(r => !vssSignupOnly.value || r.vssSignup === true))
 
-// The Closed window counts as a filter only when narrowed from its default.
-const closedStartDefault = closedStart.value
-const closedWindowNarrowed = computed(() =>
-  activeTab.value === 'closed' &&
-  (closedStart.value !== closedStartDefault || !!closedEnd.value))
-
+// Counts only what the clear button can reset. The date range is excluded: it
+// is scope, not a filter, and counting something clearing cannot clear would
+// strand the badge at a number the user can't get rid of. Status does count on
+// load — the user is looking at a filtered view, and the badge is what says so.
 const activeFilterCount = computed(() => {
   let count = 0
-  if (closedWindowNarrowed.value) count++
   if (selectedStatuses.value.length) count++
   if (selectedMember.value) count++
   if (selectedVolunteer.value) count++
@@ -172,6 +152,8 @@ const activeFilterCount = computed(() => {
   if (vssSignupOnly.value) count++
   return count
 })
+
+const totalFetched = computed(() => Array.isArray(requests.value) ? requests.value.length : 0)
 
 const columnsForCsv = [
   { header: 'Request #', key: 'displayNumber' },
@@ -251,28 +233,26 @@ const navigateToEditRequest = (serviceRequestId) => {
   router.push({ name: 'meta-service-request-edit', params: { id: serviceRequestId } })
 }
 
-// Both tab panels render the same table; bind one prop object so they cannot drift.
 const tableProps = computed(() => ({
   rows: filteredRequests.value,
   isLoading: isLoading.value,
   hasLoadedOnce: hasLoadedOnce.value,
   error: error.value,
   showVillageColumn: true,
-  flashRowId: flashRowId.value,
-  // Active lists upcoming work soonest-first; Closed is a settled record, so the
-  // most recent records belong at the top.
-  sortOrder: activeTab.value === 'closed' ? -1 : 1
+  flashRowId: flashRowId.value
 }))
 
 const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)
 
+// The date range is a scope control, not a filter: it says which period the
+// list covers, and the user picked it deliberately. Clearing filters must
+// leave it alone — which also means only the village/notification watcher can
+// fire here, so a clear costs at most one refetch.
 const clearFilters = () => {
   clearAll()
   selectedVillage.value = null
   notificationFilter.value = null
   vssSignupOnly.value = false
-  closedStart.value = closedStartDefault
-  closedEnd.value = ''
 }
 </script>
 
@@ -307,9 +287,10 @@ const clearFilters = () => {
             <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
             <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: filtersCollapsed }" aria-hidden="true" />
           </Button>
-          <span v-if="requests && activeFilterCount > 0" class="filter-count-tag">
-            {{ filteredRequests.length }} {{ filteredRequests.length === 1 ? 'request' : 'requests' }}
+          <span v-if="requests" class="filter-count-tag">
+            {{ filteredRequests.length }} of {{ totalFetched }} {{ totalFetched === 1 ? 'request' : 'requests' }}
             <span
+              v-if="activeFilterCount > 0"
               role="button"
               class="clear-filters-icon"
               @click.prevent="clearFilters()"
@@ -327,7 +308,7 @@ const clearFilters = () => {
           <div class="status-filter-group">
             <label class="filter-group-label">Status:</label>
             <div class="status-filters">
-              <div v-for="status in statusOptions" :key="status" class="status-filter">
+              <div v-for="status in ALL_STATUSES" :key="status" class="status-filter">
                 <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
                 <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
               </div>
@@ -373,45 +354,25 @@ const clearFilters = () => {
       </div>
     </div>
 
-    <Tabs v-model:value="activeTab">
-      <TabList>
-        <Tab value="active">Active</Tab>
-        <Tab value="closed">Closed</Tab>
-      </TabList>
-      <TabPanels>
-        <TabPanel value="active">
-          <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
-            <template #actions="{ data }">
-              <span class="bell-wrapper">
-                <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
-                <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
-              </span>
-              <Button v-if="canWriteSr" icon="pi pi-pencil" v-tooltip="'Edit Request'" class="p-button-rounded p-button-text p-button-sm" @click.stop="navigateToEditRequest(data.serviceRequestId)" />
-            </template>
-          </ServiceRequestTable>
-        </TabPanel>
-        <TabPanel value="closed">
-          <div class="closed-range">
-            <label for="closed-start">From</label>
-            <!-- .lazy: commit on change, not per keystroke-segment — typing a
-                 year would otherwise fire fetches for values like 0002-… -->
-            <input id="closed-start" v-model.lazy="closedStart" type="date" >
-            <label for="closed-end">To</label>
-            <input id="closed-end" v-model.lazy="closedEnd" type="date" >
-            <small>Leave “To” empty for no upper bound.</small>
-          </div>
-          <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
-            <template #actions="{ data }">
-              <span class="bell-wrapper">
-                <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
-                <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
-              </span>
-              <Button v-if="canWriteSr" icon="pi pi-pencil" v-tooltip="'Edit Request'" class="p-button-rounded p-button-text p-button-sm" @click.stop="navigateToEditRequest(data.serviceRequestId)" />
-            </template>
-          </ServiceRequestTable>
-        </TabPanel>
-      </TabPanels>
-    </Tabs>
+    <div class="date-range">
+      <label for="window-start">From</label>
+      <!-- .lazy: commit on change, not per keystroke-segment — typing a
+           year would otherwise fire fetches for values like 0002-… -->
+      <input id="window-start" v-model.lazy="windowStart" type="date" >
+      <label for="window-end">To</label>
+      <input id="window-end" v-model.lazy="windowEnd" type="date" >
+      <small>Leave “To” empty for no upper bound.</small>
+    </div>
+
+    <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
+      <template #actions="{ data }">
+        <span class="bell-wrapper">
+          <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
+          <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
+        </span>
+        <Button v-if="canWriteSr" icon="pi pi-pencil" v-tooltip="'Edit Request'" class="p-button-rounded p-button-text p-button-sm" @click.stop="navigateToEditRequest(data.serviceRequestId)" />
+      </template>
+    </ServiceRequestTable>
 
     <NotificationHistoryDialog
       v-model:visible="historyDialogVisible"
@@ -456,10 +417,10 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
 }
-.closed-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.closed-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
-.closed-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
-.closed-range small { color: var(--color-text-secondary, #777); }
+.date-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.date-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
+.date-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
+.date-range small { color: var(--color-text-secondary, #777); }
 .bell-wrapper { position: relative; display: inline-flex; }
 .bell-alert-icon { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #ff9800; color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>
