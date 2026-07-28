@@ -121,4 +121,47 @@ describe('useServiceRequestFilters', () => {
       expect(filteredRows.value.map(r => r.serviceRequestId)).toEqual(['1', '3'])
     })
   })
+
+  describe('initial statuses', () => {
+    it('defaults selectedStatuses to [] when no option is passed', () => {
+      const { selectedStatuses } = useServiceRequestFilters(ref([]))
+      expect(selectedStatuses.value).toEqual([])
+    })
+
+    it('seeds selectedStatuses from initialStatuses', () => {
+      const { selectedStatuses } = useServiceRequestFilters(ref([]), {
+        initialStatuses: ['open', 'confirmed']
+      })
+      expect(selectedStatuses.value).toEqual(['open', 'confirmed'])
+    })
+
+    it('filters rows by the seeded statuses immediately', () => {
+      const rows = ref([
+        { serviceRequestId: 1, status: 'Open' },
+        { serviceRequestId: 2, status: 'Completed' }
+      ])
+      const { filteredRows } = useServiceRequestFilters(rows, {
+        initialStatuses: ['open', 'confirmed']
+      })
+      expect(filteredRows.value.map(r => r.serviceRequestId)).toEqual([1])
+    })
+
+    it('clearAll clears to no status filter, not back to the seed', () => {
+      const rows = ref([
+        { serviceRequestId: 1, status: 'Open' },
+        { serviceRequestId: 2, status: 'Completed' }
+      ])
+      const f = useServiceRequestFilters(rows, { initialStatuses: ['open'] })
+      f.clearAll()
+      expect(f.selectedStatuses.value).toEqual([])
+      expect(f.filteredRows.value.map(r => r.serviceRequestId)).toEqual([1, 2])
+    })
+
+    it('does not alias the caller array', () => {
+      const seed = ['open']
+      const { selectedStatuses } = useServiceRequestFilters(ref([]), { initialStatuses: seed })
+      selectedStatuses.value.push('confirmed')
+      expect(seed).toEqual(['open'])
+    })
+  })
 })
