@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { render, screen, fireEvent, waitFor } from '@testing-library/vue'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import VillageServiceRequestList from '../components/VillageServiceRequestList.vue'
 import { downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -89,26 +89,60 @@ describe('VillageServiceRequestList CSV download', () => {
     }
   })
 
-  it('fetches the Active tab on mount with open+confirmed', async () => {
+  // vitest `globals` is off in vite.config.js, so Testing Library's automatic
+  // cleanup never registers and mounted components leak between tests.
+  afterEach(() => { cleanup() })
+
+  it('fetches every status on mount over the default 30-day window', async () => {
     const { getVillageServiceRequests } = await import('../api/serviceRequestApi.js')
     getVillageServiceRequests.mockClear()
     render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
     await waitFor(() => expect(getVillageServiceRequests).toHaveBeenCalled())
     const params = getVillageServiceRequests.mock.calls[0][1]
-    expect(params.status).toEqual(['open', 'confirmed'])
+    expect(params.status).toEqual(['open', 'confirmed', 'completed', 'unmatched', 'cancelled'])
     expect(params.status).not.toContain('draft')
     expect(params.serviceDateEnd).toBeUndefined()
+    expect(params.serviceDateStart).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
-  it('downloads only the rows the Active tab fetched', async () => {
+  it('renders no tab list', async () => {
+    const { queryByRole } = render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await waitFor(() => expect(queryByRole('tablist')).toBeNull())
+  })
+
+  it('shows only open and confirmed rows on first load', async () => {
+    const { getVillageServiceRequests } = await import('../api/serviceRequestApi.js')
+    getVillageServiceRequests.mockResolvedValueOnce([
+      { serviceRequestId: 1, displayNumber: 'V-1', status: 'Open', serviceDate: '2026-07-20' },
+      { serviceRequestId: 2, displayNumber: 'V-2', status: 'Completed', serviceDate: '2026-07-19' },
+      { serviceRequestId: 3, displayNumber: 'V-3', status: 'Member cancelled', serviceDate: '2026-07-18' }
+    ])
+    // ServiceRequestTable renders both a desktop DataTable and a
+    // mobile-only card list for the same rows, so text appears twice.
+    const { findAllByText, queryAllByText } = render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await findAllByText('V-1')
+    expect(queryAllByText('V-2')).toHaveLength(0)
+    expect(queryAllByText('V-3')).toHaveLength(0)
+  })
+
+  it('shows an x-of-y count reflecting the default status filter', async () => {
+    const { getVillageServiceRequests } = await import('../api/serviceRequestApi.js')
+    getVillageServiceRequests.mockResolvedValueOnce([
+      { serviceRequestId: 1, displayNumber: 'V-1', status: 'Open', serviceDate: '2026-07-20' },
+      { serviceRequestId: 2, displayNumber: 'V-2', status: 'Completed', serviceDate: '2026-07-19' }
+    ])
+    const { findByText } = render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
+    expect(await findByText(/Showing 1 of 2/)).toBeTruthy()
+  })
+
+  it('downloads only the rows visible under the default status filter', async () => {
     render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
 
-    // The Active tab requests open+confirmed, so the completed request is
-    // never fetched — the server, not a client filter, excludes it.
+    // Every status is fetched now, but the default status filter
+    // (open+confirmed) hides the completed request client-side.
     await screen.findAllByText('Alice Anderson')
     expect(screen.queryAllByText('Bob Baker')).toHaveLength(0)
 
-    // Both tab panels render an ExportButton, so target the visible one.
     await fireEvent.click(screen.getAllByText('Download')[0])
 
     await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
