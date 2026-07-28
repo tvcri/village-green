@@ -75,7 +75,8 @@ describe('MetaServiceRequestList CSV download', () => {
       addEventListener: () => {},
       removeEventListener: () => {}
     })
-    // jsdom has no ResizeObserver; PrimeVue TabList observes its tabs on mount
+    // jsdom has no ResizeObserver; various PrimeVue components (e.g.
+    // Select, Checkbox) observe their elements on mount
     globalThis.ResizeObserver = class {
       observe () {}
       unobserve () {}
@@ -146,6 +147,33 @@ describe('MetaServiceRequestList CSV download', () => {
     expect(filename).toBe('service-requests.csv')
     expect(csv).toContain('Alice Anderson')
     expect(csv).not.toContain('Bob Baker')
+  })
+
+  it('clearing filters reveals closed rows and resets the date window', async () => {
+    const { getServiceRequests } = await import('../api/serviceRequestApi.js')
+    getServiceRequests.mockResolvedValueOnce([
+      { serviceRequestId: 1, displayNumber: 'M-1', status: 'Open', serviceDate: '2026-07-20' },
+      { serviceRequestId: 2, displayNumber: 'M-2', status: 'Completed', serviceDate: '2026-07-19' }
+    ])
+    const { findAllByText, queryAllByText, container, getByTitle } = render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+
+    await findAllByText('M-1')
+    expect(queryAllByText('M-2')).toHaveLength(0)
+
+    // Open the collapsed filter panel to reach the date window inputs.
+    await fireEvent.click(screen.getByText('Filters'))
+    const fromInput = container.querySelector('#window-start')
+    const defaultFrom = fromInput.value
+    await fireEvent.update(fromInput, '2026-06-01')
+    expect(fromInput.value).toBe('2026-06-01')
+
+    // Meta's clear control is the inline ✕ in .filter-count-tag, which only
+    // renders once activeFilterCount > 0 (guaranteed by the window narrowing).
+    await fireEvent.click(getByTitle('Clear all filters'))
+
+    await waitFor(() => expect(queryAllByText('M-2').length).toBeGreaterThan(0))
+    expect(queryAllByText('M-1').length).toBeGreaterThan(0)
+    expect(fromInput.value).toBe(defaultFrom)
   })
 
   it('narrows the visible rows by status without refetching', async () => {

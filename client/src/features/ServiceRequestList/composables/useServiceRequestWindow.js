@@ -41,7 +41,7 @@ export function useServiceRequestWindow ({ fetcher, canFetch, windowDays = 30, t
   const windowStart = ref(windowStartDefault)
   const windowEnd = ref('') // '' = unbounded
 
-  const async = useAsyncState(
+  const asyncState = useAsyncState(
     () => fetcher({
       status: [...ALL_STATUSES],
       serviceDateStart: windowStart.value,
@@ -60,26 +60,26 @@ export function useServiceRequestWindow ({ fetcher, canFetch, windowDays = 30, t
     // empty state is honest, and an export can't ship a window the user
     // isn't looking at.
     if (!windowStart.value) {
-      async.state.value = null
+      asyncState.state.value = null
       return Promise.resolve(null)
     }
-    return async.execute()
+    return asyncState.execute()
   }
 
   // Tracked so the table can tell "first load in flight" (spinner) from
   // "loaded and genuinely empty" (empty state). A failed first fetch must
   // leave this false, or the empty state hides the error.
   const hasLoadedOnce = ref(false)
-  watch(async.state, (val) => { if (val !== null) hasLoadedOnce.value = true })
+  watch(asyncState.state, (val) => { if (val !== null) hasLoadedOnce.value = true })
 
   return {
     windowStart, windowEnd, windowStartDefault,
     ALL_STATUSES,
     // rows stays writable so components can null it to force a refetch, or
     // write a row update through (e.g. onNotified).
-    rows: async.state,
-    isLoading: async.isLoading,
-    error: async.error,
+    rows: asyncState.state,
+    isLoading: asyncState.isLoading,
+    error: asyncState.error,
     hasLoadedOnce,
     fetchRows
   }

@@ -14,9 +14,11 @@ vi.mock('primevue/usetoast', () => ({
   useToast: () => ({ add: vi.fn() })
 }))
 
-// Status filtering is now the SERVER's job (the tab picks the status set), so
-// the mock honours the requested statuses instead of returning everything.
-// Rows are declared inside the factory because vi.mock is hoisted.
+// The mock honours the requested `status` param (mirroring the real API's
+// server-side date-window narrowing) so the "fetches every status" test can
+// assert on it; client-side status filtering itself is exercised through the
+// component, not this mock. Rows are declared inside the factory because
+// vi.mock is hoisted.
 vi.mock('../api/serviceRequestApi.js', () => {
   const allRows = [
     {
@@ -81,7 +83,8 @@ describe('VillageServiceRequestList CSV download', () => {
       addEventListener: () => {},
       removeEventListener: () => {}
     })
-    // jsdom has no ResizeObserver; PrimeVue TabList observes its tabs on mount
+    // jsdom has no ResizeObserver; various PrimeVue components (e.g.
+    // MultiSelect, AutoComplete) observe their elements on mount
     globalThis.ResizeObserver = class {
       observe () {}
       unobserve () {}
@@ -133,6 +136,34 @@ describe('VillageServiceRequestList CSV download', () => {
     ])
     const { findByText } = render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
     expect(await findByText(/Showing 1 of 2/)).toBeTruthy()
+  })
+
+  it('clearing filters reveals closed rows and resets the date window', async () => {
+    const { getVillageServiceRequests } = await import('../api/serviceRequestApi.js')
+    getVillageServiceRequests.mockResolvedValueOnce([
+      { serviceRequestId: 1, displayNumber: 'V-1', status: 'Open', serviceDate: '2026-07-20' },
+      { serviceRequestId: 2, displayNumber: 'V-2', status: 'Completed', serviceDate: '2026-07-19' }
+    ])
+    const { findAllByText, queryAllByText, container } = render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
+
+    await findAllByText('V-1')
+    expect(queryAllByText('V-2')).toHaveLength(0)
+
+    const fromInput = container.querySelector('#window-start')
+    const defaultFrom = fromInput.value
+    await fireEvent.update(fromInput, '2026-06-01')
+    expect(fromInput.value).toBe('2026-06-01')
+
+    // The clear button only renders once activeFilterCount > 0 (the window
+    // narrowing above guarantees that); its tooltip text lives in a
+    // hover-triggered portal, not static DOM text, so target it by icon.
+    const clearButton = container.querySelector('button .pi-times')?.closest('button')
+    expect(clearButton).toBeTruthy()
+    await fireEvent.click(clearButton)
+
+    await waitFor(() => expect(queryAllByText('V-2').length).toBeGreaterThan(0))
+    expect(queryAllByText('V-1').length).toBeGreaterThan(0)
+    expect(fromInput.value).toBe(defaultFrom)
   })
 
   it('downloads only the rows visible under the default status filter', async () => {
