@@ -266,16 +266,6 @@ const clearFilters = () => {
 
 <template>
   <div class="service-request-list">
-    <div class="date-range">
-      <label for="window-start">From</label>
-      <!-- .lazy: commit on change, not per keystroke-segment — typing a
-           year would otherwise fire fetches for values like 0002-… -->
-      <input id="window-start" v-model.lazy="windowStart" type="date" >
-      <label for="window-end">To</label>
-      <input id="window-end" v-model.lazy="windowEnd" type="date" >
-      <small>Leave “To” empty for no upper bound.</small>
-    </div>
-
     <div class="header-row">
       <div class="title-group">
         <h1>Service Requests</h1>
@@ -299,6 +289,16 @@ const clearFilters = () => {
       <InputText v-model="idSearch" placeholder="Request #" />
       <Button v-if="activeFilterCount > 0" icon="pi pi-times" text rounded v-tooltip="'Clear filters'" @click="clearFilters" />
       <span v-if="hasLoadedOnce" class="showing-count">{{ showingCount }}</span>
+    </div>
+
+    <div class="date-range">
+      <label for="window-start">From</label>
+      <!-- .lazy: commit on change, not per keystroke-segment — typing a
+           year would otherwise fire fetches for values like 0002-… -->
+      <input id="window-start" v-model.lazy="windowStart" type="date" >
+      <label for="window-end">To</label>
+      <input id="window-end" v-model.lazy="windowEnd" type="date" >
+      <small>Leave “To” empty for no upper bound.</small>
     </div>
 
     <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
