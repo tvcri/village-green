@@ -145,32 +145,42 @@ describe('VillageServiceRequestList CSV download', () => {
     expect(await findByText(/Showing 1 of 2/)).toBeTruthy()
   })
 
-  it('clearing filters reveals closed rows and resets the date window', async () => {
+  it('clearing filters reveals closed rows but leaves the date window alone', async () => {
     const { getVillageServiceRequests } = await import('../api/serviceRequestApi.js')
-    getVillageServiceRequests.mockResolvedValueOnce([
+    // Not mockResolvedValueOnce: moving the window below triggers a refetch,
+    // and a one-shot mock would serve the default rows to it, dropping V-2.
+    const rows = [
       { serviceRequestId: 1, displayNumber: 'V-1', status: 'Open', serviceDate: '2026-07-20' },
       { serviceRequestId: 2, displayNumber: 'V-2', status: 'Completed', serviceDate: '2026-07-19' }
-    ])
+    ]
+    const impl = getVillageServiceRequests.getMockImplementation()
+    getVillageServiceRequests.mockResolvedValue(rows)
     const { findAllByText, queryAllByText, container } = render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
 
     await findAllByText('V-1')
     expect(queryAllByText('V-2')).toHaveLength(0)
 
+    // The inputs are v-model.lazy, so the ref only updates on `change`.
+    // fireEvent.update alone fires `input` and would leave the ref untouched —
+    // the assertion below would then pass without the window ever moving.
     const fromInput = container.querySelector('#window-start')
-    const defaultFrom = fromInput.value
-    await fireEvent.update(fromInput, '2026-06-01')
-    expect(fromInput.value).toBe('2026-06-01')
+    fromInput.value = '2026-06-01'
+    await fireEvent.change(fromInput)
 
-    // The clear button only renders once activeFilterCount > 0 (the window
-    // narrowing above guarantees that); its tooltip text lives in a
-    // hover-triggered portal, not static DOM text, so target it by icon.
+    // The clear button renders because the seeded open+confirmed status counts
+    // as a filter; its tooltip text lives in a hover-triggered portal, not
+    // static DOM text, so target it by icon.
     const clearButton = container.querySelector('button .pi-times')?.closest('button')
     expect(clearButton).toBeTruthy()
     await fireEvent.click(clearButton)
 
     await waitFor(() => expect(queryAllByText('V-2').length).toBeGreaterThan(0))
     expect(queryAllByText('V-1').length).toBeGreaterThan(0)
-    expect(fromInput.value).toBe(defaultFrom)
+    // The date range is scope, not a filter: clearing must not touch it.
+    expect(fromInput.value).toBe('2026-06-01')
+
+    // Restore the shared factory implementation for the remaining tests.
+    getVillageServiceRequests.mockImplementation(impl)
   })
 
   it('keeps the open+confirmed default when navigating to another village', async () => {

@@ -64,7 +64,7 @@ const { state: allVillages } = useAsyncState(
 )
 
 const {
-  windowStart, windowEnd, windowStartDefault,
+  windowStart, windowEnd,
   rows: requests, isLoading, error, hasLoadedOnce, fetchRows
 } = useServiceRequestWindow({
   fetcher: (params) => getServiceRequests({
@@ -136,15 +136,12 @@ onMounted(() => { fetchRows() })
 const filteredRequests = computed(() =>
   shared.filteredRows.value.filter(r => !vssSignupOnly.value || r.vssSignup === true))
 
-// The window counts as a filter only when narrowed from its default. Status
-// does count on load: the user is looking at a filtered view, and the badge
-// is what says so.
-const windowNarrowed = computed(() =>
-  windowStart.value !== windowStartDefault || !!windowEnd.value)
-
+// Counts only what the clear button can reset. The date range is excluded: it
+// is scope, not a filter, and counting something clearing cannot clear would
+// strand the badge at a number the user can't get rid of. Status does count on
+// load — the user is looking at a filtered view, and the badge is what says so.
 const activeFilterCount = computed(() => {
   let count = 0
-  if (windowNarrowed.value) count++
   if (selectedStatuses.value.length) count++
   if (selectedMember.value) count++
   if (selectedVolunteer.value) count++
@@ -247,13 +244,15 @@ const tableProps = computed(() => ({
 
 const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)
 
+// The date range is a scope control, not a filter: it says which period the
+// list covers, and the user picked it deliberately. Clearing filters must
+// leave it alone — which also means only the village/notification watcher can
+// fire here, so a clear costs at most one refetch.
 const clearFilters = () => {
   clearAll()
   selectedVillage.value = null
   notificationFilter.value = null
   vssSignupOnly.value = false
-  windowStart.value = windowStartDefault
-  windowEnd.value = ''
 }
 </script>
 

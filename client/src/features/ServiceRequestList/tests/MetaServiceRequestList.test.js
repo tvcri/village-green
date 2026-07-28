@@ -149,29 +149,39 @@ describe('MetaServiceRequestList CSV download', () => {
     expect(csv).not.toContain('Bob Baker')
   })
 
-  it('clearing filters reveals closed rows and resets the date window', async () => {
+  it('clearing filters reveals closed rows but leaves the date window alone', async () => {
     const { getServiceRequests } = await import('../api/serviceRequestApi.js')
-    getServiceRequests.mockResolvedValueOnce([
+    // Not mockResolvedValueOnce: moving the window below triggers a refetch,
+    // and a one-shot mock would serve the default rows to it, dropping M-2.
+    const rows = [
       { serviceRequestId: 1, displayNumber: 'M-1', status: 'Open', serviceDate: '2026-07-20' },
       { serviceRequestId: 2, displayNumber: 'M-2', status: 'Completed', serviceDate: '2026-07-19' }
-    ])
+    ]
+    const impl = getServiceRequests.getMockImplementation()
+    getServiceRequests.mockResolvedValue(rows)
     const { findAllByText, queryAllByText, container, getByTitle } = render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
 
     await findAllByText('M-1')
     expect(queryAllByText('M-2')).toHaveLength(0)
 
+    // The inputs are v-model.lazy, so the ref only updates on `change`.
+    // fireEvent.update alone fires `input` and would leave the ref untouched —
+    // the assertion below would then pass without the window ever moving.
     const fromInput = container.querySelector('#window-start')
-    const defaultFrom = fromInput.value
-    await fireEvent.update(fromInput, '2026-06-01')
-    expect(fromInput.value).toBe('2026-06-01')
+    fromInput.value = '2026-06-01'
+    await fireEvent.change(fromInput)
 
-    // Meta's clear control is the inline ✕ in .filter-count-tag, which only
-    // renders once activeFilterCount > 0 (guaranteed by the window narrowing).
+    // Meta's clear control is the inline ✕ in .filter-count-tag, which renders
+    // because the seeded open+confirmed status counts as a filter.
     await fireEvent.click(getByTitle('Clear all filters'))
 
     await waitFor(() => expect(queryAllByText('M-2').length).toBeGreaterThan(0))
     expect(queryAllByText('M-1').length).toBeGreaterThan(0)
-    expect(fromInput.value).toBe(defaultFrom)
+    // The date range is scope, not a filter: clearing must not touch it.
+    expect(fromInput.value).toBe('2026-06-01')
+
+    // Restore the shared factory implementation for the remaining tests.
+    getServiceRequests.mockImplementation(impl)
   })
 
   it('narrows the visible rows by status without refetching', async () => {
