@@ -75,7 +75,8 @@ describe('MetaServiceRequestList CSV download', () => {
       addEventListener: () => {},
       removeEventListener: () => {}
     })
-    // jsdom has no ResizeObserver; PrimeVue TabList observes its tabs on mount
+    // jsdom has no ResizeObserver; various PrimeVue components (e.g.
+    // Select, Checkbox) observe their elements on mount
     globalThis.ResizeObserver = class {
       observe () {}
       unobserve () {}
@@ -87,15 +88,43 @@ describe('MetaServiceRequestList CSV download', () => {
   // cleanup never registers and mounted components leak between tests.
   afterEach(() => { cleanup() })
 
-  it('fetches the Active tab on mount and never requests draft', async () => {
+  it('fetches every status on mount over the default 30-day window', async () => {
     const { getServiceRequests } = await import('../api/serviceRequestApi.js')
     getServiceRequests.mockClear()
     render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
     await waitFor(() => expect(getServiceRequests).toHaveBeenCalled())
-    const firstArgs = getServiceRequests.mock.calls[0][0]
-    expect(firstArgs.status).toEqual(['open', 'confirmed'])
-    expect(firstArgs.status).not.toContain('draft')
-    expect(firstArgs.serviceDateEnd).toBeUndefined()
+    const params = getServiceRequests.mock.calls[0][0]
+    expect(params.status).toEqual(['open', 'confirmed', 'completed', 'unmatched', 'cancelled'])
+    expect(params.status).not.toContain('draft')
+    expect(params.serviceDateEnd).toBeUndefined()
+  })
+
+  it('renders no tab list', async () => {
+    const { queryByRole } = render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await waitFor(() => expect(queryByRole('tablist')).toBeNull())
+  })
+
+  it('shows only open and confirmed rows on first load', async () => {
+    const { getServiceRequests } = await import('../api/serviceRequestApi.js')
+    getServiceRequests.mockResolvedValueOnce([
+      { serviceRequestId: 1, displayNumber: 'M-1', status: 'Open', serviceDate: '2026-07-20' },
+      { serviceRequestId: 2, displayNumber: 'M-2', status: 'Completed', serviceDate: '2026-07-19' }
+    ])
+    // ServiceRequestTable renders both a desktop DataTable and a
+    // mobile-only card list for the same rows, so text appears twice.
+    const { findAllByText, queryAllByText } = render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await findAllByText('M-1')
+    expect(queryAllByText('M-2')).toHaveLength(0)
+  })
+
+  it('shows an x-of-y count reflecting the default status filter', async () => {
+    const { getServiceRequests } = await import('../api/serviceRequestApi.js')
+    getServiceRequests.mockResolvedValueOnce([
+      { serviceRequestId: 1, displayNumber: 'M-1', status: 'Open', serviceDate: '2026-07-20' },
+      { serviceRequestId: 2, displayNumber: 'M-2', status: 'Completed', serviceDate: '2026-07-19' }
+    ])
+    const { findByText } = render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+    expect(await findByText(/1 of 2 requests/)).toBeTruthy()
   })
 
   it('downloads only the rows matching the active ID filter', async () => {
@@ -120,6 +149,41 @@ describe('MetaServiceRequestList CSV download', () => {
     expect(csv).not.toContain('Bob Baker')
   })
 
+  it('clearing filters reveals closed rows but leaves the date window alone', async () => {
+    const { getServiceRequests } = await import('../api/serviceRequestApi.js')
+    // Not mockResolvedValueOnce: moving the window below triggers a refetch,
+    // and a one-shot mock would serve the default rows to it, dropping M-2.
+    const rows = [
+      { serviceRequestId: 1, displayNumber: 'M-1', status: 'Open', serviceDate: '2026-07-20' },
+      { serviceRequestId: 2, displayNumber: 'M-2', status: 'Completed', serviceDate: '2026-07-19' }
+    ]
+    const impl = getServiceRequests.getMockImplementation()
+    getServiceRequests.mockResolvedValue(rows)
+    const { findAllByText, queryAllByText, container, getByTitle } = render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+
+    await findAllByText('M-1')
+    expect(queryAllByText('M-2')).toHaveLength(0)
+
+    // The inputs are v-model.lazy, so the ref only updates on `change`.
+    // fireEvent.update alone fires `input` and would leave the ref untouched —
+    // the assertion below would then pass without the window ever moving.
+    const fromInput = container.querySelector('#window-start')
+    fromInput.value = '2026-06-01'
+    await fireEvent.change(fromInput)
+
+    // Meta's clear control is the inline ✕ in .filter-count-tag, which renders
+    // because the seeded open+confirmed status counts as a filter.
+    await fireEvent.click(getByTitle('Clear all filters'))
+
+    await waitFor(() => expect(queryAllByText('M-2').length).toBeGreaterThan(0))
+    expect(queryAllByText('M-1').length).toBeGreaterThan(0)
+    // The date range is scope, not a filter: clearing must not touch it.
+    expect(fromInput.value).toBe('2026-06-01')
+
+    // Restore the shared factory implementation for the remaining tests.
+    getServiceRequests.mockImplementation(impl)
+  })
+
   it('narrows the visible rows by status without refetching', async () => {
     const { getServiceRequests } = await import('../api/serviceRequestApi.js')
     render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
@@ -127,9 +191,11 @@ describe('MetaServiceRequestList CSV download', () => {
     await screen.findAllByText('Alice Anderson')
     getServiceRequests.mockClear()
 
-    // Alice is Open, Bob is Confirmed (both fetched by the Active tab).
+    // Alice is Open, Bob is Confirmed. The default status selection is
+    // open+confirmed, so both checkboxes start checked; unchecking Open
+    // narrows to Confirmed only.
     await fireEvent.click(screen.getByText('Filters'))
-    await fireEvent.click(screen.getByLabelText('Confirmed'))
+    await fireEvent.click(screen.getByLabelText('Open'))
 
     await waitFor(() => expect(screen.queryAllByText('Alice Anderson')).toHaveLength(0))
     expect(screen.getAllByText('Bob Baker').length).toBeGreaterThan(0)
