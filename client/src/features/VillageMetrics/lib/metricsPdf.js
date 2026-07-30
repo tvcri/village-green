@@ -26,12 +26,27 @@ const STATUS_TEXT = {
 }
 
 // Standard Helvetica encodes WinAnsi only; one character outside it makes
-// drawText throw and kills the whole document. Same guard generateLabelPdf uses.
-function winAnsi (text) {
-  return String(text ?? '')
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^\x20-\x7E]/g, '?')
+// drawText throw and kills the whole document. WinAnsi is much wider than
+// printable ASCII (it covers em dash, middle dot, precomposed Latin-1
+// accents like "ë", etc.), so pdf-lib's own encoder is used as the sole
+// authority on what's encodable — no hand-maintained character table.
+// Same guard generateLabelPdf uses.
+export function winAnsi (text, font) {
+  const s = String(text ?? '')
+  if (isEncodable(s, font)) return s
+
+  let out = ''
+  for (const ch of s) out += isEncodable(ch, font) ? ch : '?'
+  return out
+}
+
+function isEncodable (s, font) {
+  try {
+    font.widthOfTextAtSize(s, 12)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function hexColor (hex) {
@@ -52,11 +67,11 @@ export function peopleFooter (shown, total, noun) {
 }
 
 function drawText (page, text, x, y, size, font, color) {
-  page.drawText(winAnsi(text), { x, y, size, font, color })
+  page.drawText(winAnsi(text, font), { x, y, size, font, color })
 }
 
 function rightText (page, text, rightX, y, size, font, color) {
-  const s = winAnsi(text)
+  const s = winAnsi(text, font)
   page.drawText(s, { x: rightX - font.widthOfTextAtSize(s, size), y, size, font, color })
 }
 

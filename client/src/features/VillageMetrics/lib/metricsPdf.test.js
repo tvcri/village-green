@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { PDFDocument } from 'pdf-lib'
-import { PEOPLE_LIMIT, topN, peopleFooter, buildMetricsPdf } from './metricsPdf.js'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
+import { PEOPLE_LIMIT, topN, peopleFooter, buildMetricsPdf, winAnsi } from './metricsPdf.js'
 
 const ROWS = [
   { label: 'Rides', value: 704, color: '#22c55e', pct: 0.8009 },
@@ -87,5 +87,30 @@ describe('metricsPdf', () => {
       },
     }))
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3)
+  })
+
+  describe('winAnsi', () => {
+    it('passes an em dash and a middle dot through unchanged', async () => {
+      const pdf = await PDFDocument.create()
+      const font = await pdf.embedFont(StandardFonts.Helvetica)
+      expect(winAnsi('A — B · C', font)).toBe('A — B · C')
+      // Also confirm it actually builds into a PDF without throwing.
+      const bytes = await buildMetricsPdf(report({ villageName: 'Westerly — Sample · Village' }))
+      expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3)
+    })
+
+    it('keeps precomposed accented Latin characters intact (WinAnsi covers them)', async () => {
+      const pdf = await PDFDocument.create()
+      const font = await pdf.embedFont(StandardFonts.Helvetica)
+      expect(winAnsi('Zoë', font)).toBe('Zoë')
+      expect(winAnsi('Ünicode', font)).toBe('Ünicode')
+    })
+
+    it('degrades genuinely unencodable characters (CJK) to ? instead of throwing', async () => {
+      const pdf = await PDFDocument.create()
+      const font = await pdf.embedFont(StandardFonts.Helvetica)
+      expect(winAnsi('日本', font)).toBe('??')
+      expect(winAnsi('Ünicode, Zoë — 日本', font)).toBe('Ünicode, Zoë — ??')
+    })
   })
 })
