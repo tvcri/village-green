@@ -1,11 +1,16 @@
 <script setup>
 import { computed } from 'vue'
 import Chart from 'primevue/chart'
+import Button from 'primevue/button'
+import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { PIE_COLUMNS, pieCsvRows } from '../lib/metricsCsv.js'
 
 const props = defineProps({
   slices: { type: Array, required: true }, // [{ label, value, color }]
   rows: { type: Array, required: true }, // [{ label, value, color, pct }] — pct is a fraction (0..1)
   emptyMessage: { type: String, required: true },
+  // Empty string = no export control. Lets existing call sites stay untouched.
+  csvFilename: { type: String, default: '' },
 })
 
 defineOptions({ name: 'MetricsPieCard' })
@@ -46,6 +51,10 @@ const chartOptions = {
 function formatPct (pct) {
   return `${Math.round(pct * 100)}%`
 }
+
+function onDownloadCsv () {
+  downloadCsv(toCsv(pieCsvRows(props.rows), PIE_COLUMNS), props.csvFilename)
+}
 </script>
 
 <template>
@@ -55,6 +64,15 @@ function formatPct (pct) {
       <p v-else class="empty-msg">{{ emptyMessage }}</p>
     </div>
     <div class="legend-table-wrap">
+      <div v-if="csvFilename" class="legend-actions">
+        <Button
+          icon="pi pi-download"
+          label="Download CSV"
+          text
+          size="small"
+          @click="onDownloadCsv"
+        />
+      </div>
       <table class="legend-table">
         <thead>
           <tr>
@@ -109,6 +127,12 @@ function formatPct (pct) {
   min-width: 0;
   max-height: 22rem; /* scrolls past ~10 rows instead of stretching the card */
   overflow-y: auto;
+}
+
+.legend-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.25rem;
 }
 
 .legend-table {
