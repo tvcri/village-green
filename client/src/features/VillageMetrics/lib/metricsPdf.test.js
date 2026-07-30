@@ -13,6 +13,16 @@ function people (n, prefix) {
   }))
 }
 
+// A distinct-serviceName legend row per entry — Services' legend is unrolled
+// per serviceName with no Other-merge, so it can run much longer than the
+// fixed-vocabulary Categories/Outcomes pies. Used to push the Services
+// section tall enough on page 2 that People no longer fits beneath it.
+function serviceRows (n) {
+  return Array.from({ length: n }, (_, i) => ({
+    label: `Service ${i}`, value: n - i, color: '#0ea5e9', pct: 1 / n,
+  }))
+}
+
 function report (over = {}) {
   return {
     villageName: 'Sample Village',
@@ -32,9 +42,9 @@ function report (over = {}) {
 }
 
 describe('metricsPdf', () => {
-  it('caps People tables at 25', () => {
-    expect(PEOPLE_LIMIT).toBe(25)
-    expect(topN(people(200, 'M'), PEOPLE_LIMIT)).toHaveLength(25)
+  it('caps People tables at 20', () => {
+    expect(PEOPLE_LIMIT).toBe(20)
+    expect(topN(people(200, 'M'), PEOPLE_LIMIT)).toHaveLength(20)
   })
 
   it('takes the highest counts first', () => {
@@ -56,10 +66,14 @@ describe('metricsPdf', () => {
     expect(peopleFooter(3, 3, 'members')).toBe('Showing all 3 members by completed requests.')
   })
 
-  it('builds a three-page document', async () => {
-    const bytes = await buildMetricsPdf(report())
+  // People fits beneath Services on page 2 whenever there's room for it — a
+  // small monthly-shaped report (few services, few people) is the common case.
+  it('draws People beneath Services on page 2 when it fits, producing a 2-page document', async () => {
+    const bytes = await buildMetricsPdf(report({
+      people: { members: people(7, 'M'), volunteers: people(7, 'V') },
+    }))
     const doc = await PDFDocument.load(bytes)
-    expect(doc.getPageCount()).toBe(3)
+    expect(doc.getPageCount()).toBe(2)
   })
 
   it('produces a non-trivial file', async () => {
@@ -75,7 +89,7 @@ describe('metricsPdf', () => {
       },
       people: { members: [], volunteers: [] },
     }))
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3)
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2)
   })
 
   // Helvetica is WinAnsi-only; one stray character otherwise kills the document.
@@ -86,7 +100,56 @@ describe('metricsPdf', () => {
         volunteers: [],
       },
     }))
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3)
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2)
+  })
+
+  describe('People placement on page 2', () => {
+    // Monthly-shaped report: small People counts fit beneath Services with
+    // room to spare, so no third page is needed.
+    it('produces a 2-page document for a monthly-shaped report (7 members, 7 volunteers, 6 services)', async () => {
+      const bytes = await buildMetricsPdf(report({
+        views: {
+          categories: { rows: ROWS, status: 'completed', emptyMessage: 'No completed requests in this range' },
+          services: { rows: serviceRows(6), status: 'completed', category: 'all', emptyMessage: 'No completed requests in this range' },
+          outcomes: { rows: ROWS, emptyMessage: 'No requests in this range' },
+        },
+        people: { members: people(7, 'M'), volunteers: people(7, 'V') },
+      }))
+      const doc = await PDFDocument.load(bytes)
+      expect(doc.getPageCount()).toBe(2)
+    })
+
+    // People counts at/above the cap still fit under Services in the common
+    // case (few service types) — correct document, correct truncation wording
+    // (verified against real rendered PDF text via pdftotext separately).
+    it('still fits on page 2 and reports truncation when People counts are at the cap', async () => {
+      const bytes = await buildMetricsPdf(report({
+        people: { members: people(233, 'M'), volunteers: people(206, 'V') },
+      }))
+      const doc = await PDFDocument.load(bytes)
+      expect(doc.getPageCount()).toBe(2)
+      expect(peopleFooter(PEOPLE_LIMIT, 233, 'members'))
+        .toBe('Showing top 20 of 233 members by completed requests.')
+      expect(peopleFooter(PEOPLE_LIMIT, 206, 'volunteers'))
+        .toBe('Showing top 20 of 206 volunteers by completed requests.')
+    })
+
+    // When the Services legend is long enough (many distinct serviceNames —
+    // it has no Other-merge, unlike Categories/Outcomes), there isn't 382pt
+    // of room left for a full 20/20 People block on page 2, and it must
+    // spill to a genuine third page rather than overlap the footer.
+    it('spills People to a third page when Services leaves too little room', async () => {
+      const bytes = await buildMetricsPdf(report({
+        views: {
+          categories: { rows: ROWS, status: 'completed', emptyMessage: 'No completed requests in this range' },
+          services: { rows: serviceRows(25), status: 'completed', category: 'all', emptyMessage: 'No completed requests in this range' },
+          outcomes: { rows: ROWS, emptyMessage: 'No requests in this range' },
+        },
+        people: { members: people(20, 'M'), volunteers: people(20, 'V') },
+      }))
+      const doc = await PDFDocument.load(bytes)
+      expect(doc.getPageCount()).toBe(3)
+    })
   })
 
   describe('winAnsi', () => {
@@ -96,7 +159,7 @@ describe('metricsPdf', () => {
       expect(winAnsi('A — B · C', font)).toBe('A — B · C')
       // Also confirm it actually builds into a PDF without throwing.
       const bytes = await buildMetricsPdf(report({ villageName: 'Westerly — Sample · Village' }))
-      expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3)
+      expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2)
     })
 
     it('keeps precomposed accented Latin characters intact (WinAnsi covers them)', async () => {

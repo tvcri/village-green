@@ -13,7 +13,13 @@ const LINE = rgb(0.9, 0.91, 0.92)
 const PIE_SIZE = 200
 const ROW_H = 15
 
-export const PEOPLE_LIMIT = 25
+// Baseline the footer text is drawn at (see `footer` in buildMetricsPdf).
+// Nothing else may draw at or below this y.
+const FOOTER_Y = MARGIN - 18
+// "People" heading + its subtitle, drawn once above both columns.
+const PEOPLE_HEADING_H = 40
+
+export const PEOPLE_LIMIT = 20
 
 const STATUS_TEXT = {
   all: 'All statuses',
@@ -131,6 +137,39 @@ async function drawPieSection (pdf, page, fonts, title, subtitle, image, view, y
   return Math.min(y - PIE_SIZE, legendBottom) - 24
 }
 
+// Height (in pt) a single People column needs, from the section "People"
+// heading (shared above both columns) down past its truncation footer line,
+// with margin to spare. Fixed chrome is 18 (heading -> column header) + 38
+// (column header row: label/rule/first-row offset) + 26 (gap + truncation
+// footer, including descender clearance) = 82pt, plus 13pt per row drawn.
+function peopleColumnHeight (rowCount) {
+  return 18 + 38 + rowCount * 13 + 26
+}
+
+// Required height for the whole People section — its own "People" heading
+// plus the two-column block below, sized by whichever column is taller (the
+// two row counts can differ). This is what a fits-check compares against
+// remaining page space.
+function peopleSectionHeight (report) {
+  const shownMembers = Math.min(report.people.members.length, PEOPLE_LIMIT)
+  const shownVolunteers = Math.min(report.people.volunteers.length, PEOPLE_LIMIT)
+  const colH = Math.max(peopleColumnHeight(shownMembers), peopleColumnHeight(shownVolunteers))
+  return PEOPLE_HEADING_H + colH
+}
+
+// Draws the "People" heading and both columns (Members left, Volunteers
+// right) starting at the given y. Caller is responsible for having already
+// verified (via peopleSectionHeight) that it fits above the footer.
+function drawPeopleSection (page, fonts, report, y) {
+  const { helv, bold } = fonts
+  const colW = (PAGE_W - MARGIN * 2 - 24) / 2
+  drawText(page, 'People', MARGIN, y - 12, 13, bold, INK)
+  drawText(page, 'Completed requests only.', MARGIN + 60, y - 11, 9.5, helv, MUTED)
+  const peopleY = y - PEOPLE_HEADING_H
+  drawPeopleTable(page, fonts, 'Members', report.people.members, MARGIN, peopleY, colW)
+  drawPeopleTable(page, fonts, 'Volunteers', report.people.volunteers, MARGIN + colW + 24, peopleY, colW)
+}
+
 function drawPeopleTable (page, fonts, heading, rows, x, y, width) {
   const { helv, bold } = fonts
   const shown = topN(rows, PEOPLE_LIMIT)
@@ -195,6 +234,12 @@ export async function buildMetricsPdf (report) {
   })
   y -= 50
 
+  // Extra breathing room so Categories doesn't sit tight against the strip —
+  // matches the whitespace Outcomes gets above it (drawPieSection's own 24pt
+  // trailing gap). Verified page 1 still clears the footer at max legend rows
+  // (5 categories + 4 outcomes): ~40pt of clearance remains above y=36.
+  y -= 14
+
   y = await drawPieSection(pdf, p1, fonts, 'Categories',
     `Status: ${STATUS_TEXT[report.views.categories.status] ?? report.views.categories.status}`,
     report.images.categories, report.views.categories, y)
@@ -203,24 +248,27 @@ export async function buildMetricsPdf (report) {
     report.images.outcomes, report.views.outcomes, y)
   footer(p1)
 
-  // ---- Page 2: Services (alone — its legend is the longest) ----
+  // ---- Page 2: Services, then People beneath it if it fits ----
   const p2 = pdf.addPage([PAGE_W, PAGE_H])
   const svc = report.views.services
   const svcSub = `Status: ${STATUS_TEXT[svc.status] ?? svc.status}`
     + (svc.category && svc.category !== 'all' ? `  ·  Category: ${svc.category}` : '')
-  await drawPieSection(pdf, p2, fonts, 'Services', svcSub,
+  const afterServicesY = await drawPieSection(pdf, p2, fonts, 'Services', svcSub,
     report.images.services, svc, PAGE_H - MARGIN)
-  footer(p2)
 
-  // ---- Page 3: People, top 25 each, side by side ----
-  const p3 = pdf.addPage([PAGE_W, PAGE_H])
-  const colW = (PAGE_W - MARGIN * 2 - 24) / 2
-  drawText(p3, 'People', MARGIN, PAGE_H - MARGIN - 12, 13, bold, INK)
-  drawText(p3, 'Completed requests only.', MARGIN + 60, PAGE_H - MARGIN - 11, 9.5, helv, MUTED)
-  const peopleY = PAGE_H - MARGIN - 40
-  drawPeopleTable(p3, fonts, 'Members', report.people.members, MARGIN, peopleY, colW)
-  drawPeopleTable(p3, fonts, 'Volunteers', report.people.volunteers, MARGIN + colW + 24, peopleY, colW)
-  footer(p3)
+  const requiredPeopleH = peopleSectionHeight(report)
+  const availablePeopleH = afterServicesY - FOOTER_Y
+
+  if (requiredPeopleH <= availablePeopleH) {
+    drawPeopleSection(p2, fonts, report, afterServicesY)
+    footer(p2)
+  } else {
+    footer(p2)
+    // ---- Page 3: People spilled over — not enough room beneath Services ----
+    const p3 = pdf.addPage([PAGE_W, PAGE_H])
+    drawPeopleSection(p3, fonts, report, PAGE_H - MARGIN)
+    footer(p3)
+  }
 
   return pdf.save()
 }
