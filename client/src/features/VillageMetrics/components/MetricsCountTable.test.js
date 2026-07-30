@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import PrimeVue from 'primevue/config'
 import MetricsCountTable from './MetricsCountTable.vue'
+import * as csvUtils from '../../../shared/lib/csvUtils.js'
 
 const ROWS = [
   { personId: '11', fullName: 'Anderson, Alice', count: 5 },
@@ -82,5 +83,24 @@ describe('MetricsCountTable', () => {
   it('right-aligns the Completed column', () => {
     const { container } = mountTable({})
     expect(container.querySelector('tbody tr').cells[1].classList.contains('count-cell')).toBe(true)
+  })
+
+  it('shows no download button without a csvFilename', () => {
+    mountTable({ csvFilename: '' })
+    expect(screen.queryByRole('button', { name: /download csv/i })).toBeNull()
+  })
+
+  it('exports every row, quoting "Last, First" names', async () => {
+    const spy = vi.spyOn(csvUtils, 'downloadCsv').mockImplementation(() => {})
+    mountTable({ csvFilename: 'sample-members-2026-01-01-2026-07-30.csv' })
+
+    await fireEvent.click(screen.getByRole('button', { name: /download csv/i }))
+
+    const [csv, filename] = spy.mock.calls[0]
+    expect(filename).toBe('sample-members-2026-01-01-2026-07-30.csv')
+    expect(csv.split('\n')[0]).toBe('Member,Completed')
+    expect(csv).toContain('"Anderson, Alice",5')
+    expect(csv).toContain('"Baker, Bob",3')
+    spy.mockRestore()
   })
 })
