@@ -138,10 +138,13 @@ async function drawPieSection (pdf, page, fonts, title, subtitle, image, view, y
 }
 
 // Height (in pt) a single People column needs, from the section "People"
-// heading (shared above both columns) down past its truncation footer line,
-// with margin to spare. Fixed chrome is 18 (heading -> column header) + 38
-// (column header row: label/rule/first-row offset) + 26 (gap + truncation
-// footer, including descender clearance) = 82pt, plus 13pt per row drawn.
+// heading (shared above both columns) down past its truncation footer line.
+// drawPeopleTable's own fixed chrome measures 44pt (18 heading -> column
+// header, then 6 + 14 rule/first-row offset, then 6 to the footer line); this
+// budgets 82pt so the fits-check keeps ~38pt of slack. The overestimate is
+// deliberate and one-directional: it can only spill People to a fresh page
+// slightly sooner than strictly necessary, never let it overlap the footer.
+// Keep it conservative — do NOT "correct" it down to the measured 44.
 function peopleColumnHeight (rowCount) {
   return 18 + 38 + rowCount * 13 + 26
 }
