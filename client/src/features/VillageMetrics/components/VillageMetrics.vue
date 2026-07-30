@@ -23,6 +23,7 @@ import {
   stripStats,
 } from '../lib/metricsView.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
+import { csvFilename } from '../lib/metricsCsv.js'
 import MetricsRangePicker from './MetricsRangePicker.vue'
 import MetricsCountTable from './MetricsCountTable.vue'
 import MetricsSummaryStrip from './MetricsSummaryStrip.vue'
@@ -154,6 +155,24 @@ function adjustPeople (rows) {
 const memberRows = computed(() => (hasData.value ? adjustPeople(metrics.value.byMember) : []))
 const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value.byVolunteer) : []))
 
+// Filenames carry the filter state because the contents do: without it, four
+// downloads at different statuses all collide as one name in Downloads.
+function nameFor (table, state) {
+  return csvFilename({
+    villageName: metrics.value?.villageName || 'village',
+    table,
+    state,
+    start: range.value.start,
+    end: range.value.end,
+  })
+}
+
+const categoryCsvName = computed(() => nameFor('categories', catStatus.value))
+const serviceCsvName = computed(() => nameFor('services', svcStatus.value))
+const outcomesCsvName = computed(() => nameFor('outcomes', ''))
+const memberCsvName = computed(() => nameFor('members', ''))
+const volunteerCsvName = computed(() => nameFor('volunteers', ''))
+
 </script>
 
 <template>
@@ -199,7 +218,7 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="categoryView" />
+            <MetricsPieCard v-bind="categoryView" :csvFilename="categoryCsvName" />
           </TabPanel>
 
           <TabPanel value="services">
@@ -221,11 +240,11 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="serviceView" />
+            <MetricsPieCard v-bind="serviceView" :csvFilename="serviceCsvName" />
           </TabPanel>
 
           <TabPanel value="outcomes">
-            <MetricsPieCard v-bind="outcomesView" />
+            <MetricsPieCard v-bind="outcomesView" :csvFilename="outcomesCsvName" />
           </TabPanel>
 
           <TabPanel value="people">
@@ -233,12 +252,12 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
               <section class="metrics-section">
                 <h2>By member</h2>
                 <p class="caption">Completed requests only.</p>
-                <MetricsCountTable :rows="memberRows" nameHeader="Member" />
+                <MetricsCountTable :rows="memberRows" nameHeader="Member" :csvFilename="memberCsvName" />
               </section>
               <section class="metrics-section">
                 <h2>By volunteer</h2>
                 <p class="caption">Completed requests only.</p>
-                <MetricsCountTable :rows="volunteerRows" nameHeader="Volunteer" />
+                <MetricsCountTable :rows="volunteerRows" nameHeader="Volunteer" :csvFilename="volunteerCsvName" />
               </section>
             </div>
           </TabPanel>

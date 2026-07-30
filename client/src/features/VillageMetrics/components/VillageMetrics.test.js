@@ -238,4 +238,10 @@ describe('VillageMetrics container', () => {
     const { query } = mockRouter.replace.mock.calls.at(-1)[0]
     expect(query).toMatchObject({ start: '2026-01-01', end: '2026-12-31', tab: 'people' })
   })
+
+  it('offers a CSV download on the visible legend table', async () => {
+    await renderLoaded()
+    const buttons = screen.getAllByRole('button', { name: /download csv/i })
+    expect(buttons.length).toBeGreaterThan(0)
+  })
 })
