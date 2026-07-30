@@ -244,4 +244,9 @@ describe('VillageMetrics container', () => {
     const buttons = screen.getAllByRole('button', { name: /download csv/i })
     expect(buttons.length).toBeGreaterThan(0)
   })
+
+  it('offers a Download PDF button', async () => {
+    await renderLoaded()
+    expect(screen.getByRole('button', { name: /download pdf/i })).toBeTruthy()
+  })
 })

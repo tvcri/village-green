@@ -9,6 +9,9 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
+import Button from 'primevue/button'
+import { captureAll } from '../lib/capturePies.js'
+import { buildMetricsPdf } from '../lib/metricsPdf.js'
 import { getVillageMetrics } from '../api/villageMetricsApi.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
@@ -173,6 +176,75 @@ const outcomesCsvName = computed(() => nameFor('outcomes', ''))
 const memberCsvName = computed(() => nameFor('members', ''))
 const volunteerCsvName = computed(() => nameFor('volunteers', ''))
 
+// ---- PDF export ----
+// No spinner: a measured export runs ~200ms, where a spinner would only flash.
+// The disabled button plus a changed label is enough, and it also prevents the
+// double-click-two-PDFs race.
+const isExporting = ref(false)
+
+// Chart.js is loaded on demand so the export path costs nothing until used.
+async function chartDeps () {
+  const { default: Chart } = await import('chart.js/auto')
+  return {
+    createCanvas: (size) => {
+      const c = document.createElement('canvas')
+      c.width = size
+      c.height = size
+      return c
+    },
+    createChart: (canvas, cfg) => new Chart(canvas, cfg),
+  }
+}
+
+async function onDownloadPdf () {
+  isExporting.value = true
+  try {
+    const deps = await chartDeps()
+    const images = captureAll({
+      categories: categoryView.value.slices,
+      services: serviceView.value.slices,
+      outcomes: outcomesView.value.slices,
+    }, deps)
+
+    const bytes = await buildMetricsPdf({
+      villageName: metrics.value?.villageName || 'Village',
+      start: range.value.start,
+      end: range.value.end,
+      legs: legs.value,
+      strip: strip.value,
+      images,
+      views: {
+        categories: { rows: categoryView.value.rows, status: catStatus.value, emptyMessage: categoryView.value.emptyMessage },
+        services: { rows: serviceView.value.rows, status: svcStatus.value, category: svcCategory.value, emptyMessage: serviceView.value.emptyMessage },
+        outcomes: { rows: outcomesView.value.rows, emptyMessage: outcomesView.value.emptyMessage },
+      },
+      people: { members: memberRows.value, volunteers: volunteerRows.value },
+    })
+
+    const blob = new Blob([bytes], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = pdfName.value
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } finally {
+    isExporting.value = false
+  }
+}
+
+const pdfName = computed(() =>
+  csvFilename({
+    villageName: metrics.value?.villageName || 'village',
+    table: 'metrics',
+    state: '',
+    start: range.value.start,
+    end: range.value.end,
+  }).replace(/\.csv$/, '.pdf'),
+)
+
 </script>
 
 <template>
@@ -197,6 +269,15 @@ const volunteerCsvName = computed(() => nameFor('volunteers', ''))
       <div class="legs-toggle">
         <ToggleSwitch v-model="legs" inputId="legsToggle" />
         <label for="legsToggle">Count round trips as 2 legs</label>
+      </div>
+
+      <div class="export-bar">
+        <Button
+          icon="pi pi-file-pdf"
+          :label="isExporting ? 'Preparing…' : 'Download PDF'"
+          :disabled="isExporting"
+          @click="onDownloadPdf"
+        />
       </div>
 
       <Tabs v-model:value="tab" lazy>
@@ -280,6 +361,11 @@ const volunteerCsvName = computed(() => nameFor('volunteers', ''))
   margin-bottom: 1rem;
 }
 .legs-toggle label { font-size: 0.9rem; cursor: pointer; }
+.export-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
 .panel-filters {
   display: flex;
   flex-wrap: wrap;
