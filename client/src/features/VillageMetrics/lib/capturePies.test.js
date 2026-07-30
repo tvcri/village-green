@@ -45,6 +45,16 @@ describe('capturePies', () => {
     expect(deps.created[0].options.animation).toBe(false)
   })
 
+  // Chart.js's initOptions writes options.plugins and options.scales during
+  // construction. A frozen options object makes that write throw in strict mode,
+  // which killed every PDF export before this was fixed.
+  it('hands Chart.js a mutable options object', () => {
+    const cfg = chartConfig(SLICES)
+    expect(Object.isFrozen(cfg.options)).toBe(false)
+    expect(() => { cfg.options.plugins = {}; cfg.options.scales = {} }).not.toThrow()
+    expect(cfg.options.animation).toBe(false) // still load-bearing after the clone
+  })
+
   it('destroys the chart so repeated exports do not leak', () => {
     const destroy = vi.fn()
     capturePie(SLICES, {

@@ -11,6 +11,10 @@ const EXPORT_SIZE = 560 // 280 CSS px at 2x, so the raster holds up in print
 // construction and toDataURL() on the next line returns a finished pie — no
 // await, no nextTick, no requestAnimationFrame. Set any other value here and
 // captures silently become half-swept pies.
+//
+// Frozen because this is the canonical template, shared by every capture and
+// pinned by tests below. chartConfig() must NOT hand this object to Chart.js
+// directly — see the clone comment there for why.
 export const EXPORT_CHART_OPTIONS = Object.freeze({
   responsive: false,
   maintainAspectRatio: false,
@@ -30,7 +34,12 @@ export function chartConfig (slices) {
         backgroundColor: slices.map(s => s.color),
       }],
     },
-    options: EXPORT_CHART_OPTIONS,
+    // Shallow clone, not the frozen object itself: Chart.js's initConfig()
+    // writes options.plugins / options.scales in place during `new Chart()`,
+    // before any canvas context is acquired. Handing it the frozen template
+    // makes that write throw ("Cannot assign to read only property") in
+    // strict mode, which is every module here — killing every PDF export.
+    options: { ...EXPORT_CHART_OPTIONS },
   }
 }
 
