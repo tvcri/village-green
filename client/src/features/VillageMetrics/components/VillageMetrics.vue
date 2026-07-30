@@ -266,12 +266,12 @@ const pdfName = computed(() =>
     <template v-else-if="hasData">
       <MetricsSummaryStrip :stats="strip" />
 
-      <div class="legs-toggle">
-        <ToggleSwitch v-model="legs" inputId="legsToggle" />
-        <label for="legsToggle">Count round trips as 2 legs</label>
-      </div>
+      <div class="controls-bar">
+        <div class="legs-toggle">
+          <ToggleSwitch v-model="legs" inputId="legsToggle" />
+          <label for="legsToggle">Count round trips as 2 legs</label>
+        </div>
 
-      <div class="export-bar">
         <Button
           icon="pi pi-file-pdf"
           :label="isExporting ? 'Preparing…' : 'Download PDF'"
@@ -354,18 +354,22 @@ const pdfName = computed(() =>
 .exclusion-note { color: var(--color-text-muted, #6b7280); font-size: 0.85rem; margin: 0.25rem 0 1rem; }
 .metrics-section { margin-bottom: 2rem; }
 .caption { color: var(--color-text-muted, #6b7280); font-size: 0.85rem; margin: 0 0 0.5rem; }
+/* Toggle left, Download PDF right, on one row. Wraps to two rows on narrow
+   viewports rather than crushing the toggle label. */
+.controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
 .legs-toggle {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
 }
 .legs-toggle label { font-size: 0.9rem; cursor: pointer; }
-.export-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 1rem;
-}
 .panel-filters {
   display: flex;
   flex-wrap: wrap;
