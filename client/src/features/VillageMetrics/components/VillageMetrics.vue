@@ -9,6 +9,9 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
+import SplitButton from 'primevue/splitbutton'
+import { captureAll } from '../lib/capturePies.js'
+import { buildMetricsPdf } from '../lib/metricsPdf.js'
 import { getVillageMetrics } from '../api/villageMetricsApi.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
@@ -23,6 +26,7 @@ import {
   stripStats,
 } from '../lib/metricsView.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
+import { csvFilename } from '../lib/metricsCsv.js'
 import MetricsRangePicker from './MetricsRangePicker.vue'
 import MetricsCountTable from './MetricsCountTable.vue'
 import MetricsSummaryStrip from './MetricsSummaryStrip.vue'
@@ -154,6 +158,120 @@ function adjustPeople (rows) {
 const memberRows = computed(() => (hasData.value ? adjustPeople(metrics.value.byMember) : []))
 const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value.byVolunteer) : []))
 
+// Filenames carry the filter state because the contents do: without it, four
+// downloads at different statuses all collide as one name in Downloads.
+function nameFor (table, state) {
+  return csvFilename({
+    villageName: metrics.value?.villageName || 'village',
+    table,
+    state,
+    start: range.value.start,
+    end: range.value.end,
+  })
+}
+
+const categoryCsvName = computed(() => nameFor('categories', catStatus.value))
+const serviceCsvName = computed(() => nameFor('services', svcStatus.value))
+const outcomesCsvName = computed(() => nameFor('outcomes', ''))
+const memberCsvName = computed(() => nameFor('members', ''))
+const volunteerCsvName = computed(() => nameFor('volunteers', ''))
+
+// ---- PDF export ----
+// No spinner: a measured export runs ~200ms, where a spinner would only flash.
+// The disabled button plus a changed label is enough, and it also prevents the
+// double-click-two-PDFs race.
+const isExporting = ref(false)
+
+// Chart.js is loaded on demand so the export path costs nothing until used.
+async function chartDeps () {
+  const { default: Chart } = await import('chart.js/auto')
+  return {
+    createCanvas: (size) => {
+      const c = document.createElement('canvas')
+      c.width = size
+      c.height = size
+      return c
+    },
+    createChart: (canvas, cfg) => new Chart(canvas, cfg),
+  }
+}
+
+async function onDownloadPdf () {
+  isExporting.value = true
+  try {
+    const deps = await chartDeps()
+    const images = captureAll({
+      categories: categoryView.value.slices,
+      services: serviceView.value.slices,
+      outcomes: outcomesView.value.slices,
+    }, deps)
+
+    const bytes = await buildMetricsPdf({
+      villageName: metrics.value?.villageName || 'Village',
+      start: range.value.start,
+      end: range.value.end,
+      legs: legs.value,
+      strip: strip.value,
+      images,
+      views: {
+        categories: { rows: categoryView.value.rows, status: catStatus.value, emptyMessage: categoryView.value.emptyMessage },
+        services: { rows: serviceView.value.rows, status: svcStatus.value, category: svcCategory.value, emptyMessage: serviceView.value.emptyMessage },
+        outcomes: { rows: outcomesView.value.rows, emptyMessage: outcomesView.value.emptyMessage },
+      },
+      people: { members: memberRows.value, volunteers: volunteerRows.value },
+    })
+
+    saveBlob(new Blob([bytes], { type: 'application/pdf' }), pdfName.value)
+  } finally {
+    isExporting.value = false
+  }
+}
+
+// Shared by the PDF and JSON downloads. The CSV path uses downloadCsv() from
+// csvUtils.js instead — it owns its own text/csv Blob and the same anchor dance.
+function saveBlob (blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+// Reuses csvFilename's slug + range construction, swapping the extension —
+// so PDF, JSON and the five CSVs all carry the same village/range identity.
+function exportName (ext) {
+  return csvFilename({
+    villageName: metrics.value?.villageName || 'village',
+    table: 'metrics',
+    state: '',
+    start: range.value.start,
+    end: range.value.end,
+  }).replace(/\.csv$/, ext)
+}
+
+const pdfName = computed(() => exportName('.pdf'))
+const jsonName = computed(() => exportName('.json'))
+
+// The RAW API response, deliberately unfiltered: no status/category selection
+// and no legs doubling, because those are client-side interpretations of this
+// payload rather than part of it. The five CSVs cover the filtered views.
+function onDownloadJson () {
+  if (!metrics.value) return
+  const json = JSON.stringify(metrics.value, null, 2)
+  saveBlob(new Blob([json], { type: 'application/json' }), jsonName.value)
+}
+
+const exportMenuItems = computed(() => [
+  {
+    label: 'Download JSON',
+    icon: 'pi pi-code',
+    command: onDownloadJson,
+  },
+])
+
 </script>
 
 <template>
@@ -175,9 +293,19 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
     <template v-else-if="hasData">
       <MetricsSummaryStrip :stats="strip" />
 
-      <div class="legs-toggle">
-        <ToggleSwitch v-model="legs" inputId="legsToggle" />
-        <label for="legsToggle">Count round trips as 2 legs</label>
+      <div class="controls-bar">
+        <div class="legs-toggle">
+          <ToggleSwitch v-model="legs" inputId="legsToggle" />
+          <label for="legsToggle">Round trip = 2 legs</label>
+        </div>
+
+        <SplitButton
+          icon="pi pi-file-pdf"
+          :label="isExporting ? 'Preparing…' : 'Download PDF'"
+          :disabled="isExporting"
+          :model="exportMenuItems"
+          @click="onDownloadPdf"
+        />
       </div>
 
       <Tabs v-model:value="tab" lazy>
@@ -199,7 +327,7 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="categoryView" />
+            <MetricsPieCard v-bind="categoryView" :csvFilename="categoryCsvName" />
           </TabPanel>
 
           <TabPanel value="services">
@@ -221,11 +349,11 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="serviceView" />
+            <MetricsPieCard v-bind="serviceView" :csvFilename="serviceCsvName" />
           </TabPanel>
 
           <TabPanel value="outcomes">
-            <MetricsPieCard v-bind="outcomesView" />
+            <MetricsPieCard v-bind="outcomesView" :csvFilename="outcomesCsvName" />
           </TabPanel>
 
           <TabPanel value="people">
@@ -233,12 +361,12 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
               <section class="metrics-section">
                 <h2>By member</h2>
                 <p class="caption">Completed requests only.</p>
-                <MetricsCountTable :rows="memberRows" nameHeader="Member" />
+                <MetricsCountTable :rows="memberRows" nameHeader="Member" :csvFilename="memberCsvName" />
               </section>
               <section class="metrics-section">
                 <h2>By volunteer</h2>
                 <p class="caption">Completed requests only.</p>
-                <MetricsCountTable :rows="volunteerRows" nameHeader="Volunteer" />
+                <MetricsCountTable :rows="volunteerRows" nameHeader="Volunteer" :csvFilename="volunteerCsvName" />
               </section>
             </div>
           </TabPanel>
@@ -254,11 +382,20 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
 .exclusion-note { color: var(--color-text-muted, #6b7280); font-size: 0.85rem; margin: 0.25rem 0 1rem; }
 .metrics-section { margin-bottom: 2rem; }
 .caption { color: var(--color-text-muted, #6b7280); font-size: 0.85rem; margin: 0 0 0.5rem; }
+/* Toggle left, Download PDF right, on one row. Wraps to two rows on narrow
+   viewports rather than crushing the toggle label. */
+.controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
 .legs-toggle {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
 }
 .legs-toggle label { font-size: 0.9rem; cursor: pointer; }
 .panel-filters {
@@ -269,10 +406,25 @@ const volunteerRows = computed(() => (hasData.value ? adjustPeople(metrics.value
   margin-bottom: 1rem;
 }
 .panel-filters label { color: var(--color-text-muted, #6b7280); font-size: 0.85rem; }
+/* `minmax(320px, ...)` is a hard floor: on a 320-390px viewport the 320px track
+   plus the page's own horizontal padding overflowed the screen. min() lets the
+   track collapse to the available width on a phone while still giving two
+   columns the moment there is room for them. */
 .people-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 1.5rem;
 }
 .loading-state { padding: 2rem; }
+
+@media (max-width: 640px) {
+  /* 1.5rem each side is a meaningful slice of a 320px screen; the content needs
+     it back more than the page needs the gutter. */
+  .village-metrics { padding: 1rem 0.75rem; }
+
+  /* Each filter gets its own line: label above control, control full-width,
+     rather than four items competing for one row. */
+  .panel-filters { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .panel-filters :deep(.p-select) { width: 100%; }
+}
 </style>

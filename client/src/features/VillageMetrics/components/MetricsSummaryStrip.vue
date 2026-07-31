@@ -45,7 +45,10 @@ defineOptions({ name: 'MetricsSummaryStrip' })
   border-radius: 8px;
   padding: 1rem;
   flex: 1 1 150px;
-  min-width: 150px;
+  /* A flat 150px floor plus the 1rem gap overflows a 320px screen once two
+     cards share a row. min() keeps the 150px preference on wider viewports but
+     lets the card collapse rather than push the document sideways. */
+  min-width: min(150px, 100%);
 }
 
 .stat-label {

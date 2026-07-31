@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, cleanup, waitFor } from '@testing-library/vue'
+import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { reactive, nextTick } from 'vue'
 import PrimeVue from 'primevue/config'
@@ -85,7 +85,7 @@ function renderPage () {
 // Wait for the async fetch to resolve and the dashboard to paint.
 async function renderLoaded () {
   const utils = renderPage()
-  await waitFor(() => expect(screen.getByText('Count round trips as 2 legs')).toBeTruthy())
+  await waitFor(() => expect(screen.getByText('Round trip = 2 legs')).toBeTruthy())
   return utils
 }
 
@@ -237,5 +237,56 @@ describe('VillageMetrics container', () => {
     await waitFor(() => expect(mockRouter.replace).toHaveBeenCalled())
     const { query } = mockRouter.replace.mock.calls.at(-1)[0]
     expect(query).toMatchObject({ start: '2026-01-01', end: '2026-12-31', tab: 'people' })
+  })
+
+  it('offers a CSV download on the visible legend table', async () => {
+    await renderLoaded()
+    const buttons = screen.getAllByRole('button', { name: /download csv/i })
+    expect(buttons.length).toBeGreaterThan(0)
+  })
+
+  it('offers a Download PDF button', async () => {
+    await renderLoaded()
+    expect(screen.getByRole('button', { name: /download pdf/i })).toBeTruthy()
+  })
+
+  // The JSON item lives in the SplitButton's dropdown, which PrimeVue renders
+  // only once opened — so drive it through the toggle rather than asserting on
+  // markup that isn't mounted yet.
+  it('offers Download JSON in the export dropdown', async () => {
+    await renderLoaded()
+    const toggle = document.querySelector('.p-splitbutton-dropdown')
+    expect(toggle).not.toBeNull()
+
+    await fireEvent.click(toggle)
+    await waitFor(() => expect(screen.getByText('Download JSON')).toBeTruthy())
+  })
+
+  // The raw payload is exported unfiltered: no status/category selection and no
+  // legs doubling, since those are client-side readings of this same JSON.
+  it('downloads the unmodified API payload as JSON', async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    // jsdom's Blob has no .text(), so capture the serialized parts on the way in.
+    const captured = []
+    const RealBlob = globalThis.Blob
+    globalThis.Blob = class extends RealBlob {
+      constructor (parts, opts) { super(parts, opts); captured.push({ parts, type: opts?.type }) }
+    }
+    const origCreate = URL.createObjectURL
+    URL.createObjectURL = () => 'blob:stub'
+    URL.revokeObjectURL = () => {}
+
+    await renderLoaded()
+    await fireEvent.click(document.querySelector('.p-splitbutton-dropdown'))
+    await waitFor(() => expect(screen.getByText('Download JSON')).toBeTruthy())
+    await fireEvent.click(screen.getByText('Download JSON'))
+
+    const json = captured.find(c => c.type === 'application/json')
+    expect(json).toBeTruthy()
+    expect(JSON.parse(json.parts[0])).toEqual(METRICS)
+
+    globalThis.Blob = RealBlob
+    URL.createObjectURL = origCreate
+    clickSpy.mockRestore()
   })
 })

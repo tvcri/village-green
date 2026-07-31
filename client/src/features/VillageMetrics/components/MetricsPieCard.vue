@@ -1,11 +1,16 @@
 <script setup>
 import { computed } from 'vue'
 import Chart from 'primevue/chart'
+import Button from 'primevue/button'
+import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { PIE_COLUMNS, pieCsvRows } from '../lib/metricsCsv.js'
 
 const props = defineProps({
   slices: { type: Array, required: true }, // [{ label, value, color }]
   rows: { type: Array, required: true }, // [{ label, value, color, pct }] — pct is a fraction (0..1)
   emptyMessage: { type: String, required: true },
+  // Empty string = no export control. Lets existing call sites stay untouched.
+  csvFilename: { type: String, default: '' },
 })
 
 defineOptions({ name: 'MetricsPieCard' })
@@ -46,6 +51,10 @@ const chartOptions = {
 function formatPct (pct) {
   return `${Math.round(pct * 100)}%`
 }
+
+function onDownloadCsv () {
+  downloadCsv(toCsv(pieCsvRows(props.rows), PIE_COLUMNS), props.csvFilename)
+}
 </script>
 
 <template>
@@ -55,6 +64,15 @@ function formatPct (pct) {
       <p v-else class="empty-msg">{{ emptyMessage }}</p>
     </div>
     <div class="legend-table-wrap">
+      <div v-if="csvFilename" class="legend-actions">
+        <Button
+          icon="pi pi-download"
+          label="Download CSV"
+          text
+          size="small"
+          @click="onDownloadCsv"
+        />
+      </div>
       <table class="legend-table">
         <thead>
           <tr>
@@ -81,13 +99,18 @@ function formatPct (pct) {
 .pie-card {
   display: flex;
   gap: 1.5rem;
-  container-type: inline-size;
+  min-width: 0;
 }
 
+/* `flex: 0 0 280px` here was a hard 280px floor: on a 320-390px viewport the
+   chart plus the legend beside it forced the document wider than the screen.
+   Shrinking is allowed now, with the 280px kept as a max rather than a floor. */
 .chart-container {
-  flex: 0 0 280px;
-  width: 280px;
+  flex: 0 1 280px;
+  width: 100%;
+  max-width: 280px;
   height: 280px;
+  min-width: 0;
 }
 
 /* Container-owned sizing: if the canvas sizes its own wrapper, Chart.js reads back the
@@ -109,6 +132,16 @@ function formatPct (pct) {
   min-width: 0;
   max-height: 22rem; /* scrolls past ~10 rows instead of stretching the card */
   overflow-y: auto;
+  /* Long service-type labels can still out-width a phone. Scrolling the table
+     inside its own box keeps that overflow local instead of widening the
+     document — which is what was shearing the Value/Pct columns off-screen. */
+  overflow-x: auto;
+}
+
+.legend-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.25rem;
 }
 
 .legend-table {
@@ -141,14 +174,24 @@ function formatPct (pct) {
   border-radius: 2px;
 }
 
-@container (max-width: 640px) {
+/* `container-type` sits on .pie-card, and an element can never match a query
+   against the container IT establishes — so the old `@container` rule targeting
+   .pie-card itself never applied and the card stayed side-by-side at every
+   width. A media query is the honest tool here: the card spans the page, so
+   viewport width and card width track each other anyway. */
+@media (max-width: 640px) {
   .pie-card {
     flex-direction: column;
   }
 
+  /* Centred once stacked — a left-aligned pie under a full-width table reads as
+     misaligned rather than deliberate. */
   .chart-container {
-    width: 100%;
-    max-width: 280px;
+    align-self: center;
+    /* Keep the square: with the row constraint gone, height must follow the
+       (now smaller) width or the pie sits in a letterboxed box. */
+    height: auto;
+    aspect-ratio: 1;
   }
 }
 </style>

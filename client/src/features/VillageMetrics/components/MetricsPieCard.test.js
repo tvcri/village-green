@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { render, screen, cleanup } from '@testing-library/vue'
-import { describe, it, expect, afterEach } from 'vitest'
+import { render, screen, cleanup, fireEvent } from '@testing-library/vue'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import PrimeVue from 'primevue/config'
 import MetricsPieCard from './MetricsPieCard.vue'
+import * as csvUtils from '../../../shared/lib/csvUtils.js'
 
 // jsdom has no canvas rendering, so Chart.js internals are never asserted on here.
 // Stub primevue/chart with a trivial component so mounting doesn't touch canvas at all.
@@ -26,6 +27,10 @@ function mountCard (props) {
 }
 
 describe('MetricsPieCard', () => {
+  beforeEach(() => {
+    window.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })
+  })
+
   afterEach(() => cleanup())
 
   it('renders one row per rows entry with label, value, and formatted pct', () => {
@@ -59,5 +64,30 @@ describe('MetricsPieCard', () => {
     expect(screen.getByText('Other')).toBeTruthy()
     expect(screen.getByText('100%')).toBeTruthy()
     expect(document.querySelector('canvas')).toBeTruthy()
+  })
+
+  it('shows no download button without a csvFilename', () => {
+    mountCard({ csvFilename: '' })
+    expect(screen.queryByRole('button', { name: /download csv/i })).toBeNull()
+  })
+
+  it('downloads the legend rows as CSV', async () => {
+    const spy = vi.spyOn(csvUtils, 'downloadCsv').mockImplementation(() => {})
+    mountCard({
+      rows: [
+        { label: 'Rides', value: 704, color: '#22c55e', pct: 0.8009 },
+        { label: 'Errands', value: 53, color: '#f59e0b', pct: 0.0603 },
+      ],
+      csvFilename: 'sample-categories-2026-01-01-2026-07-30.csv',
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: /download csv/i }))
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    const [csv, filename] = spy.mock.calls[0]
+    expect(filename).toBe('sample-categories-2026-01-01-2026-07-30.csv')
+    expect(csv.split('\n')[0]).toBe('Label,Value,Pct')
+    expect(csv).toContain('Rides,704,80%')
+    spy.mockRestore()
   })
 })

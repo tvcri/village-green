@@ -211,7 +211,23 @@ if (typeof window !== 'undefined') {
 const router = createRouter({
   history: historyBase ? createWebHistory(historyBase) : createWebHashHistory(),
   routes,
-  scrollBehavior() {
+  // Scrolling to top is right for a real page change, but wrong for a
+  // navigation that only rewrites the query string. Several views keep UI state
+  // in the URL — the metrics tab/date range, VolunteerHome's tab — via
+  // router.replace({ query: ... }). Each of those is a full navigation, so an
+  // unconditional { top: 0 } yanked the user back to the top of the page every
+  // time they switched a tab while reading content further down.
+  //
+  // Same path = same page, so leave the scroll position alone (returning false
+  // tells vue-router not to scroll at all). A changed path is a genuine page
+  // change and still goes to top.
+  //
+  // savedPosition is deliberately NOT honored here: useScrollRestore.js already
+  // owns back-navigation restore for the list views, via its own afterEach and
+  // window.scrollTo. Returning it would put two mechanisms in a race to set the
+  // same scroll position on one navigation.
+  scrollBehavior(to, from) {
+    if (to.path === from.path) return false // query-only change: keep position
     return { top: 0 }
   },
 })
