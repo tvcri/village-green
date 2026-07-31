@@ -52,7 +52,6 @@ export function presetRange (key, todayCivil) {
       return { start: addDaysCivil(todayCivil, -89), end: todayCivil }
     case 'last30':
       return { start: addDaysCivil(todayCivil, -29), end: todayCivil }
-    case 'custom':
     default:
       return null
   }

@@ -91,9 +91,10 @@ const endDate = computed({
   min-width: 0;
 }
 
-/* The five presets are one segmented control. At desktop width they fit on a
-   row; below that the control has to wrap internally rather than clip its last
-   option ("Custom" was being cut off at 390px). */
+/* The presets are one segmented control, which by default neither wraps nor
+   shrinks — so a viewport too narrow for the whole row clipped the last option
+   rather than reflowing. The four short-labelled presets fit one row on a
+   375px phone, but this keeps a longer set (or a wider locale) from clipping. */
 .metrics-range-picker :deep(.p-selectbutton) {
   display: flex;
   flex-wrap: wrap;
@@ -101,9 +102,9 @@ const endDate = computed({
      omits its left border and leans on the previous button's right border,
      with only :first-child getting one back. That holds on a single row, but a
      button that STARTS a wrapped row is not :first-child, so it renders with no
-     left edge at all ("Last 30 days" was missing its separator). There is no
-     "first in row" selector to patch it with, so separate the rows instead:
-     with a row-gap each line reads as its own group and the seam disappears. */
+     left edge at all. There is no "first in row" selector to patch it with, so
+     separate the rows instead: with a row-gap each line reads as its own group
+     and the seam disappears. */
   row-gap: 0.35rem;
 }
 
