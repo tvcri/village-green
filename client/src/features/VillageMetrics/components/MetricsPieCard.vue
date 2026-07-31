@@ -52,6 +52,12 @@ function formatPct (pct) {
   return `${Math.round(pct * 100)}%`
 }
 
+// Sums the rendered rows, matching the PDF's legend Total (see `legend` in
+// metricsPdf.js). Rows are what's displayed — Services merges its tail into
+// "Other" and the legs toggle adjusts values, so summing rows keeps the
+// on-screen total consistent with the rows above it.
+const totalValue = computed(() => props.rows.reduce((sum, r) => sum + r.value, 0))
+
 function onDownloadCsv () {
   downloadCsv(toCsv(pieCsvRows(props.rows), PIE_COLUMNS), props.csvFilename)
 }
@@ -90,6 +96,14 @@ function onDownloadCsv () {
             <td>{{ formatPct(row.pct) }}</td>
           </tr>
         </tbody>
+        <tfoot v-if="rows.length">
+          <tr>
+            <td class="swatch-col" />
+            <td>Total</td>
+            <td>{{ totalValue }}</td>
+            <td />
+          </tr>
+        </tfoot>
       </table>
     </div>
   </div>
@@ -161,6 +175,19 @@ function onDownloadCsv () {
 .legend-table td {
   padding: 0.35rem 0.5rem;
   border-bottom: 1px solid var(--color-border-default, #e5e7eb);
+}
+
+/* Mirrors the PDF legend: one rule separating the data from the Total, and no
+   bottom border under it. Sticky so the total stays visible when a long
+   Services legend scrolls inside .legend-table-wrap. */
+.legend-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-surface-default, #fff);
+  border-top: 1px solid var(--color-border-default, #e5e7eb);
+  border-bottom: none;
+  font-weight: 600;
+  padding: 0.35rem 0.5rem;
 }
 
 .swatch-col {

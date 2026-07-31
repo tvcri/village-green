@@ -66,6 +66,32 @@ describe('MetricsPieCard', () => {
     expect(document.querySelector('canvas')).toBeTruthy()
   })
 
+  // Mirrors the PDF legend's Total line (see `legend` in metricsPdf.js).
+  it('renders a Total row summing the displayed values', () => {
+    mountCard({})
+    const foot = document.querySelector('.legend-table tfoot')
+    expect(foot).toBeTruthy()
+    expect(foot.textContent).toContain('Total')
+    expect(foot.textContent).toContain('10') // 8 + 2
+  })
+
+  it('sums the rows as displayed, including a merged Other row', () => {
+    mountCard({
+      slices: [{ label: 'Rides', value: 5, color: '#22c55e' }],
+      rows: [
+        { label: 'Rides', value: 5, color: '#22c55e', pct: 0.5 },
+        { label: 'Other', value: 5, color: '#94a3b8', pct: 0.5 },
+      ],
+    })
+    expect(document.querySelector('.legend-table tfoot').textContent).toContain('10')
+  })
+
+  it('omits the Total row entirely when there are no rows', () => {
+    mountCard({ slices: [], rows: [] })
+    expect(document.querySelector('.legend-table tfoot')).toBeNull()
+    expect(screen.queryByText('Total')).toBeNull()
+  })
+
   it('shows no download button without a csvFilename', () => {
     mountCard({ csvFilename: '' })
     expect(screen.queryByRole('button', { name: /download csv/i })).toBeNull()
