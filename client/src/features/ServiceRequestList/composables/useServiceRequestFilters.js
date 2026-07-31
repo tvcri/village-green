@@ -33,15 +33,20 @@ const sortedUniqueServices = (rows) => {
 /**
  * Shared client-side filtering for the service request lists.
  * @param {import('vue').Ref<Array|null>} rows source rows (null while loading)
+ * @param {object} [opts]
+ * @param {string[]} [opts.initialStatuses] status keys selected on first render.
+ *   The lists seed this with open+confirmed so the default view matches the
+ *   work a coordinator acts on. It is a real filter, not a structural default:
+ *   clearAll() clears it to [] rather than restoring it.
  */
-export function useServiceRequestFilters (rows) {
+export function useServiceRequestFilters (rows, { initialStatuses = [] } = {}) {
   const selectedMember = ref('')
   const selectedVolunteer = ref('')
   const selectedService = ref('')
   const idSearch = ref('')
-  // [] = no status filter (show everything the tab fetched), matching the
-  // previous behavior when a user unchecked every box.
-  const selectedStatuses = ref([])
+  // [] = no status filter (show every status fetched). Copy the caller's array
+  // so a later push here cannot mutate their constant.
+  const selectedStatuses = ref([...initialStatuses])
 
   const safeRows = computed(() => Array.isArray(rows.value) ? rows.value : [])
 

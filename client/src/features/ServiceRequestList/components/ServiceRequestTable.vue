@@ -18,9 +18,9 @@ const props = defineProps({
   error: { required: true },
   showVillageColumn: { type: Boolean, default: false },
   flashRowId: { type: [String, Number], default: null },
-  // Initial serviceDate sort: 1 = ascending (soonest work first, right for
-  // upcoming requests), -1 = descending (most recent first, right for an
-  // archive view). Users can still re-sort by clicking a column header.
+  // Initial serviceDate sort: 1 = ascending (soonest first), -1 = descending.
+  // The lists default to ascending so upcoming work reads in the order it will
+  // happen. Users can still re-sort by clicking a column header.
   sortOrder: { type: Number, default: 1 }
 })
 

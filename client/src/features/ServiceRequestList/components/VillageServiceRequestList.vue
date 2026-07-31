@@ -7,11 +7,6 @@ import MultiSelect from 'primevue/multiselect'
 import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
 import NotificationHistoryDialog from './NotificationHistoryDialog.vue'
 import ServiceRequestTable from './ServiceRequestTable.vue'
 import { useToast } from 'primevue/usetoast'
@@ -19,7 +14,7 @@ import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getVillageServiceRequests } from '../api/serviceRequestApi.js'
 import { useServiceRequestFilters } from '../composables/useServiceRequestFilters.js'
-import { useServiceRequestTabs } from '../composables/useServiceRequestTabs.js'
+import { useServiceRequestWindow, ALL_STATUSES } from '../composables/useServiceRequestWindow.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import { toCsv, downloadCsv, withLocalDateTimeColumns } from '../../../shared/lib/csvUtils.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
@@ -53,7 +48,10 @@ const openHistory = (row) => {
   historyDialogVisible.value = true
 }
 
-const tabs = useServiceRequestTabs({
+const {
+  windowStart, windowEnd,
+  rows: requests, isLoading, error, hasLoadedOnce, fetchRows
+} = useServiceRequestWindow({
   fetcher: (params) => getVillageServiceRequests(villageId.value, params),
   // This component is kept alive, so navigating to a route without a
   // :villageId (e.g. the village list) leaves villageId undefined while the
@@ -61,27 +59,20 @@ const tabs = useServiceRequestTabs({
   // "path requires parameter {villageId}".
   canFetch: () => !!villageId.value
 })
-const {
-  activeTab, historicStart, historicEnd, statusOptions,
-  currentRows: requests, isLoading, error, hasLoadedOnce, fetchCurrent
-} = tabs
+
+// The status selection the list opens with. It is a real, clearable filter —
+// the clear button empties it — but every fresh load of a village starts here.
+const DEFAULT_STATUSES = ['open', 'confirmed']
 
 const {
   selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
   memberNames, volunteerNames, serviceNames,
   filteredRows: filteredRequests, clearAll
-} = useServiceRequestFilters(requests)
+} = useServiceRequestFilters(requests, { initialStatuses: DEFAULT_STATUSES })
 
-// Each tab offers its own status set, so a selection made on one tab would
-// match nothing on the other. Reset it when the tab changes.
-watch(activeTab, () => { selectedStatuses.value = [] })
-
-// `requests` is a computed over the visible tab, so write through to the
-// underlying ref that tab is backed by.
 const onNotified = (updated) => {
-  const target = activeTab.value === 'active' ? tabs.activeRows : tabs.historicRows
-  if (!Array.isArray(target.value)) return
-  target.value = target.value.map(r =>
+  if (!Array.isArray(requests.value)) return
+  requests.value = requests.value.map(r =>
     r.serviceRequestId === updated.serviceRequestId
       ? { ...r, notifications: updated.notificationHistory?.map(e => e.eventType) ?? [] }
       : r
@@ -98,29 +89,25 @@ const villageIdAtDeactivation = ref(null)
 const flashRowId = ref(null)
 const flashTimer = ref(null)
 
-// Refetch the visible tab when it is first shown, or when the historic window moves.
-watch(activeTab, () => { if (requests.value === null) fetchCurrent() })
-watch([historicStart, historicEnd], () => {
-  if (activeTab.value === 'historic') fetchCurrent()
-})
+// The window is the only server-side narrowing, so moving it refetches.
+watch([windowStart, windowEnd], () => { fetchRows() })
 
-onMounted(() => { if (villageId.value) tabs.fetchActive() })
+onMounted(() => { if (villageId.value) fetchRows() })
 
 const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, (newVillageId) => {
   // Navigating to a route without a :villageId (the village list) also fires
   // this watcher. There is no new village to load, so leave state intact
   // rather than clearing it and firing a fetch that cannot be built.
   if (!newVillageId) return
+  // Names and IDs from the previous village mean nothing here, so clear them —
+  // but a village switch is a fresh load, not a "clear filters" click, so the
+  // status default comes back rather than leaving every status showing.
   clearAll()
+  selectedStatuses.value = [...DEFAULT_STATUSES]
   memberInput.value = ''
   volunteerInput.value = ''
-  tabs.activeRows.value = null
-  tabs.historicRows.value = null
-  // If we're on Historic, switching the tab back is enough: the tab-change
-  // watcher sees the nulled rows and fetches. Calling fetchActive() here too
-  // would double-fetch.
-  if (activeTab.value === 'active') tabs.fetchActive()
-  else activeTab.value = 'active'
+  requests.value = null
+  fetchRows()
   village.value = null
 })
 
@@ -140,7 +127,7 @@ onActivated(async () => {
     consumePendingHighlight()
     return
   }
-  await fetchCurrent()
+  await fetchRows()
   const id = consumePendingHighlight()
   if (id) {
     flashRowId.value = id
@@ -174,15 +161,12 @@ const serviceChoice = computed({
   set: (val) => { selectedService.value = val === 'All services' ? '' : val }
 })
 
-// The historic window counts as a filter only when narrowed from its default.
-const historicStartDefault = historicStart.value
-const historicWindowNarrowed = computed(() =>
-  activeTab.value === 'historic' &&
-  (historicStart.value !== historicStartDefault || !!historicEnd.value))
-
+// Counts only what the clear button can reset. The date range is excluded: it
+// is scope, not a filter, and counting something clearing cannot clear would
+// strand the badge at a number the user can't get rid of. Status does count on
+// load — the user is looking at a filtered view, and the badge is what says so.
 const activeFilterCount = computed(() => {
   let count = 0
-  if (historicWindowNarrowed.value) count++
   if (selectedMember.value) count++
   if (selectedVolunteer.value) count++
   if (selectedService.value) count++
@@ -190,6 +174,9 @@ const activeFilterCount = computed(() => {
   if (selectedStatuses.value.length) count++
   return count
 })
+
+const totalFetched = computed(() => Array.isArray(requests.value) ? requests.value.length : 0)
+const showingCount = computed(() => `Showing ${filteredRequests.value.length} of ${totalFetched.value}`)
 
 const columnsForCsv = [
   { header: 'Request #', key: 'displayNumber' },
@@ -258,16 +245,12 @@ async function handleCreateSheet() {
   }
 }
 
-// Both tab panels render the same table; bind one prop object so they cannot drift.
 const tableProps = computed(() => ({
   rows: filteredRequests.value,
   isLoading: isLoading.value,
   hasLoadedOnce: hasLoadedOnce.value,
   error: error.value,
-  flashRowId: flashRowId.value,
-  // Active lists upcoming work soonest-first; Historic is an archive, so the
-  // most recent records belong at the top.
-  sortOrder: activeTab.value === 'historic' ? -1 : 1
+  flashRowId: flashRowId.value
 }))
 
 const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)
@@ -277,12 +260,13 @@ const navigateToRequest = (serviceRequestId, rowVillageId) => {
   router.push({ name: 'service-request-detail', params: { villageId: rowVillageId ?? villageId.value, id: serviceRequestId } })
 }
 
+// The date range is a scope control, not a filter: it says which period the
+// list covers, and the user picked it deliberately. Clearing filters must
+// leave it alone — so a clear never triggers a refetch here at all.
 const clearFilters = () => {
   clearAll()
   memberInput.value = ''
   volunteerInput.value = ''
-  historicStart.value = historicStartDefault
-  historicEnd.value = ''
 }
 </script>
 
@@ -300,7 +284,7 @@ const clearFilters = () => {
       <Select v-model="serviceChoice" :options="serviceOptions" placeholder="Service" />
       <MultiSelect
         v-model="selectedStatuses"
-        :options="statusOptions"
+        :options="ALL_STATUSES"
         :option-label="s => s.charAt(0).toUpperCase() + s.slice(1)"
         placeholder="Status"
         :max-selected-labels="5"
@@ -310,47 +294,28 @@ const clearFilters = () => {
       />
       <InputText v-model="idSearch" placeholder="Request #" />
       <Button v-if="activeFilterCount > 0" icon="pi pi-times" text rounded v-tooltip="'Clear filters'" @click="clearFilters" />
+      <span v-if="hasLoadedOnce" class="showing-count">{{ showingCount }}</span>
     </div>
 
-    <Tabs v-model:value="activeTab">
-      <TabList>
-        <Tab value="active">Active</Tab>
-        <Tab value="historic">Historic</Tab>
-      </TabList>
-      <TabPanels>
-        <TabPanel value="active">
-          <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
-            <template #paginator-extra><ExportButton :disabled="isLoading || isCreatingSheet" @download="handleDownloadCsv" @export="handleCreateSheet" /></template>
-            <template #actions="{ data }">
-              <span class="bell-wrapper">
-                <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
-                <span v-if="data.requestNumber == null && !data.notifications?.length" class="bell-alert-icon" aria-hidden="true"></span>
-              </span>
-            </template>
-          </ServiceRequestTable>
-        </TabPanel>
-        <TabPanel value="historic">
-          <div class="historic-range">
-            <label for="historic-start">From</label>
-            <!-- .lazy: commit on change, not per keystroke-segment — typing a
-                 year would otherwise fire fetches for values like 0002-… -->
-            <input id="historic-start" v-model.lazy="historicStart" type="date" >
-            <label for="historic-end">To</label>
-            <input id="historic-end" v-model.lazy="historicEnd" type="date" >
-            <small>Leave “To” empty for no upper bound.</small>
-          </div>
-          <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
-            <template #paginator-extra><ExportButton :disabled="isLoading || isCreatingSheet" @download="handleDownloadCsv" @export="handleCreateSheet" /></template>
-            <template #actions="{ data }">
-              <span class="bell-wrapper">
-                <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
-                <span v-if="data.requestNumber == null && !data.notifications?.length" class="bell-alert-icon" aria-hidden="true"></span>
-              </span>
-            </template>
-          </ServiceRequestTable>
-        </TabPanel>
-      </TabPanels>
-    </Tabs>
+    <div class="date-range">
+      <label for="window-start">From</label>
+      <!-- .lazy: commit on change, not per keystroke-segment — typing a
+           year would otherwise fire fetches for values like 0002-… -->
+      <input id="window-start" v-model.lazy="windowStart" type="date" >
+      <label for="window-end">To</label>
+      <input id="window-end" v-model.lazy="windowEnd" type="date" >
+      <small>Leave “To” empty for no upper bound.</small>
+    </div>
+
+    <ServiceRequestTable v-bind="tableProps" @row-click="onRowClick">
+      <template #paginator-extra><ExportButton :disabled="isLoading || isCreatingSheet" @download="handleDownloadCsv" @export="handleCreateSheet" /></template>
+      <template #actions="{ data }">
+        <span class="bell-wrapper">
+          <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
+          <span v-if="data.requestNumber == null && !data.notifications?.length" class="bell-alert-icon" aria-hidden="true"></span>
+        </span>
+      </template>
+    </ServiceRequestTable>
 
     <NotificationHistoryDialog
       v-model:visible="historyDialogVisible"
@@ -370,10 +335,11 @@ h1 { margin: 0; color: var(--color-text-primary); }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
 }
-.historic-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.historic-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
-.historic-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
-.historic-range small { color: var(--color-text-secondary, #777); }
+.date-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.date-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
+.date-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
+.date-range small { color: var(--color-text-secondary, #777); }
+.showing-count { color: var(--color-text-secondary, #777); font-size: 0.875rem; margin-left: auto; }
 .bell-wrapper { position: relative; display: inline-flex; }
 .bell-alert-icon { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #ff9800; color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>
