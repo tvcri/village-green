@@ -63,15 +63,43 @@ const endDate = computed({
   flex-wrap: wrap;
   gap: 1rem;
   align-items: flex-end;
+  /* Children are flex items, whose min-width defaults to auto (= their content
+     width). Without this they refuse to shrink below that and push the document
+     wider than a phone viewport. */
+  min-width: 0;
 }
+
+/* The five presets are one segmented control. At desktop width they fit on a
+   row; below that the control has to wrap internally rather than clip its last
+   option ("Custom" was being cut off at 390px). */
+.metrics-range-picker :deep(.p-selectbutton) {
+  display: flex;
+  flex-wrap: wrap;
+}
+
 .custom-range {
   display: flex;
   gap: 1rem;
+  flex: 1 1 auto;
+  min-width: 0;
 }
+
 .custom-range label {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.85rem;
+  /* Share the row evenly and allow shrinking; the DatePicker's own intrinsic
+     width would otherwise hold each label at full size and overflow. */
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The input is what actually carries the intrinsic width, so the shrink has to
+   reach it too — relaxing only the label leaves the field itself overflowing. */
+.custom-range :deep(.p-datepicker),
+.custom-range :deep(.p-inputtext) {
+  width: 100%;
+  min-width: 0;
 }
 </style>

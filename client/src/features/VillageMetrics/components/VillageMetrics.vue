@@ -406,10 +406,29 @@ const exportMenuItems = computed(() => [
   margin-bottom: 1rem;
 }
 .panel-filters label { color: var(--color-text-muted, #6b7280); font-size: 0.85rem; }
+/* `minmax(320px, ...)` is a hard floor: on a 320-390px viewport the 320px track
+   plus the page's own horizontal padding overflowed the screen. min() lets the
+   track collapse to the available width on a phone while still giving two
+   columns the moment there is room for them. */
 .people-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 1.5rem;
 }
 .loading-state { padding: 2rem; }
+
+@media (max-width: 640px) {
+  /* 1.5rem each side is a meaningful slice of a 320px screen; the content needs
+     it back more than the page needs the gutter. */
+  .village-metrics { padding: 1rem 0.75rem; }
+
+  /* Full-width controls beat a cramped two-up row at this width. */
+  .controls-bar { align-items: stretch; }
+  .controls-bar :deep(.p-splitbutton) { width: 100%; }
+
+  /* Each filter gets its own line: label above control, control full-width,
+     rather than four items competing for one row. */
+  .panel-filters { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .panel-filters :deep(.p-select) { width: 100%; }
+}
 </style>
