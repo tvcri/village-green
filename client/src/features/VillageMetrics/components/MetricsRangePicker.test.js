@@ -30,14 +30,32 @@ describe('MetricsRangePicker', () => {
   afterEach(() => cleanup())
 
 
-  it('renders the five preset buttons', () => {
+  it('renders the four preset buttons', () => {
     mountPicker({ start: '2026-01-01', end: '2026-07-13' })
     // getByText throws if the element is absent, so a successful lookup is the assertion.
     expect(screen.getByText('This year')).toBeTruthy()
     expect(screen.getByText('Last year')).toBeTruthy()
     expect(screen.getByText('Last 90 days')).toBeTruthy()
     expect(screen.getByText('Last 30 days')).toBeTruthy()
-    expect(screen.getByText('Custom')).toBeTruthy()
+  })
+
+  it('offers no Custom button — an arbitrary range simply highlights nothing', () => {
+    mountPicker({ start: '2026-03-02', end: '2026-04-05' })
+    expect(screen.queryByText('Custom')).toBeNull()
+    // Every real preset is still offered, none of them selected.
+    expect(screen.getByText('This year')).toBeTruthy()
+    expect(document.querySelector('.p-togglebutton-checked')).toBeNull()
+  })
+
+  it('uses short labels on a narrow viewport', async () => {
+    window.matchMedia = () => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })
+    mountPicker({ start: '2026-01-01', end: '2026-07-13' })
+    expect(screen.getByText('30 days')).toBeTruthy()
+    expect(screen.queryByText('Last 30 days')).toBeNull()
   })
 
   it('emits the computed range when a preset is clicked', async () => {

@@ -1,8 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import SelectButton from 'primevue/selectbutton'
 import DatePicker from 'primevue/datepicker'
-import { PRESET_KEYS, PRESET_LABELS, presetRange, matchPreset } from '../lib/rangePresets.js'
+import { PRESET_KEYS, PRESET_LABELS, PRESET_LABELS_SHORT, presetRange, matchPreset } from '../lib/rangePresets.js'
 import { dateToServiceDate, serviceDateToDate } from '../../../shared/lib/civilDate.js'
 
 const props = defineProps({
@@ -12,13 +12,35 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:range'])
 
-// SelectButton options: [{ label, value }]
-const presetOptions = PRESET_KEYS.map(key => ({ label: PRESET_LABELS[key], value: key }))
+// The option LABELS are viewport-dependent, so this cannot be a CSS swap —
+// SelectButton renders label text, not markup we could hide. matchMedia is the
+// cheap read: one listener, no resize-storm. Guarded for jsdom, which supplies
+// matchMedia only when a test stubs it.
+const isNarrow = ref(
+  typeof window !== 'undefined' && window.matchMedia
+    ? window.matchMedia('(max-width: 640px)').matches
+    : false,
+)
 
+if (typeof window !== 'undefined' && window.matchMedia) {
+  const mq = window.matchMedia('(max-width: 640px)')
+  const onChange = e => { isNarrow.value = e.matches }
+  mq.addEventListener('change', onChange)
+  onUnmounted(() => mq.removeEventListener('change', onChange))
+}
+
+// SelectButton options: [{ label, value }]
+const presetOptions = computed(() => {
+  const labels = isNarrow.value ? PRESET_LABELS_SHORT : PRESET_LABELS
+  return PRESET_KEYS.map(key => ({ label: labels[key], value: key }))
+})
+
+// null when the range matches no preset — nothing is highlighted and the date
+// fields alone carry the state.
 const activePreset = computed(() => matchPreset({ start: props.start, end: props.end }, props.today))
 
 function onPreset (key) {
-  if (!key || key === 'custom') return // 'custom' is display-only; picker edits drive it
+  if (!key) return
   const r = presetRange(key, props.today)
   if (r) emit('update:range', r)
 }
@@ -75,6 +97,24 @@ const endDate = computed({
 .metrics-range-picker :deep(.p-selectbutton) {
   display: flex;
   flex-wrap: wrap;
+  /* PrimeVue draws the dividers as `border-width: 1px 1px 1px 0` — every button
+     omits its left border and leans on the previous button's right border,
+     with only :first-child getting one back. That holds on a single row, but a
+     button that STARTS a wrapped row is not :first-child, so it renders with no
+     left edge at all ("Last 30 days" was missing its separator). There is no
+     "first in row" selector to patch it with, so separate the rows instead:
+     with a row-gap each line reads as its own group and the seam disappears. */
+  row-gap: 0.35rem;
+}
+
+/* Only where the control actually wraps. On a single row PrimeVue's shared-edge
+   look is correct and must be left alone; once the buttons sit on two rows each
+   needs its own left edge and its own corners. */
+@media (max-width: 640px) {
+  .metrics-range-picker :deep(.p-selectbutton .p-togglebutton) {
+    border-inline-start-width: 1px;
+    border-radius: var(--p-selectbutton-border-radius, 6px);
+  }
 }
 
 .custom-range {
