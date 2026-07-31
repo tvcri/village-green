@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
-import { PEOPLE_LIMIT, topN, peopleFooter, buildMetricsPdf, winAnsi } from './metricsPdf.js'
+import { PEOPLE_LIMIT, topN, peopleFooter, buildMetricsPdf, winAnsi, formatCivil, formatRange } from './metricsPdf.js'
 
 const ROWS = [
   { label: 'Rides', value: 704, color: '#22c55e', pct: 0.8009 },
@@ -40,6 +40,49 @@ function report (over = {}) {
     ...over,
   }
 }
+
+describe('civil date formatting', () => {
+  it('renders a civil date without a timezone shift', () => {
+    // Jan 1 must stay Jan 1. `new Date('2026-01-01')` is UTC midnight, which is
+    // Dec 31 in every western zone — the exact bug this helper must not have.
+    expect(formatCivil('2026-01-01')).toBe('January 1, 2026')
+    expect(formatCivil('2026-07-30')).toBe('July 30, 2026')
+    expect(formatCivil('2026-12-31')).toBe('December 31, 2026')
+  })
+
+  it('drops leading zeros from the day', () => {
+    expect(formatCivil('2026-03-05')).toBe('March 5, 2026')
+  })
+
+  it('collapses a shared year into one mention', () => {
+    expect(formatRange('2026-01-01', '2026-07-30')).toBe('January 1 – July 30, 2026')
+  })
+
+  it('keeps both years when the range spans a year boundary', () => {
+    expect(formatRange('2025-11-01', '2026-02-28'))
+      .toBe('November 1, 2025 – February 28, 2026')
+  })
+
+  it('passes malformed input through rather than inventing a date', () => {
+    expect(formatCivil('not-a-date')).toBe('not-a-date')
+    expect(formatCivil('')).toBe('')
+    expect(formatCivil(null)).toBe('')
+    expect(formatRange('nope', '2026-07-30')).toBe('nope – July 30, 2026')
+  })
+
+  it('rejects an out-of-range month rather than emitting undefined', () => {
+    expect(formatCivil('2026-13-01')).toBe('2026-13-01')
+  })
+
+  // The en dash must survive the PDF's WinAnsi sanitizer.
+  it('uses an en dash that Helvetica can encode', async () => {
+    const pdf = await PDFDocument.create()
+    const font = await pdf.embedFont(StandardFonts.Helvetica)
+    const range = formatRange('2026-01-01', '2026-07-30')
+    expect(range).toContain('–')
+    expect(winAnsi(range, font)).toBe(range)
+  })
+})
 
 describe('metricsPdf', () => {
   it('caps People tables at 20', () => {
