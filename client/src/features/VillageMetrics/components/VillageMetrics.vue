@@ -9,7 +9,7 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
-import Button from 'primevue/button'
+import SplitButton from 'primevue/splitbutton'
 import { captureAll } from '../lib/capturePies.js'
 import { buildMetricsPdf } from '../lib/metricsPdf.js'
 import { getVillageMetrics } from '../api/villageMetricsApi.js'
@@ -221,29 +221,56 @@ async function onDownloadPdf () {
       people: { members: memberRows.value, volunteers: volunteerRows.value },
     })
 
-    const blob = new Blob([bytes], { type: 'application/pdf' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = pdfName.value
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    saveBlob(new Blob([bytes], { type: 'application/pdf' }), pdfName.value)
   } finally {
     isExporting.value = false
   }
 }
 
-const pdfName = computed(() =>
-  csvFilename({
+// Shared by the PDF and JSON downloads. The CSV path uses downloadCsv() from
+// csvUtils.js instead — it owns its own text/csv Blob and the same anchor dance.
+function saveBlob (blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+// Reuses csvFilename's slug + range construction, swapping the extension —
+// so PDF, JSON and the five CSVs all carry the same village/range identity.
+function exportName (ext) {
+  return csvFilename({
     villageName: metrics.value?.villageName || 'village',
     table: 'metrics',
     state: '',
     start: range.value.start,
     end: range.value.end,
-  }).replace(/\.csv$/, '.pdf'),
-)
+  }).replace(/\.csv$/, ext)
+}
+
+const pdfName = computed(() => exportName('.pdf'))
+const jsonName = computed(() => exportName('.json'))
+
+// The RAW API response, deliberately unfiltered: no status/category selection
+// and no legs doubling, because those are client-side interpretations of this
+// payload rather than part of it. The five CSVs cover the filtered views.
+function onDownloadJson () {
+  if (!metrics.value) return
+  const json = JSON.stringify(metrics.value, null, 2)
+  saveBlob(new Blob([json], { type: 'application/json' }), jsonName.value)
+}
+
+const exportMenuItems = computed(() => [
+  {
+    label: 'Download JSON',
+    icon: 'pi pi-code',
+    command: onDownloadJson,
+  },
+])
 
 </script>
 
@@ -272,10 +299,11 @@ const pdfName = computed(() =>
           <label for="legsToggle">Count round trips as 2 legs</label>
         </div>
 
-        <Button
+        <SplitButton
           icon="pi pi-file-pdf"
           :label="isExporting ? 'Preparing…' : 'Download PDF'"
           :disabled="isExporting"
+          :model="exportMenuItems"
           @click="onDownloadPdf"
         />
       </div>
