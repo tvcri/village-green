@@ -85,7 +85,7 @@ function renderPage () {
 // Wait for the async fetch to resolve and the dashboard to paint.
 async function renderLoaded () {
   const utils = renderPage()
-  await waitFor(() => expect(screen.getByText('Count round trips as 2 legs')).toBeTruthy())
+  await waitFor(() => expect(screen.getByText('Round trip = 2 legs')).toBeTruthy())
   return utils
 }
 

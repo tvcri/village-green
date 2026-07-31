@@ -296,7 +296,7 @@ const exportMenuItems = computed(() => [
       <div class="controls-bar">
         <div class="legs-toggle">
           <ToggleSwitch v-model="legs" inputId="legsToggle" />
-          <label for="legsToggle">Count round trips as 2 legs</label>
+          <label for="legsToggle">Round trip = 2 legs</label>
         </div>
 
         <SplitButton
@@ -421,10 +421,6 @@ const exportMenuItems = computed(() => [
   /* 1.5rem each side is a meaningful slice of a 320px screen; the content needs
      it back more than the page needs the gutter. */
   .village-metrics { padding: 1rem 0.75rem; }
-
-  /* Full-width controls beat a cramped two-up row at this width. */
-  .controls-bar { align-items: stretch; }
-  .controls-bar :deep(.p-splitbutton) { width: 100%; }
 
   /* Each filter gets its own line: label above control, control full-width,
      rather than four items competing for one row. */
