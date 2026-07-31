@@ -3,13 +3,14 @@
 // components.schemas.VillageMetrics) and produces pie/strip data ready for the components
 // in this feature to render.
 
+// Terminal statuses only — the API reports on settled requests, so 'open' and
+// 'confirmed' never appear in a byStatus payload. See
+// dbUtils.TERMINAL_SR_STATUSES (api/source/service/utils.js).
 export const STATUS_ORDER = [
-  'open', 'confirmed', 'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled',
+  'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled',
 ]
 
 export const STATUS_LABELS = {
-  open: 'Open',
-  confirmed: 'Confirmed',
   completed: 'Completed',
   unmatched: 'Unmatched',
   memberCancelled: 'Member cancelled',
@@ -42,7 +43,7 @@ const OUTCOME_SPECS = [
   { label: 'Unmatched', statusKey: 'unmatched', color: '#94a3b8', legs: false },
 ]
 
-// sel 'all' -> sum of the 7 status keys; else the single selected key.
+// sel 'all' -> sum of every status key in STATUS_ORDER; else the single key.
 export function statusCount (byStatus, sel) {
   if (sel === 'all') {
     return STATUS_ORDER.reduce((sum, k) => sum + byStatus[k], 0)

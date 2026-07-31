@@ -8,7 +8,7 @@ import {
 // A hand-built fixture matching the VillageMetrics API payload shape
 // (api/source/specification/village-green.yaml components.schemas.VillageMetrics).
 function emptyStatus () {
-  return { open: 0, confirmed: 0, completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
+  return { completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
 }
 
 function makeMetrics () {
@@ -17,8 +17,8 @@ function makeMetrics () {
     villageName: 'Test Village',
     range: { start: '2026-01-01', end: '2026-07-13' },
     totals: {
-      totalRequests: 100,
-      byStatus: { open: 7, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
+      totalRequests: 90,
+      byStatus: { completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
       completedRoundTrips: 8,
     },
     byCategory: [
@@ -42,16 +42,14 @@ function makeMetrics () {
 }
 
 describe('STATUS_ORDER / STATUS_LABELS / STATUS_OPTIONS', () => {
-  it('has the 6-key canonical order', () => {
+  it('has the 4-key canonical order — terminal statuses only', () => {
     expect(STATUS_ORDER).toEqual([
-      'open', 'confirmed', 'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled',
+      'completed', 'unmatched', 'memberCancelled', 'volunteerCancelled',
     ])
   })
 
   it('labels every status', () => {
     expect(STATUS_LABELS).toEqual({
-      open: 'Open',
-      confirmed: 'Confirmed',
       completed: 'Completed',
       unmatched: 'Unmatched',
       memberCancelled: 'Member cancelled',
@@ -62,8 +60,6 @@ describe('STATUS_ORDER / STATUS_LABELS / STATUS_OPTIONS', () => {
   it('STATUS_OPTIONS leads with All statuses then mirrors STATUS_ORDER', () => {
     expect(STATUS_OPTIONS).toEqual([
       { label: 'All statuses', value: 'all' },
-      { label: 'Open', value: 'open' },
-      { label: 'Confirmed', value: 'confirmed' },
       { label: 'Completed', value: 'completed' },
       { label: 'Unmatched', value: 'unmatched' },
       { label: 'Member cancelled', value: 'memberCancelled' },
@@ -85,15 +81,15 @@ describe('CATEGORY_COLORS', () => {
 })
 
 describe('statusCount', () => {
-  const by = { open: 7, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 }
+  const by = { completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 }
 
-  it('all sums the 6 keys', () => {
-    expect(statusCount(by, 'all')).toBe(100)
+  it('all sums the 4 keys', () => {
+    expect(statusCount(by, 'all')).toBe(90)
   })
 
   it('single status returns that key', () => {
     expect(statusCount(by, 'completed')).toBe(70)
-    expect(statusCount(by, 'confirmed')).toBe(3)
+    expect(statusCount(by, 'memberCancelled')).toBe(10)
   })
 })
 
@@ -103,16 +99,16 @@ describe('legsApply', () => {
     expect(legsApply('completed', true)).toBe(true)
     expect(legsApply('all', false)).toBe(false)
     expect(legsApply('completed', false)).toBe(false)
-    expect(legsApply('open', true)).toBe(false)
+    expect(legsApply('memberCancelled', true)).toBe(false)
     expect(legsApply('unmatched', true)).toBe(false)
   })
 })
 
 describe('adjustedCount', () => {
-  const entry = { byStatus: { open: 7, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 }, completedRoundTrips: 8 }
+  const entry = { byStatus: { completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 }, completedRoundTrips: 8 }
 
   it('adds completedRoundTrips when legs applies (all)', () => {
-    expect(adjustedCount(entry, 'all', true)).toBe(108)
+    expect(adjustedCount(entry, 'all', true)).toBe(98)
   })
 
   it('adds completedRoundTrips when legs applies (completed)', () => {
@@ -120,12 +116,12 @@ describe('adjustedCount', () => {
   })
 
   it('does not add legs for a non-completed selection', () => {
-    expect(adjustedCount(entry, 'open', true)).toBe(7)
+    expect(adjustedCount(entry, 'memberCancelled', true)).toBe(10)
   })
 
   it('does not add legs when legs is off', () => {
     expect(adjustedCount(entry, 'completed', false)).toBe(70)
-    expect(adjustedCount(entry, 'all', false)).toBe(100)
+    expect(adjustedCount(entry, 'all', false)).toBe(90)
   })
 })
 
@@ -252,8 +248,8 @@ describe('servicePie', () => {
 
 describe('outcomesPie', () => {
   const totals = {
-    totalRequests: 100,
-    byStatus: { open: 7, confirmed: 3, completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
+    totalRequests: 90,
+    byStatus: { completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
     completedRoundTrips: 8,
   }
 
@@ -282,7 +278,7 @@ describe('outcomesPie', () => {
   it('all-zero total yields pct 0 for every row (div-by-zero guard)', () => {
     const zeroTotals = {
       totalRequests: 0,
-      byStatus: { open: 0, confirmed: 0, completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
+      byStatus: { completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
       completedRoundTrips: 0,
     }
     const { slices, rows } = outcomesPie(zeroTotals, false)
@@ -308,7 +304,7 @@ describe('stripStats', () => {
 
   it('legs off: raw totals, unmatched, cancelled sum', () => {
     const stats = stripStats(metrics, false)
-    expect(stats.requests).toBe(100)
+    expect(stats.requests).toBe(90)
     expect(stats.completed).toBe(70)
     expect(stats.unmatched).toBe(4)
     expect(stats.cancelled).toBe(16) // 10 + 6
@@ -316,14 +312,14 @@ describe('stripStats', () => {
 
   it('legs on: requests and completed both bumped by totals.completedRoundTrips', () => {
     const stats = stripStats(metrics, true)
-    expect(stats.requests).toBe(108)
+    expect(stats.requests).toBe(98)
     expect(stats.completed).toBe(78)
     expect(stats.unmatched).toBe(4) // legs-independent
     expect(stats.cancelled).toBe(16) // legs-independent
   })
 
   // Version-skew defense: legs ON but the API response omits completedRoundTrips.
-  // Previously `100 + undefined` -> NaN, which rendered literal "NaN" in the summary strip.
+  // Previously `90 + undefined` -> NaN, which rendered literal "NaN" in the summary strip.
   it('legs on + missing completedRoundTrips: finite numbers, not NaN', () => {
     const { totalRequests, byStatus } = metrics.totals
     const metricsMissingField = {
@@ -333,7 +329,7 @@ describe('stripStats', () => {
     const stats = stripStats(metricsMissingField, true)
     expect(Number.isFinite(stats.requests)).toBe(true)
     expect(Number.isFinite(stats.completed)).toBe(true)
-    expect(stats.requests).toBe(100) // 100 + 0, not 100 + undefined
+    expect(stats.requests).toBe(90) // 90 + 0, not 90 + undefined
     expect(stats.completed).toBe(70)
   })
 })
