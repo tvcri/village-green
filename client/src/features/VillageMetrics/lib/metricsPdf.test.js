@@ -126,8 +126,8 @@ describe('metricsPdf', () => {
   it('survives empty pies and empty people', async () => {
     const bytes = await buildMetricsPdf(report({
       views: {
-        categories: { rows: [], status: 'open', emptyMessage: 'No open requests in this range' },
-        services: { rows: [], status: 'open', category: 'all', emptyMessage: 'No open requests in this range' },
+        categories: { rows: [], status: 'unmatched', emptyMessage: 'No unmatched requests in this range' },
+        services: { rows: [], status: 'unmatched', category: 'all', emptyMessage: 'No unmatched requests in this range' },
         outcomes: { rows: [], emptyMessage: 'No requests in this range' },
       },
       people: { members: [], volunteers: [] },

@@ -36,8 +36,6 @@ const ChartStub = { name: 'Chart', props: ['type', 'data', 'options'], template:
 
 function byStatus (over = {}) {
   return {
-    open: 0,
-    confirmed: 0,
     completed: 0,
     unmatched: 0,
     memberCancelled: 0,

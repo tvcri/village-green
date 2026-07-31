@@ -447,6 +447,27 @@ module.exports.buildServiceNameCategoryCase = function (colExpr) {
   return `CASE ${whens.join(' ')} ELSE NULL END`
 }
 
+// The statuses a service request can be in once it is settled. Metrics report
+// on these only: 'Open' and 'Confirmed' are still in flight, and
+// evt_auto_complete_service_requests rewrites them to 'Unmatched'/'Completed'
+// the day after serviceDate — so counting them makes a report irreproducible,
+// its numbers changing between runs of the same range. 'Hub cancelled' is
+// absent because those requests are treated as if they never existed.
+//
+// An inclusion list, deliberately: a status added to the enum later is not
+// retroactively terminal, and inclusion ignores it. Exclusion would silently
+// count it into every report.
+module.exports.TERMINAL_SR_STATUSES = [
+  'Completed', 'Unmatched', 'Member cancelled', 'Volunteer cancelled'
+]
+
+// Closed developer-controlled vocabulary, not user input — inlined for the
+// same reason buildServiceNameCategoryCase inlines its category literals.
+module.exports.sqlTerminalStatus = function (colExpr) {
+  const list = module.exports.TERMINAL_SR_STATUSES.map(s => `'${s}'`).join(', ')
+  return `${colExpr} IN (${list})`
+}
+
 // Runtime VSS identity (set form). Resolves the ACTIVE VOLUNTEERS behind a
 // username as a JSON array of person ids ('[]' when none match). person is
 // only the email key — one email may map to several persons (shared household

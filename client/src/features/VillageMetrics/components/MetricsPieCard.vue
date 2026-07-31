@@ -33,6 +33,11 @@ const chartData = computed(() => ({
 // Only `false` (disable) or a config object are meaningful here.
 const chartOptions = {
   maintainAspectRatio: false,
+  // Chart.js defaults arc borders to 2px of #fff. That white is load-bearing in
+  // light theme — it's what separates adjacent slices, including the 3-4%
+  // slivers a Services pie produces — so it stays, just thinner. At 2px it read
+  // as heavy white lines against the dark theme's near-black card.
+  elements: { arc: { borderWidth: 1 } },
   plugins: {
     legend: { display: false },
     tooltip: {
@@ -51,6 +56,12 @@ const chartOptions = {
 function formatPct (pct) {
   return `${Math.round(pct * 100)}%`
 }
+
+// Sums the rendered rows, matching the PDF's legend Total (see `legend` in
+// metricsPdf.js). Rows are what's displayed — Services merges its tail into
+// "Other" and the legs toggle adjusts values, so summing rows keeps the
+// on-screen total consistent with the rows above it.
+const totalValue = computed(() => props.rows.reduce((sum, r) => sum + r.value, 0))
 
 function onDownloadCsv () {
   downloadCsv(toCsv(pieCsvRows(props.rows), PIE_COLUMNS), props.csvFilename)
@@ -90,6 +101,14 @@ function onDownloadCsv () {
             <td>{{ formatPct(row.pct) }}</td>
           </tr>
         </tbody>
+        <tfoot v-if="rows.length">
+          <tr>
+            <td class="swatch-col" />
+            <td>Total</td>
+            <td>{{ totalValue }}</td>
+            <td />
+          </tr>
+        </tfoot>
       </table>
     </div>
   </div>
@@ -161,6 +180,23 @@ function onDownloadCsv () {
 .legend-table td {
   padding: 0.35rem 0.5rem;
   border-bottom: 1px solid var(--color-border-default, #e5e7eb);
+}
+
+/* Mirrors the PDF legend: one rule separating the data from the Total, and no
+   bottom border under it. Sticky so the total stays visible when a long
+   Services legend scrolls inside .legend-table-wrap. */
+.legend-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  /* Must be opaque: rows scroll UNDER this cell. --color-background-light is
+     theme-aware (style.css defines a dark override); the undefined
+     --color-surface-default this replaces fell through to #fff and painted a
+     white bar across the dark theme. */
+  background: var(--color-background-light, #fff);
+  border-top: 1px solid var(--color-border-default, #e5e7eb);
+  border-bottom: none;
+  font-weight: 600;
+  padding: 0.35rem 0.5rem;
 }
 
 .swatch-col {

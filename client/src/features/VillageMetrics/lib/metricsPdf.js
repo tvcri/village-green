@@ -38,8 +38,6 @@ export const PEOPLE_LIMIT = 20
 
 const STATUS_TEXT = {
   all: 'All statuses',
-  open: 'Open',
-  confirmed: 'Confirmed',
   completed: 'Completed',
   unmatched: 'Unmatched',
   memberCancelled: 'Member cancelled',
