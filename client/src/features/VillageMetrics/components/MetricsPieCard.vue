@@ -33,6 +33,11 @@ const chartData = computed(() => ({
 // Only `false` (disable) or a config object are meaningful here.
 const chartOptions = {
   maintainAspectRatio: false,
+  // Chart.js defaults arc borders to 2px of #fff. That white is load-bearing in
+  // light theme — it's what separates adjacent slices, including the 3-4%
+  // slivers a Services pie produces — so it stays, just thinner. At 2px it read
+  // as heavy white lines against the dark theme's near-black card.
+  elements: { arc: { borderWidth: 1 } },
   plugins: {
     legend: { display: false },
     tooltip: {
