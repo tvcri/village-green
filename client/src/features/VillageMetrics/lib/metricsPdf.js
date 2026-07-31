@@ -9,9 +9,24 @@ const MARGIN = 54
 const INK = rgb(0.09, 0.09, 0.11)
 const MUTED = rgb(0.42, 0.45, 0.5)
 const LINE = rgb(0.9, 0.91, 0.92)
+// One step darker than LINE. The hairline LINE reads fine on a screen but can
+// nearly vanish on a laser printer, and this is a document people print.
+const BORDER = rgb(0.82, 0.84, 0.86)
+// Barely-there card fill (#f9fafb).
+const TINT = rgb(0.976, 0.980, 0.985)
 
-const PIE_SIZE = 200
+// Smaller than the unframed layout's 200 so the pie sits inside CARD_PAD
+// without crowding the card border.
+const PIE_SIZE = 170
 const ROW_H = 15
+
+const CARD_PAD = 14
+const CARD_RADIUS = 8
+// Title row inside a card: heading baseline plus the gap to the content below.
+const CARD_TITLE_H = 24
+// Vertical gap between stacked cards.
+const CARD_GAP = 20
+const STAT_CARD_H = 52
 
 // Baseline the footer text is drawn at (see `footer` in buildMetricsPdf).
 // Nothing else may draw at or below this y.
@@ -29,6 +44,36 @@ const STATUS_TEXT = {
   unmatched: 'Unmatched',
   memberCancelled: 'Member cancelled',
   volunteerCancelled: 'Volunteer cancelled',
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December']
+
+// 'YYYY-MM-DD' -> 'January 1, 2026'. Splits the string rather than going
+// through a JS Date: these are civil calendar values, and 'YYYY-MM-DD' parses
+// as UTC midnight, which lands on the previous day in western zones. The
+// filenames stay ISO — only the human-facing header is reformatted.
+// Anything that isn't a well-formed civil date is passed through untouched.
+export function formatCivil (s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s ?? ''))
+  if (!m) return String(s ?? '')
+  const month = MONTHS[Number(m[2]) - 1]
+  if (!month) return String(s)
+  return `${month} ${Number(m[3])}, ${Number(m[1])}`
+}
+
+// "January 1 – July 30, 2026" when both ends share a year, otherwise the two
+// full dates. En dash (U+2013) is the range convention and encodes in WinAnsi.
+export function formatRange (start, end) {
+  const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(start ?? ''))
+  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(end ?? ''))
+  if (!a || !b) return `${formatCivil(start)} – ${formatCivil(end)}`
+  if (a[1] === b[1]) {
+    const ma = MONTHS[Number(a[2]) - 1]
+    const mb = MONTHS[Number(b[2]) - 1]
+    if (ma && mb) return `${ma} ${Number(a[3])} – ${mb} ${Number(b[3])}, ${Number(b[1])}`
+  }
+  return `${formatCivil(start)} – ${formatCivil(end)}`
 }
 
 // Standard Helvetica encodes WinAnsi only; one character outside it makes
@@ -81,6 +126,30 @@ function rightText (page, text, rightX, y, size, font, color) {
   page.drawText(s, { x: rightX - font.widthOfTextAtSize(s, size), y, size, font, color })
 }
 
+// A card frame. pdf-lib's drawRectangle has no borderRadius, so this is an SVG
+// path — and drawSvgPath anchors SVG-style at the top-left with +y pointing
+// DOWN, unlike every other pdf-lib call in this file. The path is therefore
+// authored in local coordinates from (0,0) and anchored at the card's TOP-left
+// (x, y): h is added going down, not subtracted. Getting this backwards draws
+// the frame mirrored off the content — which is exactly what happened first try.
+function roundedRect (page, { x, y, w, h, r = CARD_RADIUS, fill = TINT }) {
+  const d = [
+    `M ${r} 0`,
+    `L ${w - r} 0`, `Q ${w} 0 ${w} ${r}`,
+    `L ${w} ${h - r}`, `Q ${w} ${h} ${w - r} ${h}`,
+    `L ${r} ${h}`, `Q 0 ${h} 0 ${h - r}`,
+    `L 0 ${r}`, `Q 0 0 ${r} 0`, 'Z',
+  ].join(' ')
+  page.drawSvgPath(d, { x, y, borderColor: BORDER, borderWidth: 1, color: fill })
+}
+
+// What drawLegend consumes vertically: 6 (header -> rule) + 14 (rule -> first
+// row) + rows*ROW_H, plus the Total line (2 + ROW_H) when there are any rows.
+// Tracks the cy walk in drawLegend — keep the two in step.
+function legendHeight (rows) {
+  return 20 + rows.length * ROW_H + (rows.length ? ROW_H + 2 : 0)
+}
+
 // Legend table drawn as TEXT, not baked into the image, so it stays selectable
 // and searchable in the finished PDF.
 function drawLegend (page, fonts, rows, x, y, width) {
@@ -96,6 +165,10 @@ function drawLegend (page, fonts, rows, x, y, width) {
   page.drawLine({ start: { x, y: cy }, end: { x: x + width, y: cy }, thickness: 1, color: LINE })
   cy -= 14
 
+  // No per-row rules. A 0.5pt rule at cy+9 lands exactly on the top edge of the
+  // 9pt color chip, so it clipped the chip instead of separating rows — and
+  // inside a card frame the stack of hairlines read as noise. Row spacing plus
+  // the aligned chips carry the separation on their own.
   let total = 0
   for (const r of rows) {
     total += r.value
@@ -104,11 +177,13 @@ function drawLegend (page, fonts, rows, x, y, width) {
     rightText(page, String(r.value), valueX, cy, 10, helv, INK)
     rightText(page, `${Math.round((r.pct ?? 0) * 100)}%`, pctX, cy, 10, helv, INK)
     cy -= ROW_H
-    page.drawLine({ start: { x, y: cy + 9 }, end: { x: x + width, y: cy + 9 }, thickness: 0.5, color: LINE })
   }
 
   if (rows.length > 0) {
-    cy -= 2
+    // The one rule that earns its place: it separates the data from the Total.
+    cy += 3
+    page.drawLine({ start: { x, y: cy }, end: { x: x + width, y: cy }, thickness: 1, color: LINE })
+    cy -= 14
     drawText(page, 'Total', x + 18, cy, 10, bold, INK)
     rightText(page, String(total), valueX, cy, 10, bold, INK)
     cy -= ROW_H
@@ -116,25 +191,38 @@ function drawLegend (page, fonts, rows, x, y, width) {
   return cy
 }
 
-// One pie + its legend side by side, matching the on-screen card layout.
+// Height a framed pie section occupies, so callers can fits-check before drawing.
+function pieSectionHeight (rows) {
+  return Math.max(PIE_SIZE, legendHeight(rows)) + CARD_PAD * 2 + CARD_TITLE_H
+}
+
+// One pie + its legend side by side inside a rounded card, mirroring the
+// on-screen .pie-card. Returns the y a following section may start at.
 async function drawPieSection (pdf, page, fonts, title, subtitle, image, view, y) {
   const { helv, bold } = fonts
-  drawText(page, title, MARGIN, y - 12, 13, bold, INK)
-  if (subtitle) drawText(page, subtitle, MARGIN + 110, y - 11, 9.5, helv, MUTED)
-  y -= 28
+  const cardH = pieSectionHeight(view.rows)
+  const cardW = PAGE_W - MARGIN * 2
 
+  roundedRect(page, { x: MARGIN, y, w: cardW, h: cardH })
+
+  let inner = y - CARD_PAD
+  drawText(page, title, MARGIN + CARD_PAD, inner - 12, 13, bold, INK)
+  if (subtitle) drawText(page, subtitle, MARGIN + CARD_PAD + 110, inner - 11, 9.5, helv, MUTED)
+  inner -= CARD_TITLE_H
+
+  const pieX = MARGIN + CARD_PAD
   if (image) {
     const png = await pdf.embedPng(image)
-    page.drawImage(png, { x: MARGIN, y: y - PIE_SIZE, width: PIE_SIZE, height: PIE_SIZE })
+    page.drawImage(png, { x: pieX, y: inner - PIE_SIZE, width: PIE_SIZE, height: PIE_SIZE })
   } else {
-    drawText(page, view.emptyMessage, MARGIN, y - PIE_SIZE / 2, 10, helv, MUTED)
+    drawText(page, view.emptyMessage, pieX, inner - PIE_SIZE / 2, 10, helv, MUTED)
   }
 
-  const legendX = MARGIN + PIE_SIZE + 24
-  const legendW = PAGE_W - MARGIN - legendX
-  const legendBottom = drawLegend(page, fonts, view.rows, legendX, y - 6, legendW)
+  const legendX = pieX + PIE_SIZE + 24
+  const legendW = PAGE_W - MARGIN - CARD_PAD - legendX
+  drawLegend(page, fonts, view.rows, legendX, inner - 6, legendW)
 
-  return Math.min(y - PIE_SIZE, legendBottom) - 24
+  return y - cardH - CARD_GAP
 }
 
 // Height (in pt) a single People column needs, from the section "People"
@@ -146,7 +234,7 @@ async function drawPieSection (pdf, page, fonts, title, subtitle, image, view, y
 // slightly sooner than strictly necessary, never let it overlap the footer.
 // Keep it conservative — do NOT "correct" it down to the measured 44.
 function peopleColumnHeight (rowCount) {
-  return 18 + 38 + rowCount * 13 + 26
+  return 18 + 38 + rowCount * 13 + 26 + CARD_PAD * 2
 }
 
 // Required height for the whole People section — its own "People" heading
@@ -169,31 +257,44 @@ function drawPeopleSection (page, fonts, report, y) {
   drawText(page, 'People', MARGIN, y - 12, 13, bold, INK)
   drawText(page, 'Completed requests only.', MARGIN + 60, y - 11, 9.5, helv, MUTED)
   const peopleY = y - PEOPLE_HEADING_H
-  drawPeopleTable(page, fonts, 'Members', report.people.members, MARGIN, peopleY, colW)
-  drawPeopleTable(page, fonts, 'Volunteers', report.people.volunteers, MARGIN + colW + 24, peopleY, colW)
+
+  // Both cards take the TALLER column's height so their frames align; a card
+  // sized to its own shorter list would leave the pair visibly ragged.
+  const shownMembers = Math.min(report.people.members.length, PEOPLE_LIMIT)
+  const shownVolunteers = Math.min(report.people.volunteers.length, PEOPLE_LIMIT)
+  const cardH = Math.max(peopleColumnHeight(shownMembers), peopleColumnHeight(shownVolunteers))
+
+  drawPeopleTable(page, fonts, 'Members', report.people.members, MARGIN, peopleY, colW, cardH)
+  drawPeopleTable(page, fonts, 'Volunteers', report.people.volunteers, MARGIN + colW + 24, peopleY, colW, cardH)
 }
 
-function drawPeopleTable (page, fonts, heading, rows, x, y, width) {
+function drawPeopleTable (page, fonts, heading, rows, x, y, width, cardH) {
   const { helv, bold } = fonts
   const shown = topN(rows, PEOPLE_LIMIT)
-  const countX = x + width
 
-  drawText(page, heading, x, y, 11, bold, INK)
-  let cy = y - 18
-  drawText(page, 'Name', x, cy, 9, bold, MUTED)
+  roundedRect(page, { x, y, w: width, h: cardH })
+
+  // Content is inset by CARD_PAD on both sides; the rule and right-aligned
+  // counts stop at the padded edge, not the card edge.
+  const ix = x + CARD_PAD
+  const countX = x + width - CARD_PAD
+
+  drawText(page, heading, ix, y - CARD_PAD - 11, 11, bold, INK)
+  let cy = y - CARD_PAD - 29
+  drawText(page, 'Name', ix, cy, 9, bold, MUTED)
   rightText(page, 'Completed', countX, cy, 9, bold, MUTED)
   cy -= 6
-  page.drawLine({ start: { x, y: cy }, end: { x: countX, y: cy }, thickness: 1, color: LINE })
+  page.drawLine({ start: { x: ix, y: cy }, end: { x: countX, y: cy }, thickness: 1, color: LINE })
   cy -= 14
 
   for (const r of shown) {
-    drawText(page, r.fullName, x, cy, 9.5, helv, INK)
+    drawText(page, r.fullName, ix, cy, 9.5, helv, INK)
     rightText(page, String(r.count), countX, cy, 9.5, helv, INK)
     cy -= 13
   }
 
   cy -= 6
-  drawText(page, peopleFooter(shown.length, rows.length, heading.toLowerCase()), x, cy, 8, helv, MUTED)
+  drawText(page, peopleFooter(shown.length, rows.length, heading.toLowerCase()), ix, cy, 8, helv, MUTED)
 }
 
 export async function buildMetricsPdf (report) {
@@ -205,7 +306,7 @@ export async function buildMetricsPdf (report) {
   const { helv, bold } = fonts
 
   const footer = (page) => {
-    drawText(page, `Village Green — generated for ${report.start} to ${report.end}`,
+    drawText(page, `Village Green — generated for ${formatRange(report.start, report.end)}`,
       MARGIN, MARGIN - 18, 8, helv, MUTED)
   }
 
@@ -213,12 +314,19 @@ export async function buildMetricsPdf (report) {
   const p1 = pdf.addPage([PAGE_W, PAGE_H])
   let y = PAGE_H - MARGIN
 
+  // Three tiers: WHAT (village) -> WHEN (range) -> caveats (muted fine print).
+  // The range is the fact that distinguishes this document from every other
+  // export, so it gets its own line in bold INK rather than sharing the
+  // disclaimer's weight. It is NOT appended to the title line: that line
+  // already uses an em dash, and village names are variable-width — pdf-lib
+  // does not wrap, so a long name plus a range would run silently off the page.
   drawText(p1, `${report.villageName} — Metrics`, MARGIN, y - 18, 18, bold, INK)
-  y -= 30
+  y -= 32
+  drawText(p1, formatRange(report.start, report.end), MARGIN, y - 11, 11, bold, INK)
+  y -= 20
   const legsNote = report.legs ? 'Round trips counted as 2 legs' : 'Round trips counted once'
-  drawText(p1, `${report.start} to ${report.end}  ·  ${legsNote}`, MARGIN, y - 10, 9.5, helv, MUTED)
-  y -= 16
-  drawText(p1, 'Hub-cancelled requests are excluded from all counts.', MARGIN, y - 10, 9.5, helv, MUTED)
+  drawText(p1, `${legsNote}  ·  Hub-cancelled requests are excluded from all counts.`,
+    MARGIN, y - 10, 9.5, helv, MUTED)
   y -= 22
   p1.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_W - MARGIN, y }, thickness: 1, color: LINE })
   y -= 26
@@ -229,19 +337,18 @@ export async function buildMetricsPdf (report) {
     ['Cancelled', report.strip.cancelled],
     ['Unmatched', report.strip.unmatched],
   ]
-  const cellW = (PAGE_W - MARGIN * 2) / stats.length
+  // Framed to match the on-screen .stat-card boxes. Without frames the top of
+  // page 1 sits bare above framed sections, which reads as unfinished rather
+  // than airy.
+  const statGap = 10
+  const statW = (PAGE_W - MARGIN * 2 - statGap * (stats.length - 1)) / stats.length
   stats.forEach(([label, value], i) => {
-    const x = MARGIN + i * cellW
-    drawText(p1, label, x, y - 10, 9, helv, MUTED)
-    drawText(p1, String(value), x, y - 30, 18, bold, INK)
+    const x = MARGIN + i * (statW + statGap)
+    roundedRect(p1, { x, y, w: statW, h: STAT_CARD_H, r: 6 })
+    drawText(p1, label, x + 10, y - 16, 9, helv, MUTED)
+    drawText(p1, String(value), x + 10, y - 40, 18, bold, INK)
   })
-  y -= 50
-
-  // Extra breathing room so Categories doesn't sit tight against the strip —
-  // matches the whitespace Outcomes gets above it (drawPieSection's own 24pt
-  // trailing gap). Verified page 1 still clears the footer at max legend rows
-  // (5 categories + 4 outcomes): ~40pt of clearance remains above y=36.
-  y -= 14
+  y -= STAT_CARD_H + CARD_GAP
 
   y = await drawPieSection(pdf, p1, fonts, 'Categories',
     `Status: ${STATUS_TEXT[report.views.categories.status] ?? report.views.categories.status}`,
