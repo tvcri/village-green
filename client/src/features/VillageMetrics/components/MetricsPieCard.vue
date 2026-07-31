@@ -183,7 +183,11 @@ function onDownloadCsv () {
 .legend-table tfoot td {
   position: sticky;
   bottom: 0;
-  background: var(--color-surface-default, #fff);
+  /* Must be opaque: rows scroll UNDER this cell. --color-background-light is
+     theme-aware (style.css defines a dark override); the undefined
+     --color-surface-default this replaces fell through to #fff and painted a
+     white bar across the dark theme. */
+  background: var(--color-background-light, #fff);
   border-top: 1px solid var(--color-border-default, #e5e7eb);
   border-bottom: none;
   font-weight: 600;
