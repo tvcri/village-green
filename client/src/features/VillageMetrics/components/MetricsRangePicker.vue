@@ -121,7 +121,12 @@ const endDate = computed({
 .custom-range {
   display: flex;
   gap: 1rem;
+  /* `flex: 1 1 auto` is what lets these shrink on a phone, but it also makes
+     them swallow every leftover pixel of a desktop row — a date is ~10
+     characters and does not need 350px. The cap holds them to a sensible
+     reading width; below it they still shrink normally. */
   flex: 1 1 auto;
+  max-width: 26rem;
   min-width: 0;
 }
 
