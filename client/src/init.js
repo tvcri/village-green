@@ -27,7 +27,6 @@ else {
     await setupGoogleWorker()
     const authorized = await authorize()
     if (authorized) {
-      // await setupServiceWorker()
       appendStatus('Fetching user profile')
       const userObj = await getUserObject()
       if (userObj) {
