@@ -167,26 +167,17 @@ function onDownloadCsv () {
    shrunken size and the chart never re-expands after a viewport shrink (see b02e1ba0). */
 .chart-container :deep(.p-chart) { width: 100%; height: 100%; }
 
-/* Bar mode: the chart takes the full card width and the legend table drops
-   below it. Horizontal bars are only an improvement over a pie if they get
-   the width — keeping the 280px square would spend it all on y-axis labels
-   and leave ~160px of actual bar. Height comes from the inline chartStyle,
-   which scales with bar count. */
-.pie-card.bar-mode {
-  flex-direction: column;
-}
-
+/* Bar mode keeps the pie's side-by-side card; only the chart column's width
+   rule differs. Bars were briefly given the full card width, but at desktop
+   width (~1200px) that left the bars stretched across ~1000px with the legend
+   stranded below and the right half of the card empty. 60/40 gives the bars
+   more room than the pie's 280px square without wasting the remainder.
+   Below 640px the shared media query stacks this exactly as it stacks a pie. */
 .pie-card.bar-mode .chart-container {
-  flex: 0 0 auto;
+  flex: 1 1 60%;
   max-width: none;
-  /* height set inline; aspect-ratio must not fight it on mobile */
+  /* height set inline (scales with bar count); aspect-ratio must not fight it */
   aspect-ratio: auto;
-}
-
-.pie-card.bar-mode .legend-table-wrap {
-  /* Already full width once stacked; drop the scroll cap so the table reads
-     as part of the same block rather than a second scrolling pane. */
-  max-height: none;
 }
 
 .empty-msg {
