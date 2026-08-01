@@ -178,6 +178,14 @@ function onDownloadCsv () {
   max-width: none;
   /* height set inline (scales with bar count); aspect-ratio must not fight it */
   aspect-ratio: auto;
+  /* The chart's height comes from its bar count and the table's from its row
+     count, so the two columns are rarely the same height — 7 bars (~230px)
+     against a 7-row legend (~290px) left the chart floating at the top with
+     the imbalance all at the bottom. Centring the shorter column balances it.
+     Scoped to the chart rather than set as `align-items` on .pie-card so pie
+     mode, whose 280px square is close to most legend heights, keeps the
+     top-aligned behaviour it was tuned for. */
+  align-self: center;
 }
 
 .empty-msg {
