@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Chart from 'primevue/chart'
 import Button from 'primevue/button'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -21,6 +21,36 @@ const hasSlices = computed(() => props.slices.length > 0)
 
 const isBar = computed(() => props.chartType === 'bar')
 
+// Chart.js does not re-measure its container on a viewport resize here: a
+// narrow-then-widen cycle (crossing the 640px stacking breakpoint) left the
+// canvas at its stacked size until a tab switch remounted the component. Bar
+// mode exposes this because its height comes from content; the pie's fixed
+// 280px square hides it. Setting `responsive: true` did NOT fix it — the root
+// cause was not pinned down, so this addresses the symptom directly: container
+// geometry changes, chart re-measures.
+//
+// Not hypothetical — this is served over ngrok for customer demos on their own
+// devices, where resizing is expected.
+const chartHost = ref(null)
+const chartRef = ref(null)
+let resizeObserver = null
+
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined' || !chartHost.value) return
+  resizeObserver = new ResizeObserver(() => {
+    // getChart() is PrimeVue's accessor for the underlying Chart.js instance.
+    // It is null until chart.js/auto finishes its dynamic import, so this is
+    // optional-chained rather than assumed present.
+    chartRef.value?.getChart()?.resize()
+  })
+  resizeObserver.observe(chartHost.value)
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+})
+
 // Bars need height proportional to their count — a fixed square would crush
 // 10 service types. Pie keeps its CSS-driven square, so no inline style.
 // The empty case has no bars to measure and falls back to the square's height
@@ -29,12 +59,18 @@ const BAR_THICKNESS = 28
 const BAR_CHART_PADDING = 48
 const EMPTY_HEIGHT = 280
 
+// min-height, NOT height: the two card columns are flex siblings, so the
+// default `align-items: stretch` already makes the chart as tall as the legend
+// beside it — no measuring required. A fixed height would opt the chart OUT of
+// that stretch, which is what previously left a 3-bar chart in a stub of a box
+// next to a full-height table. The floor only bites the other way: when the bar
+// count needs more room than the legend provides, it grows the row.
 const chartStyle = computed(() => {
   if (!isBar.value) return {}
-  const height = hasSlices.value
+  const min = hasSlices.value
     ? props.slices.length * BAR_THICKNESS + BAR_CHART_PADDING
     : EMPTY_HEIGHT
-  return { height: `${height}px` }
+  return { minHeight: `${min}px` }
 })
 
 const chartData = computed(() => ({
@@ -63,6 +99,11 @@ function tooltipLabel (context, value) {
 const chartOptions = computed(() => {
   const bar = isBar.value
   return {
+    // Explicit rather than relying on the default. NOTE: setting this alone did
+    // NOT fix the stale-canvas-after-resize problem — the ResizeObserver in this
+    // component is what actually does that. Kept because it is the correct value
+    // to state, not because it is load-bearing.
+    responsive: true,
     maintainAspectRatio: false,
     // Horizontal bars: categories down the y-axis, values along x.
     ...(bar ? { indexAxis: 'y' } : {}),
@@ -101,8 +142,8 @@ function onDownloadCsv () {
 
 <template>
   <div class="pie-card" :class="{ 'bar-mode': isBar }">
-    <div class="chart-container" :style="chartStyle">
-      <Chart v-if="hasSlices" :type="chartType" :data="chartData" :options="chartOptions" />
+    <div class="chart-container" :style="chartStyle" ref="chartHost">
+      <Chart v-if="hasSlices" ref="chartRef" :type="chartType" :data="chartData" :options="chartOptions" />
       <p v-else class="empty-msg">{{ emptyMessage }}</p>
     </div>
     <div class="legend-table-wrap">
@@ -161,6 +202,7 @@ function onDownloadCsv () {
   max-width: 280px;
   height: 280px;
   min-width: 0;
+  align-self: flex-end;
 }
 
 /* Container-owned sizing: if the canvas sizes its own wrapper, Chart.js reads back the
@@ -174,18 +216,21 @@ function onDownloadCsv () {
    more room than the pie's 280px square without wasting the remainder.
    Below 640px the shared media query stacks this exactly as it stacks a pie. */
 .pie-card.bar-mode .chart-container {
-  flex: 1 1 60%;
-  max-width: none;
-  /* height set inline (scales with bar count); aspect-ratio must not fight it */
+  /* WIDTH, not flex-basis. Basis applies to the flex MAIN axis, and the 640px
+     media query flips .pie-card to `column` — where basis means HEIGHT. A
+     `flex: 0 1 480px` here silently became a 480px-tall box once stacked, which
+     is what drew three bars 150px thick. Setting width keeps this rule about
+     width at every viewport size. */
+  flex: 0 1 auto;
+  width: 480px;
+  max-width: 100%;
+  /* No fixed height and no align-self: both would opt this column out of the
+     flex row's default stretch, which is what matches the chart to the legend
+     beside it. The inline style sets min-height only, so the chart grows past
+     the legend when the bar count needs it and matches it otherwise. */
+  height: auto;
   aspect-ratio: auto;
-  /* The chart's height comes from its bar count and the table's from its row
-     count, so the two columns are rarely the same height — 7 bars (~230px)
-     against a 7-row legend (~290px) left the chart floating at the top with
-     the imbalance all at the bottom. Centring the shorter column balances it.
-     Scoped to the chart rather than set as `align-items` on .pie-card so pie
-     mode, whose 280px square is close to most legend heights, keeps the
-     top-aligned behaviour it was tuned for. */
-  align-self: center;
+  align-self: stretch;
 }
 
 .empty-msg {
@@ -280,6 +325,17 @@ function onDownloadCsv () {
        (now smaller) width or the pie sits in a letterboxed box. */
     height: auto;
     aspect-ratio: 1;
+  }
+
+  /* Bar mode must NOT take the square. Stacked, the container is as wide as the
+     card, so aspect-ratio:1 makes it just as TALL — a ~1100px box that three
+     bars then divide between them. Widening the window back reveals the result
+     as absurdly fat bars, because the tall box is what the row inherited.
+     Bar mode keeps its count-based min-height and lets content set the rest. */
+  .pie-card.bar-mode .chart-container {
+    aspect-ratio: auto;
+    height: auto;
+    align-self: stretch;
   }
 }
 </style>

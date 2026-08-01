@@ -168,23 +168,32 @@ describe('MetricsPieCard', () => {
     expect(document.querySelector('.pie-card.bar-mode')).toBeTruthy()
   })
 
-  // Height grows with bar count so 10 service types don't crush into a
-  // 280px box: 2 bars * 28 + 48 = 104.
-  it('sizes the bar chart container from the slice count', () => {
+  // A FLOOR, not a height: the chart is a flex sibling of the legend, so it
+  // stretches to the legend's height for free. min-height only bites when the
+  // bar count needs more room than that. 2 bars * 28 + 48 = 104.
+  it('floors the bar chart container height at the slice count', () => {
     mountCard({ chartType: 'bar' })
-    expect(document.querySelector('.chart-container').style.height).toBe('104px')
+    expect(document.querySelector('.chart-container').style.minHeight).toBe('104px')
+  })
+
+  // Setting `height` would opt the chart out of the flex row's stretch, which
+  // is exactly what left a 3-bar chart in a stub of a box beside a tall table.
+  it('sets no fixed height in bar mode, so the column can stretch', () => {
+    mountCard({ chartType: 'bar' })
+    expect(document.querySelector('.chart-container').style.height).toBe('')
   })
 
   // No bars to measure — an empty container must not collapse to zero, or the
   // empty message has nowhere to render.
-  it('falls back to a fixed height for an empty bar chart', () => {
+  it('falls back to a fixed floor for an empty bar chart', () => {
     mountCard({ chartType: 'bar', slices: [] })
-    expect(document.querySelector('.chart-container').style.height).toBe('280px')
+    expect(document.querySelector('.chart-container').style.minHeight).toBe('280px')
   })
 
-  // The pie keeps its CSS-driven square; no inline height.
+  // The pie keeps its CSS-driven square; no inline sizing at all.
   it('leaves the pie container height to CSS', () => {
     mountCard({})
     expect(document.querySelector('.chart-container').style.height).toBe('')
+    expect(document.querySelector('.chart-container').style.minHeight).toBe('')
   })
 })
