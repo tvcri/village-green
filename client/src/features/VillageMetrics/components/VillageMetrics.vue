@@ -341,11 +341,6 @@ const exportMenuItems = computed(() => [
 
       <div class="controls-bar">
         <div class="view-controls">
-          <div class="legs-toggle">
-            <ToggleSwitch v-model="legs" inputId="legsToggle" />
-            <label for="legsToggle">Round trip = 2 legs</label>
-          </div>
-
           <SelectButton
             v-model="chartType"
             :options="CHART_TYPE_OPTIONS"
@@ -354,6 +349,11 @@ const exportMenuItems = computed(() => [
             :allowEmpty="false"
             aria-label="Chart type"
           />
+          <div class="legs-toggle">
+            <ToggleSwitch v-model="legs" inputId="legsToggle" />
+            <label for="legsToggle">Round trip = 2 legs</label>
+          </div>
+
         </div>
 
         <SplitButton
