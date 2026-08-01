@@ -211,10 +211,27 @@ describe('MetricsPieCard', () => {
 
   // A FLOOR, not a height: the chart is a flex sibling of the legend, so it
   // stretches to the legend's height for free. min-height only bites when the
-  // bar count needs more room than that. 2 bars * 28 + 48 = 104.
+  // bar count needs more room than that. 2 bars * 44 + 48 = 136.
+  //
+  // On mobile the card stacks, there is no sibling to stretch against, and this
+  // floor becomes the ACTUAL height — which is why the per-bar band is 44 and
+  // not the 28 that sufficed while desktop's legend always won.
   it('floors the bar chart container height at the slice count', () => {
     mountCard({ chartType: 'bar' })
-    expect(document.querySelector('.chart-container').style.minHeight).toBe('104px')
+    expect(document.querySelector('.chart-container').style.minHeight).toBe('136px')
+  })
+
+  it('grows the floor with each additional bar', () => {
+    mountCard({
+      chartType: 'bar',
+      slices: [
+        { label: 'A', value: 3, color: '#111' },
+        { label: 'B', value: 2, color: '#222' },
+        { label: 'C', value: 1, color: '#333' },
+      ],
+    })
+    // 3 bars * 44 + 48 = 180 — one band more than the two-bar case above
+    expect(document.querySelector('.chart-container').style.minHeight).toBe('180px')
   })
 
   // Setting `height` would opt the chart out of the flex row's stretch, which

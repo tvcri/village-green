@@ -71,7 +71,14 @@ onBeforeUnmount(() => {
 // 10 service types. Pie keeps its CSS-driven square, so no inline style.
 // The empty case has no bars to measure and falls back to the square's height
 // so the empty message still has a box to sit in.
-const BAR_THICKNESS = 28
+//
+// 28 was chosen when this was only a floor that the desktop legend nearly
+// always exceeded. Stacked on mobile there is no sibling to stretch against, so
+// the floor became the actual height and 5 bars rendered 188px tall against a
+// ~280px legend — visibly compressed. 44 is a band per bar, not the bar itself:
+// Chart.js divides the height among the bars and draws each at a fraction of
+// its band.
+const BAR_THICKNESS = 44
 const BAR_CHART_PADDING = 48
 const EMPTY_HEIGHT = 280
 
@@ -285,6 +292,29 @@ function onDownloadCsv () {
    shrunken size and the chart never re-expands after a viewport shrink (see b02e1ba0). */
 .chart-container :deep(.p-chart) { width: 100%; height: 100%; }
 
+/* Bar mode's container has min-height but no HEIGHT, and a percentage height
+   resolves only against a DEFINITE one — min-height does not count. So the
+   `height: 100%` above computed to auto, PrimeVue's .p-chart wrapper collapsed,
+   and the canvas fell back to Chart.js's built-in 150px default. That is the
+   150-inside-188 mismatch: not a squeeze, just the library default showing
+   through because nothing upstream supplied a height.
+   Flex stretch needs no definite parent height, so it fills where the
+   percentage could not. min-height stays, which is what lets the desktop row
+   still stretch the chart to the legend beside it.
+   `display: flex` for this lives in the bar-mode rule below.
+
+   NO TEST GUARDS THIS. vitest does not inject scoped styles into jsdom — the
+   element carries a bare `chart-container` class with no style attached — so
+   any assertion here would pass whether the rule exists or not. Deleting these
+   two rules silently returns the canvas to 150px, visible only in a browser. */
+.pie-card.bar-mode .chart-container :deep(.p-chart) {
+  flex: 1 1 auto;
+  /* Flex items floor at their content size; without this the wrapper refuses to
+     shrink below the canvas and cannot stretch to fill either. */
+  min-height: 0;
+  height: auto;
+}
+
 /* Bar mode keeps the pie's side-by-side card; only the chart column's width
    rule differs. Bars were briefly given the full card width, but at desktop
    width (~1200px) that left the bars stretched across ~1000px with the legend
@@ -300,6 +330,9 @@ function onDownloadCsv () {
   flex: 0 1 auto;
   width: 480px;
   max-width: 100%;
+  /* Makes the .p-chart wrapper a flex item so it can stretch to this box —
+     see the percentage-vs-definite-height note above. */
+  display: flex;
   /* No fixed height and no align-self: both would opt this column out of the
      flex row's default stretch, which is what matches the chart to the legend
      beside it. The inline style sets min-height only, so the chart grows past
@@ -391,6 +424,10 @@ function onDownloadCsv () {
 @media (max-width: 640px) {
   .pie-card {
     flex-direction: column;
+    /* `gap` applies along whichever axis the flex direction sets, so the 4.5rem
+       that separates chart from legend side by side becomes 4.5rem of dead
+       space BETWEEN them once stacked. Vertical stacking needs far less. */
+    gap: 1rem;
   }
 
   /* Centred once stacked — a left-aligned pie under a full-width table reads as
