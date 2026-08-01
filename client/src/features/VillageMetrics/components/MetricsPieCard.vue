@@ -46,9 +46,25 @@ onMounted(() => {
   resizeObserver.observe(chartHost.value)
 })
 
+// The theme toggle adds/removes `app-dark` on <html> (see useTheme.js). That is
+// invisible to Vue, so watching the attribute is what turns a theme change into
+// a re-render of the chart's CSS-variable-derived colors.
+let themeObserver = null
+
+onMounted(() => {
+  if (typeof MutationObserver === 'undefined') return
+  themeObserver = new MutationObserver(() => { themeTick.value++ })
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  })
+})
+
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   resizeObserver = null
+  themeObserver?.disconnect()
+  themeObserver = null
 })
 
 // Bars need height proportional to their count — a fixed square would crush
@@ -96,8 +112,34 @@ function tooltipLabel (context, value) {
   return `${context.label}: ${value} (${pct}%)`
 }
 
+// Chart.js has no theme awareness: its default grid is a fixed near-black at
+// low alpha, which reads fine on the light card and all but vanishes on the
+// dark one. Reading the app's own CSS variables keeps the axes in step with
+// whatever the palette says rather than hardcoding a second set of hexes.
+//
+// Deliberately NOT via useTheme(): that composable touches localStorage and
+// matchMedia at call time, which a presentational card has no business
+// depending on — importing it broke every test in this file. The CSS variables
+// already carry the theme, so reading them is enough.
+//
+// `themeTick` is what makes this reactive. The theme toggle swaps a class on
+// <html>, which changes no Vue state, so a computed reading CSS variables would
+// otherwise never re-evaluate.
+const themeTick = ref(0)
+
+function cssVar (name, fallback) {
+  if (typeof getComputedStyle === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+
 const chartOptions = computed(() => {
   const bar = isBar.value
+  // Read so a theme change re-runs this; by the time it fires the class swap
+  // has happened and the variables below resolve to the new palette.
+  void themeTick.value
+  const gridColor = cssVar('--color-border-default', '#e4e4e7')
+  const tickColor = cssVar('--color-text-dim', '#6b7280')
   return {
     // Explicit rather than relying on the default. NOTE: setting this alone did
     // NOT fix the stale-canvas-after-resize problem — the ResizeObserver in this
@@ -125,6 +167,18 @@ const chartOptions = computed(() => {
               from: (ctx) => (ctx.type === 'data' && ctx.mode === 'default'
                 ? ctx.chart.scales.x.getPixelForValue(0)
                 : undefined),
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: tickColor },
+              grid: { color: gridColor },
+            },
+            y: {
+              ticks: { color: tickColor },
+              // No horizontal rules: with one bar per category they would just
+              // underline each bar. The vertical value grid carries the reading.
+              grid: { display: false },
             },
           },
         }
