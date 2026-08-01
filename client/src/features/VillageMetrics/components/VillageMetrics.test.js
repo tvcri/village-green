@@ -31,7 +31,7 @@ vi.mock('../api/villageMetricsApi.js', () => ({
 
 const VillageMetrics = (await import('./VillageMetrics.vue')).default
 
-// jsdom has no canvas; stub primevue/chart so MetricsPieCard mounts without touching it.
+// jsdom has no canvas; stub primevue/chart so MetricsChartCard mounts without touching it.
 // Records the `type` of every Chart rendered this mount, so a test can assert
 // the page-level toggle reached the card. The push lives in the render
 // function (not `setup`, which only runs once) because clicking the

@@ -1,5 +1,5 @@
-// Renders pies off-screen purely to capture them for the PDF, then throws them
-// away. Deliberately does NOT reuse the on-screen charts: <Tabs lazy> means
+// Renders charts off-screen purely to capture them for the PDF, then throws
+// them away. Deliberately does NOT reuse the on-screen charts: <Tabs lazy> means
 // unvisited panels never mount, so there is nothing there to snapshot.
 //
 // createChart/createCanvas are injected so tests can run without a canvas —
@@ -8,9 +8,9 @@
 const EXPORT_SIZE = 560 // 280 CSS px at 2x, so the raster holds up in print
 
 // animation:false is LOAD-BEARING. With it, Chart.js draws synchronously during
-// construction and toDataURL() on the next line returns a finished pie — no
+// construction and toDataURL() on the next line returns a finished chart — no
 // await, no nextTick, no requestAnimationFrame. Set any other value here and
-// captures silently become half-swept pies.
+// captures silently become half-drawn: pies half-swept, bars mid-grow.
 //
 // Frozen because this is the canonical template, shared by every capture and
 // pinned by tests below. chartConfig() must NOT hand this object to Chart.js
@@ -20,7 +20,7 @@ export const EXPORT_CHART_OPTIONS = Object.freeze({
   maintainAspectRatio: false,
   animation: false,
   // The PDF draws its own legend table, so the chart's is off — matching the
-  // on-screen MetricsPieCard.
+  // on-screen MetricsChartCard.
   plugins: { legend: { display: false } },
 })
 
@@ -72,7 +72,7 @@ export function chartConfig (slices, chartType = 'pie') {
 
 // Returns null for an empty chart: a blank box in the PDF would read as a bug,
 // and the caller prints the empty message instead.
-export function capturePie (slices, deps, chartType = 'pie') {
+export function captureChart (slices, deps, chartType = 'pie') {
   if (!slices || slices.length === 0) return null
 
   const { createCanvas, createChart, size = EXPORT_SIZE, height } = deps
@@ -87,10 +87,10 @@ export function capturePie (slices, deps, chartType = 'pie') {
   return url
 }
 
-export function captureAll (pies, deps, chartType = 'pie') {
+export function captureAll (charts, deps, chartType = 'pie') {
   const out = {}
-  for (const [name, slices] of Object.entries(pies)) {
-    out[name] = capturePie(slices, deps, chartType)
+  for (const [name, slices] of Object.entries(charts)) {
+    out[name] = captureChart(slices, deps, chartType)
   }
   return out
 }

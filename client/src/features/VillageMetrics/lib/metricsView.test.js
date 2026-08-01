@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   STATUS_ORDER, STATUS_LABELS, CATEGORY_COLORS, STATUS_OPTIONS,
   statusCount, legsApply, adjustedCount,
-  categoryPie, servicePie, outcomesPie, stripStats,
+  categoryChart, serviceChart, outcomesChart, stripStats,
 } from './metricsView.js'
 
 // A hand-built fixture matching the VillageMetrics API payload shape
@@ -125,11 +125,11 @@ describe('adjustedCount', () => {
   })
 })
 
-describe('categoryPie', () => {
+describe('categoryChart', () => {
   const metrics = makeMetrics()
 
   it('omits zero-value slices but keeps all 5 rows with pct', () => {
-    const { slices, rows } = categoryPie(metrics.byCategory, 'completed', false)
+    const { slices, rows } = categoryChart(metrics.byCategory, 'completed', false)
     // Rides 40, Errands 20, Home Help 10 are nonzero; Tech Support and Member Added are 0
     expect(slices).toEqual([
       { label: 'Rides', value: 40, color: '#22c55e' },
@@ -148,7 +148,7 @@ describe('categoryPie', () => {
   })
 
   it('applies legs adjustment to completed selection', () => {
-    const { rows } = categoryPie(metrics.byCategory, 'completed', true)
+    const { rows } = categoryChart(metrics.byCategory, 'completed', true)
     // Rides: 40+6=46, Errands: 20+2=22, Home Help: 10+0=10
     const ridesRow = rows.find(r => r.label === 'Rides')
     const errandsRow = rows.find(r => r.label === 'Errands')
@@ -164,7 +164,7 @@ describe('categoryPie', () => {
       { category: 'Tech Support', byStatus: emptyStatus(), completedRoundTrips: 0 },
       { category: 'Member Added', byStatus: emptyStatus(), completedRoundTrips: 0 },
     ]
-    const { slices, rows } = categoryPie(zeroCategories, 'unmatched', false)
+    const { slices, rows } = categoryChart(zeroCategories, 'unmatched', false)
     expect(slices).toEqual([])
     expect(rows.every(r => r.pct === 0)).toBe(true)
   })
@@ -181,7 +181,7 @@ describe('categoryPie', () => {
       { category: 'Tech Support', byStatus: emptyStatus() },
       { category: 'Member Added', byStatus: emptyStatus() },
     ]
-    const { slices, rows } = categoryPie(categoriesMissingField, 'completed', true)
+    const { slices, rows } = categoryChart(categoriesMissingField, 'completed', true)
     expect(rows.every(r => Number.isFinite(r.value) && Number.isFinite(r.pct))).toBe(true)
     expect(slices).toEqual([
       { label: 'Rides', value: 40, color: '#22c55e' },
@@ -190,19 +190,19 @@ describe('categoryPie', () => {
   })
 })
 
-describe('servicePie', () => {
+describe('serviceChart', () => {
   const metrics = makeMetrics()
 
   it('filters by category; null category only appears under all', () => {
-    const rides = servicePie(metrics.byServiceType, 'completed', 'Rides', false)
+    const rides = serviceChart(metrics.byServiceType, 'completed', 'Rides', false)
     expect(rides.rows.map(r => r.label)).toEqual(['Ride: Medical', 'Ride: Social'])
 
-    const all = servicePie(metrics.byServiceType, 'completed', 'all', false)
+    const all = serviceChart(metrics.byServiceType, 'completed', 'all', false)
     expect(all.rows.map(r => r.label)).toContain('Something Custom')
   })
 
   it('sorts by adjustedCount desc then serviceName asc', () => {
-    const { rows } = servicePie(metrics.byServiceType, 'completed', 'all', false)
+    const { rows } = serviceChart(metrics.byServiceType, 'completed', 'all', false)
     // completed counts: Ride: Medical 30, Errand: Grocery 19, Ride: Social 10,
     // Household Chores/Handy Help 10, Something Custom 5, Tiny Errand 1
     expect(rows.map(r => r.label)).toEqual([
@@ -218,13 +218,13 @@ describe('servicePie', () => {
   // TEMPORARY, paired with SERVICE_LABELS in metricsView.js — delete both when the
   // serviceName is renamed in the SR table.
   it('shortens Household Chores/Handy Help to Home Help for display', () => {
-    const { rows } = servicePie(metrics.byServiceType, 'completed', 'all', false)
+    const { rows } = serviceChart(metrics.byServiceType, 'completed', 'all', false)
     expect(rows.map(r => r.label)).toContain('Home Help')
     expect(rows.map(r => r.label)).not.toContain('Household Chores/Handy Help')
   })
 
   it('passes unmapped serviceNames through unchanged', () => {
-    const { rows } = servicePie(metrics.byServiceType, 'completed', 'all', false)
+    const { rows } = serviceChart(metrics.byServiceType, 'completed', 'all', false)
     // 'Something Custom' is a user-typed name with no SERVICE_LABELS entry.
     expect(rows.map(r => r.label)).toContain('Something Custom')
   })
@@ -237,7 +237,7 @@ describe('servicePie', () => {
       { serviceName: 'Big One', category: 'Rides', byStatus: { ...emptyStatus(), completed: total - small }, completedRoundTrips: 0 },
       { serviceName: 'Small One', category: 'Rides', byStatus: { ...emptyStatus(), completed: small }, completedRoundTrips: 0 },
     ]
-    const { slices, rows } = servicePie(entries, 'completed', 'all', false)
+    const { slices, rows } = serviceChart(entries, 'completed', 'all', false)
     expect(slices).toEqual([
       { label: 'Big One', value: total - small, color: '#0ea5e9' },
       { label: 'Other', value: small, color: '#94a3b8' },
@@ -255,12 +255,12 @@ describe('servicePie', () => {
       byStatus: { ...emptyStatus(), completed: 100 - i }, // strictly descending, no Other merge (all well above 2%)
       completedRoundTrips: 0,
     }))
-    const { slices } = servicePie(entries, 'completed', 'all', false, 0) // otherPct 0 disables merging
+    const { slices } = serviceChart(entries, 'completed', 'all', false, 0) // otherPct 0 disables merging
     expect(slices.map(s => s.color)).toEqual([...ramp, ramp[0]])
   })
 })
 
-describe('outcomesPie', () => {
+describe('outcomesChart', () => {
   const totals = {
     totalRequests: 90,
     byStatus: { completed: 70, unmatched: 4, memberCancelled: 10, volunteerCancelled: 6 },
@@ -268,7 +268,7 @@ describe('outcomesPie', () => {
   }
 
   it('4 fixed entries with legs adjusting only Completed', () => {
-    const { rows } = outcomesPie(totals, true)
+    const { rows } = outcomesChart(totals, true)
     expect(rows).toEqual([
       { label: 'Completed', value: 78, color: '#22c55e', pct: 78 / (78 + 10 + 6 + 4) },
       { label: 'Member cancelled', value: 10, color: '#f59e0b', pct: 10 / (78 + 10 + 6 + 4) },
@@ -278,13 +278,13 @@ describe('outcomesPie', () => {
   })
 
   it('no legs adjustment when legs is off', () => {
-    const { rows } = outcomesPie(totals, false)
+    const { rows } = outcomesChart(totals, false)
     expect(rows.find(r => r.label === 'Completed').value).toBe(70)
   })
 
   it('omits zero slices', () => {
     const zeroed = { ...totals, byStatus: { ...totals.byStatus, unmatched: 0 } }
-    const { slices } = outcomesPie(zeroed, false)
+    const { slices } = outcomesChart(zeroed, false)
     expect(slices.find(s => s.label === 'Unmatched')).toBeUndefined()
     expect(slices).toHaveLength(3)
   })
@@ -295,7 +295,7 @@ describe('outcomesPie', () => {
       byStatus: { completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
       completedRoundTrips: 0,
     }
-    const { slices, rows } = outcomesPie(zeroTotals, false)
+    const { slices, rows } = outcomesChart(zeroTotals, false)
     expect(slices).toEqual([])
     expect(rows.every(r => r.pct === 0)).toBe(true)
   })
@@ -304,7 +304,7 @@ describe('outcomesPie', () => {
   it('legs on + missing completedRoundTrips: Completed stays finite, not NaN', () => {
     const { totalRequests, byStatus } = totals
     const totalsMissingField = { totalRequests, byStatus } // no completedRoundTrips key
-    const { rows, slices } = outcomesPie(totalsMissingField, true)
+    const { rows, slices } = outcomesChart(totalsMissingField, true)
     const completedRow = rows.find(r => r.label === 'Completed')
     expect(Number.isFinite(completedRow.value)).toBe(true)
     expect(completedRow.value).toBe(70) // 70 + 0, not 70 + undefined

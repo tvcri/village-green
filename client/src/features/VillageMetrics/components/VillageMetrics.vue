@@ -11,7 +11,7 @@ import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import SelectButton from 'primevue/selectbutton'
 import SplitButton from 'primevue/splitbutton'
-import { capturePie } from '../lib/capturePies.js'
+import { captureChart } from '../lib/captureCharts.js'
 import { buildMetricsPdf, chartDrawHeight, chartSlotWidth } from '../lib/metricsPdf.js'
 import { getVillageMetrics } from '../api/villageMetricsApi.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -21,9 +21,9 @@ import {
   STATUS_LABELS,
   STATUS_OPTIONS,
   CATEGORY_COLORS,
-  categoryPie,
-  servicePie,
-  outcomesPie,
+  categoryChart,
+  serviceChart,
+  outcomesChart,
   stripStats,
 } from '../lib/metricsView.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
@@ -31,7 +31,7 @@ import { csvFilename } from '../lib/metricsCsv.js'
 import MetricsRangePicker from './MetricsRangePicker.vue'
 import MetricsCountTable from './MetricsCountTable.vue'
 import MetricsSummaryStrip from './MetricsSummaryStrip.vue'
-import MetricsPieCard from './MetricsPieCard.vue'
+import MetricsChartCard from './MetricsChartCard.vue'
 
 defineOptions({ name: 'VillageMetrics' })
 
@@ -150,7 +150,7 @@ const strip = computed(() => (hasData.value ? stripStats(metrics.value, legs.val
 const categoryView = computed(() => {
   if (!hasData.value) return null
   return {
-    ...categoryPie(metrics.value.byCategory, catStatus.value, legs.value),
+    ...categoryChart(metrics.value.byCategory, catStatus.value, legs.value),
     emptyMessage: emptyMessageFor(catStatus.value),
   }
 })
@@ -158,7 +158,7 @@ const categoryView = computed(() => {
 const serviceView = computed(() => {
   if (!hasData.value) return null
   return {
-    ...servicePie(metrics.value.byServiceType, svcStatus.value, svcCategory.value, legs.value),
+    ...serviceChart(metrics.value.byServiceType, svcStatus.value, svcCategory.value, legs.value),
     emptyMessage: emptyMessageFor(svcStatus.value),
   }
 })
@@ -166,7 +166,7 @@ const serviceView = computed(() => {
 const outcomesView = computed(() => {
   if (!hasData.value) return null
   return {
-    ...outcomesPie(metrics.value.totals, legs.value),
+    ...outcomesChart(metrics.value.totals, legs.value),
     emptyMessage: 'No requests in this range',
   }
 })
@@ -230,12 +230,12 @@ function captureFor (view, deps) {
     ? {
         ...deps,
         size: chartSlotWidth('bar') * CAPTURE_SCALE,
-        // Must match the height drawPieSection will draw it at, or pdf-lib
+        // Must match the height drawChartSection will draw it at, or pdf-lib
         // stretches the raster to fit.
         height: chartDrawHeight(view.slices.length, 'bar') * CAPTURE_SCALE,
       }
     : deps
-  return capturePie(view.slices, sized, chartType.value)
+  return captureChart(view.slices, sized, chartType.value)
 }
 
 async function onDownloadPdf () {
@@ -255,7 +255,7 @@ async function onDownloadPdf () {
       legs: legs.value,
       strip: strip.value,
       images,
-      // chartType and sliceCount ride along on each view so drawPieSection can
+      // chartType and sliceCount ride along on each view so drawChartSection can
       // size the image the same way the capture did. sliceCount is the BAR
       // count, which differs from rows.length: Services merges its tail into a
       // single "Other" slice while the legend lists every row.
@@ -384,7 +384,7 @@ const exportMenuItems = computed(() => [
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="categoryView" :csvFilename="categoryCsvName" :chartType="chartType" />
+            <MetricsChartCard v-bind="categoryView" :csvFilename="categoryCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="services">
@@ -406,11 +406,11 @@ const exportMenuItems = computed(() => [
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="serviceView" :csvFilename="serviceCsvName" :chartType="chartType" />
+            <MetricsChartCard v-bind="serviceView" :csvFilename="serviceCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="outcomes">
-            <MetricsPieCard v-bind="outcomesView" :csvFilename="outcomesCsvName" :chartType="chartType" />
+            <MetricsChartCard v-bind="outcomesView" :csvFilename="outcomesCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="people">

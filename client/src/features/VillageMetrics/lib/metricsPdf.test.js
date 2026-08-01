@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
-import { PEOPLE_LIMIT, topN, peopleFooter, buildMetricsPdf, winAnsi, formatCivil, formatRange, chartSlotWidth, chartDrawHeight, chartContentHeight, PIE_SIZE } from './metricsPdf.js'
+import { PEOPLE_LIMIT, topN, peopleFooter, buildMetricsPdf, winAnsi, formatCivil, formatRange, chartSlotWidth, chartDrawHeight, chartContentHeight, CHART_SIZE } from './metricsPdf.js'
 
 const ROWS = [
   { label: 'Rides', value: 704, color: '#22c55e', pct: 0.8009 },
@@ -222,23 +222,23 @@ describe('metricsPdf', () => {
 
   // ---- chart geometry ----
   // These three numbers must agree with what the CAPTURE renders at, or pdf-lib
-  // stretches the raster to fit the draw box. They were hardcoded PIE_SIZE at
+  // stretches the raster to fit the draw box. They were hardcoded CHART_SIZE at
   // each site before bar mode, which is exactly how the first bar export came
   // out squashed.
   describe('chart geometry', () => {
     it('gives bars a wider slot than a pie', () => {
-      expect(chartSlotWidth('pie')).toBe(PIE_SIZE)
-      expect(chartSlotWidth('bar')).toBeGreaterThan(PIE_SIZE)
+      expect(chartSlotWidth('pie')).toBe(CHART_SIZE)
+      expect(chartSlotWidth('bar')).toBeGreaterThan(CHART_SIZE)
     })
 
     it('treats an absent chartType as a pie', () => {
-      expect(chartSlotWidth(undefined)).toBe(PIE_SIZE)
-      expect(chartDrawHeight(5, undefined)).toBe(PIE_SIZE)
+      expect(chartSlotWidth(undefined)).toBe(CHART_SIZE)
+      expect(chartDrawHeight(5, undefined)).toBe(CHART_SIZE)
     })
 
     it('draws a pie as a square regardless of slice count', () => {
-      expect(chartDrawHeight(3, 'pie')).toBe(PIE_SIZE)
-      expect(chartDrawHeight(12, 'pie')).toBe(PIE_SIZE)
+      expect(chartDrawHeight(3, 'pie')).toBe(CHART_SIZE)
+      expect(chartDrawHeight(12, 'pie')).toBe(CHART_SIZE)
     })
 
     // The point of sizing from bar count: consistent thickness across sections.
@@ -254,9 +254,9 @@ describe('metricsPdf', () => {
     })
 
     it('lets a short bar chart be shorter than the pie square', () => {
-      // The PIE_SIZE floor exists so a square pie is never clipped. Applying it
+      // The CHART_SIZE floor exists so a square pie is never clipped. Applying it
       // to bars padded every short section with unusable whitespace.
-      expect(chartDrawHeight(2, 'bar')).toBeLessThan(PIE_SIZE)
+      expect(chartDrawHeight(2, 'bar')).toBeLessThan(CHART_SIZE)
     })
 
     it('sizes the card to whichever of chart and legend is taller', () => {
@@ -269,10 +269,10 @@ describe('metricsPdf', () => {
     })
 
     it('keeps the pie card on its original formula', () => {
-      // max(PIE_SIZE, legend) — unchanged by the bar work, so pie exports are
+      // max(CHART_SIZE, legend) — unchanged by the bar work, so pie exports are
       // byte-identical to before it.
-      expect(chartContentHeight(ROWS, ROWS.length, 'pie')).toBe(PIE_SIZE)
-      expect(chartContentHeight(serviceRows(20), 20, 'pie')).toBeGreaterThan(PIE_SIZE)
+      expect(chartContentHeight(ROWS, ROWS.length, 'pie')).toBe(CHART_SIZE)
+      expect(chartContentHeight(serviceRows(20), 20, 'pie')).toBeGreaterThan(CHART_SIZE)
     })
   })
 

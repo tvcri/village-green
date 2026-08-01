@@ -2,7 +2,7 @@
 import { render, screen, cleanup, fireEvent } from '@testing-library/vue'
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import PrimeVue from 'primevue/config'
-import MetricsPieCard from './MetricsPieCard.vue'
+import MetricsChartCard from './MetricsChartCard.vue'
 import * as csvUtils from '../../../shared/lib/csvUtils.js'
 
 // Captures the props Chart was rendered with, so tests can assert on chart
@@ -28,13 +28,13 @@ const ROWS = [
 ]
 
 function mountCard (props) {
-  return render(MetricsPieCard, {
+  return render(MetricsChartCard, {
     props: { slices: SLICES, rows: ROWS, emptyMessage: 'No data in this range.', ...props },
     global: { plugins: [PrimeVue], stubs: { Chart: ChartStub } },
   })
 }
 
-describe('MetricsPieCard', () => {
+describe('MetricsChartCard', () => {
   beforeEach(() => {
     window.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })
     chartProps = null
@@ -65,7 +65,7 @@ describe('MetricsPieCard', () => {
     expect(chartProps).not.toBeNull()
   })
 
-  it('tolerates a single-slice pie (servicePie "Other" collapse edge case)', () => {
+  it('tolerates a single-slice pie (serviceChart "Other" collapse edge case)', () => {
     mountCard({
       slices: [{ label: 'Other', value: 10, color: '#94a3b8' }],
       rows: [{ label: 'Other', value: 10, color: '#94a3b8', pct: 1 }],
@@ -201,12 +201,12 @@ describe('MetricsPieCard', () => {
 
   it('does not apply bar-mode layout for a pie', () => {
     mountCard({})
-    expect(document.querySelector('.pie-card.bar-mode')).toBeNull()
+    expect(document.querySelector('.chart-card.bar-mode')).toBeNull()
   })
 
   it('applies bar-mode layout for a bar chart', () => {
     mountCard({ chartType: 'bar' })
-    expect(document.querySelector('.pie-card.bar-mode')).toBeTruthy()
+    expect(document.querySelector('.chart-card.bar-mode')).toBeTruthy()
   })
 
   // A FLOOR, not a height: the chart is a flex sibling of the legend, so it

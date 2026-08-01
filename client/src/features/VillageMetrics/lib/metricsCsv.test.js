@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { PIE_COLUMNS, countColumns, pieCsvRows, csvFilename } from './metricsCsv.js'
+import { CHART_COLUMNS, countColumns, chartCsvRows, csvFilename } from './metricsCsv.js'
 import { toCsv } from '../../../shared/lib/csvUtils.js'
 
 describe('metricsCsv', () => {
   it('exposes label/value/pct columns for legend tables', () => {
-    expect(PIE_COLUMNS.map(c => c.key)).toEqual(['label', 'value', 'pct'])
+    expect(CHART_COLUMNS.map(c => c.key)).toEqual(['label', 'value', 'pct'])
   })
 
   it('names the count column after the role', () => {
@@ -13,12 +13,12 @@ describe('metricsCsv', () => {
   })
 
   it('renders pct as a whole-number percent', () => {
-    const rows = pieCsvRows([{ label: 'Rides', value: 704, pct: 0.8009 }])
+    const rows = chartCsvRows([{ label: 'Rides', value: 704, pct: 0.8009 }])
     expect(rows[0].pct).toBe('80%')
   })
 
   it('renders a zero pct without NaN', () => {
-    expect(pieCsvRows([{ label: 'None', value: 0, pct: 0 }])[0].pct).toBe('0%')
+    expect(chartCsvRows([{ label: 'None', value: 0, pct: 0 }])[0].pct).toBe('0%')
   })
 
   // The whole reason CSV quoting matters here: table names are "Last, First".

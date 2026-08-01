@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { EXPORT_CHART_OPTIONS, chartConfig, capturePie, captureAll } from './capturePies.js'
+import { EXPORT_CHART_OPTIONS, chartConfig, captureChart, captureAll } from './captureCharts.js'
 
 const SLICES = [
   { label: 'Rides', value: 704, color: '#22c55e' },
@@ -23,7 +23,7 @@ function fakeDeps () {
   }
 }
 
-describe('capturePies', () => {
+describe('captureCharts', () => {
   // Load-bearing: with animation:false Chart.js draws during construction, so
   // toDataURL() needs no await. Any other value yields half-swept pies.
   it('disables animation', () => {
@@ -43,12 +43,12 @@ describe('capturePies', () => {
   })
 
   it('returns a PNG data URL', () => {
-    expect(capturePie(SLICES, fakeDeps())).toBe('data:image/png;base64,STUB')
+    expect(captureChart(SLICES, fakeDeps())).toBe('data:image/png;base64,STUB')
   })
 
   it('constructs the chart with animation disabled', () => {
     const deps = fakeDeps()
-    capturePie(SLICES, deps)
+    captureChart(SLICES, deps)
     expect(deps.created[0].options.animation).toBe(false)
   })
 
@@ -64,18 +64,18 @@ describe('capturePies', () => {
 
   it('destroys the chart so repeated exports do not leak', () => {
     const destroy = vi.fn()
-    capturePie(SLICES, {
+    captureChart(SLICES, {
       createCanvas: () => ({ toDataURL: () => 'data:image/png;base64,STUB' }),
       createChart: () => ({ destroy }),
     })
     expect(destroy).toHaveBeenCalledTimes(1)
   })
 
-  it('returns null for an empty pie rather than a blank image', () => {
-    expect(capturePie([], fakeDeps())).toBeNull()
+  it('returns null for an empty chart rather than a blank image', () => {
+    expect(captureChart([], fakeDeps())).toBeNull()
   })
 
-  it('captures every named pie', () => {
+  it('captures every named chart', () => {
     const out = captureAll(
       { categories: SLICES, outcomes: SLICES, services: [] },
       fakeDeps(),
@@ -122,13 +122,13 @@ describe('capturePies', () => {
   // by pdf-lib — this is what produced the first squashed bar export.
   it('honours an explicit non-square capture height', () => {
     const deps = fakeDeps()
-    capturePie(SLICES, { ...deps, size: 750, height: 456 }, 'bar')
+    captureChart(SLICES, { ...deps, size: 750, height: 456 }, 'bar')
     expect(deps.sizes[0]).toEqual({ w: 750, h: 456 })
   })
 
   it('keeps the pie capture square', () => {
     const deps = fakeDeps()
-    capturePie(SLICES, { ...deps, size: 560 })
+    captureChart(SLICES, { ...deps, size: 560 })
     expect(deps.sizes[0]).toEqual({ w: 560, h: 560 })
   })
 })

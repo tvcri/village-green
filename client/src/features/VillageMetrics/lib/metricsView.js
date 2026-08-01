@@ -1,6 +1,6 @@
 // Pure view-model helpers for the Village Metrics dashboard: no Vue, no DOM.
 // Consumes the VillageMetrics API payload shape (api/source/specification/village-green.yaml
-// components.schemas.VillageMetrics) and produces pie/strip data ready for the components
+// components.schemas.VillageMetrics) and produces chart/strip data ready for the components
 // in this feature to render.
 
 // Terminal statuses only — the API reports on settled requests, so 'open' and
@@ -76,7 +76,7 @@ export function adjustedCount (entry, sel, legs) {
   return base + (legsApply(sel, legs) ? (entry.completedRoundTrips ?? 0) : 0)
 }
 
-export function categoryPie (byCategory, sel, legs) {
+export function categoryChart (byCategory, sel, legs) {
   const rows = byCategory.map(entry => ({
     label: entry.category,
     value: adjustedCount(entry, sel, legs),
@@ -90,7 +90,7 @@ export function categoryPie (byCategory, sel, legs) {
   return { slices, rows: withPct }
 }
 
-export function servicePie (byServiceType, sel, cat, legs, otherPct = 0.02) {
+export function serviceChart (byServiceType, sel, cat, legs, otherPct = 0.02) {
   const filtered = cat === 'all'
     ? byServiceType
     : byServiceType.filter(e => e.category === cat)
@@ -139,7 +139,7 @@ export function servicePie (byServiceType, sel, cat, legs, otherPct = 0.02) {
   return { slices, rows: rowsWithColor }
 }
 
-export function outcomesPie (totals, legs) {
+export function outcomesChart (totals, legs) {
   const rows = OUTCOME_SPECS.map(spec => ({
     label: spec.label,
     value: totals.byStatus[spec.statusKey] + (spec.legs && legs ? (totals.completedRoundTrips ?? 0) : 0),

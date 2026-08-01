@@ -2,7 +2,7 @@
 // exports. Pure — no Vue, no DOM. Pairs with shared/lib/csvUtils.js, which
 // already handles RFC-4180 quoting.
 
-export const PIE_COLUMNS = [
+export const CHART_COLUMNS = [
   { header: 'Label', key: 'label' },
   { header: 'Value', key: 'value' },
   { header: 'Pct', key: 'pct' },
@@ -18,7 +18,7 @@ export function countColumns (nameHeader) {
 
 // pct arrives as a fraction (0..1); the screen shows it rounded to a whole
 // percent, so the CSV matches rather than leaking float noise.
-export function pieCsvRows (rows) {
+export function chartCsvRows (rows) {
   return rows.map(r => ({
     label: r.label,
     value: r.value,

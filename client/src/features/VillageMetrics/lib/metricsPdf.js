@@ -1,5 +1,5 @@
-// Assembles the Village Metrics PDF. Takes already-captured pie images plus row
-// data and returns bytes — no DOM, no Vue, no canvas, so it is unit-testable.
+// Assembles the Village Metrics PDF. Takes already-captured chart images plus
+// row data and returns bytes — no DOM, no Vue, no canvas, so it is unit-testable.
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
 const PAGE_W = 612
@@ -15,22 +15,23 @@ const BORDER = rgb(0.82, 0.84, 0.86)
 // Barely-there card fill (#f9fafb).
 const TINT = rgb(0.976, 0.980, 0.985)
 
-// Smaller than the unframed layout's 200 so the pie sits inside CARD_PAD
-// without crowding the card border.
+// The square pie's edge length, and the default chart slot width. Smaller than
+// the unframed layout's 200 so the chart sits inside CARD_PAD without crowding
+// the card border.
 // Exported so the capture step can render at this width's aspect ratio — a
 // canvas whose proportions differ from the draw box gets squashed by pdf-lib.
-export const PIE_SIZE = 170
+export const CHART_SIZE = 170
 
 // A horizontal bar chart spends its width on y-axis labels before it draws any
-// bar at all: at PIE_SIZE the Services chart had ~110pt of bar left after
+// bar at all: at CHART_SIZE the Services chart had ~110pt of bar left after
 // "Ride: Activity/Event". The legend can afford the difference — its three
-// columns leave visible slack at PIE_SIZE — so bar mode takes a wider slot.
+// columns leave visible slack at CHART_SIZE — so bar mode takes a wider slot.
 export const BAR_WIDTH = 250
 
 // Width of the chart slot for a given mode. The legend takes whatever is left,
 // so this is the single number that trades one against the other.
 export function chartSlotWidth (chartType) {
-  return chartType === 'bar' ? BAR_WIDTH : PIE_SIZE
+  return chartType === 'bar' ? BAR_WIDTH : CHART_SIZE
 }
 const ROW_H = 15
 
@@ -212,12 +213,12 @@ function drawLegend (page, fonts, rows, x, y, width) {
 }
 
 // Bar geometry, mirroring the on-screen card (BAR_THICKNESS/BAR_CHART_PADDING
-// in MetricsPieCard.vue) but in points rather than CSS pixels. The padding
+// in MetricsChartCard.vue) but in points rather than CSS pixels. The padding
 // covers the x-axis, its labels, and a little breathing room.
 const PDF_BAR_THICKNESS = 22
 const PDF_BAR_PADDING = 42
 
-// Height of the drawn CHART. A pie is square, so PIE_SIZE. A bar chart sizes
+// Height of the drawn CHART. A pie is square, so CHART_SIZE. A bar chart sizes
 // to its own bar count, which keeps bar thickness consistent across sections:
 // stretching a 3-bar Outcomes chart to fill a legend-sized card drew 40pt bars
 // next to Services' 15pt ones — same page, same units, incomparable weights.
@@ -225,31 +226,32 @@ const PDF_BAR_PADDING = 42
 // Depends only on its own inputs, never on the card, so chartContentHeight can
 // depend on THIS without the two becoming circular.
 export function chartDrawHeight (sliceCount, chartType) {
-  if (chartType !== 'bar') return PIE_SIZE
+  if (chartType !== 'bar') return CHART_SIZE
   return sliceCount * PDF_BAR_THICKNESS + PDF_BAR_PADDING
 }
 
 // Content height inside a chart CARD — the taller of the chart and its legend,
 // so neither is clipped and the card fits whichever needs the room.
 //
-// The PIE_SIZE floor lives in chartDrawHeight now rather than here. It exists
-// so a PIE card is never shorter than its square image; applying it in bar
-// mode left a 108pt chart and a 90pt legend inside a 170pt card, padding every
-// short section with whitespace it had no use for.
+// The CHART_SIZE floor lives in chartDrawHeight now rather than here. It is
+// PIE-SPECIFIC: it exists so a pie card is never shorter than its square image.
+// Applying it in bar mode left a 108pt chart and a 90pt legend inside a 170pt
+// card, padding every short section with whitespace it had no use for — which
+// is why bar mode is exempt.
 export function chartContentHeight (rows, sliceCount, chartType) {
   return Math.max(chartDrawHeight(sliceCount, chartType), legendHeight(rows))
 }
 
 // Height a framed chart section occupies, so callers can fits-check before drawing.
-function pieSectionHeight (view) {
+function chartSectionHeight (view) {
   return chartContentHeight(view.rows, view.sliceCount, view.chartType) + CARD_PAD * 2 + CARD_TITLE_H
 }
 
 // One chart + its legend side by side inside a rounded card, mirroring the
-// on-screen .pie-card. Returns the y a following section may start at.
-async function drawPieSection (pdf, page, fonts, title, subtitle, image, view, y) {
+// on-screen .chart-card. Returns the y a following section may start at.
+async function drawChartSection (pdf, page, fonts, title, subtitle, image, view, y) {
   const { helv, bold } = fonts
-  const cardH = pieSectionHeight(view)
+  const cardH = chartSectionHeight(view)
   const cardW = PAGE_W - MARGIN * 2
 
   roundedRect(page, { x: MARGIN, y, w: cardW, h: cardH })
@@ -259,21 +261,21 @@ async function drawPieSection (pdf, page, fonts, title, subtitle, image, view, y
   if (subtitle) drawText(page, subtitle, MARGIN + CARD_PAD + 110, inner - 11, 9.5, helv, MUTED)
   inner -= CARD_TITLE_H
 
-  const pieX = MARGIN + CARD_PAD
+  const chartX = MARGIN + CARD_PAD
   const slotW = chartSlotWidth(view.chartType)
   if (image) {
     const png = await pdf.embedPng(image)
-    // A pie draws as a PIE_SIZE square; a bar chart takes a wider slot and a
+    // A pie draws as a CHART_SIZE square; a bar chart takes a wider slot and a
     // height set by its bar count. Top-aligned from `inner`, so a chart shorter
     // than the card leaves its slack at the bottom rather than stretching.
     // The CARD height is unchanged either way, so pagination is untouched.
     const imgH = chartDrawHeight(view.sliceCount, view.chartType)
-    page.drawImage(png, { x: pieX, y: inner - imgH, width: slotW, height: imgH })
+    page.drawImage(png, { x: chartX, y: inner - imgH, width: slotW, height: imgH })
   } else {
-    drawText(page, view.emptyMessage, pieX, inner - PIE_SIZE / 2, 10, helv, MUTED)
+    drawText(page, view.emptyMessage, chartX, inner - CHART_SIZE / 2, 10, helv, MUTED)
   }
 
-  const legendX = pieX + slotW + 24
+  const legendX = chartX + slotW + 24
   const legendW = PAGE_W - MARGIN - CARD_PAD - legendX
   drawLegend(page, fonts, view.rows, legendX, inner - 6, legendW)
 
@@ -405,11 +407,11 @@ export async function buildMetricsPdf (report) {
   })
   y -= STAT_CARD_H + CARD_GAP
 
-  y = await drawPieSection(pdf, p1, fonts, 'Categories',
+  y = await drawChartSection(pdf, p1, fonts, 'Categories',
     `Status: ${STATUS_TEXT[report.views.categories.status] ?? report.views.categories.status}`,
     report.images.categories, report.views.categories, y)
 
-  await drawPieSection(pdf, p1, fonts, 'Outcomes', '',
+  await drawChartSection(pdf, p1, fonts, 'Outcomes', '',
     report.images.outcomes, report.views.outcomes, y)
   footer(p1)
 
@@ -418,7 +420,7 @@ export async function buildMetricsPdf (report) {
   const svc = report.views.services
   const svcSub = `Status: ${STATUS_TEXT[svc.status] ?? svc.status}`
     + (svc.category && svc.category !== 'all' ? `  ·  Category: ${svc.category}` : '')
-  const afterServicesY = await drawPieSection(pdf, p2, fonts, 'Services', svcSub,
+  const afterServicesY = await drawChartSection(pdf, p2, fonts, 'Services', svcSub,
     report.images.services, svc, PAGE_H - MARGIN)
 
   const requiredPeopleH = peopleSectionHeight(report)

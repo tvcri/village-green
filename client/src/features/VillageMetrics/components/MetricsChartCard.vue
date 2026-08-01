@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Chart from 'primevue/chart'
 import Button from 'primevue/button'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
-import { PIE_COLUMNS, pieCsvRows } from '../lib/metricsCsv.js'
+import { CHART_COLUMNS, chartCsvRows } from '../lib/metricsCsv.js'
 
 const props = defineProps({
   slices: { type: Array, required: true }, // [{ label, value, color }]
@@ -15,7 +15,7 @@ const props = defineProps({
   chartType: { type: String, default: 'pie' },
 })
 
-defineOptions({ name: 'MetricsPieCard' })
+defineOptions({ name: 'MetricsChartCard' })
 
 const hasSlices = computed(() => props.slices.length > 0)
 
@@ -219,12 +219,12 @@ function formatPct (pct) {
 const totalValue = computed(() => props.rows.reduce((sum, r) => sum + r.value, 0))
 
 function onDownloadCsv () {
-  downloadCsv(toCsv(pieCsvRows(props.rows), PIE_COLUMNS), props.csvFilename)
+  downloadCsv(toCsv(chartCsvRows(props.rows), CHART_COLUMNS), props.csvFilename)
 }
 </script>
 
 <template>
-  <div class="pie-card" :class="{ 'bar-mode': isBar }">
+  <div class="chart-card" :class="{ 'bar-mode': isBar }">
     <div class="chart-container" :style="chartStyle" ref="chartHost">
       <Chart v-if="hasSlices" ref="chartRef" :type="chartType" :data="chartData" :options="chartOptions" />
       <p v-else class="empty-msg">{{ emptyMessage }}</p>
@@ -270,7 +270,7 @@ function onDownloadCsv () {
 </template>
 
 <style scoped>
-.pie-card {
+.chart-card {
   display: flex;
   gap: 4.5rem;
   min-width: 0;
@@ -307,7 +307,7 @@ function onDownloadCsv () {
    element carries a bare `chart-container` class with no style attached — so
    any assertion here would pass whether the rule exists or not. Deleting these
    two rules silently returns the canvas to 150px, visible only in a browser. */
-.pie-card.bar-mode .chart-container :deep(.p-chart) {
+.chart-card.bar-mode .chart-container :deep(.p-chart) {
   flex: 1 1 auto;
   /* Flex items floor at their content size; without this the wrapper refuses to
      shrink below the canvas and cannot stretch to fill either. */
@@ -321,9 +321,9 @@ function onDownloadCsv () {
    stranded below and the right half of the card empty. 60/40 gives the bars
    more room than the pie's 280px square without wasting the remainder.
    Below 640px the shared media query stacks this exactly as it stacks a pie. */
-.pie-card.bar-mode .chart-container {
+.chart-card.bar-mode .chart-container {
   /* WIDTH, not flex-basis. Basis applies to the flex MAIN axis, and the 640px
-     media query flips .pie-card to `column` — where basis means HEIGHT. A
+     media query flips .chart-card to `column` — where basis means HEIGHT. A
      `flex: 0 1 480px` here silently became a 480px-tall box once stacked, which
      is what drew three bars 150px thick. Setting width keeps this rule about
      width at every viewport size. */
@@ -416,13 +416,13 @@ function onDownloadCsv () {
   border-radius: 2px;
 }
 
-/* `container-type` sits on .pie-card, and an element can never match a query
+/* `container-type` sits on .chart-card, and an element can never match a query
    against the container IT establishes — so the old `@container` rule targeting
-   .pie-card itself never applied and the card stayed side-by-side at every
+   .chart-card itself never applied and the card stayed side-by-side at every
    width. A media query is the honest tool here: the card spans the page, so
    viewport width and card width track each other anyway. */
 @media (max-width: 640px) {
-  .pie-card {
+  .chart-card {
     flex-direction: column;
     /* `gap` applies along whichever axis the flex direction sets, so the 4.5rem
        that separates chart from legend side by side becomes 4.5rem of dead
@@ -445,7 +445,7 @@ function onDownloadCsv () {
      bars then divide between them. Widening the window back reveals the result
      as absurdly fat bars, because the tall box is what the row inherited.
      Bar mode keeps its count-based min-height and lets content set the rest. */
-  .pie-card.bar-mode .chart-container {
+  .chart-card.bar-mode .chart-container {
     aspect-ratio: auto;
     height: auto;
     align-self: stretch;
