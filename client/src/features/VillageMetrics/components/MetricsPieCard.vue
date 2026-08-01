@@ -265,7 +265,7 @@ function onDownloadCsv () {
 <style scoped>
 .pie-card {
   display: flex;
-  gap: 1.5rem;
+  gap: 4.5rem;
   min-width: 0;
 }
 
