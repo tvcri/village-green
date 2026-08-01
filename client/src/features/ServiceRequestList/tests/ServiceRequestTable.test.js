@@ -68,6 +68,60 @@ describe('ServiceRequestTable serviceDate ordering', () => {
     expect(rows.map(r => r.serviceRequestId)).toEqual(['1', '2', '3'])
   })
 
+  it('orders same-date rows by startTime in both views', () => {
+    const rows = [
+      { serviceRequestId: '1', displayNumber: 101, status: 'Open', serviceName: 'Afternoon', serviceDate: '2026-07-11', startTime: '14:15:00' },
+      { serviceRequestId: '2', displayNumber: 202, status: 'Open', serviceName: 'Morning', serviceDate: '2026-07-11', startTime: '09:00:00' },
+      { serviceRequestId: '3', displayNumber: 303, status: 'Open', serviceName: 'Evening', serviceDate: '2026-07-11', startTime: '18:30:00' }
+    ]
+    const pick = (container, sel) =>
+      Array.from(container.querySelectorAll(sel))
+        .map(el => el.textContent)
+        .map(t => ['Morning', 'Afternoon', 'Evening'].find(n => t.includes(n)))
+        .filter(Boolean)
+
+    const { container } = render(ServiceRequestTable, {
+      props: { ...baseProps, rows, sortOrder: 1 }, global: { plugins: [PrimeVue] }
+    })
+    expect(pick(container, '.desktop-only tbody tr')).toEqual(['Morning', 'Afternoon', 'Evening'])
+    expect(pick(container, '.request-cards .request-card')).toEqual(['Morning', 'Afternoon', 'Evening'])
+  })
+
+  // Only 'Ride: *' services carry times, so a date group routinely mixes timed
+  // and untimed rows. Ascending is the lists' default view.
+  it('places untimed rows after timed ones within a date, ascending', () => {
+    const rows = [
+      { serviceRequestId: '1', displayNumber: 101, status: 'Open', serviceName: 'Untimed', serviceDate: '2026-07-11', startTime: null },
+      { serviceRequestId: '2', displayNumber: 202, status: 'Open', serviceName: 'Morning', serviceDate: '2026-07-11', startTime: '09:00:00' },
+      { serviceRequestId: '3', displayNumber: 303, status: 'Open', serviceName: 'Evening', serviceDate: '2026-07-11', startTime: '18:30:00' }
+    ]
+    const pick = (container, sel) =>
+      Array.from(container.querySelectorAll(sel))
+        .map(el => el.textContent)
+        .map(t => ['Morning', 'Evening', 'Untimed'].find(n => t.includes(n)))
+        .filter(Boolean)
+
+    const { container } = render(ServiceRequestTable, {
+      props: { ...baseProps, rows, sortOrder: 1 }, global: { plugins: [PrimeVue] }
+    })
+    expect(pick(container, '.desktop-only tbody tr')).toEqual(['Morning', 'Evening', 'Untimed'])
+    expect(pick(container, '.request-cards .request-card')).toEqual(['Morning', 'Evening', 'Untimed'])
+  })
+
+  // The date grouping must survive the tiebreak: a later date's earliest slot
+  // never outranks an earlier date's latest one.
+  it('keeps dates grouped ahead of the startTime tiebreak', () => {
+    const rows = [
+      { serviceRequestId: '1', displayNumber: 101, status: 'Open', serviceName: 'Day2Early', serviceDate: '2026-07-12', startTime: '08:00:00' },
+      { serviceRequestId: '2', displayNumber: 202, status: 'Open', serviceName: 'Day1Late', serviceDate: '2026-07-11', startTime: '23:00:00' }
+    ]
+    const { container } = render(ServiceRequestTable, {
+      props: { ...baseProps, rows, sortOrder: 1 }, global: { plugins: [PrimeVue] }
+    })
+    const text = container.textContent
+    expect(text.indexOf('Day1Late')).toBeLessThan(text.indexOf('Day2Early'))
+  })
+
   it('defaults to soonest-first when no sortOrder is passed', () => {
     const rows = [
       { serviceRequestId: 1, serviceDate: '2026-07-01', displayNumber: 'A-1', status: 'Open' },

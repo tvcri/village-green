@@ -7,7 +7,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
-import { formatServiceDate } from '../lib/timeFields.js'
+import { formatServiceDate, serviceDateTimeSortKey } from '../lib/timeFields.js'
 
 defineOptions({ name: 'ServiceRequestTable' })
 
@@ -31,12 +31,20 @@ const { getStatusSeverity } = useStatusSeverity()
 
 const pageRows = ref(10)
 
+// The Date column sorts on this derived key rather than on serviceDate, so a
+// group of same-day requests falls into startTime order. Keeping the table in
+// single-sort mode (instead of multiSortMeta) leaves header-click behavior
+// alone: one sort indicator, no metaKey needed for a tiebreak the user can't
+// click anyway -- startTime has no column of its own.
+const tableRows = computed(() =>
+  props.rows.map(row => ({ ...row, serviceDateTimeSort: serviceDateTimeSortKey(row) })))
+
 // The DataTable sorts internally; the mobile cards iterate `rows` directly, so
 // sort here too or the two views disagree about ordering.
 const sortedRows = computed(() => {
   const by = props.sortOrder
   return [...props.rows].sort((a, b) =>
-    by * String(a.serviceDate ?? '').localeCompare(String(b.serviceDate ?? '')))
+    by * serviceDateTimeSortKey(a).localeCompare(serviceDateTimeSortKey(b)))
 })
 
 const rowClass = computed(() => {
@@ -60,11 +68,11 @@ const rowClass = computed(() => {
 
     <DataTable
       v-else
-      :value="rows"
+      :value="tableRows"
       row-hover
       paginator
       :rows="pageRows"
-      sort-field="serviceDate"
+      sort-field="serviceDateTimeSort"
       :sort-order="sortOrder"
       class="request-table-responsive desktop-only"
       :row-class="rowClass"
@@ -87,7 +95,7 @@ const rowClass = computed(() => {
         </div>
       </template>
 
-      <Column field="serviceDate" header="Date" sortable style="width: 17%">
+      <Column field="serviceDate" sort-field="serviceDateTimeSort" header="Date" sortable style="width: 17%">
         <template #body="slotProps">
           {{ formatServiceDate(slotProps.data.serviceDate, { weekday: true }) || '—' }}
         </template>
