@@ -157,4 +157,34 @@ describe('MetricsPieCard', () => {
     expect(csv).toContain('Rides,704,80%')
     spy.mockRestore()
   })
+
+  it('does not apply bar-mode layout for a pie', () => {
+    mountCard({})
+    expect(document.querySelector('.pie-card.bar-mode')).toBeNull()
+  })
+
+  it('applies bar-mode layout for a bar chart', () => {
+    mountCard({ chartType: 'bar' })
+    expect(document.querySelector('.pie-card.bar-mode')).toBeTruthy()
+  })
+
+  // Height grows with bar count so 10 service types don't crush into a
+  // 280px box: 2 bars * 28 + 48 = 104.
+  it('sizes the bar chart container from the slice count', () => {
+    mountCard({ chartType: 'bar' })
+    expect(document.querySelector('.chart-container').style.height).toBe('104px')
+  })
+
+  // No bars to measure — an empty container must not collapse to zero, or the
+  // empty message has nowhere to render.
+  it('falls back to a fixed height for an empty bar chart', () => {
+    mountCard({ chartType: 'bar', slices: [] })
+    expect(document.querySelector('.chart-container').style.height).toBe('280px')
+  })
+
+  // The pie keeps its CSS-driven square; no inline height.
+  it('leaves the pie container height to CSS', () => {
+    mountCard({})
+    expect(document.querySelector('.chart-container').style.height).toBe('')
+  })
 })

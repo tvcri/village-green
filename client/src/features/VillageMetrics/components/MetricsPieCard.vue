@@ -21,6 +21,22 @@ const hasSlices = computed(() => props.slices.length > 0)
 
 const isBar = computed(() => props.chartType === 'bar')
 
+// Bars need height proportional to their count — a fixed square would crush
+// 10 service types. Pie keeps its CSS-driven square, so no inline style.
+// The empty case has no bars to measure and falls back to the square's height
+// so the empty message still has a box to sit in.
+const BAR_THICKNESS = 28
+const BAR_CHART_PADDING = 48
+const EMPTY_HEIGHT = 280
+
+const chartStyle = computed(() => {
+  if (!isBar.value) return {}
+  const height = hasSlices.value
+    ? props.slices.length * BAR_THICKNESS + BAR_CHART_PADDING
+    : EMPTY_HEIGHT
+  return { height: `${height}px` }
+})
+
 const chartData = computed(() => ({
   labels: props.slices.map(s => s.label),
   datasets: [{
@@ -84,8 +100,8 @@ function onDownloadCsv () {
 </script>
 
 <template>
-  <div class="pie-card">
-    <div class="chart-container">
+  <div class="pie-card" :class="{ 'bar-mode': isBar }">
+    <div class="chart-container" :style="chartStyle">
       <Chart v-if="hasSlices" :type="chartType" :data="chartData" :options="chartOptions" />
       <p v-else class="empty-msg">{{ emptyMessage }}</p>
     </div>
@@ -150,6 +166,28 @@ function onDownloadCsv () {
 /* Container-owned sizing: if the canvas sizes its own wrapper, Chart.js reads back the
    shrunken size and the chart never re-expands after a viewport shrink (see b02e1ba0). */
 .chart-container :deep(.p-chart) { width: 100%; height: 100%; }
+
+/* Bar mode: the chart takes the full card width and the legend table drops
+   below it. Horizontal bars are only an improvement over a pie if they get
+   the width — keeping the 280px square would spend it all on y-axis labels
+   and leave ~160px of actual bar. Height comes from the inline chartStyle,
+   which scales with bar count. */
+.pie-card.bar-mode {
+  flex-direction: column;
+}
+
+.pie-card.bar-mode .chart-container {
+  flex: 0 0 auto;
+  max-width: none;
+  /* height set inline; aspect-ratio must not fight it on mobile */
+  aspect-ratio: auto;
+}
+
+.pie-card.bar-mode .legend-table-wrap {
+  /* Already full width once stacked; drop the scroll cap so the table reads
+     as part of the same block rather than a second scrolling pane. */
+  max-height: none;
+}
 
 .empty-msg {
   display: flex;
