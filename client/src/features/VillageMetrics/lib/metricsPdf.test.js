@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
-import { PEOPLE_LIMIT, topN, peopleFooter, buildMetricsPdf, winAnsi, formatCivil, formatRange } from './metricsPdf.js'
+import { PEOPLE_LIMIT, topN, peopleFooter, buildMetricsPdf, winAnsi, formatCivil, formatRange, chartSlotWidth, chartDrawHeight, chartContentHeight, PIE_SIZE } from './metricsPdf.js'
 
 const ROWS = [
   { label: 'Rides', value: 704, color: '#22c55e', pct: 0.8009 },
@@ -218,5 +218,73 @@ describe('metricsPdf', () => {
       expect(winAnsi('日本', font)).toBe('??')
       expect(winAnsi('Ünicode, Zoë — 日本', font)).toBe('Ünicode, Zoë — ??')
     })
+  })
+
+  // ---- chart geometry ----
+  // These three numbers must agree with what the CAPTURE renders at, or pdf-lib
+  // stretches the raster to fit the draw box. They were hardcoded PIE_SIZE at
+  // each site before bar mode, which is exactly how the first bar export came
+  // out squashed.
+  describe('chart geometry', () => {
+    it('gives bars a wider slot than a pie', () => {
+      expect(chartSlotWidth('pie')).toBe(PIE_SIZE)
+      expect(chartSlotWidth('bar')).toBeGreaterThan(PIE_SIZE)
+    })
+
+    it('treats an absent chartType as a pie', () => {
+      expect(chartSlotWidth(undefined)).toBe(PIE_SIZE)
+      expect(chartDrawHeight(5, undefined)).toBe(PIE_SIZE)
+    })
+
+    it('draws a pie as a square regardless of slice count', () => {
+      expect(chartDrawHeight(3, 'pie')).toBe(PIE_SIZE)
+      expect(chartDrawHeight(12, 'pie')).toBe(PIE_SIZE)
+    })
+
+    // The point of sizing from bar count: consistent thickness across sections.
+    // Stretching a 3-bar chart to a legend-sized card drew 40pt bars beside
+    // Services' 15pt ones, on the same page.
+    it('scales bar chart height with the bar count', () => {
+      const three = chartDrawHeight(3, 'bar')
+      const six = chartDrawHeight(6, 'bar')
+      const nine = chartDrawHeight(9, 'bar')
+      expect(six).toBeGreaterThan(three)
+      // equal spacing per added bar — this is what keeps thickness constant
+      expect(six - three).toBe(nine - six)
+    })
+
+    it('lets a short bar chart be shorter than the pie square', () => {
+      // The PIE_SIZE floor exists so a square pie is never clipped. Applying it
+      // to bars padded every short section with unusable whitespace.
+      expect(chartDrawHeight(2, 'bar')).toBeLessThan(PIE_SIZE)
+    })
+
+    it('sizes the card to whichever of chart and legend is taller', () => {
+      const manyRows = serviceRows(14)
+      // legend-driven: 14 rows out-measure a 2-bar chart
+      expect(chartContentHeight(manyRows, 2, 'bar')).toBeGreaterThan(chartDrawHeight(2, 'bar'))
+      // chart-driven: 12 bars out-measure a 2-row legend
+      const twoRows = serviceRows(2)
+      expect(chartContentHeight(twoRows, 12, 'bar')).toBe(chartDrawHeight(12, 'bar'))
+    })
+
+    it('keeps the pie card on its original formula', () => {
+      // max(PIE_SIZE, legend) — unchanged by the bar work, so pie exports are
+      // byte-identical to before it.
+      expect(chartContentHeight(ROWS, ROWS.length, 'pie')).toBe(PIE_SIZE)
+      expect(chartContentHeight(serviceRows(20), 20, 'pie')).toBeGreaterThan(PIE_SIZE)
+    })
+  })
+
+  // A bar report must produce a valid document, not just plausible numbers.
+  it('builds a bar-mode report', async () => {
+    const bytes = await buildMetricsPdf(report({
+      views: {
+        categories: { rows: ROWS, sliceCount: 2, chartType: 'bar', status: 'completed', emptyMessage: 'x' },
+        services: { rows: ROWS, sliceCount: 2, chartType: 'bar', status: 'completed', category: 'all', emptyMessage: 'x' },
+        outcomes: { rows: ROWS, sliceCount: 2, chartType: 'bar', emptyMessage: 'x' },
+      },
+    }))
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThanOrEqual(2)
   })
 })
