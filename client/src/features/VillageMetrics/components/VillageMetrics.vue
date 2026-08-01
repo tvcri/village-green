@@ -104,18 +104,32 @@ const tab = computed({
   },
 })
 
+// ---- chart type (URL-backed) ----
+const CHART_TYPE_OPTIONS = [
+  { label: 'Pie', value: 'pie' },
+  { label: 'Bar', value: 'bar' },
+]
+const CHART_TYPE_VALUES = CHART_TYPE_OPTIONS.map(o => o.value)
+
+// Same shape as `tab` above: ?chart= is read when present and valid, and a
+// fresh visit falls back to the 'pie' default exactly as a fresh visit falls
+// back to the Categories tab and the this-year range. Being in the URL means a
+// reload keeps the choice and a link can be shared already in bar mode.
+// Unknown values fall back rather than writing a correction, so ?chart=banana
+// renders sanely without an extra history entry.
+const chartType = computed({
+  get: () => (CHART_TYPE_VALUES.includes(route.query.chart) ? route.query.chart : 'pie'),
+  set: (value) => {
+    if (!CHART_TYPE_VALUES.includes(value)) return
+    router.replace({ query: { ...route.query, chart: value } })
+  },
+})
+
 // ---- view state ----
 const legs = ref(true) // default ON: a completed round trip counts as 2 legs
 const catStatus = ref('completed')
 const svcStatus = ref('completed')
 const svcCategory = ref('all')
-
-// Plain ref, like `legs` — resets on reload, deliberately not URL-backed.
-const chartType = ref('pie')
-const CHART_TYPE_OPTIONS = [
-  { label: 'Pie', value: 'pie' },
-  { label: 'Bar', value: 'bar' },
-]
 
 const categoryOptions = [
   { label: 'All categories', value: 'all' },
