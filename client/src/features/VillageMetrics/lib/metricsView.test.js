@@ -208,11 +208,25 @@ describe('servicePie', () => {
     expect(rows.map(r => r.label)).toEqual([
       'Ride: Medical',
       'Errand: Grocery',
-      'Household Chores/Handy Help', // tie w/ Ride: Social at 10 -> alpha asc
+      'Home Help', // display label for Household Chores/Handy Help; tie w/ Ride: Social at 10 -> alpha asc
       'Ride: Social',
       'Something Custom',
       'Tiny Errand',
     ])
+  })
+
+  // TEMPORARY, paired with SERVICE_LABELS in metricsView.js — delete both when the
+  // serviceName is renamed in the SR table.
+  it('shortens Household Chores/Handy Help to Home Help for display', () => {
+    const { rows } = servicePie(metrics.byServiceType, 'completed', 'all', false)
+    expect(rows.map(r => r.label)).toContain('Home Help')
+    expect(rows.map(r => r.label)).not.toContain('Household Chores/Handy Help')
+  })
+
+  it('passes unmapped serviceNames through unchanged', () => {
+    const { rows } = servicePie(metrics.byServiceType, 'completed', 'all', false)
+    // 'Something Custom' is a user-typed name with no SERVICE_LABELS entry.
+    expect(rows.map(r => r.label)).toContain('Something Custom')
   })
 
   it('merges slices under otherPct of the selected total into one Other slice', () => {

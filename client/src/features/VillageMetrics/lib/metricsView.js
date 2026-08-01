@@ -33,6 +33,20 @@ export const CATEGORY_COLORS = {
   'Member Added': '#64748b',
 }
 
+// TEMPORARY display-only shortening, pending a serviceName rename in the SR table.
+// 'Household Chores/Handy Help' is a serviceName whose category is already 'Home Help'
+// (api/source/service/utils.js maps the two), and the long string dominates the y-axis
+// of a horizontal bar chart. VolunteerHome does the same thing at
+// features/VolunteerHome/lib/serviceCategories.js ({ label: 'Home Help', prefix: ... }).
+//
+// DELETE THIS when serviceName is renamed in the database: the ?? fallthrough below makes
+// an unmapped name pass through unchanged, so removing the entry is a no-op at that point.
+// Its alphabetical slot is unaffected — 'Home Help' and 'Household…' both sort after every
+// 'Errand:' and before every 'Ride:', and the tie-break only compares equal-count entries.
+const SERVICE_LABELS = {
+  'Household Chores/Handy Help': 'Home Help',
+}
+
 const SERVICE_COLOR_RAMP = ['#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b']
 const OTHER_COLOR = '#94a3b8'
 
@@ -82,7 +96,12 @@ export function servicePie (byServiceType, sel, cat, legs, otherPct = 0.02) {
     : byServiceType.filter(e => e.category === cat)
 
   const withCount = filtered
-    .map(entry => ({ label: entry.serviceName, value: adjustedCount(entry, sel, legs) }))
+    .map(entry => ({
+      // Display label, not the domain value: custom serviceNames users type are
+      // unmapped and fall through unchanged.
+      label: SERVICE_LABELS[entry.serviceName] ?? entry.serviceName,
+      value: adjustedCount(entry, sel, legs),
+    }))
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
 
   const total = withCount.reduce((sum, r) => sum + r.value, 0)
