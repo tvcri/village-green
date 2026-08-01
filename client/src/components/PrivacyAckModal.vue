@@ -101,6 +101,7 @@ async function acknowledge() {
       <p class="privacy-error">Failed to load the privacy agreement.</p>
       <Button label="Retry" severity="secondary" @click="loadRules" />
     </div>
+    <!-- eslint-disable vue/no-v-html -- rulesHtml is server-provided, admin-authored privacy-rules content -->
     <div
       v-else
       ref="contentEl"
@@ -108,6 +109,7 @@ async function acknowledge() {
       v-html="rulesHtml"
       @scroll="checkScrolledToEnd"
     />
+    <!-- eslint-enable vue/no-v-html -->
     <p v-if="error" class="privacy-error">{{ error }}</p>
     <template #footer>
       <Button

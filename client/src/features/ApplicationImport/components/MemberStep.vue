@@ -54,7 +54,7 @@ onMounted(async () => {
       form.miscNotes = form.miscNotes ? `${form.miscNotes}\n\n${dump}` : dump
     }
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load member data — go back and retry', life: 3000 })
   }
 })

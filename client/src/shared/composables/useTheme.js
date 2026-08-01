@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 let isDark = null
 const THEME_KEY = 'vg-theme'

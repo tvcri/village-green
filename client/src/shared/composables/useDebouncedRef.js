@@ -19,6 +19,9 @@ export function useDebouncedRef(value, delay = 200) {
       },
     }
   })
+  // Deliberately a method ON the ref object (an escape hatch bypassing the
+  // debounce), not the wrapped value — the rule's autofix would break it.
+  // eslint-disable-next-line vue/no-ref-as-operand
   ref.immediate = (newValue) => {
     clearTimeout(timeout)
     value = newValue

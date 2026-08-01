@@ -413,18 +413,6 @@ async function setupGoogleWorker() {
   }
 }
 
-async function setupServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    try {
-      await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}service-worker.js`)
-      appendStatus('Service Worker registered successfully')
-    }
-    catch (err) {
-      appendError(`Service Worker registration failed: ${err}`)
-    }
-  }
-}
-
 async function getUserObject() {
   const response = await fetch(`${VG.Env.apiBase}/user?projection=webPreferences`, {
     headers: {

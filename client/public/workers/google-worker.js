@@ -4,7 +4,6 @@ const logPrefix = '[GoogleWorker]:'
 let accessToken = null
 let refreshToken = null
 let tokenExpiry = null
-let codeVerifier = null
 let authState = null
 let ENV = null
 let initialized = false
@@ -36,7 +35,7 @@ const messageHandlers = {
 }
 
 // Get current status (for client to check if authenticated)
-function getStatus(options, port) {
+function getStatus(_options, _port) {
   return {
     initialized,
     hasAccessToken: !!accessToken,
@@ -64,7 +63,7 @@ async function onMessage(e) {
 }
 
 // Initialize with Google config from main thread
-async function initialize(options, port) {
+async function initialize(options, _port) {
   if (!initialized) {
     initialized = true
     ENV = options.env || null
@@ -88,9 +87,8 @@ async function initialize(options, port) {
 }
 
 // Get authorization URL (called by main app before opening popup)
-async function getAuthUrl(options, port) {
+async function getAuthUrl(_options, _port) {
   const { verifier, challenge } = await generatePKCE()
-  codeVerifier = verifier
   authState = generateRandomString(32)
 
   const params = new URLSearchParams({
@@ -109,7 +107,7 @@ async function getAuthUrl(options, port) {
 }
 
 // Handle OAuth callback from google-callback.html
-async function oauthCallback(options, port) {
+async function oauthCallback(options, _port) {
   console.log(logPrefix, 'oauthCallback called with payload:', options)
 
   const { tokens, state } = options
@@ -129,7 +127,6 @@ async function oauthCallback(options, port) {
   accessToken = tokens.access_token
   refreshToken = tokens.refresh_token || null
   tokenExpiry = tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : null
-  codeVerifier = null // consumed
 
   console.log(logPrefix, 'Tokens stored, broadcasting AUTH_COMPLETE')
 
@@ -144,7 +141,7 @@ async function oauthCallback(options, port) {
 }
 
 // Create Google Sheet (called by main app after auth)
-async function createSheet(options, port) {
+async function createSheet(options, _port) {
   const { rows, columns, sheetName } = options
 
   // Ensure we have a valid token
