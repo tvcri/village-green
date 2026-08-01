@@ -32,7 +32,22 @@ vi.mock('../api/villageMetricsApi.js', () => ({
 const VillageMetrics = (await import('./VillageMetrics.vue')).default
 
 // jsdom has no canvas; stub primevue/chart so MetricsPieCard mounts without touching it.
-const ChartStub = { name: 'Chart', props: ['type', 'data', 'options'], template: '<canvas />' }
+// Records the `type` of every Chart rendered this mount, so a test can assert
+// the page-level toggle reached the card. The push lives in the render
+// function (not `setup`, which only runs once) because clicking the
+// SelectButton updates `type` reactively on an already-mounted card rather
+// than remounting it — `setup` would only ever capture the initial value.
+let chartTypes = []
+const ChartStub = {
+  name: 'Chart',
+  props: ['type', 'data', 'options'],
+  setup (props) {
+    return () => {
+      chartTypes.push(props.type)
+      return null
+    }
+  },
+}
 
 function byStatus (over = {}) {
   return {
@@ -116,6 +131,7 @@ describe('VillageMetrics container', () => {
     mockRouter.push.mockClear()
     getVillageMetrics.mockReset()
     getVillageMetrics.mockResolvedValue(METRICS)
+    chartTypes = []
   })
 
   afterEach(() => {
@@ -286,5 +302,75 @@ describe('VillageMetrics container', () => {
     globalThis.Blob = RealBlob
     URL.createObjectURL = origCreate
     clickSpy.mockRestore()
+  })
+
+  it('switches the rendered chart type when the chart-type control changes', async () => {
+    await renderLoaded()
+
+    // defaults to pie
+    expect(chartTypes).toContain('pie')
+    expect(chartTypes).not.toContain('bar')
+
+    chartTypes = []
+    await fireEvent.click(screen.getByText('Bar'))
+    await nextTick()
+
+    expect(chartTypes).toContain('bar')
+  })
+
+  // ---- ?chart= persistence ----
+  // The point of URL-backing: a reload keeps the choice, and a link can be
+  // shared already in bar mode. Demos are served over ngrok where customers
+  // drive their own browser, so this is the difference between them keeping
+  // the view and landing back on pie every time.
+  it('renders bars when the URL says ?chart=bar', async () => {
+    mockRoute.query = { ...mockRoute.query, chart: 'bar' }
+    await renderLoaded()
+    expect(chartTypes).toContain('bar')
+    expect(chartTypes).not.toContain('pie')
+  })
+
+  it('defaults to pie when ?chart= is absent', async () => {
+    await renderLoaded()
+    expect(chartTypes).toContain('pie')
+    expect(chartTypes).not.toContain('bar')
+  })
+
+  // Falls back rather than writing a correction, matching ?tab= — a hand-typed
+  // bad value renders sanely without pushing an extra history entry.
+  it('falls back to pie for an unknown ?chart= value without rewriting the URL', async () => {
+    mockRoute.query = { ...mockRoute.query, chart: 'banana' }
+    await renderLoaded()
+
+    expect(chartTypes).toContain('pie')
+    expect(chartTypes).not.toContain('bar')
+    // no navigation issued purely to correct the bad value
+    expect(mockRouter.replace).not.toHaveBeenCalled()
+  })
+
+  // The setter spreads route.query; dropping that would silently reset the
+  // user's tab and date range every time they touched the chart-type control.
+  it('preserves tab and range when the chart type changes', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'services' }
+    await renderLoaded()
+
+    await fireEvent.click(screen.getByText('Bar'))
+    await nextTick()
+
+    expect(mockRouter.replace).toHaveBeenCalledWith({
+      query: { start: '2026-01-01', end: '2026-12-31', tab: 'services', chart: 'bar' },
+    })
+  })
+
+  // ?chart= must not look like a range change: rangeKey is start|end precisely
+  // so a chart or tab navigation does not refetch.
+  it('does not refetch when only the chart type changes', async () => {
+    await renderLoaded()
+    expect(getVillageMetrics).toHaveBeenCalledTimes(1)
+
+    await fireEvent.click(screen.getByText('Bar'))
+    await nextTick()
+
+    expect(getVillageMetrics).toHaveBeenCalledTimes(1)
   })
 })

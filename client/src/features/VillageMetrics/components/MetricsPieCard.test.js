@@ -5,9 +5,17 @@ import PrimeVue from 'primevue/config'
 import MetricsPieCard from './MetricsPieCard.vue'
 import * as csvUtils from '../../../shared/lib/csvUtils.js'
 
-// jsdom has no canvas rendering, so Chart.js internals are never asserted on here.
-// Stub primevue/chart with a trivial component so mounting doesn't touch canvas at all.
-const ChartStub = { name: 'Chart', props: ['type', 'data', 'options'], template: '<canvas />' }
+// Captures the props Chart was rendered with, so tests can assert on chart
+// type and options without a canvas. Reset in beforeEach.
+let chartProps = null
+const ChartStub = {
+  name: 'Chart',
+  props: ['type', 'data', 'options'],
+  setup (props) {
+    chartProps = props
+    return () => null
+  },
+}
 
 const SLICES = [
   { label: 'Rides', value: 8, color: '#22c55e' },
@@ -29,6 +37,7 @@ function mountCard (props) {
 describe('MetricsPieCard', () => {
   beforeEach(() => {
     window.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })
+    chartProps = null
   })
 
   afterEach(() => cleanup())
@@ -51,9 +60,9 @@ describe('MetricsPieCard', () => {
     expect(screen.getByText('80%')).toBeTruthy()
   })
 
-  it('renders the chart canvas when slices are present', () => {
+  it('renders the chart when slices are present', () => {
     mountCard({})
-    expect(document.querySelector('canvas')).toBeTruthy()
+    expect(chartProps).not.toBeNull()
   })
 
   it('tolerates a single-slice pie (servicePie "Other" collapse edge case)', () => {
@@ -63,7 +72,80 @@ describe('MetricsPieCard', () => {
     })
     expect(screen.getByText('Other')).toBeTruthy()
     expect(screen.getByText('100%')).toBeTruthy()
-    expect(document.querySelector('canvas')).toBeTruthy()
+    expect(chartProps).not.toBeNull()
+  })
+
+  it('renders a pie chart by default', () => {
+    mountCard({})
+    expect(chartProps.type).toBe('pie')
+    expect(chartProps.options.indexAxis).toBeUndefined()
+  })
+
+  it('renders a horizontal bar chart when chartType is bar', () => {
+    mountCard({ chartType: 'bar' })
+    expect(chartProps.type).toBe('bar')
+    expect(chartProps.options.indexAxis).toBe('y')
+  })
+
+  // ---- bar entry animation ----
+  // Chart.js's default numeric animations are pie/line-oriented (x, y,
+  // borderWidth, radius, tension) and the bar controller overrides them, so
+  // bars appeared fully drawn while the pie swept in. The explicit animations.x
+  // is what restores the grow-in. It reads as decorative config — pinning it so
+  // a tidy-up of chartOptions cannot silently delete it, since the loss is
+  // invisible in review and only shows in a browser.
+  it('animates bar length from the axis origin', () => {
+    mountCard({ chartType: 'bar' })
+    const x = chartProps.options.animations?.x
+    expect(x).toBeTruthy()
+    expect(x.type).toBe('number')
+    expect(x.duration).toBe(1000)
+  })
+
+  it('adds no bar animation config to a pie', () => {
+    mountCard({})
+    expect(chartProps.options.animations).toBeUndefined()
+  })
+
+  // `from` applies ONLY to the initial render. Without the mode check, every
+  // status-filter or legs change would collapse the bars to zero and regrow
+  // them instead of sliding to the new values.
+  it('starts the initial bar render at the axis zero', () => {
+    mountCard({ chartType: 'bar' })
+    const ctx = {
+      type: 'data',
+      mode: 'default',
+      chart: { scales: { x: { getPixelForValue: v => (v === 0 ? 42 : 999) } } },
+    }
+    expect(chartProps.options.animations.x.from(ctx)).toBe(42)
+  })
+
+  it('leaves later bar updates to animate from their previous value', () => {
+    mountCard({ chartType: 'bar' })
+    const scales = { x: { getPixelForValue: () => 42 } }
+    // a non-initial update: undefined means "animate from where you are"
+    expect(chartProps.options.animations.x.from({ type: 'data', mode: 'resize', chart: { scales } })).toBeUndefined()
+    expect(chartProps.options.animations.x.from({ type: 'dataset', mode: 'default', chart: { scales } })).toBeUndefined()
+  })
+
+  it('hides the built-in chart legend in both modes', () => {
+    mountCard({ chartType: 'bar' })
+    expect(chartProps.options.plugins.legend.display).toBe(false)
+  })
+
+  // Chart.js sets context.parsed to a NUMBER for a pie but an OBJECT for a
+  // bar; with indexAxis:'y' the value is on .x. Reading the wrong one puts
+  // "[object Object]" in the tooltip.
+  it('formats the pie tooltip from a numeric parsed value', () => {
+    mountCard({})
+    const ctx = { label: 'Rides', parsed: 8, dataset: { data: [8, 2] } }
+    expect(chartProps.options.plugins.tooltip.callbacks.label(ctx)).toBe('Rides: 8 (80%)')
+  })
+
+  it('formats the bar tooltip from parsed.x', () => {
+    mountCard({ chartType: 'bar' })
+    const ctx = { label: 'Rides', parsed: { x: 8, y: 0 }, dataset: { data: [8, 2] } }
+    expect(chartProps.options.plugins.tooltip.callbacks.label(ctx)).toBe('Rides: 8 (80%)')
   })
 
   // Mirrors the PDF legend's Total line (see `legend` in metricsPdf.js).
@@ -115,5 +197,44 @@ describe('MetricsPieCard', () => {
     expect(csv.split('\n')[0]).toBe('Label,Value,Pct')
     expect(csv).toContain('Rides,704,80%')
     spy.mockRestore()
+  })
+
+  it('does not apply bar-mode layout for a pie', () => {
+    mountCard({})
+    expect(document.querySelector('.pie-card.bar-mode')).toBeNull()
+  })
+
+  it('applies bar-mode layout for a bar chart', () => {
+    mountCard({ chartType: 'bar' })
+    expect(document.querySelector('.pie-card.bar-mode')).toBeTruthy()
+  })
+
+  // A FLOOR, not a height: the chart is a flex sibling of the legend, so it
+  // stretches to the legend's height for free. min-height only bites when the
+  // bar count needs more room than that. 2 bars * 28 + 48 = 104.
+  it('floors the bar chart container height at the slice count', () => {
+    mountCard({ chartType: 'bar' })
+    expect(document.querySelector('.chart-container').style.minHeight).toBe('104px')
+  })
+
+  // Setting `height` would opt the chart out of the flex row's stretch, which
+  // is exactly what left a 3-bar chart in a stub of a box beside a tall table.
+  it('sets no fixed height in bar mode, so the column can stretch', () => {
+    mountCard({ chartType: 'bar' })
+    expect(document.querySelector('.chart-container').style.height).toBe('')
+  })
+
+  // No bars to measure — an empty container must not collapse to zero, or the
+  // empty message has nowhere to render.
+  it('falls back to a fixed floor for an empty bar chart', () => {
+    mountCard({ chartType: 'bar', slices: [] })
+    expect(document.querySelector('.chart-container').style.minHeight).toBe('280px')
+  })
+
+  // The pie keeps its CSS-driven square; no inline sizing at all.
+  it('leaves the pie container height to CSS', () => {
+    mountCard({})
+    expect(document.querySelector('.chart-container').style.height).toBe('')
+    expect(document.querySelector('.chart-container').style.minHeight).toBe('')
   })
 })

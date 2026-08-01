@@ -9,9 +9,10 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
+import SelectButton from 'primevue/selectbutton'
 import SplitButton from 'primevue/splitbutton'
-import { captureAll } from '../lib/capturePies.js'
-import { buildMetricsPdf } from '../lib/metricsPdf.js'
+import { capturePie } from '../lib/capturePies.js'
+import { buildMetricsPdf, chartDrawHeight, chartSlotWidth } from '../lib/metricsPdf.js'
 import { getVillageMetrics } from '../api/villageMetricsApi.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
@@ -103,6 +104,27 @@ const tab = computed({
   },
 })
 
+// ---- chart type (URL-backed) ----
+const CHART_TYPE_OPTIONS = [
+  { label: 'Pie', value: 'pie' },
+  { label: 'Bar', value: 'bar' },
+]
+const CHART_TYPE_VALUES = CHART_TYPE_OPTIONS.map(o => o.value)
+
+// Same shape as `tab` above: ?chart= is read when present and valid, and a
+// fresh visit falls back to the 'pie' default exactly as a fresh visit falls
+// back to the Categories tab and the this-year range. Being in the URL means a
+// reload keeps the choice and a link can be shared already in bar mode.
+// Unknown values fall back rather than writing a correction, so ?chart=banana
+// renders sanely without an extra history entry.
+const chartType = computed({
+  get: () => (CHART_TYPE_VALUES.includes(route.query.chart) ? route.query.chart : 'pie'),
+  set: (value) => {
+    if (!CHART_TYPE_VALUES.includes(value)) return
+    router.replace({ query: { ...route.query, chart: value } })
+  },
+})
+
 // ---- view state ----
 const legs = ref(true) // default ON: a completed round trip counts as 2 legs
 const catStatus = ref('completed')
@@ -186,25 +208,45 @@ const isExporting = ref(false)
 async function chartDeps () {
   const { default: Chart } = await import('chart.js/auto')
   return {
-    createCanvas: (size) => {
+    createCanvas: (w, h = w) => {
       const c = document.createElement('canvas')
-      c.width = size
-      c.height = size
+      c.width = w
+      c.height = h
       return c
     },
     createChart: (canvas, cfg) => new Chart(canvas, cfg),
   }
 }
 
+// Captures render at 3x the PDF's point size so the raster holds up in print.
+// The canvas MUST have the same proportions as the box it is drawn into: a bar
+// capture at the pie's default square width but a taller height gets squashed
+// horizontally by pdf-lib to fit. So both dimensions derive from the PDF's own
+// measurements — chartSlotWidth() for width, chartDrawHeight() for height.
+const CAPTURE_SCALE = 3
+
+function captureFor (view, deps) {
+  const sized = chartType.value === 'bar'
+    ? {
+        ...deps,
+        size: chartSlotWidth('bar') * CAPTURE_SCALE,
+        // Must match the height drawPieSection will draw it at, or pdf-lib
+        // stretches the raster to fit.
+        height: chartDrawHeight(view.slices.length, 'bar') * CAPTURE_SCALE,
+      }
+    : deps
+  return capturePie(view.slices, sized, chartType.value)
+}
+
 async function onDownloadPdf () {
   isExporting.value = true
   try {
     const deps = await chartDeps()
-    const images = captureAll({
-      categories: categoryView.value.slices,
-      services: serviceView.value.slices,
-      outcomes: outcomesView.value.slices,
-    }, deps)
+    const images = {
+      categories: captureFor(categoryView.value, deps),
+      services: captureFor(serviceView.value, deps),
+      outcomes: captureFor(outcomesView.value, deps),
+    }
 
     const bytes = await buildMetricsPdf({
       villageName: metrics.value?.villageName || 'Village',
@@ -213,10 +255,14 @@ async function onDownloadPdf () {
       legs: legs.value,
       strip: strip.value,
       images,
+      // chartType and sliceCount ride along on each view so drawPieSection can
+      // size the image the same way the capture did. sliceCount is the BAR
+      // count, which differs from rows.length: Services merges its tail into a
+      // single "Other" slice while the legend lists every row.
       views: {
-        categories: { rows: categoryView.value.rows, status: catStatus.value, emptyMessage: categoryView.value.emptyMessage },
-        services: { rows: serviceView.value.rows, status: svcStatus.value, category: svcCategory.value, emptyMessage: serviceView.value.emptyMessage },
-        outcomes: { rows: outcomesView.value.rows, emptyMessage: outcomesView.value.emptyMessage },
+        categories: { rows: categoryView.value.rows, sliceCount: categoryView.value.slices.length, status: catStatus.value, emptyMessage: categoryView.value.emptyMessage, chartType: chartType.value },
+        services: { rows: serviceView.value.rows, sliceCount: serviceView.value.slices.length, status: svcStatus.value, category: svcCategory.value, emptyMessage: serviceView.value.emptyMessage, chartType: chartType.value },
+        outcomes: { rows: outcomesView.value.rows, sliceCount: outcomesView.value.slices.length, emptyMessage: outcomesView.value.emptyMessage, chartType: chartType.value },
       },
       people: { members: memberRows.value, volunteers: volunteerRows.value },
     })
@@ -294,9 +340,20 @@ const exportMenuItems = computed(() => [
       <MetricsSummaryStrip :stats="strip" />
 
       <div class="controls-bar">
-        <div class="legs-toggle">
-          <ToggleSwitch v-model="legs" inputId="legsToggle" />
-          <label for="legsToggle">Round trip = 2 legs</label>
+        <div class="view-controls">
+          <SelectButton
+            v-model="chartType"
+            :options="CHART_TYPE_OPTIONS"
+            optionLabel="label"
+            optionValue="value"
+            :allowEmpty="false"
+            aria-label="Chart type"
+          />
+          <div class="legs-toggle">
+            <ToggleSwitch v-model="legs" inputId="legsToggle" />
+            <label for="legsToggle">Round trip = 2 legs</label>
+          </div>
+
         </div>
 
         <SplitButton
@@ -327,7 +384,7 @@ const exportMenuItems = computed(() => [
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="categoryView" :csvFilename="categoryCsvName" />
+            <MetricsPieCard v-bind="categoryView" :csvFilename="categoryCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="services">
@@ -349,11 +406,11 @@ const exportMenuItems = computed(() => [
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="serviceView" :csvFilename="serviceCsvName" />
+            <MetricsPieCard v-bind="serviceView" :csvFilename="serviceCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="outcomes">
-            <MetricsPieCard v-bind="outcomesView" :csvFilename="outcomesCsvName" />
+            <MetricsPieCard v-bind="outcomesView" :csvFilename="outcomesCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="people">
@@ -391,6 +448,14 @@ const exportMenuItems = computed(() => [
   justify-content: space-between;
   gap: 0.75rem 1rem;
   margin-bottom: 1rem;
+}
+/* Groups the two view controls on the left so space-between pushes only the
+   export button right. Wraps rather than crushing on a narrow viewport. */
+.view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
 }
 .legs-toggle {
   display: flex;

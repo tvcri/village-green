@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Chart from 'primevue/chart'
 import Button from 'primevue/button'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -11,11 +11,83 @@ const props = defineProps({
   emptyMessage: { type: String, required: true },
   // Empty string = no export control. Lets existing call sites stay untouched.
   csvFilename: { type: String, default: '' },
+  // 'pie' | 'bar' — bar renders horizontally (indexAxis: 'y').
+  chartType: { type: String, default: 'pie' },
 })
 
 defineOptions({ name: 'MetricsPieCard' })
 
 const hasSlices = computed(() => props.slices.length > 0)
+
+const isBar = computed(() => props.chartType === 'bar')
+
+// Chart.js does not re-measure its container on a viewport resize here: a
+// narrow-then-widen cycle (crossing the 640px stacking breakpoint) left the
+// canvas at its stacked size until a tab switch remounted the component. Bar
+// mode exposes this because its height comes from content; the pie's fixed
+// 280px square hides it. Setting `responsive: true` did NOT fix it — the root
+// cause was not pinned down, so this addresses the symptom directly: container
+// geometry changes, chart re-measures.
+//
+// Not hypothetical — this is served over ngrok for customer demos on their own
+// devices, where resizing is expected.
+const chartHost = ref(null)
+const chartRef = ref(null)
+let resizeObserver = null
+
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined' || !chartHost.value) return
+  resizeObserver = new ResizeObserver(() => {
+    // getChart() is PrimeVue's accessor for the underlying Chart.js instance.
+    // It is null until chart.js/auto finishes its dynamic import, so this is
+    // optional-chained rather than assumed present.
+    chartRef.value?.getChart()?.resize()
+  })
+  resizeObserver.observe(chartHost.value)
+})
+
+// The theme toggle adds/removes `app-dark` on <html> (see useTheme.js). That is
+// invisible to Vue, so watching the attribute is what turns a theme change into
+// a re-render of the chart's CSS-variable-derived colors.
+let themeObserver = null
+
+onMounted(() => {
+  if (typeof MutationObserver === 'undefined') return
+  themeObserver = new MutationObserver(() => { themeTick.value++ })
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  })
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  themeObserver?.disconnect()
+  themeObserver = null
+})
+
+// Bars need height proportional to their count — a fixed square would crush
+// 10 service types. Pie keeps its CSS-driven square, so no inline style.
+// The empty case has no bars to measure and falls back to the square's height
+// so the empty message still has a box to sit in.
+const BAR_THICKNESS = 28
+const BAR_CHART_PADDING = 48
+const EMPTY_HEIGHT = 280
+
+// min-height, NOT height: the two card columns are flex siblings, so the
+// default `align-items: stretch` already makes the chart as tall as the legend
+// beside it — no measuring required. A fixed height would opt the chart OUT of
+// that stretch, which is what previously left a 3-bar chart in a stub of a box
+// next to a full-height table. The floor only bites the other way: when the bar
+// count needs more room than the legend provides, it grows the row.
+const chartStyle = computed(() => {
+  if (!isBar.value) return {}
+  const min = hasSlices.value
+    ? props.slices.length * BAR_THICKNESS + BAR_CHART_PADDING
+    : EMPTY_HEIGHT
+  return { minHeight: `${min}px` }
+})
 
 const chartData = computed(() => ({
   labels: props.slices.map(s => s.label),
@@ -31,27 +103,103 @@ const chartData = computed(() => ({
 // `animation: true` is NOT a supported value — it replaces the default config
 // OBJECT with a boolean, leaving no duration, so the pie appears with no sweep.
 // Only `false` (disable) or a config object are meaningful here.
-const chartOptions = {
-  maintainAspectRatio: false,
-  // Chart.js defaults arc borders to 2px of #fff. That white is load-bearing in
-  // light theme — it's what separates adjacent slices, including the 3-4%
-  // slivers a Services pie produces — so it stays, just thinner. At 2px it read
-  // as heavy white lines against the dark theme's near-black card.
-  elements: { arc: { borderWidth: 1 } },
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      callbacks: {
-        label (context) {
-          const value = context.parsed
-          const total = context.dataset.data.reduce((sum, v) => sum + v, 0)
-          const pct = total > 0 ? Math.round((value / total) * 100) : 0
-          return `${context.label}: ${value} (${pct}%)`
+
+// Shared by both modes. `parsed` is a number for a pie but an object for a
+// bar, so the value is extracted by the caller.
+function tooltipLabel (context, value) {
+  const total = context.dataset.data.reduce((sum, v) => sum + v, 0)
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0
+  return `${context.label}: ${value} (${pct}%)`
+}
+
+// Chart.js has no theme awareness: its default grid is a fixed near-black at
+// low alpha, which reads fine on the light card and all but vanishes on the
+// dark one. Reading the app's own CSS variables keeps the axes in step with
+// whatever the palette says rather than hardcoding a second set of hexes.
+//
+// Deliberately NOT via useTheme(): that composable touches localStorage and
+// matchMedia at call time, which a presentational card has no business
+// depending on — importing it broke every test in this file. The CSS variables
+// already carry the theme, so reading them is enough.
+//
+// `themeTick` is what makes this reactive. The theme toggle swaps a class on
+// <html>, which changes no Vue state, so a computed reading CSS variables would
+// otherwise never re-evaluate.
+const themeTick = ref(0)
+
+function cssVar (name, fallback) {
+  if (typeof getComputedStyle === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+
+const chartOptions = computed(() => {
+  const bar = isBar.value
+  // Read so a theme change re-runs this; by the time it fires the class swap
+  // has happened and the variables below resolve to the new palette.
+  void themeTick.value
+  const gridColor = cssVar('--color-border-default', '#e4e4e7')
+  const tickColor = cssVar('--color-text-dim', '#6b7280')
+  return {
+    // Explicit rather than relying on the default. NOTE: setting this alone did
+    // NOT fix the stale-canvas-after-resize problem — the ResizeObserver in this
+    // component is what actually does that. Kept because it is the correct value
+    // to state, not because it is load-bearing.
+    responsive: true,
+    maintainAspectRatio: false,
+    // Horizontal bars: categories down the y-axis, values along x.
+    // The bar controller overrides Chart.js's default numeric animations (which
+    // are pie/line-oriented: x, y, borderWidth, radius, tension), and the result
+    // is that bars simply appear while the pie still sweeps. Animating `x`
+    // explicitly from the axis origin restores a grow-in: each bar starts at
+    // x=0 and eases out to its value. `from` is only applied on the initial
+    // render (ctx.type === 'data' && ctx.mode === 'default'), so later updates
+    // — a status filter change, a legs toggle — animate from their PREVIOUS
+    // value rather than snapping back to zero first.
+    ...(bar
+      ? {
+          indexAxis: 'y',
+          animations: {
+            x: {
+              type: 'number',
+              easing: 'easeOutQuart',
+              duration: 1000,
+              from: (ctx) => (ctx.type === 'data' && ctx.mode === 'default'
+                ? ctx.chart.scales.x.getPixelForValue(0)
+                : undefined),
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: tickColor },
+              grid: { color: gridColor },
+            },
+            y: {
+              ticks: { color: tickColor },
+              // No horizontal rules: with one bar per category they would just
+              // underline each bar. The vertical value grid carries the reading.
+              grid: { display: false },
+            },
+          },
+        }
+      : {}),
+    // Chart.js defaults arc borders to 2px of #fff. That white is load-bearing in
+    // light theme — it's what separates adjacent slices, including the 3-4%
+    // slivers a Services pie produces — so it stays, just thinner. At 2px it read
+    // as heavy white lines against the dark theme's near-black card.
+    elements: { arc: { borderWidth: 1 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label (context) {
+            return tooltipLabel(context, bar ? context.parsed.x : context.parsed)
+          },
         },
       },
     },
-  },
-}
+  }
+})
 
 function formatPct (pct) {
   return `${Math.round(pct * 100)}%`
@@ -69,9 +217,9 @@ function onDownloadCsv () {
 </script>
 
 <template>
-  <div class="pie-card">
-    <div class="chart-container">
-      <Chart v-if="hasSlices" type="pie" :data="chartData" :options="chartOptions" />
+  <div class="pie-card" :class="{ 'bar-mode': isBar }">
+    <div class="chart-container" :style="chartStyle" ref="chartHost">
+      <Chart v-if="hasSlices" ref="chartRef" :type="chartType" :data="chartData" :options="chartOptions" />
       <p v-else class="empty-msg">{{ emptyMessage }}</p>
     </div>
     <div class="legend-table-wrap">
@@ -117,7 +265,7 @@ function onDownloadCsv () {
 <style scoped>
 .pie-card {
   display: flex;
-  gap: 1.5rem;
+  gap: 4.5rem;
   min-width: 0;
 }
 
@@ -130,11 +278,36 @@ function onDownloadCsv () {
   max-width: 280px;
   height: 280px;
   min-width: 0;
+  align-self: flex-end;
 }
 
 /* Container-owned sizing: if the canvas sizes its own wrapper, Chart.js reads back the
    shrunken size and the chart never re-expands after a viewport shrink (see b02e1ba0). */
 .chart-container :deep(.p-chart) { width: 100%; height: 100%; }
+
+/* Bar mode keeps the pie's side-by-side card; only the chart column's width
+   rule differs. Bars were briefly given the full card width, but at desktop
+   width (~1200px) that left the bars stretched across ~1000px with the legend
+   stranded below and the right half of the card empty. 60/40 gives the bars
+   more room than the pie's 280px square without wasting the remainder.
+   Below 640px the shared media query stacks this exactly as it stacks a pie. */
+.pie-card.bar-mode .chart-container {
+  /* WIDTH, not flex-basis. Basis applies to the flex MAIN axis, and the 640px
+     media query flips .pie-card to `column` — where basis means HEIGHT. A
+     `flex: 0 1 480px` here silently became a 480px-tall box once stacked, which
+     is what drew three bars 150px thick. Setting width keeps this rule about
+     width at every viewport size. */
+  flex: 0 1 auto;
+  width: 480px;
+  max-width: 100%;
+  /* No fixed height and no align-self: both would opt this column out of the
+     flex row's default stretch, which is what matches the chart to the legend
+     beside it. The inline style sets min-height only, so the chart grows past
+     the legend when the bar count needs it and matches it otherwise. */
+  height: auto;
+  aspect-ratio: auto;
+  align-self: stretch;
+}
 
 .empty-msg {
   display: flex;
@@ -228,6 +401,17 @@ function onDownloadCsv () {
        (now smaller) width or the pie sits in a letterboxed box. */
     height: auto;
     aspect-ratio: 1;
+  }
+
+  /* Bar mode must NOT take the square. Stacked, the container is as wide as the
+     card, so aspect-ratio:1 makes it just as TALL — a ~1100px box that three
+     bars then divide between them. Widening the window back reveals the result
+     as absurdly fat bars, because the tall box is what the row inherited.
+     Bar mode keeps its count-based min-height and lets content set the rest. */
+  .pie-card.bar-mode .chart-container {
+    aspect-ratio: auto;
+    height: auto;
+    align-self: stretch;
   }
 }
 </style>

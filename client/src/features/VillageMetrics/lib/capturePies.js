@@ -24,9 +24,10 @@ export const EXPORT_CHART_OPTIONS = Object.freeze({
   plugins: { legend: { display: false } },
 })
 
-export function chartConfig (slices) {
+export function chartConfig (slices, chartType = 'pie') {
+  const bar = chartType === 'bar'
   return {
-    type: 'pie',
+    type: bar ? 'bar' : 'pie',
     data: {
       labels: slices.map(s => s.label),
       datasets: [{
@@ -39,27 +40,57 @@ export function chartConfig (slices) {
     // before any canvas context is acquired. Handing it the frozen template
     // makes that write throw ("Cannot assign to read only property") in
     // strict mode, which is every module here — killing every PDF export.
-    options: { ...EXPORT_CHART_OPTIONS },
+    //
+    // Bar mode adds indexAxis and axis styling. The on-screen chart inherits
+    // Chart.js's default tick colors, which suit a dark app background; the PDF
+    // draws on white, so ticks and grid lines are set to print-legible values
+    // here rather than coming out near-invisible.
+    options: {
+      ...EXPORT_CHART_OPTIONS,
+      ...(bar
+        ? {
+            indexAxis: 'y',
+            // Font sizes are in CANVAS pixels, and the canvas is rendered at 3x
+            // the PDF's point size — so 24px here lands as ~8pt on the page,
+            // matching the legend text beside it. Sized in page points (8) it
+            // would come out about 2.7pt: technically present, unreadable.
+            scales: {
+              x: {
+                ticks: { color: '#4b5563', font: { size: 24 } },
+                grid: { color: '#e5e7eb' },
+              },
+              y: {
+                ticks: { color: '#111827', font: { size: 24 } },
+                grid: { display: false },
+              },
+            },
+          }
+        : {}),
+    },
   }
 }
 
-// Returns null for an empty pie: a blank square in the PDF would read as a bug,
+// Returns null for an empty chart: a blank box in the PDF would read as a bug,
 // and the caller prints the empty message instead.
-export function capturePie (slices, deps) {
+export function capturePie (slices, deps, chartType = 'pie') {
   if (!slices || slices.length === 0) return null
 
-  const { createCanvas, createChart, size = EXPORT_SIZE } = deps
-  const canvas = createCanvas(size)
-  const chart = createChart(canvas, chartConfig(slices))
+  const { createCanvas, createChart, size = EXPORT_SIZE, height } = deps
+  // A pie is square; a bar chart takes an explicit height from the caller, which
+  // sizes it to the PDF card it will be drawn into. createCanvas takes (w, h) —
+  // callers that only pass a width still get a square, so the pie path is
+  // unchanged.
+  const canvas = createCanvas(size, height ?? size)
+  const chart = createChart(canvas, chartConfig(slices, chartType))
   const url = canvas.toDataURL('image/png')
   chart.destroy()
   return url
 }
 
-export function captureAll (pies, deps) {
+export function captureAll (pies, deps, chartType = 'pie') {
   const out = {}
   for (const [name, slices] of Object.entries(pies)) {
-    out[name] = capturePie(slices, deps)
+    out[name] = capturePie(slices, deps, chartType)
   }
   return out
 }

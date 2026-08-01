@@ -7,11 +7,18 @@ const SLICES = [
 ]
 
 // Stand-ins for the DOM: jsdom has no canvas, so nothing real is rendered.
+// `sizes` records the (w, h) each canvas was created at — the capture's aspect
+// ratio has to match the box the PDF draws it into, or pdf-lib stretches it.
 function fakeDeps () {
   const created = []
+  const sizes = []
   return {
     created,
-    createCanvas: () => ({ toDataURL: () => 'data:image/png;base64,STUB' }),
+    sizes,
+    createCanvas: (w, h = w) => {
+      sizes.push({ w, h })
+      return { toDataURL: () => 'data:image/png;base64,STUB' }
+    },
     createChart: (canvas, cfg) => { created.push(cfg); return { destroy () {} } },
   }
 }
@@ -76,5 +83,52 @@ describe('capturePies', () => {
     expect(out.categories).toBe('data:image/png;base64,STUB')
     expect(out.outcomes).toBe('data:image/png;base64,STUB')
     expect(out.services).toBeNull()
+  })
+
+  // ---- bar capture ----
+  it('builds a horizontal bar config when asked for one', () => {
+    const cfg = chartConfig(SLICES, 'bar')
+    expect(cfg.type).toBe('bar')
+    expect(cfg.options.indexAxis).toBe('y')
+    // same data mapping as the pie — only the presentation differs
+    expect(cfg.data.labels).toEqual(['Rides', 'Errands'])
+    expect(cfg.data.datasets[0].backgroundColor).toEqual(['#22c55e', '#f59e0b'])
+  })
+
+  it('leaves a pie config free of bar-only options', () => {
+    const cfg = chartConfig(SLICES)
+    expect(cfg.options.indexAxis).toBeUndefined()
+    expect(cfg.options.scales).toBeUndefined()
+  })
+
+  // The PDF prints on white; the on-screen chart inherits Chart.js defaults
+  // tuned for the app's dark background, which come out near-invisible.
+  it('styles bar axes for print', () => {
+    const cfg = chartConfig(SLICES, 'bar')
+    expect(cfg.options.scales.y.ticks.color).toBe('#111827')
+    expect(cfg.options.scales.y.grid.display).toBe(false)
+    expect(cfg.options.scales.x.ticks.color).toBe('#4b5563')
+  })
+
+  // Font sizes are canvas pixels against a 3x canvas, so they must be ~3x the
+  // intended point size. Sized as if they were points, labels render at ~2.7pt.
+  it('sizes bar tick fonts for the 3x canvas', () => {
+    const cfg = chartConfig(SLICES, 'bar')
+    expect(cfg.options.scales.y.ticks.font.size).toBe(24)
+    expect(cfg.options.scales.x.ticks.font.size).toBe(24)
+  })
+
+  // A canvas whose proportions differ from the PDF's draw box gets stretched
+  // by pdf-lib — this is what produced the first squashed bar export.
+  it('honours an explicit non-square capture height', () => {
+    const deps = fakeDeps()
+    capturePie(SLICES, { ...deps, size: 750, height: 456 }, 'bar')
+    expect(deps.sizes[0]).toEqual({ w: 750, h: 456 })
+  })
+
+  it('keeps the pie capture square', () => {
+    const deps = fakeDeps()
+    capturePie(SLICES, { ...deps, size: 560 })
+    expect(deps.sizes[0]).toEqual({ w: 560, h: 560 })
   })
 })
