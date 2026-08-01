@@ -17,9 +17,9 @@ const ROWS = [
 
 const baseProps = { rows: ROWS, isLoading: false, hasLoadedOnce: true, error: null }
 
-// Read each view separately: the DataTable sorts internally, while the mobile
-// cards iterate the component's own sortedRows. Both must agree, and a helper
-// that merged them would mask a regression in either one.
+// Read each view separately. Both now render the same sortedRows, but keeping
+// the assertions independent is what would catch the table drifting back to
+// sorting internally -- a merged helper would hide exactly that regression.
 const desktopOrder = (container) =>
   Array.from(container.querySelectorAll('.desktop-only tbody tr'))
     .map(tr => tr.textContent)
@@ -133,5 +133,93 @@ describe('ServiceRequestTable serviceDate ordering', () => {
     })
     const text = container.textContent
     expect(text.indexOf('A-1')).toBeLessThan(text.indexOf('A-2'))
+  })
+})
+
+// Sorting by any other column keeps date+time as an implicit secondary key, so
+// a volunteer's or village's requests still read in the order they happen.
+// Before this, clicking any non-date header left dates arbitrary within groups.
+describe('ServiceRequestTable secondary date ordering', () => {
+  // Volunteers deliberately out of order, with dates interleaved across them so
+  // a single-key sort on either field alone would fail these assertions.
+  const ROWS = [
+    { serviceRequestId: '1', displayNumber: 'burke-late', status: 'Open', volunteerFullName: 'Burke, Anne', serviceDate: '2026-08-20', startTime: '09:00:00' },
+    { serviceRequestId: '2', displayNumber: 'areson-early', status: 'Open', volunteerFullName: 'Areson, Paul', serviceDate: '2026-08-22', startTime: '09:00:00' },
+    { serviceRequestId: '3', displayNumber: 'burke-early', status: 'Open', volunteerFullName: 'Burke, Anne', serviceDate: '2026-08-03', startTime: '09:00:00' },
+    { serviceRequestId: '4', displayNumber: 'areson-late', status: 'Open', volunteerFullName: 'Areson, Paul', serviceDate: '2026-08-29', startTime: '09:00:00' },
+    { serviceRequestId: '5', displayNumber: 'burke-mid', status: 'Open', volunteerFullName: 'Burke, Anne', serviceDate: '2026-08-13', startTime: '14:00:00' }
+  ]
+
+  const LABELS = ['areson-early', 'areson-late', 'burke-early', 'burke-mid', 'burke-late']
+
+  const orderOf = (container, selector) =>
+    Array.from(container.querySelectorAll(selector))
+      .map(el => el.textContent)
+      .map(t => LABELS.find(n => t.includes(n)))
+      .filter(Boolean)
+
+  const desktopOrder = (container) => orderOf(container, '.desktop-only tbody tr')
+
+  // PrimeVue emits @sort from a header click; the component mirrors that into
+  // its own sort state. Clicking the text node is what a user actually hits.
+  const clickHeader = async (getByText, label) => {
+    getByText(label).click()
+    await new Promise(resolve => setTimeout(resolve, 0))
+  }
+
+  const renderTable = (props = {}) => render(ServiceRequestTable, {
+    props: { rows: ROWS, isLoading: false, hasLoadedOnce: true, error: null, ...props },
+    global: { plugins: [PrimeVue] }
+  })
+
+  beforeEach(() => {
+    window.matchMedia = () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {}
+    })
+  })
+  afterEach(() => { cleanup() })
+
+  it('groups by the clicked column with dates ascending inside each group', async () => {
+    const { container, getByText } = renderTable()
+    await clickHeader(getByText, 'Volunteer')
+    expect(desktopOrder(container)).toEqual([
+      'areson-early', 'areson-late', 'burke-early', 'burke-mid', 'burke-late'
+    ])
+  })
+
+  // The appended date key stays ascending when the primary reverses: within one
+  // volunteer, dates should still read earliest-first.
+  it('keeps dates ascending within a group when the primary sorts descending', async () => {
+    const { container, getByText } = renderTable()
+    await clickHeader(getByText, 'Volunteer')
+    await clickHeader(getByText, 'Volunteer')
+    expect(desktopOrder(container)).toEqual([
+      'burke-early', 'burke-mid', 'burke-late', 'areson-early', 'areson-late'
+    ])
+  })
+
+  // Assert BOTH views: the DataTable moves empty values on its own (PrimeVue's
+  // sort() swaps in nullSortOrder when either side is empty), so only the
+  // component's own null guard keeps the mobile cards agreeing with it. A
+  // desktop-only assertion passes with that guard deleted -- the views silently
+  // disagree instead, which is the regression worth catching.
+  it('sorts nullish primary values last in both views and directions', async () => {
+    const rows = [
+      ...ROWS,
+      { serviceRequestId: '6', displayNumber: 'unassigned', status: 'Open', volunteerFullName: null, serviceDate: '2026-08-01', startTime: '09:00:00' }
+    ]
+    const { container, getByText } = renderTable({ rows })
+    const lastOf = (selector) =>
+      Array.from(container.querySelectorAll(selector)).at(-1).textContent
+
+    await clickHeader(getByText, 'Volunteer')
+    expect(lastOf('.desktop-only tbody tr')).toContain('unassigned')
+    expect(lastOf('.request-cards .request-card')).toContain('unassigned')
+
+    await clickHeader(getByText, 'Volunteer')
+    expect(lastOf('.desktop-only tbody tr')).toContain('unassigned')
+    expect(lastOf('.request-cards .request-card')).toContain('unassigned')
   })
 })
