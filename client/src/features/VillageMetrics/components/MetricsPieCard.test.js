@@ -87,6 +87,47 @@ describe('MetricsPieCard', () => {
     expect(chartProps.options.indexAxis).toBe('y')
   })
 
+  // ---- bar entry animation ----
+  // Chart.js's default numeric animations are pie/line-oriented (x, y,
+  // borderWidth, radius, tension) and the bar controller overrides them, so
+  // bars appeared fully drawn while the pie swept in. The explicit animations.x
+  // is what restores the grow-in. It reads as decorative config — pinning it so
+  // a tidy-up of chartOptions cannot silently delete it, since the loss is
+  // invisible in review and only shows in a browser.
+  it('animates bar length from the axis origin', () => {
+    mountCard({ chartType: 'bar' })
+    const x = chartProps.options.animations?.x
+    expect(x).toBeTruthy()
+    expect(x.type).toBe('number')
+    expect(x.duration).toBe(1000)
+  })
+
+  it('adds no bar animation config to a pie', () => {
+    mountCard({})
+    expect(chartProps.options.animations).toBeUndefined()
+  })
+
+  // `from` applies ONLY to the initial render. Without the mode check, every
+  // status-filter or legs change would collapse the bars to zero and regrow
+  // them instead of sliding to the new values.
+  it('starts the initial bar render at the axis zero', () => {
+    mountCard({ chartType: 'bar' })
+    const ctx = {
+      type: 'data',
+      mode: 'default',
+      chart: { scales: { x: { getPixelForValue: v => (v === 0 ? 42 : 999) } } },
+    }
+    expect(chartProps.options.animations.x.from(ctx)).toBe(42)
+  })
+
+  it('leaves later bar updates to animate from their previous value', () => {
+    mountCard({ chartType: 'bar' })
+    const scales = { x: { getPixelForValue: () => 42 } }
+    // a non-initial update: undefined means "animate from where you are"
+    expect(chartProps.options.animations.x.from({ type: 'data', mode: 'resize', chart: { scales } })).toBeUndefined()
+    expect(chartProps.options.animations.x.from({ type: 'dataset', mode: 'default', chart: { scales } })).toBeUndefined()
+  })
+
   it('hides the built-in chart legend in both modes', () => {
     mountCard({ chartType: 'bar' })
     expect(chartProps.options.plugins.legend.display).toBe(false)
