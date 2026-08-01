@@ -106,7 +106,29 @@ const chartOptions = computed(() => {
     responsive: true,
     maintainAspectRatio: false,
     // Horizontal bars: categories down the y-axis, values along x.
-    ...(bar ? { indexAxis: 'y' } : {}),
+    // The bar controller overrides Chart.js's default numeric animations (which
+    // are pie/line-oriented: x, y, borderWidth, radius, tension), and the result
+    // is that bars simply appear while the pie still sweeps. Animating `x`
+    // explicitly from the axis origin restores a grow-in: each bar starts at
+    // x=0 and eases out to its value. `from` is only applied on the initial
+    // render (ctx.type === 'data' && ctx.mode === 'default'), so later updates
+    // — a status filter change, a legs toggle — animate from their PREVIOUS
+    // value rather than snapping back to zero first.
+    ...(bar
+      ? {
+          indexAxis: 'y',
+          animations: {
+            x: {
+              type: 'number',
+              easing: 'easeOutQuart',
+              duration: 1000,
+              from: (ctx) => (ctx.type === 'data' && ctx.mode === 'default'
+                ? ctx.chart.scales.x.getPixelForValue(0)
+                : undefined),
+            },
+          },
+        }
+      : {}),
     // Chart.js defaults arc borders to 2px of #fff. That white is load-bearing in
     // light theme — it's what separates adjacent slices, including the 3-4%
     // slivers a Services pie produces — so it stays, just thinner. At 2px it read
