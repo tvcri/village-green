@@ -11,11 +11,15 @@ const props = defineProps({
   emptyMessage: { type: String, required: true },
   // Empty string = no export control. Lets existing call sites stay untouched.
   csvFilename: { type: String, default: '' },
+  // 'pie' | 'bar' — bar renders horizontally (indexAxis: 'y').
+  chartType: { type: String, default: 'pie' },
 })
 
 defineOptions({ name: 'MetricsPieCard' })
 
 const hasSlices = computed(() => props.slices.length > 0)
+
+const isBar = computed(() => props.chartType === 'bar')
 
 const chartData = computed(() => ({
   labels: props.slices.map(s => s.label),
@@ -31,27 +35,38 @@ const chartData = computed(() => ({
 // `animation: true` is NOT a supported value — it replaces the default config
 // OBJECT with a boolean, leaving no duration, so the pie appears with no sweep.
 // Only `false` (disable) or a config object are meaningful here.
-const chartOptions = {
-  maintainAspectRatio: false,
-  // Chart.js defaults arc borders to 2px of #fff. That white is load-bearing in
-  // light theme — it's what separates adjacent slices, including the 3-4%
-  // slivers a Services pie produces — so it stays, just thinner. At 2px it read
-  // as heavy white lines against the dark theme's near-black card.
-  elements: { arc: { borderWidth: 1 } },
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      callbacks: {
-        label (context) {
-          const value = context.parsed
-          const total = context.dataset.data.reduce((sum, v) => sum + v, 0)
-          const pct = total > 0 ? Math.round((value / total) * 100) : 0
-          return `${context.label}: ${value} (${pct}%)`
+
+// Shared by both modes. `parsed` is a number for a pie but an object for a
+// bar, so the value is extracted by the caller.
+function tooltipLabel (context, value) {
+  const total = context.dataset.data.reduce((sum, v) => sum + v, 0)
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0
+  return `${context.label}: ${value} (${pct}%)`
+}
+
+const chartOptions = computed(() => {
+  const bar = isBar.value
+  return {
+    maintainAspectRatio: false,
+    // Horizontal bars: categories down the y-axis, values along x.
+    ...(bar ? { indexAxis: 'y' } : {}),
+    // Chart.js defaults arc borders to 2px of #fff. That white is load-bearing in
+    // light theme — it's what separates adjacent slices, including the 3-4%
+    // slivers a Services pie produces — so it stays, just thinner. At 2px it read
+    // as heavy white lines against the dark theme's near-black card.
+    elements: { arc: { borderWidth: 1 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label (context) {
+            return tooltipLabel(context, bar ? context.parsed.x : context.parsed)
+          },
         },
       },
     },
-  },
-}
+  }
+})
 
 function formatPct (pct) {
   return `${Math.round(pct * 100)}%`
@@ -71,7 +86,7 @@ function onDownloadCsv () {
 <template>
   <div class="pie-card">
     <div class="chart-container">
-      <Chart v-if="hasSlices" type="pie" :data="chartData" :options="chartOptions" />
+      <Chart v-if="hasSlices" :type="chartType" :data="chartData" :options="chartOptions" />
       <p v-else class="empty-msg">{{ emptyMessage }}</p>
     </div>
     <div class="legend-table-wrap">

@@ -5,9 +5,17 @@ import PrimeVue from 'primevue/config'
 import MetricsPieCard from './MetricsPieCard.vue'
 import * as csvUtils from '../../../shared/lib/csvUtils.js'
 
-// jsdom has no canvas rendering, so Chart.js internals are never asserted on here.
-// Stub primevue/chart with a trivial component so mounting doesn't touch canvas at all.
-const ChartStub = { name: 'Chart', props: ['type', 'data', 'options'], template: '<canvas />' }
+// Captures the props Chart was rendered with, so tests can assert on chart
+// type and options without a canvas. Reset in beforeEach.
+let chartProps = null
+const ChartStub = {
+  name: 'Chart',
+  props: ['type', 'data', 'options'],
+  setup (props) {
+    chartProps = props
+    return () => null
+  },
+}
 
 const SLICES = [
   { label: 'Rides', value: 8, color: '#22c55e' },
@@ -29,6 +37,7 @@ function mountCard (props) {
 describe('MetricsPieCard', () => {
   beforeEach(() => {
     window.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })
+    chartProps = null
   })
 
   afterEach(() => cleanup())
@@ -51,9 +60,9 @@ describe('MetricsPieCard', () => {
     expect(screen.getByText('80%')).toBeTruthy()
   })
 
-  it('renders the chart canvas when slices are present', () => {
+  it('renders the chart when slices are present', () => {
     mountCard({})
-    expect(document.querySelector('canvas')).toBeTruthy()
+    expect(chartProps).not.toBeNull()
   })
 
   it('tolerates a single-slice pie (servicePie "Other" collapse edge case)', () => {
@@ -63,7 +72,39 @@ describe('MetricsPieCard', () => {
     })
     expect(screen.getByText('Other')).toBeTruthy()
     expect(screen.getByText('100%')).toBeTruthy()
-    expect(document.querySelector('canvas')).toBeTruthy()
+    expect(chartProps).not.toBeNull()
+  })
+
+  it('renders a pie chart by default', () => {
+    mountCard({})
+    expect(chartProps.type).toBe('pie')
+    expect(chartProps.options.indexAxis).toBeUndefined()
+  })
+
+  it('renders a horizontal bar chart when chartType is bar', () => {
+    mountCard({ chartType: 'bar' })
+    expect(chartProps.type).toBe('bar')
+    expect(chartProps.options.indexAxis).toBe('y')
+  })
+
+  it('hides the built-in chart legend in both modes', () => {
+    mountCard({ chartType: 'bar' })
+    expect(chartProps.options.plugins.legend.display).toBe(false)
+  })
+
+  // Chart.js sets context.parsed to a NUMBER for a pie but an OBJECT for a
+  // bar; with indexAxis:'y' the value is on .x. Reading the wrong one puts
+  // "[object Object]" in the tooltip.
+  it('formats the pie tooltip from a numeric parsed value', () => {
+    mountCard({})
+    const ctx = { label: 'Rides', parsed: 8, dataset: { data: [8, 2] } }
+    expect(chartProps.options.plugins.tooltip.callbacks.label(ctx)).toBe('Rides: 8 (80%)')
+  })
+
+  it('formats the bar tooltip from parsed.x', () => {
+    mountCard({ chartType: 'bar' })
+    const ctx = { label: 'Rides', parsed: { x: 8, y: 0 }, dataset: { data: [8, 2] } }
+    expect(chartProps.options.plugins.tooltip.callbacks.label(ctx)).toBe('Rides: 8 (80%)')
   })
 
   // Mirrors the PDF legend's Total line (see `legend` in metricsPdf.js).
