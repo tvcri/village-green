@@ -32,7 +32,22 @@ vi.mock('../api/villageMetricsApi.js', () => ({
 const VillageMetrics = (await import('./VillageMetrics.vue')).default
 
 // jsdom has no canvas; stub primevue/chart so MetricsPieCard mounts without touching it.
-const ChartStub = { name: 'Chart', props: ['type', 'data', 'options'], template: '<canvas />' }
+// Records the `type` of every Chart rendered this mount, so a test can assert
+// the page-level toggle reached the card. The push lives in the render
+// function (not `setup`, which only runs once) because clicking the
+// SelectButton updates `type` reactively on an already-mounted card rather
+// than remounting it — `setup` would only ever capture the initial value.
+let chartTypes = []
+const ChartStub = {
+  name: 'Chart',
+  props: ['type', 'data', 'options'],
+  setup (props) {
+    return () => {
+      chartTypes.push(props.type)
+      return null
+    }
+  },
+}
 
 function byStatus (over = {}) {
   return {
@@ -116,6 +131,7 @@ describe('VillageMetrics container', () => {
     mockRouter.push.mockClear()
     getVillageMetrics.mockReset()
     getVillageMetrics.mockResolvedValue(METRICS)
+    chartTypes = []
   })
 
   afterEach(() => {
@@ -286,5 +302,19 @@ describe('VillageMetrics container', () => {
     globalThis.Blob = RealBlob
     URL.createObjectURL = origCreate
     clickSpy.mockRestore()
+  })
+
+  it('switches the rendered chart type when the chart-type control changes', async () => {
+    await renderLoaded()
+
+    // defaults to pie
+    expect(chartTypes).toContain('pie')
+    expect(chartTypes).not.toContain('bar')
+
+    chartTypes = []
+    await fireEvent.click(screen.getByText('Bar'))
+    await nextTick()
+
+    expect(chartTypes).toContain('bar')
   })
 })

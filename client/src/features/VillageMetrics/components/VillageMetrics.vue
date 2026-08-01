@@ -9,6 +9,7 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
+import SelectButton from 'primevue/selectbutton'
 import SplitButton from 'primevue/splitbutton'
 import { captureAll } from '../lib/capturePies.js'
 import { buildMetricsPdf } from '../lib/metricsPdf.js'
@@ -108,6 +109,13 @@ const legs = ref(true) // default ON: a completed round trip counts as 2 legs
 const catStatus = ref('completed')
 const svcStatus = ref('completed')
 const svcCategory = ref('all')
+
+// Plain ref, like `legs` — resets on reload, deliberately not URL-backed.
+const chartType = ref('pie')
+const CHART_TYPE_OPTIONS = [
+  { label: 'Pie', value: 'pie' },
+  { label: 'Bar', value: 'bar' },
+]
 
 const categoryOptions = [
   { label: 'All categories', value: 'all' },
@@ -294,9 +302,20 @@ const exportMenuItems = computed(() => [
       <MetricsSummaryStrip :stats="strip" />
 
       <div class="controls-bar">
-        <div class="legs-toggle">
-          <ToggleSwitch v-model="legs" inputId="legsToggle" />
-          <label for="legsToggle">Round trip = 2 legs</label>
+        <div class="view-controls">
+          <div class="legs-toggle">
+            <ToggleSwitch v-model="legs" inputId="legsToggle" />
+            <label for="legsToggle">Round trip = 2 legs</label>
+          </div>
+
+          <SelectButton
+            v-model="chartType"
+            :options="CHART_TYPE_OPTIONS"
+            optionLabel="label"
+            optionValue="value"
+            :allowEmpty="false"
+            aria-label="Chart type"
+          />
         </div>
 
         <SplitButton
@@ -327,7 +346,7 @@ const exportMenuItems = computed(() => [
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="categoryView" :csvFilename="categoryCsvName" />
+            <MetricsPieCard v-bind="categoryView" :csvFilename="categoryCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="services">
@@ -349,11 +368,11 @@ const exportMenuItems = computed(() => [
                 optionValue="value"
               />
             </div>
-            <MetricsPieCard v-bind="serviceView" :csvFilename="serviceCsvName" />
+            <MetricsPieCard v-bind="serviceView" :csvFilename="serviceCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="outcomes">
-            <MetricsPieCard v-bind="outcomesView" :csvFilename="outcomesCsvName" />
+            <MetricsPieCard v-bind="outcomesView" :csvFilename="outcomesCsvName" :chartType="chartType" />
           </TabPanel>
 
           <TabPanel value="people">
@@ -391,6 +410,14 @@ const exportMenuItems = computed(() => [
   justify-content: space-between;
   gap: 0.75rem 1rem;
   margin-bottom: 1rem;
+}
+/* Groups the two view controls on the left so space-between pushes only the
+   export button right. Wraps rather than crushing on a narrow viewport. */
+.view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
 }
 .legs-toggle {
   display: flex;
