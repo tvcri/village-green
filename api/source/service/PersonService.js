@@ -2,8 +2,6 @@
 const dbUtils = require('./utils')
 const { hasPermission } = require('../utils/authz')
 
-const _this = this
-
 async function queryPersons (inPredicates = {}) {
   const columns = [
     'CAST(p.id AS CHAR) AS personId',
