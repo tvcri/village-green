@@ -2,6 +2,7 @@
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
+import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -18,10 +19,7 @@ function edited (field) {
   emit('edited', field)
 }
 
-function uncertainText (field) {
-  const u = props.uncertain[field]
-  return u.alternative ? `${u.reason} — alternative: ${u.alternative}` : u.reason
-}
+function uncertainText (field) { return sharedUncertainText(props.uncertain, field) }
 </script>
 
 <template>

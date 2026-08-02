@@ -7,6 +7,7 @@ import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import AutoComplete from 'primevue/autocomplete'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
+import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -24,10 +25,7 @@ const memberLevelOptions = ['Primary', 'Secondary'].map(s => ({ label: s, value:
 
 function edited (field) { emit('edited', field) }
 
-function uncertainText (field) {
-  const u = props.uncertain[field]
-  return u.alternative ? `${u.reason} — alternative: ${u.alternative}` : u.reason
-}
+function uncertainText (field) { return sharedUncertainText(props.uncertain, field) }
 
 // Primary Person autocomplete (edit mode only) — restricted to Primary-level
 // members of the person's village, since a Secondary member's primary must

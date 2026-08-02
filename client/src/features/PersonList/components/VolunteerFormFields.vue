@@ -8,6 +8,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import DatePicker from 'primevue/datepicker'
 import Button from 'primevue/button'
+import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 
 const props = defineProps({
   providerType: { type: String, default: '' },
@@ -28,10 +29,7 @@ const emit = defineEmits([
   'update:vettings',
 ])
 
-function uncertainText (field) {
-  const u = props.uncertain[field]
-  return u?.alternative ? `${u.reason} — alternative: ${u.alternative}` : u?.reason
-}
+function uncertainText (field) { return sharedUncertainText(props.uncertain, field) }
 
 // Dates are exchanged with the API as 'YYYY-MM-DD' strings; PrimeVue's
 // DatePicker works in local Date objects. Convert at the edges, using local
