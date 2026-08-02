@@ -141,31 +141,34 @@ const columnsForCsv = [
   { header: 'Disabilities', key: 'disabilities' }
 ]
 
+// Rows are summary shape plus the projected `detail` object; email/phone/cell
+// come from the summary root (detail deliberately omits them).
 function detailRowForCsv(p) {
+  const d = p.detail ?? {}
   return {
     fullName: p.fullName,
     villageName: p.village?.name ?? '',
     roles: parseJson(p.activeAs).join(', '),
-    firstName: p.firstName,
-    middleInitial: p.middleInitial,
-    lastName: p.lastName,
-    nickname: p.nickname,
-    street: p.street,
-    unit: p.unit,
-    city: p.city,
-    state: p.state,
-    zip: p.zip,
+    firstName: d.firstName,
+    middleInitial: d.middleInitial,
+    lastName: d.lastName,
+    nickname: d.nickname,
+    street: d.street,
+    unit: d.unit,
+    city: d.city,
+    state: d.state,
+    zip: d.zip,
     email: p.email,
-    phone: p.phone,
-    cell: p.cell,
-    birthDate: p.birthDate,
-    emergencyContactName: p.emergencyContactName,
-    emergencyContactRelationship: p.emergencyContactRelationship,
-    emergencyContactPhone: p.emergencyContactPhone,
-    emergencyContactEmail: p.emergencyContactEmail,
-    communities: (p.communities ?? []).map(c => c.name).join(', '),
-    disabilities: (p.disabilities ?? [])
-      .map(d => d.note ? `${d.name} (${d.note})` : d.name)
+    phone: parsePhoneObj(p.phone).phone,
+    cell: parsePhoneObj(p.phone).cell,
+    birthDate: d.birthDate,
+    emergencyContactName: d.emergencyContactName,
+    emergencyContactRelationship: d.emergencyContactRelationship,
+    emergencyContactPhone: d.emergencyContactPhone,
+    emergencyContactEmail: d.emergencyContactEmail,
+    communities: (d.communities ?? []).map(c => c.name).join(', '),
+    disabilities: (d.disabilities ?? [])
+      .map(dis => dis.note ? `${dis.name} (${dis.note})` : dis.name)
       .join('; ')
   }
 }

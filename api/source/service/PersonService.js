@@ -13,8 +13,9 @@ const VILLAGE_COLUMN = `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.n
 
 // communities + disabilities are `required` on the Person schema, so every
 // full-row path must emit them. NULL-safe via COALESCE — a person with none
-// yields JSON_ARRAY(), not null.
-const COMMUNITIES_COLUMN = `(
+// yields JSON_ARRAY(), not null. Bare subqueries so they compose as top-level
+// columns (full rows) or JSON_OBJECT values (the detail projection).
+const COMMUNITIES_SUBQUERY = `(
       SELECT COALESCE(
         ${dbUtils.jsonArrayAgg({
           value: `JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name)`,
@@ -25,9 +26,9 @@ const COMMUNITIES_COLUMN = `(
       FROM person_community pc
       JOIN community c ON c.id = pc.communityId
       WHERE pc.personId = p.id
-    ) AS communities`
+    )`
 
-const DISABILITIES_COLUMN = `(
+const DISABILITIES_SUBQUERY = `(
       SELECT COALESCE(
         ${dbUtils.jsonArrayAgg({
           value: `JSON_OBJECT('disabilityId', CAST(d.id AS CHAR), 'name', d.name, 'note', pd.note)`,
@@ -39,7 +40,34 @@ const DISABILITIES_COLUMN = `(
       JOIN disability d ON d.id = pd.disabilityId
       WHERE pd.personId = p.id
         AND d.name IN ('Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane')
-    ) AS disabilities`
+    )`
+
+const COMMUNITIES_COLUMN = `${COMMUNITIES_SUBQUERY} AS communities`
+const DISABILITIES_COLUMN = `${DISABILITIES_SUBQUERY} AS disabilities`
+
+// The getPersons `detail` projection: summary rows gain a same-named object
+// with the Person columns the summary lacks (projection convention — a
+// projection adds a property, it never reshapes the row). email/phone/cell
+// stay out: the summary root already carries them.
+const DETAIL_COLUMN = `JSON_OBJECT(
+      'lastName', p.lastName,
+      'firstName', p.firstName,
+      'middleInitial', p.middleInitial,
+      'nickname', p.nickname,
+      'street', p.street,
+      'unit', p.unit,
+      'address', p.address,
+      'city', p.city,
+      'state', p.state,
+      'zip', LPAD(p.zip, 5, '0'),
+      'birthDate', DATE_FORMAT(p.birthDate, '%Y-%m-%d'),
+      'emergencyContactName', p.emergencyContactName,
+      'emergencyContactRelationship', p.emergencyContactRelationship,
+      'emergencyContactPhone', p.emergencyContactPhone,
+      'emergencyContactEmail', p.emergencyContactEmail,
+      'communities', ${COMMUNITIES_SUBQUERY},
+      'disabilities', ${DISABILITIES_SUBQUERY}
+    ) AS detail`
 
 function memberColumn ({ financial, confidential, inactive }) {
   // Row gating: without member:read_inactive the source is the
@@ -134,10 +162,11 @@ function volunteerColumn ({ inactive }) {
 //   firstName, lastName, phone, email - LIKE searches
 // inOptions:
 //   summary           - PersonSummary column set instead of full Person
+//   detail            - add the `detail` object to summary rows (getPersons projection)
 //   member            - { financial, confidential, inactive } projection gates
 //   volunteer         - { inactive } projection gates
 async function queryPersons (inPredicates = {}, inOptions = {}) {
-  const { summary = false, member = null, volunteer = null } = inOptions
+  const { summary = false, detail = false, member = null, volunteer = null } = inOptions
 
   const columns = summary
     ? [
@@ -175,6 +204,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       DISABILITIES_COLUMN
     ]
 
+  if (detail) columns.push(DETAIL_COLUMN)
   if (member) columns.push(memberColumn(member))
   if (volunteer) columns.push(volunteerColumn(volunteer))
 
@@ -278,12 +308,13 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
 }
 
 module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, projection }) {
-  // 'detail' swaps in the full Person column set for exports. Deliberately no
-  // member/volunteer options here: those projections carry per-village-gated
-  // fields, and this endpoint can span villages (see getPerson's gate logic).
+  // 'detail' adds a same-named object with the full person columns (exports).
+  // Deliberately no member/volunteer options here: those projections carry
+  // per-village-gated fields, and this endpoint can span villages (see
+  // getPerson's gate logic).
   return queryPersons(
     { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email },
-    { summary: !projection?.includes('detail') }
+    { summary: true, detail: projection?.includes('detail') }
   )
 }
 

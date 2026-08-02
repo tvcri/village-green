@@ -55,17 +55,21 @@ test('old projection names (memberInfo/volunteerInfo) are gone from the enum -> 
 
 // ---- list endpoint projection=detail (export enrichment) ----
 
-test('getPersons projection=detail returns full Person rows, granted villages only', async () => {
+test('getPersons projection=detail adds a same-named object, granted villages only', async () => {
   const { status, json } = await vgCall('getPersons',
     { villageId: [String(villages.quahog.id)], lastName: 'Griffin', projection: ['detail'] },
     { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   const peter = json.find(p => p.fullName === persons.quahogMember.fullName)
   assert.ok(peter, 'search predicates still apply with the detail projection')
-  assert.equal(peter.street, persons.quahogMember.street)
+  // Summary root is unchanged; the projection ADDS `detail` (convention:
+  // projections add a property of their own name, never reshape the row).
+  assert.ok(!('street' in peter), 'summary root unchanged')
+  assert.ok(peter.detail, 'detail object projected')
+  assert.equal(peter.detail.street, persons.quahogMember.street)
   // Unseeded columns are still selected: key present, value null.
-  assert.ok('birthDate' in peter && 'emergencyContactName' in peter, 'full column set present')
-  assert.ok(Array.isArray(peter.communities) && Array.isArray(peter.disabilities), 'aggregate arrays present')
+  assert.ok('birthDate' in peter.detail && 'emergencyContactName' in peter.detail, 'full column set present')
+  assert.ok(Array.isArray(peter.detail.communities) && Array.isArray(peter.detail.disabilities), 'aggregate arrays present')
   // Deliberately NOT part of this projection (multi-village gating — see plan/grades log).
   assert.ok(!('member' in peter) && !('volunteer' in peter), 'no member/volunteer on the list endpoint')
   assert.ok(json.every(p => p.village?.villageId === String(villages.quahog.id)), 'rows stay village-clamped')
@@ -77,5 +81,5 @@ test('getPersons without projection keeps the summary shape', async () => {
     { token: tokens.users.full_v1 })
   assert.equal(status, 200)
   const peter = json.find(p => p.fullName === persons.quahogMember.fullName)
-  assert.ok(peter && !('street' in peter), 'summary rows carry no detail columns')
+  assert.ok(peter && !('detail' in peter) && !('street' in peter), 'no detail object without the projection')
 })
