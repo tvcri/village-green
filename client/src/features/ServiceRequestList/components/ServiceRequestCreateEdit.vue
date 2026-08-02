@@ -1410,7 +1410,6 @@ const openPersonDialog = (personId) => {
 
 .status-display {
   padding: 0.5rem 0.75rem;
-  background-color: var(--color-background-secondary);
   border: 1px solid var(--color-border-default);
   border-radius: 4px;
   color: var(--color-text-primary);

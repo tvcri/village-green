@@ -390,7 +390,7 @@ const clearFilters = () => {
 .title-group { display: flex; flex-direction: column; gap: 0.25rem; }
 h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .header-actions { display: flex; align-items: center; gap: 1rem; }
-.filter-section { margin-bottom: 1.5rem; padding: 1rem 0; background-color: var(--color-background-primary); border-bottom: 1px solid var(--color-border-default); width: 100%; display: flex; flex-direction: column; gap: 1rem; }
+.filter-section { margin-bottom: 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--color-border-default); width: 100%; display: flex; flex-direction: column; gap: 1rem; }
 .filters-container { display: flex; flex-direction: column; gap: 0.75rem; }
 .filters-header { display: flex; align-items: center; gap: 0.75rem; }
 /* Bolder label matches the "Use member's home" treatment: outlined + 700 label
