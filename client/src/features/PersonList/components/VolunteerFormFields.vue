@@ -239,7 +239,7 @@ function updateVettingDate (index, field, date) {
 }
 .add-vetting-type { min-width: 14rem; }
 .duplicate-vetting-error {
-  color: var(--color-error);
+  color: var(--color-text-error);
   font-size: 0.85rem;
   margin: 0.5rem 0 0;
 }

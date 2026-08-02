@@ -88,6 +88,6 @@ const flatPerson = computed(() => {
 }
 
 .dialog-state.error {
-  color: var(--color-error);
+  color: var(--color-text-error);
 }
 </style>

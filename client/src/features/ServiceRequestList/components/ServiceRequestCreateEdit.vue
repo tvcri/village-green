@@ -1277,7 +1277,7 @@ const openPersonDialog = (personId) => {
 }
 
 .req {
-  color: var(--color-error);
+  color: var(--color-text-error);
   margin-left: 0.15rem;
 }
 
@@ -1360,7 +1360,7 @@ const openPersonDialog = (personId) => {
 
 .form-label.required::after {
   content: ' *';
-  color: var(--color-error);
+  color: var(--color-text-error);
 }
 
 .form-section {
