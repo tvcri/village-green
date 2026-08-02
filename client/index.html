@@ -7,8 +7,9 @@
     <link rel="icon" type="image/svg+xml" href="house.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
-      const _t = localStorage.getItem('vg-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-      if (_t !== 'dark') document.documentElement.classList.remove('app-dark')
+      const _t = localStorage.getItem('vg-theme')
+      const _dark = _t === 'dark' || ((_t === 'system' || !_t) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      if (!_dark) document.documentElement.classList.remove('app-dark')
     </script>
     <script type="text/javascript" src="./Env.js"></script>
     <script type="module" src="/src/init.js"></script>
