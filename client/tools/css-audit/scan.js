@@ -203,6 +203,7 @@ export function scanSfc (source, filename) {
     try {
       root = postcss.parse(styleSrc)
     } catch {
+      console.error(`${filename}: style block failed to parse and was skipped`)
       continue // unparseable block (e.g. SCSS-only syntax) — skip, don't guess
     }
 
