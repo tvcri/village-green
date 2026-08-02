@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch, onMounted, onActivated } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import Checkbox from 'primevue/checkbox'
@@ -25,7 +25,6 @@ import { createSheet } from '../../../shared/services/googleSheetsService.js'
 defineOptions({ name: 'MetaServiceRequestList' })
 
 const router = useRouter()
-const route = useRoute()
 const { hasPermission } = useCurrentUser()
 const canWriteSr = computed(() => hasPermission('sr:write'))
 

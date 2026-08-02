@@ -47,7 +47,7 @@
           @click="copyTempPassword"
         />
       </div>
-      <Button class="signin-button"label="Take me to sign in" @click="goToLogin" />
+      <Button class="signin-button" label="Take me to sign in" @click="goToLogin" />
     </template>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>

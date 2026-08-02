@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/vue'
+import { render } from '@testing-library/vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { cleanup } from '@testing-library/vue'
 import PrimeVue from 'primevue/config'

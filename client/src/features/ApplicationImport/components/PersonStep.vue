@@ -41,7 +41,7 @@ onMounted(async () => {
     allDisabilities.value = await getDisabilities()
     await findDuplicates()
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load form data — go back and retry', life: 3000 })
   }
 })
@@ -107,7 +107,7 @@ async function submit () {
       existing: false,
     })
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create person', life: 3000 })
   }
   finally {

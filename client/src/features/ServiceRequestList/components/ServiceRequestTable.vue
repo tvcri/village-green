@@ -15,7 +15,7 @@ const props = defineProps({
   rows: { type: Array, required: true },
   isLoading: { type: Boolean, required: true },
   hasLoadedOnce: { type: Boolean, required: true },
-  error: { required: true },
+  error: { type: Error, required: true },
   showVillageColumn: { type: Boolean, default: false },
   flashRowId: { type: [String, Number], default: null },
   // Initial serviceDate sort: 1 = ascending (soonest first), -1 = descending.
@@ -52,11 +52,13 @@ const onSort = (event) => {
   sortOrderRef.value = event.sortOrder ?? 1
 }
 
-// Bound to the DataTable's sortField. resolveFieldData() returns a constant for
-// a function key, so PrimeVue's internal comparator sees every row as equal and
-// its sort collapses to a stable no-op that preserves the order computed below.
-// Passing null instead would disable sorting entirely -- and take the header
-// sort icons with it, since they key off the same internal sortField.
+// Bound to the DataTable's sortField, which is documented as accepting either a
+// field name or a getter function. A getter returning a constant makes every row
+// compare equal, so PrimeVue's sort collapses to a stable no-op (ES2019) that
+// preserves the order computed below -- the supported way to keep its sort UI
+// while owning the ordering, since PrimeVue has no client-side equivalent of
+// "manual sorting". Passing null instead would disable sorting entirely -- and
+// take the header sort icons with it, since they key off the same sortField.
 const noopSortField = () => 0
 
 const compareDateTime = (a, b) =>

@@ -7,7 +7,6 @@
 // The worker broadcasts all received events to all connected contexts via BroadcastChannel.
 // Implements custom reconnect logic that retries connections even on 502 errors from reverse proxies.
 
-const logPrefix = '[state-worker]:'
 const retryInterval = 3000 // 3-second retry delay
 const channelName = crypto.randomUUID()
 const stateWorkerChannel = new BroadcastChannel(channelName) // Used to broadcast state events
@@ -44,7 +43,7 @@ function initialize(options) {
     eventSource = new EventSource(`${apiBase}/op/state/sse`)
 
     // Handle SSE errors, which are usually disconnections
-    eventSource.onerror = (event) => {
+    eventSource.onerror = () => {
       if (!initialized) {
         clearTimeout(timeoutId)
         resolve({ success: false, error: 'API connection error' })
@@ -109,7 +108,7 @@ function reconnectSSE() {
   if (eventSource) { eventSource.close() }
   eventSource = new EventSource(`${apiBase}/op/state/sse`)
 
-  eventSource.onopen = function (event) {
+  eventSource.onopen = function () {
     addListeners()
   }
   eventSource.onerror = function (error) {

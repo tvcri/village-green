@@ -57,7 +57,7 @@ async function removePerson () {
     toast.add({ severity: 'success', summary: 'Deleted', detail: 'Person deleted', life: 2000 })
     router.push({ name: 'meta-persons' })
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete person', life: 3000 })
   }
 }
