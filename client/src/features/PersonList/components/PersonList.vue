@@ -74,15 +74,18 @@ const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
   { immediate: false }
 )
 
+// Shared with the export path so a detail re-fetch filters row-for-row the
+// same way the table does.
+function matchesRoleFilter(p) {
+  if (!showMembers.value && !showVolunteers.value) return true
+  const activeAs = parseJson(p.activeAs)
+  return (showMembers.value && activeAs.includes('member')) ||
+    (showVolunteers.value && activeAs.includes('volunteer'))
+}
+
 const filteredPersons = computed(() => {
   if (!persons.value) return null
-  if (!showMembers.value && !showVolunteers.value) return persons.value
-  return persons.value.filter(p => {
-    const activeAs = parseJson(p.activeAs)
-    if (showMembers.value && activeAs.includes('member')) return true
-    if (showVolunteers.value && activeAs.includes('volunteer')) return true
-    return false
-  })
+  return persons.value.filter(matchesRoleFilter)
 })
 
 function parseJson(val) {
@@ -108,38 +111,109 @@ function getRoleSeverity(role) {
 }
 
 const isCreatingSheet = ref(false)
+const isFetchingExport = ref(false)
 
+// Fixed export column list (order and headers are the contract, never derived
+// from row keys). Exports carry the full Person shape; the live table stays
+// on summary rows.
 const columnsForCsv = [
-  { header: 'Full Name', key: 'fullName' },
+  { header: 'Name', key: 'fullName' },
   { header: 'Village', key: 'villageName' },
   { header: 'Roles', key: 'roles' },
-  { header: 'Phone', key: 'phoneNumber' },
-  { header: 'Cell', key: 'cellNumber' },
-  { header: 'Email', key: 'email' }
+  { header: 'First Name', key: 'firstName' },
+  { header: 'Middle Initial', key: 'middleInitial' },
+  { header: 'Last Name', key: 'lastName' },
+  { header: 'Nickname', key: 'nickname' },
+  { header: 'Street', key: 'street' },
+  { header: 'Unit', key: 'unit' },
+  { header: 'City', key: 'city' },
+  { header: 'State', key: 'state' },
+  { header: 'Zip', key: 'zip' },
+  { header: 'Email', key: 'email' },
+  { header: 'Phone', key: 'phone' },
+  { header: 'Cell', key: 'cell' },
+  { header: 'Birth Date', key: 'birthDate' },
+  { header: 'Emergency Contact Name', key: 'emergencyContactName' },
+  { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
+  { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
+  { header: 'Emergency Contact Email', key: 'emergencyContactEmail' },
+  { header: 'Communities', key: 'communities' },
+  { header: 'Disabilities', key: 'disabilities' }
 ]
 
-const personsForCsv = computed(() => {
-  if (!filteredPersons.value) return []
-  return filteredPersons.value.map(p => ({
+function detailRowForCsv(p) {
+  return {
     fullName: p.fullName,
     villageName: p.village?.name ?? '',
-    roles: parseJson(p.activeAs).join('; '),
-    phoneNumber: parsePhoneObj(p.phone).phone ?? '',
-    cellNumber: parsePhoneObj(p.phone).cell ?? '',
-    email: p.email ?? ''
-  }))
-})
+    roles: parseJson(p.activeAs).join(', '),
+    firstName: p.firstName,
+    middleInitial: p.middleInitial,
+    lastName: p.lastName,
+    nickname: p.nickname,
+    street: p.street,
+    unit: p.unit,
+    city: p.city,
+    state: p.state,
+    zip: p.zip,
+    email: p.email,
+    phone: p.phone,
+    cell: p.cell,
+    birthDate: p.birthDate,
+    emergencyContactName: p.emergencyContactName,
+    emergencyContactRelationship: p.emergencyContactRelationship,
+    emergencyContactPhone: p.emergencyContactPhone,
+    emergencyContactEmail: p.emergencyContactEmail,
+    communities: (p.communities ?? []).map(c => c.name).join(', '),
+    disabilities: (p.disabilities ?? [])
+      .map(d => d.note ? `${d.name} (${d.note})` : d.name)
+      .join('; ')
+  }
+}
 
-const handleDownloadCsv = () => {
-  const csv = toCsv(personsForCsv.value, columnsForCsv)
-  downloadCsv(csv, 'persons.csv')
+// Re-run the current search with projection=detail at export time — full rows
+// (with communities/disabilities subqueries) are paid only here, never on the
+// live search page.
+async function fetchRowsForExport() {
+  try {
+    isFetchingExport.value = true
+    const detail = await getPersons({
+      villageId: selectedVillageId.value ? [selectedVillageId.value] : undefined,
+      firstName: firstName.value.trim() || undefined,
+      lastName: lastName.value.trim() || undefined,
+      phone: phone.value.trim() || undefined,
+      email: email.value.trim() || undefined,
+      projection: ['detail']
+    })
+    const rows = detail.filter(matchesRoleFilter)
+    if (rows.length !== (filteredPersons.value?.length ?? 0)) {
+      throw new Error('The results changed since the last search — search again, then retry the export.')
+    }
+    return rows.map(detailRowForCsv)
+  } finally {
+    isFetchingExport.value = false
+  }
+}
+
+async function handleDownloadCsv() {
+  try {
+    const rows = await fetchRowsForExport()
+    const csv = toCsv(rows, columnsForCsv)
+    downloadCsv(csv, 'persons.csv')
+  } catch (err) {
+    if (toast) {
+      toast.add({ severity: 'error', summary: 'Export Failed', detail: err.message, life: 5000 })
+    } else {
+      console.error(err)
+    }
+  }
 }
 
 async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
 
-    const result = await createSheet(personsForCsv.value, columnsForCsv, 'Village Green Persons')
+    const rows = await fetchRowsForExport()
+    const result = await createSheet(rows, columnsForCsv, 'Village Green Persons')
     const sheetUrl = result.url || result
 
     if (result.popupBlocked) {
@@ -301,7 +375,7 @@ function onSearch() {
           <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
           <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
           <ExportButton
-            :disabled="isLoading || isCreatingSheet"
+            :disabled="isLoading || isCreatingSheet || isFetchingExport"
             @download="handleDownloadCsv"
             @export="handleCreateSheet"
           />
