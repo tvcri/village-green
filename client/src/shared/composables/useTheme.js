@@ -5,7 +5,9 @@ const darkQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
 // Module-level state so every useTheme() instance shares one source of truth
 // and the pre-paint theme choice made in index.html isn't redone/undone.
-let mode = null // 'light' | 'dark' | 'system'
+// Must be a ref: components render from reads of `mode`, so a plain variable
+// here silently freezes every consumer's view of the current setting.
+const modeState = ref(null) // 'light' | 'dark' | 'system'
 const isDarkRef = ref(false)
 
 function resolveIsDark(m) {
@@ -18,21 +20,21 @@ function applyIsDark(dark) {
 }
 
 function onSystemChange() {
-  if (mode === 'system') applyIsDark(darkQuery.matches)
+  if (modeState.value === 'system') applyIsDark(darkQuery.matches)
 }
 
 function setMode(newMode) {
-  mode = newMode
-  localStorage.setItem(THEME_KEY, mode)
-  applyIsDark(resolveIsDark(mode))
+  modeState.value = newMode
+  localStorage.setItem(THEME_KEY, newMode)
+  applyIsDark(resolveIsDark(newMode))
 }
 
 function init() {
-  if (mode !== null) return
+  if (modeState.value !== null) return
 
   const stored = localStorage.getItem(THEME_KEY)
-  mode = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system'
-  applyIsDark(resolveIsDark(mode))
+  modeState.value = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system'
+  applyIsDark(resolveIsDark(modeState.value))
   darkQuery.addEventListener('change', onSystemChange)
 }
 
@@ -40,7 +42,7 @@ export function useTheme() {
   init()
 
   const modeRef = computed({
-    get: () => mode,
+    get: () => modeState.value,
     set: (newMode) => setMode(newMode),
   })
 
