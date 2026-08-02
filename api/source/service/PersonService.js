@@ -277,10 +277,13 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   return rows[0] ?? null
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email }) {
+module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, projection }) {
+  // 'detail' swaps in the full Person column set for exports. Deliberately no
+  // member/volunteer options here: those projections carry per-village-gated
+  // fields, and this endpoint can span villages (see getPerson's gate logic).
   return queryPersons(
     { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email },
-    { summary: true }
+    { summary: !projection?.includes('detail') }
   )
 }
 

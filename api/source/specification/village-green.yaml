@@ -1425,6 +1425,19 @@ paths:
           description: Filter by email (contains, case-insensitive)
           schema:
             type: string
+        - name: projection
+          in: query
+          description: >-
+            `detail` returns full Person rows (without member/volunteer)
+            instead of the summary shape. Intended for exports.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+              - detail
       responses:
         '200':
           description: List of persons
@@ -1433,7 +1446,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PersonSummary'
+                  oneOf:
+                  - $ref: '#/components/schemas/PersonSummary'
+                  - $ref: '#/components/schemas/Person'
         default:
           description: error
           content:
