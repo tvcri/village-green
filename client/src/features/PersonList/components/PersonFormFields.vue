@@ -295,47 +295,10 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
   </div>
 </template>
 
+<style scoped src="./formFields.css"></style>
 <style scoped>
 .section {
-  display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 1rem 1.5rem;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
-}
-
-.section:first-of-type {
-  margin-top: 1rem;
-}
-
-.section:last-child {
-  margin-bottom: 0;
-}
-
-.section-header {
-  grid-column: 1 / -1;
-  margin: 0 0 0.75rem 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--p-primary-600);
-  border-bottom: 2px solid var(--color-border-default);
-  padding-bottom: 0.75rem;
-}
-
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.label {
-  font-weight: 600;
-  color: var(--color-text-dim);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .required {
@@ -348,28 +311,12 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
   margin-top: 0.25rem;
 }
 
-.w-full {
-  width: 100%;
-}
-
 .communities-row {
   grid-column: 1 / -1;
   flex-direction: row;
   gap: 1.5rem;
   align-items: center;
   padding-top: 0.25rem;
-}
-
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.checkbox-label {
-  font-size: 1rem;
-  color: var(--color-text-primary);
 }
 
 .disabilities-list {
@@ -388,12 +335,6 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
 .disability-note {
   flex: 1;
   max-width: 20rem;
-}
-
-.uncertain-icon {
-  color: var(--p-amber-500, #f59e0b);
-  margin-left: 0.35rem;
-  cursor: help;
 }
 
 @media (max-width: 900px) {

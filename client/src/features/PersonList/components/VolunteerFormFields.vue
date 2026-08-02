@@ -176,16 +176,11 @@ function updateVettingDate (index, field, date) {
   </div>
 </template>
 
+<style scoped src="./formFields.css"></style>
 <style scoped>
 .section {
-  display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1rem 1.5rem;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
 }
-.section:first-of-type { margin-top: 1rem; }
-.section:last-child { margin-bottom: 0; }
 .section-header-row {
   grid-column: 1 / -1;
   display: flex;
@@ -201,34 +196,7 @@ function updateVettingDate (index, field, date) {
   padding-bottom: 0;
   margin: 0;
 }
-.section-header {
-  grid-column: 1 / -1;
-  margin: 0 0 0.75rem 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--p-primary-600);
-  border-bottom: 2px solid var(--color-border-default);
-  padding-bottom: 0.75rem;
-}
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
 .form-field.span-4 { grid-column: 1 / -1; }
-.label {
-  font-weight: 600;
-  color: var(--color-text-dim);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.w-full { width: 100%; }
-.checkbox-item { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
-.checkbox-label { font-size: 1rem; color: var(--color-text-primary); }
-.uncertain-icon { color: var(--p-amber-500, #f59e0b); margin-left: 0.35rem; cursor: help; }
 .add-vetting-row {
   display: flex;
   align-items: center;
