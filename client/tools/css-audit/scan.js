@@ -130,14 +130,40 @@ function scriptMayReference (script, name) {
 
 // ---- Selector parsing -------------------------------------------------------
 
+// Class-name fragments that PrimeVue renders on content it teleports out of
+// the component root (charter's "Teleported content (modals, menus,
+// tooltips)... scoped attrs still apply but DOM location differs" zone).
+// Sourced from the installed package's own style/index.mjs `classes` maps,
+// not guessed — see task-2 fix report for the per-component citations:
+// dialog ('p-dialog', 'p-dialog-mask'), menu ('p-menu' root itself teleports
+// in popup mode via PrimeVue's shared Portal wrapper), tooltip ('p-tooltip'),
+// toast ('p-toast'), confirmpopup ('p-confirmpopup'), popover ('p-popover'),
+// contextmenu/tieredmenu ('p-contextmenu'/'p-tieredmenu'), and every
+// overlay-panel part PrimeVue names literally `overlay` or `panel` on an
+// input-style component (select/multiselect/autocomplete/datepicker/etc.:
+// 'p-select-overlay', 'p-multiselect-overlay', 'p-autocomplete-overlay',
+// 'p-datepicker-panel', ...). Deliberately does NOT include a bare
+// component-root class like 'p-select' or 'p-inputtext' — those render
+// in place (verified against PrimeVue source in the calibration report),
+// so a selector targeting only the root must not be misclassified as
+// teleported. Only the specific overlay/panel/mask/mask-adjacent part names
+// (or a whole component family that teleports unconditionally) qualify.
+const TELEPORT_CLASS_RE = /\bp-(?:dialog|dialog-mask|tooltip|toast|confirmpopup|confirmdialog|popover|contextmenu|tieredmenu|drawer|[\w-]+-overlay|[\w-]+-panel|[\w-]+-mask)\b/
+
 // False-positive zone detection, syntactic only (charter's "Declared
-// false-positive zones" section).
+// false-positive zones" section). Order matters: almost every selector that
+// legitimately targets teleported PrimeVue-internal content also has to go
+// through :deep() to pierce scoping in the first place (e.g.
+// `:deep(.p-dialog)`), so the teleport-class check must run BEFORE the
+// generic :deep() fallback or every teleport case would be masked as the
+// less specific 'deep' zone and this fix would never actually fire.
 function classifySelector (selector) {
+  if (TELEPORT_CLASS_RE.test(selector)) return 'teleport'
   if (/:deep\(/.test(selector)) return 'deep'
   if (/-enter-active|-leave-active|-enter-from|-enter-to|-leave-from|-leave-to|^\.v-enter|^\.v-leave/.test(selector)) {
     return 'transition'
   }
-  return null // not a syntactic zone; caller may still classify via context (keyframe/teleport/media-only)
+  return null // not a syntactic zone; caller may still classify via context (keyframe/media-only)
 }
 
 // Split a selector into simple parts across combinators, then pull class/id

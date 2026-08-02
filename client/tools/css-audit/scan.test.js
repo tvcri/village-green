@@ -29,6 +29,7 @@ const DEEP_FIXTURE = `
 <style scoped>
 .wrapper { padding: 1rem; }
 .wrapper :deep(.p-inputtext) { width: 100%; }
+:deep(.p-dialog) { max-width: 40rem; }
 </style>`
 
 it('classifies :deep() selectors as the deep zone, not a plain candidate', () => {
@@ -36,4 +37,11 @@ it('classifies :deep() selectors as the deep zone, not a plain candidate', () =>
   const deepEntry = result.candidates.find(c => c.selector === '.wrapper :deep(.p-inputtext)')
   expect(deepEntry).toBeDefined()
   expect(deepEntry.classification).toBe('deep')
+})
+
+it('classifies :deep() selectors targeting teleported PrimeVue overlay content as the teleport zone', () => {
+  const result = scanSfc(DEEP_FIXTURE, 'Deep.vue')
+  const teleportEntry = result.candidates.find(c => c.selector === ':deep(.p-dialog)')
+  expect(teleportEntry).toBeDefined()
+  expect(teleportEntry.classification).toBe('teleport')
 })
