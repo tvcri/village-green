@@ -103,11 +103,11 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
 
       <form v-else @submit.prevent="save">
         <VolunteerFormFields
-          v-model:providerType="providerType"
+          v-model:provider-type="providerType"
           v-model:active="active"
           v-model:notes="notes"
-          v-model:selectedCapabilityIds="selectedCapabilityIds"
-          v-model:selectedAssociateVillageIds="selectedAssociateVillageIds"
+          v-model:selected-capability-ids="selectedCapabilityIds"
+          v-model:selected-associate-village-ids="selectedAssociateVillageIds"
           v-model:vettings="vettings"
           :capability-options="capabilityOptions"
           :village-options="villageOptions"

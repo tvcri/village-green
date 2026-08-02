@@ -5,7 +5,6 @@ import Checkbox from 'primevue/checkbox'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 
 const props = defineProps({
-  form: { type: Object, required: true },
   errors: { type: Object, required: true },
   uncertain: { type: Object, default: () => ({}) },
   villages: { type: Array, required: true },
@@ -13,6 +12,25 @@ const props = defineProps({
   disabilities: { type: Object, required: true },     // Map<name, note>
 })
 const emit = defineEmits(['edited', 'toggle-community', 'toggle-disability', 'edit-disability-note'])
+
+const firstName = defineModel('firstName')
+const middleInitial = defineModel('middleInitial')
+const lastName = defineModel('lastName')
+const nickname = defineModel('nickname')
+const email = defineModel('email')
+const phone = defineModel('phone')
+const cell = defineModel('cell')
+const street = defineModel('street')
+const unit = defineModel('unit')
+const city = defineModel('city')
+const state = defineModel('state')
+const zip = defineModel('zip')
+const birthDate = defineModel('birthDate')
+const villageId = defineModel('villageId')
+const emergencyContactName = defineModel('emergencyContactName')
+const emergencyContactRelationship = defineModel('emergencyContactRelationship')
+const emergencyContactPhone = defineModel('emergencyContactPhone')
+const emergencyContactEmail = defineModel('emergencyContactEmail')
 
 function edited (field) {
   delete props.errors[field]
@@ -33,7 +51,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="firstName"
-        v-model="form.firstName"
+        v-model="firstName"
         class="w-full"
         :class="{ 'p-invalid': errors.firstName }"
         @input="edited('firstName')"
@@ -47,7 +65,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="middleInitial"
-        v-model="form.middleInitial"
+        v-model="middleInitial"
         class="w-full"
         :class="{ 'p-invalid': errors.middleInitial }"
         @input="edited('middleInitial')"
@@ -61,7 +79,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="lastName"
-        v-model="form.lastName"
+        v-model="lastName"
         class="w-full"
         :class="{ 'p-invalid': errors.lastName }"
         @input="edited('lastName')"
@@ -73,7 +91,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       <label class="label" for="nickname">Nickname
         <i v-if="uncertain.nickname" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('nickname')" />
       </label>
-      <InputText id="nickname" v-model="form.nickname" class="w-full" @input="edited('nickname')" />
+      <InputText id="nickname" v-model="nickname" class="w-full" @input="edited('nickname')" />
     </div>
 
     <div class="form-field">
@@ -82,7 +100,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="email"
-        v-model="form.email"
+        v-model="email"
         class="w-full"
         :class="{ 'p-invalid': errors.email }"
         @input="edited('email')"
@@ -96,7 +114,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="phone"
-        v-model="form.phone"
+        v-model="phone"
         class="w-full"
         :class="{ 'p-invalid': errors.phone }"
         @input="edited('phone')"
@@ -110,7 +128,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="cell"
-        v-model="form.cell"
+        v-model="cell"
         class="w-full"
         :class="{ 'p-invalid': errors.cell }"
         @input="edited('cell')"
@@ -122,28 +140,28 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       <label class="label" for="street">Street
         <i v-if="uncertain.street" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('street')" />
       </label>
-      <InputText id="street" v-model="form.street" class="w-full" @input="edited('street')" />
+      <InputText id="street" v-model="street" class="w-full" @input="edited('street')" />
     </div>
 
     <div class="form-field">
       <label class="label" for="unit">Unit
         <i v-if="uncertain.unit" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('unit')" />
       </label>
-      <InputText id="unit" v-model="form.unit" class="w-full" @input="edited('unit')" />
+      <InputText id="unit" v-model="unit" class="w-full" @input="edited('unit')" />
     </div>
 
     <div class="form-field">
       <label class="label" for="city">City
         <i v-if="uncertain.city" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('city')" />
       </label>
-      <InputText id="city" v-model="form.city" class="w-full" @input="edited('city')" />
+      <InputText id="city" v-model="city" class="w-full" @input="edited('city')" />
     </div>
 
     <div class="form-field">
       <label class="label" for="state">State
         <i v-if="uncertain.state" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('state')" />
       </label>
-      <InputText id="state" v-model="form.state" class="w-full" @input="edited('state')" />
+      <InputText id="state" v-model="state" class="w-full" @input="edited('state')" />
     </div>
 
     <div class="form-field">
@@ -152,7 +170,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="zip"
-        v-model="form.zip"
+        v-model="zip"
         class="w-full"
         :class="{ 'p-invalid': errors.zip }"
         @input="edited('zip')"
@@ -166,7 +184,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="birthDate"
-        v-model="form.birthDate"
+        v-model="birthDate"
         placeholder="YYYY-MM-DD"
         class="w-full"
         :class="{ 'p-invalid': errors.birthDate }"
@@ -186,7 +204,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <Select
         id="villageId"
-        v-model="form.villageId"
+        v-model="villageId"
         :options="villages"
         optionLabel="name"
         optionValue="villageId"
@@ -255,14 +273,14 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       <label class="label" for="emergencyContactName">Name
         <i v-if="uncertain.emergencyContactName" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactName')" />
       </label>
-      <InputText id="emergencyContactName" v-model="form.emergencyContactName" class="w-full" @input="edited('emergencyContactName')" />
+      <InputText id="emergencyContactName" v-model="emergencyContactName" class="w-full" @input="edited('emergencyContactName')" />
     </div>
 
     <div class="form-field">
       <label class="label" for="emergencyContactRelationship">Relationship
         <i v-if="uncertain.emergencyContactRelationship" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactRelationship')" />
       </label>
-      <InputText id="emergencyContactRelationship" v-model="form.emergencyContactRelationship" class="w-full" @input="edited('emergencyContactRelationship')" />
+      <InputText id="emergencyContactRelationship" v-model="emergencyContactRelationship" class="w-full" @input="edited('emergencyContactRelationship')" />
     </div>
 
     <div class="form-field">
@@ -271,7 +289,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="emergencyContactPhone"
-        v-model="form.emergencyContactPhone"
+        v-model="emergencyContactPhone"
         class="w-full"
         :class="{ 'p-invalid': errors.emergencyContactPhone }"
         @input="edited('emergencyContactPhone')"
@@ -285,7 +303,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
       </label>
       <InputText
         id="emergencyContactEmail"
-        v-model="form.emergencyContactEmail"
+        v-model="emergencyContactEmail"
         class="w-full"
         :class="{ 'p-invalid': errors.emergencyContactEmail }"
         @input="edited('emergencyContactEmail')"
