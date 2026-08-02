@@ -19,12 +19,14 @@ import { getPersons } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
+import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
 defineOptions({ name: 'PersonList' })
 
 const router = useRouter()
 const { hasPermission } = useCurrentUser()
 const canWritePerson = computed(() => hasPermission('person:write'))
+const { trackEvent } = useAnalytics()
 
 let toast = null
 onMounted(() => {
@@ -198,7 +200,10 @@ watch([firstName, lastName, phone, email, selectedVillage], () => {
 })
 
 function onSearch() {
-  if (hasFilter.value) fetchPersons()
+  if (hasFilter.value) {
+    trackEvent('filter_applied')
+    fetchPersons()
+  }
 }
 </script>
 
