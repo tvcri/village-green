@@ -3582,13 +3582,17 @@ components:
           type: string
           maxLength: 200
         village:
+          # Always an object (built inline via JSON_OBJECT), but a villageless
+          # (global) person yields null members — a LEFT JOIN with no village.
+          # Same shape as Person.village; keep the two in sync.
           type: object
           nullable: true
           properties:
             villageId:
-              $ref: '#/components/schemas/VillageId'
+              $ref: '#/components/schemas/VillageIdNullable'
             name:
               type: string
+              nullable: true
         activeAs:
           $ref: '#/components/schemas/ActiveAs'
         phone:
