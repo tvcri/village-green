@@ -219,7 +219,6 @@ function updateVettingDate (index, field, date) {
   flex-direction: column;
   gap: 0.4rem;
 }
-.form-field.span-2 { grid-column: span 2; }
 .form-field.span-4 { grid-column: 1 / -1; }
 .label {
   font-weight: 600;
@@ -247,10 +246,10 @@ function updateVettingDate (index, field, date) {
 
 @media (max-width: 900px) {
   .section { grid-template-columns: 1fr 1fr; }
-  .form-field.span-2, .form-field.span-4 { grid-column: span 2; }
+  .form-field.span-4 { grid-column: span 2; }
 }
 @media (max-width: 600px) {
   .section { grid-template-columns: 1fr; }
-  .form-field.span-2, .form-field.span-4 { grid-column: span 1; }
+  .form-field.span-4 { grid-column: span 1; }
 }
 </style>
