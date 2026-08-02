@@ -9,7 +9,7 @@ import { getUser } from '../shared/api/userApi.js'
 import MyAccessSummary from './MyAccessSummary.vue'
 
 defineProps({
-  version: String
+  version: { type: String, default: '' }
 })
 
 const router = useRouter()
@@ -22,7 +22,6 @@ const { state: user, isLoading } = useAsyncState(
   { immediate: true, onError: null }
 )
 
-const displayName = computed(() => user.value?.displayName || user.value?.username || 'User')
 const email = computed(() => user.value?.email)
 
 const isInAdmin = computed(() => {

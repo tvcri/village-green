@@ -49,7 +49,7 @@ async function publish() {
     savedContent.value = draftContent.value
     toast.add({ severity: 'success', summary: 'Published', detail: 'New privacy rules version published. All users will be re-prompted.', life: 5000 })
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to publish rules', life: 4000 })
   }
   finally {
@@ -65,7 +65,7 @@ async function saveCorrections() {
     savedContent.value = draftContent.value
     toast.add({ severity: 'success', summary: 'Saved', detail: 'Rules corrected. Existing acknowledgements remain valid.', life: 5000 })
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to save corrections', life: 4000 })
   }
   finally {
@@ -134,6 +134,7 @@ async function saveCorrections() {
           <span>Data Privacy Agreement</span>
         </div>
       </template>
+      <!-- eslint-disable-next-line vue/no-v-html -- draftHtml is admin-authored privacy-rules preview -->
       <div class="privacy-content" v-html="draftHtml" />
       <template #footer>
         <Button label="I Agree" disabled />

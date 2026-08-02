@@ -98,7 +98,7 @@ async function handleSubmit () {
     toast.add({ severity: 'success', summary: 'Saved', detail: isEdit.value ? 'Person updated' : 'Person created', life: 2000 })
     router.push({ name: 'meta-person-detail', params: { personId: id } })
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to save person', life: 3000 })
   }
 }

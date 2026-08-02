@@ -51,10 +51,6 @@ describe('useAsyncState', () => {
 
     // 1. Start first request
     execute()
-    const firstCallArgs = factory.mock.calls[0]
-    const firstSignal = firstCallArgs[0].signal // We pass config as last arg, but here args are ...args, so it depends on how we call execute.
-    // Wait, useAsyncState passes (...args, { signal })
-    // So if we call execute(), args is empty. factory called with ({ signal })
 
     const firstConfig = factory.mock.calls[0][0] // factory( { signal } )
 

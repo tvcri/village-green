@@ -7,7 +7,6 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import SplitButton from 'primevue/splitbutton'
 import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
@@ -363,12 +362,6 @@ const serviceNameOptions = [
   'Errand: Shopping',
   'Errand: Pick up/delivery',
   'Errand: Other'
-]
-
-const transportationTypeOptions = [
-  'Round Trip',
-  'One Way',
-  'None'
 ]
 
 const stateOptions = [

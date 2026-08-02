@@ -1,12 +1,12 @@
-name: API tests
+name: Integration tests
 
 # Black-box API integration tests (test/api). Runs the real server against a
 # disposable MySQL 8 + the mock OIDC provider — see test/api/README.md.
 #
-# Both jobs are green and safe to make REQUIRED checks:
+# Both jobs are required-check material:
 #
-#   - `api-tests`: the findings it was originally written to characterize have
-#     all landed upstream (see test/api/SECURITY-FINDINGS.md). If a new
+#   - `API integration`: the findings it was originally written to characterize
+#     have all landed upstream (see test/api/SECURITY-FINDINGS.md). If a new
 #     deliberate RED is ever characterized, it goes red by design and a note
 #     to that effect should come back.
 #
@@ -26,14 +26,15 @@ on:
 
 # Don't pile up runs for the same PR/branch — cancel the previous one.
 concurrency:
-  group: api-tests-${{ github.ref }}
+  group: integration-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  api-tests:
+  api-integration:
+    name: API integration
     runs-on: ubuntu-latest # GitHub-hosted runners ship Docker + Compose v2
     timeout-minutes: 20
     steps:
@@ -81,7 +82,7 @@ jobs:
 
   response-validation:
     name: Response validation
-    needs: api-tests
+    needs: api-integration
     if: always() # audit the responses served even when the suite itself fails
     runs-on: ubuntu-latest
     steps:

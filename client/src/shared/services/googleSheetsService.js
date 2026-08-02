@@ -9,7 +9,6 @@ function setupAuthListener() {
   const port = VG.googleWorker.port;
 
   if (!port.__googleServiceAuthListenerAttached) {
-    const originalOnMessage = port.onmessage;
 
     port.onmessage = (event) => {
       // Handle auth-complete broadcast (sent to all ports)

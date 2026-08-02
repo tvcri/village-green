@@ -27,8 +27,7 @@ async function initializeConfig() {
     const envResponse = await fetch('./Env.js');
     const envScript = await envResponse.text();
     // Create a scope to eval Env.js
-    const scope = {};
-    eval(envScript); // This sets window.VG (we access scope.VG after eval)
+    eval(envScript); // sets VG on the worker global; read back via self.VG
 
     // Since eval in worker context sets globals, we access VG directly
     if (self.VG && self.VG.Env && self.VG.Env.google) {

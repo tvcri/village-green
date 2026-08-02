@@ -32,6 +32,22 @@ export function timeStringToLabel (t) {
   return `${h12}:${String(m).padStart(2, '0')} ${period}`
 }
 
+// Sort key that groups by serviceDate and orders within a date by startTime.
+// Both parts are fixed-width strings, so plain string comparison is enough --
+// no Date construction, per the wall-clock rule above. Only the five 'Ride: *'
+// services carry times; everything else has a null startTime and sorts after
+// the timed rows in its date group via a '99:99:99' sentinel. The sentinel is
+// digits on purpose: a punctuation marker like '~' sorts AFTER digits by ASCII
+// codepoint but BEFORE them under localeCompare collation, which would order
+// the DataTable and the mobile cards differently. Note untimed rows move to
+// the front of their group under a descending sort, which reverses the key
+// whole.
+export function serviceDateTimeSortKey (row) {
+  const date = row?.serviceDate ?? ''
+  const time = row?.startTime ?? '99:99:99'
+  return `${date} ${time}`
+}
+
 export function formatServiceDate (s, { weekday = false } = {}) {
   const d = serviceDateToDate(s)
   if (!d) return ''
