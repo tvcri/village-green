@@ -390,7 +390,7 @@ const clearFilters = () => {
 .title-group { display: flex; flex-direction: column; gap: 0.25rem; }
 h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .header-actions { display: flex; align-items: center; gap: 1rem; }
-.filter-section { margin-bottom: 1.5rem; padding: 1rem 0; background-color: var(--color-background-primary); border-bottom: 1px solid var(--color-border-default); width: 100%; display: flex; flex-direction: column; gap: 1rem; }
+.filter-section { margin-bottom: 1.5rem; padding: 1rem 0; border-bottom: 1px solid var(--color-border-default); width: 100%; display: flex; flex-direction: column; gap: 1rem; }
 .filters-container { display: flex; flex-direction: column; gap: 0.75rem; }
 .filters-header { display: flex; align-items: center; gap: 0.75rem; }
 /* Bolder label matches the "Use member's home" treatment: outlined + 700 label
@@ -417,9 +417,9 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
   .service-request-list { padding: 1rem; }
 }
 .date-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.date-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
+.date-range label { color: var(--color-text-dim); font-size: 0.9rem; }
 .date-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
-.date-range small { color: var(--color-text-secondary, #777); }
+.date-range small { color: var(--color-text-dim); }
 .bell-wrapper { position: relative; display: inline-flex; }
 .bell-alert-icon { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #ff9800; color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>

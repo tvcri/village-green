@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
-import { persons, members } from '../../setup/fixtures.js'
+import { persons, members, villages } from '../../setup/fixtures.js'
 
 // Post-#56 the projection enum is `member` / `volunteer` (memberInfo /
 // volunteerInfo are gone) and the response property matches the projection
@@ -51,4 +51,35 @@ test('old projection names (memberInfo/volunteerInfo) are gone from the enum -> 
     { personId: persons.quahogMember.id, projection: ['memberInfo'] },
     { token: tokens.users.full_v1 })
   assert.equal(status, 400)
+})
+
+// ---- list endpoint projection=detail (export enrichment) ----
+
+test('getPersons projection=detail adds a same-named object, granted villages only', async () => {
+  const { status, json } = await vgCall('getPersons',
+    { villageId: [String(villages.quahog.id)], lastName: 'Griffin', projection: ['detail'] },
+    { token: tokens.users.full_v1 })
+  assert.equal(status, 200)
+  const peter = json.find(p => p.fullName === persons.quahogMember.fullName)
+  assert.ok(peter, 'search predicates still apply with the detail projection')
+  // Summary root is unchanged; the projection ADDS `detail` (convention:
+  // projections add a property of their own name, never reshape the row).
+  assert.ok(!('street' in peter), 'summary root unchanged')
+  assert.ok(peter.detail, 'detail object projected')
+  assert.equal(peter.detail.street, persons.quahogMember.street)
+  // Unseeded columns are still selected: key present, value null.
+  assert.ok('birthDate' in peter.detail && 'emergencyContactName' in peter.detail, 'full column set present')
+  assert.ok(Array.isArray(peter.detail.communities) && Array.isArray(peter.detail.disabilities), 'aggregate arrays present')
+  // Deliberately NOT part of this projection (multi-village gating — see plan/grades log).
+  assert.ok(!('member' in peter) && !('volunteer' in peter), 'no member/volunteer on the list endpoint')
+  assert.ok(json.every(p => p.village?.villageId === String(villages.quahog.id)), 'rows stay village-clamped')
+})
+
+test('getPersons without projection keeps the summary shape', async () => {
+  const { status, json } = await vgCall('getPersons',
+    { villageId: [String(villages.quahog.id)], lastName: 'Griffin' },
+    { token: tokens.users.full_v1 })
+  assert.equal(status, 200)
+  const peter = json.find(p => p.fullName === persons.quahogMember.fullName)
+  assert.ok(peter && !('detail' in peter) && !('street' in peter), 'no detail object without the projection')
 })

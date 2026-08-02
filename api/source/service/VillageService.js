@@ -226,7 +226,7 @@ module.exports.getVillageVolunteers = async function (villageId) {
   return rows
 }
 
-module.exports.getVolunteers = async function ({ villageIdsGranted, allVillages }) {
+module.exports.getVolunteers = async function ({ villageIdsGranted }) {
   const columns = [
     'p.fullName',
     'CAST(vol.id AS CHAR) AS volunteerId',
@@ -242,7 +242,11 @@ module.exports.getVolunteers = async function ({ villageIdsGranted, allVillages 
     'LEFT JOIN capability c ON c.id = vc.capabilityId'
   ])
   const predicates = { statements: [], binds: [] }
-  if (!allVillages) {
+  if (villageIdsGranted) {
+    // Non-federation caller: restrict to the villages they were granted
+    // volunteer:read in. A null villageIdsGranted means a federation-wide
+    // read, which is unrestricted here (same sentinel as
+    // PersonService.queryPersons).
     if (!villageIdsGranted.length) return []
     predicates.statements.push('p.villageId IN (?)')
     predicates.binds.push(villageIdsGranted)

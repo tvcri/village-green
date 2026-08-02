@@ -8,14 +8,15 @@ const { hasPermission } = require('../utils/authz')
 
 module.exports.getVolunteers = async function getVolunteers (req, res, next) {
   try {
-    const allVillages = hasPermission(req.userObject, 'volunteer:read')
-    const villageIdsGranted = Object.keys(req.userObject.grants).filter(
-      vid => hasPermission(req.userObject, 'volunteer:read', { villageId: vid })
-    )
-    if (!allVillages && !villageIdsGranted.length) {
+    const villageIdsGranted = hasPermission(req.userObject, 'volunteer:read')
+      ? null // federation read: unrestricted
+      : Object.keys(req.userObject.grants).filter(
+          vid => hasPermission(req.userObject, 'volunteer:read', { villageId: vid })
+        )
+    if (villageIdsGranted && !villageIdsGranted.length) {
       throw new SmError.PrivilegeError()
     }
-    const response = await VillageService.getVolunteers({ villageIdsGranted, allVillages })
+    const response = await VillageService.getVolunteers({ villageIdsGranted })
     res.json(response)
   }
   catch (err) { next(err) }

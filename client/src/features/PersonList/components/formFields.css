@@ -1,0 +1,74 @@
+/* Shared rules for MemberFormFields.vue, PersonFormFields.vue, and
+   VolunteerFormFields.vue. Loaded via `<style scoped src="./formFields.css">`
+   in each component, so Vue applies the same per-component data-v-xxxx
+   scope attribute as if the rules were written inline — the scoping and
+   specificity behavior are unchanged, only the source is shared.
+
+   Genuinely per-component rules (grid column counts, notes/status/
+   communities/disabilities/vetting layout, etc.) stay in each component's
+   own local <style scoped> block, which is declared AFTER this one so its
+   selectors win on any property collision (e.g. .section's
+   grid-template-columns is overridden locally per component). */
+
+.section {
+  display: grid;
+  gap: 1rem 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+.section:first-of-type {
+  margin-top: 1rem;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.section-header {
+  grid-column: 1 / -1;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--p-primary-600);
+  border-bottom: 2px solid var(--color-border-default);
+  padding-bottom: 0.75rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--color-text-dim);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-label {
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.uncertain-icon {
+  color: var(--p-amber-500, #f59e0b);
+  margin-left: 0.35rem;
+  cursor: help;
+}

@@ -336,10 +336,10 @@ h1 { margin: 0; color: var(--color-text-primary); }
   .service-request-list { padding: 1rem; }
 }
 .date-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.date-range label { color: var(--color-text-secondary, inherit); font-size: 0.9rem; }
+.date-range label { color: var(--color-text-dim); font-size: 0.9rem; }
 .date-range input[type="date"] { padding: 0.4rem 0.5rem; border: 1px solid var(--p-inputtext-border-color, #ccc); border-radius: 4px; background: var(--p-inputtext-background, transparent); color: inherit; }
-.date-range small { color: var(--color-text-secondary, #777); }
-.showing-count { color: var(--color-text-secondary, #777); font-size: 0.875rem; margin-left: auto; }
+.date-range small { color: var(--color-text-dim); }
+.showing-count { color: var(--color-text-dim); font-size: 0.875rem; margin-left: auto; }
 .bell-wrapper { position: relative; display: inline-flex; }
 .bell-alert-icon { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #ff9800; color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; line-height: 1; }
 </style>

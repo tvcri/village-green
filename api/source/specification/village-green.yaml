@@ -1425,6 +1425,19 @@ paths:
           description: Filter by email (contains, case-insensitive)
           schema:
             type: string
+        - name: projection
+          in: query
+          description: >-
+            `detail` adds a same-named object carrying the full person
+            columns (no member/volunteer). Intended for exports.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+              - detail
       responses:
         '200':
           description: List of persons
@@ -3582,13 +3595,17 @@ components:
           type: string
           maxLength: 200
         village:
+          # Always an object (built inline via JSON_OBJECT), but a villageless
+          # (global) person yields null members — a LEFT JOIN with no village.
+          # Same shape as Person.village; keep the two in sync.
           type: object
           nullable: true
           properties:
             villageId:
-              $ref: '#/components/schemas/VillageId'
+              $ref: '#/components/schemas/VillageIdNullable'
             name:
               type: string
+              nullable: true
         activeAs:
           $ref: '#/components/schemas/ActiveAs'
         phone:
@@ -3604,6 +3621,84 @@ components:
         email:
           type: string
           nullable: true
+        detail:
+          # Present only with ?projection=detail; built inline via JSON_OBJECT
+          # so it is never null when projected. email/phone/cell are omitted —
+          # the summary root already carries them.
+          $ref: '#/components/schemas/PersonDetail'
+    PersonDetail:
+      additionalProperties: false
+      type: object
+      required:
+      - communities
+      - disabilities
+      properties:
+        lastName:
+          type: string
+          maxLength: 100
+          nullable: true
+        firstName:
+          type: string
+          maxLength: 100
+          nullable: true
+        middleInitial:
+          type: string
+          maxLength: 10
+          nullable: true
+        nickname:
+          type: string
+          maxLength: 100
+          nullable: true
+        street:
+          type: string
+          maxLength: 200
+          nullable: true
+        unit:
+          type: string
+          maxLength: 100
+          nullable: true
+        address:
+          type: string
+          maxLength: 300
+          nullable: true
+        city:
+          type: string
+          maxLength: 100
+          nullable: true
+        state:
+          type: string
+          maxLength: 50
+          nullable: true
+        zip:
+          type: string
+          maxLength: 20
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        emergencyContactName:
+          type: string
+          maxLength: 200
+          nullable: true
+        emergencyContactRelationship:
+          type: string
+          maxLength: 100
+          nullable: true
+        emergencyContactPhone:
+          type: string
+          maxLength: 50
+          nullable: true
+        emergencyContactEmail:
+          type: string
+          maxLength: 200
+          nullable: true
+        communities:
+          type: array
+          items: { $ref: '#/components/schemas/Community' }
+        disabilities:
+          type: array
+          items: { $ref: '#/components/schemas/PersonDisability' }
     PersonId:
       $ref: '#/components/schemas/StringIntId'
     PersonPatch:
