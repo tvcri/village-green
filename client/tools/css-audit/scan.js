@@ -12,6 +12,7 @@
 //
 // CLI: node scan.js <file.vue|dir> — prints candidates per file.
 
+import process from 'node:process'
 import { readFileSync, statSync, readdirSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import postcss from 'postcss'
