@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PREVIEW_ENTRIES, PREVIEW_VALUE_CHARS, childNodes, isContainer, pathsToDepth, previewOf, sizeOf, summaryOf, typeOf } from '../lib/jsonTreeModel.js'
+import { PREVIEW_ENTRIES, PREVIEW_VALUE_CHARS, childNodes, isContainer, pathsToDepth, previewOf, summaryOf, typeOf } from '../lib/jsonTreeModel.js'
 
 describe('typeOf', () => {
   it('distinguishes null, array and object', () => {
