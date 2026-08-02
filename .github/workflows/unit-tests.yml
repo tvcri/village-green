@@ -1,6 +1,6 @@
 name: Unit tests
 
-# Fast, DB-free gates that complement api-tests.yml (the black-box harness):
+# Fast, DB-free gates that complement integration-tests.yml (the black-box API harness):
 #
 #   - `client-unit`: the client vitest suite (jsdom component/composable
 #     tests) plus ESLint (correctness-only flat config — see
