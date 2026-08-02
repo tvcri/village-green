@@ -233,7 +233,7 @@ h1 {
      parent has a definite height. A fixed min-height would reintroduce the
      non-responsive floor we just removed. */
   min-height: 0;
-  border: 1px solid var(--color-border, #d1d5db);
+  border: 1px solid var(--color-border-default);
   border-radius: 4px;
 }
 
@@ -241,12 +241,12 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--color-text-dim);
 }
 
 .note {
   font-size: 0.875rem;
-  color: var(--color-text-secondary, #6b7280);
+  color: var(--color-text-dim);
 }
 
 .warning ul {
