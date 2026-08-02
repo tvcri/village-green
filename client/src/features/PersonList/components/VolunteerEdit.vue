@@ -137,10 +137,6 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
   font-size: 2rem;
 }
 
-:deep(.p-card-content) {
-  display: block;
-}
-
 .notice {
   padding: 1rem;
   border: 1px solid var(--color-border-default);

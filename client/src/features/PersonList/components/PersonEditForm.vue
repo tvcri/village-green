@@ -170,10 +170,6 @@ function cancel () {
   font-size: 2rem;
 }
 
-:deep(.p-card-content) {
-  display: block;
-}
-
 .form-footer {
   display: flex;
   justify-content: flex-end;
