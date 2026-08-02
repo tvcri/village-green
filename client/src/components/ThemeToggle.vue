@@ -1,31 +1,35 @@
 <script setup>
-import SelectButton from 'primevue/selectbutton'
+import { computed } from 'vue'
+import Button from 'primevue/button'
 import { useTheme } from '../shared/composables/useTheme.js'
 
 const { mode } = useTheme()
 
-const options = [
+// Single icon that cycles Light → Dark → Browser. The icon shows the
+// CURRENT mode; the tooltip names it and the next stop in the cycle.
+const MODES = [
   { value: 'light', icon: 'pi pi-sun', label: 'Light' },
   { value: 'dark', icon: 'pi pi-moon', label: 'Dark' },
   { value: 'system', icon: 'pi pi-desktop', label: 'Browser' },
 ]
+
+const current = computed(() => MODES.find(m => m.value === mode.value) ?? MODES[2])
+const next = computed(() => MODES[(MODES.indexOf(current.value) + 1) % MODES.length])
+
+function cycle () {
+  mode.value = next.value.value
+}
 </script>
 
 <template>
-  <SelectButton
-    v-model="mode"
-    :options="options"
-    option-label="value"
-    option-value="value"
-    data-key="value"
-    :allow-empty="false"
-    size="small"
-    aria-label="Theme"
-  >
-    <template #option="slotProps">
-      <i :class="slotProps.option.icon" :title="slotProps.option.label" />
-    </template>
-  </SelectButton>
+  <Button
+    :icon="current.icon"
+    text
+    rounded
+    :aria-label="`Theme: ${current.label}. Activate to switch to ${next.label}`"
+    v-tooltip.bottom="`Theme: ${current.label} — click for ${next.label}`"
+    @click="cycle"
+  />
 </template>
 
 <style scoped>
