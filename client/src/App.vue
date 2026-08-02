@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 import ReauthPrompt from './auth/ReauthPrompt.vue'
@@ -15,6 +16,10 @@ const { needsAck } = usePrivacyAck()
 const oidcWorker = useOidcWorker()
 const version = computed(() => VG?.Env?.version || '')
 const isDev = VG?.Env?.nodeEnv === 'development'
+const route = useRoute()
+
+// Pages that opt out of the 1200px content column (see design spec)
+const isFullWidth = computed(() => route.meta.fullWidth === true)
 
 onMounted(() => {
   document.getElementById('loading-mask')?.remove()
@@ -23,7 +28,7 @@ onMounted(() => {
 
 <template>
   <div v-if="isDev" class="dev-instance" aria-hidden="true">FOR DEMONSTRATION ONLY -- DOES NOT MANAGE PRODUCTION DATA</div>
-  <div class="app-container">
+  <div class="app-container" :class="{ 'full-width': isFullWidth }">
     <Toast position="top-center" />
     <ConfirmDialog />
     <GlobalErrorModal />
@@ -69,6 +74,12 @@ onMounted(() => {
   width: 100%;
   border-left: 1px solid var(--color-border-light);
   border-right: 1px solid var(--color-border-light);
+}
+
+.app-container.full-width {
+  max-width: none;
+  border-left: none;
+  border-right: none;
 }
 
 .dev-instance {

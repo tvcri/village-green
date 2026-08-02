@@ -190,6 +190,9 @@ const breadcrumbs = computed(() => {
     case 'friends':
       crumbs.push({ label: 'Friends', siblings: getSiblings('friends', { villageId: vId }) })
       break
+    case 'api-browser':
+      crumbs.push({ label: 'API Browser' })
+      break
     case 'meta-person-detail':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: [

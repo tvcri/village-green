@@ -239,3 +239,33 @@ export const api = {
     return apiFetch(path, { ...opts, method: 'DELETE' })
   },
 }
+
+/**
+ * Resolve the URL an operationId + params would produce, without sending it.
+ *
+ * Mirrors apiCall's base-URL resolution so a displayed URL is always identical
+ * to what apiCall would actually request. Throws the same errors getUrl throws
+ * (`unknown operationId`, `path requires parameter {x}`) — callers that display
+ * live URLs should catch and show the message as a hint.
+ *
+ * @param {string} operationId
+ * @param {object} params
+ * @returns {string}
+ */
+export function getUrlForOperation(operationId, params = {}) {
+  if (!apiSpecObj) {
+    throw new Error('API spec not configured. Call configureApiSpec first.')
+  }
+  apiSpecObj.apiBase = getBaseUrl()
+  return apiSpecObj.getUrl(operationId, params)
+}
+
+/**
+ * The configured OpenApiOps instance, for spec introspection (operationMap).
+ * Returns null before configureApiSpec has run.
+ *
+ * @returns {object|null}
+ */
+export function getApiSpec() {
+  return apiSpecObj
+}

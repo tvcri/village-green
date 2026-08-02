@@ -15,7 +15,7 @@ defineProps({
 const router = useRouter()
 const route = useRoute()
 const menuRef = ref()
-const { hasPermission } = useCurrentUser()
+const { hasPermission, isGrantless } = useCurrentUser()
 
 const { state: user, isLoading } = useAsyncState(
   () => getUser(),
@@ -48,6 +48,14 @@ const menuItems = computed(() => {
       label: 'Volunteer Self Signup',
       icon: 'pi pi-heart',
       command: () => router.push({ name: 'volunteer' }),
+    })
+  }
+
+  if (!isGrantless.value) {
+    items.push({
+      label: 'API Browser',
+      icon: 'pi pi-code',
+      command: () => router.push({ name: 'api-browser' }),
     })
   }
 

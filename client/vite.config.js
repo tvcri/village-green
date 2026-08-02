@@ -49,6 +49,8 @@ export default defineConfig(({ mode, command }) => {
         'primevue/tab',
         'primevue/tabpanels',
         'primevue/tabpanel',
+        'primevue/splitter',
+        'primevue/splitterpanel',
       ],
     },
   }
