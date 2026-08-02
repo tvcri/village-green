@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -13,14 +13,23 @@ import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import { useToast } from 'primevue/usetoast'
+import ExportButton from '../../../components/ExportButton.vue'
 import { getPersons } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { createSheet } from '../../../shared/services/googleSheetsService.js'
 
 defineOptions({ name: 'PersonList' })
 
 const router = useRouter()
 const { hasPermission } = useCurrentUser()
 const canWritePerson = computed(() => hasPermission('person:write'))
+
+let toast = null
+onMounted(() => {
+  toast = useToast()
+})
 
 useScrollRestore('meta-persons', 'meta-person-detail')
 
@@ -94,6 +103,86 @@ function getRoleSeverity(role) {
   if (role === 'member') return 'info'
   if (role === 'volunteer') return 'success'
   return 'secondary'
+}
+
+const isCreatingSheet = ref(false)
+
+const columnsForCsv = [
+  { header: 'Full Name', key: 'fullName' },
+  { header: 'Village', key: 'villageName' },
+  { header: 'Roles', key: 'roles' },
+  { header: 'Phone', key: 'phoneNumber' },
+  { header: 'Cell', key: 'cellNumber' },
+  { header: 'Email', key: 'email' }
+]
+
+const personsForCsv = computed(() => {
+  if (!filteredPersons.value) return []
+  return filteredPersons.value.map(p => ({
+    fullName: p.fullName,
+    villageName: p.village?.name ?? '',
+    roles: parseJson(p.activeAs).join('; '),
+    phoneNumber: parsePhoneObj(p.phone).phone ?? '',
+    cellNumber: parsePhoneObj(p.phone).cell ?? '',
+    email: p.email ?? ''
+  }))
+})
+
+const handleDownloadCsv = () => {
+  const csv = toCsv(personsForCsv.value, columnsForCsv)
+  downloadCsv(csv, 'persons.csv')
+}
+
+async function handleCreateSheet() {
+  try {
+    isCreatingSheet.value = true
+
+    const result = await createSheet(personsForCsv.value, columnsForCsv, 'Village Green Persons')
+    const sheetUrl = result.url || result
+
+    if (result.popupBlocked) {
+      if (toast) {
+        toast.add({
+          severity: 'success',
+          summary: 'Sheet Created',
+          detail: `Your Google Sheet has been created. <a href="${sheetUrl}" target="_blank" style="color: inherit; text-decoration: underline;">Open it here</a>.`,
+          life: 0,
+          contentStyleClass: 'bg-green-50 border-green-200',
+        })
+      }
+    } else {
+      if (toast) {
+        toast.add({
+          severity: 'success',
+          summary: 'Sheet Created',
+          detail: 'Your Google Sheet has been created and opened in a new tab.',
+          life: 3000,
+        })
+      }
+    }
+  } catch (err) {
+    let message = 'Failed to create Google Sheet'
+    if (err.message.includes('Popup was blocked')) {
+      message = 'Please allow popups for this site to use Google Sheets export'
+    } else if (err.message.includes('timeout')) {
+      message = 'Sheet creation timed out. Please try again.'
+    } else {
+      message = `Error: ${err.message}`
+    }
+
+    if (toast) {
+      toast.add({
+        severity: 'error',
+        summary: 'Sheet Creation Failed',
+        detail: message,
+        life: 5000,
+      })
+    } else {
+      console.error(message)
+    }
+  } finally {
+    isCreatingSheet.value = false
+  }
 }
 
 function navigateToPerson(personId, fullName) {
@@ -206,6 +295,11 @@ function onSearch() {
           <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
           <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
           <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <ExportButton
+            :disabled="isLoading || isCreatingSheet"
+            @download="handleDownloadCsv"
+            @export="handleCreateSheet"
+          />
         </div>
       </template>
 
