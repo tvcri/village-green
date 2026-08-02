@@ -32,6 +32,7 @@ const selectedVillage = ref('All villages')
 
 const showMembers = ref(false)
 const showVolunteers = ref(false)
+const pageRows = ref(10)
 
 // Village options for the filter; 'All villages' is the sentinel meaning no
 // village restriction (server returns persons across all granted villages).
@@ -193,10 +194,21 @@ function onSearch() {
       :loading="isLoading"
       striped-rows
       hover
+      paginator
+      :rows="pageRows"
       class="person-table"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
       @row-click="(event) => navigateToPerson(event.data.personId, event.data.fullName)"
     >
+      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
+        <div class="paginator-container">
+          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
+          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
+          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
+          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+        </div>
+      </template>
+
       <Column field="fullName" header="Name" sortable style="width: 20%" />
       <Column field="village.name" header="Village" sortable style="width: 15%" />
       <Column header="Roles" style="width: 15%">
