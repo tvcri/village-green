@@ -6,48 +6,15 @@
   background-color: #ffffff;
 
   --breadcrumb-height: 35px;
-  --role-restricted: #64748bcb;
-  --role-full: #e2ca43d5;
-  --role-manage: #4b7bc9da;
-  --role-owner: #087c21da;
-    
+
   /* Brand Colors */
   --color-primary: #6366f1; /* Indigo-500 */
-  --color-primary-hover: #4f46e5; /* Indigo-600 */
-  --color-primary-highlight: #60a5fa; /* Blue-400 */
-  --color-primary-highlight-light: #93c5fd;
-  --color-action-blue: #3b82f6; /* Blue-500 */
-  --color-action-blue-dark: #2563eb; /* Blue-700 */
   --color-action-red: #ef4444;
-  --color-action-green: #4ade80;
   --color-success: #22c55e; /* Green-500 */
-  --color-warning-yellow: #eab308; /* Yellow-500 */
-  --color-shield-green: #44ab5e; /* Green-500 */
-  --color-shield-green-dark: #4f7769; /* Green-700 */
-  --color-oss-blue: #273f6f; /* Green-700 */
-  
-  /* HOVER */
-  --color-button-hover-bg: rgba(0, 0, 0, 0.05);
-  --color-bg-hover: rgba(0, 0, 0, 0.03);
-  --color-bg-hover-strong: #e4e4e7;
-  --color-bg-hover-light: #d4d4d8;
 
-  /* Metrics Status Chart Colors */
-  --metrics-status-chart-assessed: hsl(204, 91%, 29%);
-  --metrics-status-chart-submitted: hsl(41, 66%, 46%);
-  --metrics-status-chart-accepted: hsl(146, 93%, 27%);
-  --metrics-status-chart-unassessed: hsl(0 0% 18% / 1);
-  --metrics-status-chart-unsaved: hsl(0deg 0% 18%);
-  --metrics-status-chart-rejected: hsl(5, 89%, 32%);
-  
-  /* CAT Rating Colors */
-  --color-cat1: #c68c8c;
-  --color-cat2: #d4b056;
-  --color-cat3: #a3acd6;
-  
-  /* Collection Stats Colors */
-  --color-inventory: #c4a484;
-  --color-review-age: #d4d4d8;
+  /* HOVER */
+  --color-bg-hover: rgba(0, 0, 0, 0.03);
+  --color-bg-hover-light: #d4d4d8;
 
   /* Breadcrumb sizing */
 
@@ -55,7 +22,6 @@
   --color-text-primary: rgba(0, 0, 0, 0.87);
   --color-text-dim: #71717a;
   --color-text-bright: rgba(0, 0, 0, 0.95);
-  --color-text-dark: #18181b;
 
   /* Surface Colors */
   --color-background-darkest: #ffffff;
@@ -66,70 +32,12 @@
   /* Border Colors */
   --color-border-default: #e4e4e7;
   --color-border-light: #f4f4f5;
-  --color-border-hover: #d4d4d8;
 
   /* Shadow Colors */
   --box-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.15);
 
   /* Error Colors */
   --color-text-error: #f16969;
-
-  /* Status Indicator Colors (success/warning/error) — banners, badges, etc. */
-  --color-status-success-bg: color-mix(in srgb, #166534 18%, var(--color-background-dark));
-  --color-status-success-border: #4ade80;
-  --color-status-success-text: #86efac;
-  --color-status-warning-bg: color-mix(in srgb, #92400e 18%, var(--color-background-dark));
-  --color-status-warning-border: #fbbf24;
-  --color-status-warning-text: #fcd34d;
-  --color-status-error-bg: color-mix(in srgb, #7f1d1d 18%, var(--color-background-dark));
-  --color-status-error-border: #f87171;
-  --color-status-error-text: #fca5a5;
-
-  /* Result Status Colors */
-  --result-pass: hsl(120 84% 42% / 1);
-  --result-fail: hsl(19 100% 40% / 1);
-  --result-na: #767676;
-  --result-nr: #c0bab2;
-
-  /* Access Mode Badge Colors */
-  --color-access-rw-bg: hsl(120deg 40% 25%);
-  --color-access-rw-text: hsl(120deg 60% 75%);
-  --color-access-r-bg: hsl(0deg 40% 25%);
-  --color-access-r-text: hsl(0deg 60% 75%);
-
-  /* Engine/Override Attribution Badge Colors */
-  --color-engine-text: hsl(210, 80%, 80%);
-  --color-engine-bg: hsl(210, 50%, 25%);
-  --color-engine-border: hsl(210, 40%, 35%);
-  --color-override-text: hsl(30, 90%, 75%);
-  --color-override-bg: hsl(30, 50%, 22%);
-  --color-override-border: hsl(30, 40%, 35%);
-
-  /* Rule-diff changed-property chips (one muted hue per property kind) */
-  --color-chip-ruleid-bg: rgba(168, 85, 247, 0.16);
-  --color-chip-ruleid-border: rgba(168, 85, 247, 0.4);
-  --color-chip-ruleid-text: hsl(270, 75%, 85%);
-  --color-chip-check-bg: rgba(239, 68, 68, 0.14);
-  --color-chip-check-border: rgba(239, 68, 68, 0.4);
-  --color-chip-check-text: hsl(5, 80%, 80%);
-  --color-chip-fix-bg: rgba(59, 130, 246, 0.18);
-  --color-chip-fix-border: rgba(59, 130, 246, 0.45);
-  --color-chip-fix-text: hsl(215, 80%, 82%);
-  --color-chip-vulndiscussion-bg: rgba(249, 115, 22, 0.16);
-  --color-chip-vulndiscussion-border: rgba(249, 115, 22, 0.5);
-  --color-chip-vulndiscussion-text: hsl(25, 85%, 78%);
-  --color-chip-severity-bg: rgba(234, 179, 8, 0.18);
-  --color-chip-severity-border: rgba(234, 179, 8, 0.5);
-  --color-chip-severity-text: hsl(41, 80%, 80%);
-  --color-chip-default-bg: var(--color-background-darkest);
-  --color-chip-default-border: var(--color-border-default);
-  --color-chip-default-text: var(--color-text-primary);
-
-  /* Inline rule-ID character-level diff highlight (red for old, green for new) */
-  --color-diff-inline-del-bg: rgba(239, 68, 68, 0.3);
-  --color-diff-inline-del-text: hsl(5, 80%, 85%);
-  --color-diff-inline-add-bg: rgba(34, 197, 94, 0.3);
-  --color-diff-inline-add-text: hsl(146, 80%, 85%);
 }
 
 *, *::before, *::after {
@@ -267,7 +175,6 @@ textarea:focus {
   --color-text-primary: rgba(255, 255, 255, 0.87);
   --color-text-dim: #a1a1aa;
   --color-text-bright: rgba(255, 255, 255, 0.95);
-  --color-text-dark: #18181b;
 
   --color-background-darkest: #000000;
   --color-background-dark: #1f1f23;
@@ -276,22 +183,12 @@ textarea:focus {
 
   --color-border-default: #3f3f46;
   --color-border-light: #2a2a2d;
-  --color-border-hover: #52525b;
 
   /* Shadow Colors */
   --box-shadow-card: 0 2px 8px rgb(225 225 225 / 10%);
 
-  --color-button-hover-bg: rgba(255, 255, 255, 0.1);
   --color-bg-hover: rgba(255, 255, 255, 0.05);
-  --color-bg-hover-strong: #3f3f46;
   --color-bg-hover-light: #76767c;
-
-  --color-primary-hover: #818cf8; /* Indigo-400 */
-  --color-primary-highlight: #93c5fd; /* Blue-300 */
-
-  --color-status-success-bg: color-mix(in srgb, #166534 18%, var(--color-background-dark));
-  --color-status-warning-bg: color-mix(in srgb, #92400e 18%, var(--color-background-dark));
-  --color-status-error-bg: color-mix(in srgb, #7f1d1d 18%, var(--color-background-dark));
 }
 
 :root.app-dark body {
