@@ -59,17 +59,17 @@ test('create returns 201, derives Open (no volunteer), and round-trips civil sch
 })
 
 test('notify=true records an open notification_event; omitting notify records none', async () => {
-  const withNotify = await create({ villageId: quahog, memberPersonId: member, notify: true })
+  const withNotify = await create({ villageId: quahog, memberPersonId: member, notify: true, serviceDate: '2026-08-01' })
   assert.equal(withNotify.status, 201)
   assert.deepEqual(await notificationEvents(withNotify.json.serviceRequestId), ['open'])
 
-  const withoutNotify = await create({ villageId: quahog, memberPersonId: member })
+  const withoutNotify = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
   assert.equal(withoutNotify.status, 201)
   assert.equal((await notificationEvents(withoutNotify.json.serviceRequestId)).length, 0)
 })
 
 test('assigning a volunteer via patch derives Confirmed status', async () => {
-  const created = await create({ villageId: quahog, memberPersonId: member })
+  const created = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
   assert.equal(created.status, 201)
   assert.equal(created.json.status, 'Open')
 
@@ -86,7 +86,8 @@ test('cancelling via patch sets the cancelled status and records the event', asy
   // The PR #46 confirmation dialog is client-side; this is the underlying
   // transition it guards. Cancelled statuses pass deriveStatus through verbatim
   // (they are not re-derived to Open/Confirmed from the volunteer assignment).
-  const created = await create({ villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer })
+  // serviceDate is set because the list assertion below filters by date range.
+  const created = await create({ villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer, serviceDate: '2026-08-01' })
   assert.equal(created.status, 201)
   assert.equal(created.json.status, 'Confirmed')
   const id = created.json.serviceRequestId
@@ -100,7 +101,9 @@ test('cancelling via patch sets the cancelled status and records the event', asy
     'cancelled status sticks despite the assigned volunteer')
   assert.ok((await notificationEvents(id)).includes('cancelled'), 'cancelled notification recorded')
 
-  const filtered = await vgCall('getServiceRequests', { status: ['cancelled'] }, {
+  // serviceDateStart is required; '2000-01-01' is wide enough to catch
+  // runtime-created requests whatever date they land on.
+  const filtered = await vgCall('getServiceRequests', { status: ['cancelled'], serviceDateStart: '2000-01-01' }, {
     token: tokens.users.sc, // federation read: no villageId filter needed
   })
   assert.ok(filtered.json.map(r => r.serviceRequestId).includes(id),
@@ -108,12 +111,14 @@ test('cancelling via patch sets the cancelled status and records the event', asy
 })
 
 test('status query filter maps to db statuses', async () => {
-  const open = await create({ villageId: quahog, memberPersonId: member })
-  const confirmed = await create({ villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer })
+  // Both carry serviceDate so the exclusion below proves the STATUS filter
+  // fired, not the date window.
+  const open = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
+  const confirmed = await create({ villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer, serviceDate: '2026-08-01' })
   assert.equal(open.json.status, 'Open')
   assert.equal(confirmed.json.status, 'Confirmed')
 
-  const { status, json } = await vgCall('getServiceRequests', { status: ['confirmed'] }, {
+  const { status, json } = await vgCall('getServiceRequests', { status: ['confirmed'], serviceDateStart: '2000-01-01' }, {
     token: tokens.users.sc,
   })
   assert.equal(status, 200)

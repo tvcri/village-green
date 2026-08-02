@@ -421,6 +421,32 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
   return `cast(concat('[', group_concat(${distinct ? 'distinct ' : ''}${value} ${orderBy ? `order by ${orderBy}` : ''}), ']') as json)`
 }
 
+// The closed category <-> serviceName vocabulary. Single source of truth for:
+//  - VolunteerRequestService.buildCapabilityPrefixCase (capability -> prefix)
+//  - metrics byCategory derivation (serviceName -> category)
+// Prefix matches cut at the colon, absorbing the legacy whitespace-after-colon
+// variants. 'Member Added' is a legacy stats category, not a volunteer
+// capability (capability: null). Order = fixed byCategory display order.
+// Replaced transparently when the serviceName lookup table lands.
+module.exports.SERVICE_CATEGORIES = [
+  { category: 'Rides',        capability: 'Rides',        match: { prefix: 'Ride:' } },
+  { category: 'Errands',      capability: 'Errands',      match: { prefix: 'Errand:' } },
+  { category: 'Home Help',    capability: 'Home Help',    match: { exact: 'Household Chores/Handy Help' } },
+  { category: 'Tech Support', capability: 'Tech Support', match: { exact: 'Tech Support' } },
+  { category: 'Member Added', capability: null,           match: { exact: 'Member Added' } },
+]
+
+// serviceName -> category as a SQL CASE over `colExpr`. Vocabulary values are
+// developer-controlled literals (closed set), not user input — safe to inline.
+module.exports.buildServiceNameCategoryCase = function (colExpr) {
+  const whens = module.exports.SERVICE_CATEGORIES.map(({ category, match }) =>
+    match.prefix
+      ? `WHEN ${colExpr} LIKE '${match.prefix}%' THEN '${category}'`
+      : `WHEN ${colExpr} = '${match.exact}' THEN '${category}'`
+  )
+  return `CASE ${whens.join(' ')} ELSE NULL END`
+}
+
 // Runtime VSS identity (set form). Resolves the ACTIVE VOLUNTEERS behind a
 // username as a JSON array of person ids ('[]' when none match). person is
 // only the email key — one email may map to several persons (shared household

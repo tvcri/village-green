@@ -1,0 +1,71 @@
+name: Unit tests
+
+# Fast, DB-free gates that complement integration-tests.yml (the black-box API harness):
+#
+#   - `client-unit`: the client vitest suite (jsdom component/composable
+#     tests) plus ESLint (correctness-only flat config — see
+#     client/eslint.config.js). Lint fails on errors; warnings pass.
+#
+#   - `api-unit`: the api/source node:test suite — pure unit tests, no
+#     MySQL/OIDC needed.
+#
+# Both suites were green when this gate was added; a failure here is a real
+# regression, not inherited debt.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  client-unit:
+    name: Client vitest + ESLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Run vitest
+        working-directory: client
+        run: npx vitest run
+
+      - name: Run ESLint
+        working-directory: client
+        run: npm run lint
+
+  api-unit:
+    name: API unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: api/source/package-lock.json
+
+      - name: Install dependencies
+        working-directory: api/source
+        run: npm ci
+
+      - name: Run node:test suite
+        working-directory: api/source
+        run: npm test

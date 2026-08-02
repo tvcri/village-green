@@ -147,7 +147,7 @@ const navigateToVillage = (villageId) => {
             <Tag v-if="village.personCounts" icon="pi pi-users" :value="`${getTotalPersonCount(village)}`" severity="secondary" />
           </div>
         </template>
-        <template #content class="card-stats">
+        <template #content>
           <div v-if="village.personCounts" class="people-grid">
             <div class="person-stat">
               <div class="person-label">Members</div>

@@ -150,6 +150,7 @@ export function filenameEscaped(value) {
    * @type {RegExp}
    */
   const osReserved = /[/\\:*"?<>|]/g
+  // eslint-disable-next-line no-control-regex -- intentionally strips C0 control chars from filenames
   const controlChars = /[\x00-\x1F]/g
 
   /**

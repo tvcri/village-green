@@ -263,115 +263,71 @@ module.exports.getVillagePerson = async function (villageId, personId) {
   return persons.find(p => p.personId === personId) || null
 }
 
-module.exports.getVillageServiceRequests = async function (villageId, status) {
-  const columns = [
-    'CAST(sr.id AS CHAR) AS serviceRequestId',
-    'sr.requestNumber',
-    'CAST(sr.villageId AS CHAR) AS villageId',
-    'CAST(sr.memberPersonId AS CHAR) AS memberPersonId',
-    'CAST(m.id AS CHAR) AS memberId',
-    'mp.fullName AS memberFullName',
-    'CAST(sr.volunteerPersonId AS CHAR) AS volunteerPersonId',
-    'CAST(vol.id AS CHAR) AS volunteerId',
-    'vp.fullName AS volunteerFullName',
-    'sr.status AS status',
-    'sr.serviceName',
-    'sr.transportationType',
-    "DATE_FORMAT(sr.createdAt, '%Y-%m-%dT%TZ') AS createdAt",
-    // serviceDate as a string: mysql2 would otherwise hydrate DATE into a
-    // JS Date at server-local midnight, reintroducing tz ambiguity.
-    "DATE_FORMAT(sr.serviceDate, '%Y-%m-%d') AS serviceDate",
-    // TIME columns come back from mysql2 as 'HH:MM:SS' strings natively.
-    'sr.startTime',
-    'sr.finishTime',
-    'sr.apptTime',
-    'sr.returnTime',
-    // JSON boolean (0/1 tinyint would fail the OAS boolean type).
-    "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
-    'sr.instructions AS instructions',
-    'sr.description AS description',
-    'sr.destination AS destination',
-    'sr.address AS address',
-    'sr.city AS city',
-    'sr.phone AS phone',
-    `COALESCE(
-      (SELECT ${dbUtils.jsonArrayAggDistinct('JSON_QUOTE(ne.eventType)')}
-       FROM notification_event ne
-       WHERE ne.serviceRequestId = sr.id),
-      JSON_ARRAY()
-    ) AS notifications`
-  ]
-  const joins = new Set([
-    'service_request sr',
-    'LEFT JOIN member m ON sr.memberPersonId = m.personId',
-    'LEFT JOIN person mp ON sr.memberPersonId = mp.id',
-    'LEFT JOIN volunteer vol ON sr.volunteerPersonId = vol.personId',
-    'LEFT JOIN person vp ON sr.volunteerPersonId = vp.id'
-  ])
-  const predicates = { statements: ['sr.villageId = ?'], binds: [villageId] }
-  if (status && status.length > 0) {
-    const dbStatuses = []
-    for (const s of status) {
-      if (s === 'open') dbStatuses.push('Open')
-      else if (s === 'confirmed') dbStatuses.push('Confirmed')
-      else if (s === 'completed') dbStatuses.push('Completed')
-      else if (s === 'unmatched') dbStatuses.push('Unmatched')
-      else if (s === 'cancelled') {
-        dbStatuses.push('Member cancelled', 'Volunteer cancelled')
-      }
-    }
-    if (dbStatuses.length > 0) {
-      predicates.statements.push('sr.status IN ?')
-      predicates.binds.push([dbStatuses])
-    }
-  }
-  const orderBy = ['sr.serviceDate DESC', 'sr.startTime DESC']
-  const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
-  let [rows] = await dbUtils.pool.query(sql)
-  return rows
-}
-
 module.exports.getVillageMetrics = async function (villageId, start, end) {
   // Business rule: 'Hub cancelled' requests are treated as if they never
-  // existed — excluded from every section. Breakdown sections count
-  // Completed requests only; the full status mix appears only in byStatus.
-  // Breakdown arrays are ordered in SQL (jsonArrayAgg orderBy): byServiceType
-  // by count desc then name; person lists by fullName.
+  // existed — excluded from every section. byMember/byVolunteer count
+  // Completed only; byStatus/byServiceType/byCategory carry the full mix.
+  // Breakdown arrays are ordered in SQL (jsonArrayAgg orderBy).
+  const statusJson = (alias) => `JSON_OBJECT(
+    'open',               COALESCE(SUM(${alias}.status = 'Open'), 0),
+    'confirmed',          COALESCE(SUM(${alias}.status = 'Confirmed'), 0),
+    'completed',          COALESCE(SUM(${alias}.status = 'Completed'), 0),
+    'unmatched',          COALESCE(SUM(${alias}.status = 'Unmatched'), 0),
+    'memberCancelled',    COALESCE(SUM(${alias}.status = 'Member cancelled'), 0),
+    'volunteerCancelled', COALESCE(SUM(${alias}.status = 'Volunteer cancelled'), 0)
+  )`
+  const categoryCase = dbUtils.buildServiceNameCategoryCase('sr.serviceName')
+  const ridePrefix = dbUtils.SERVICE_CATEGORIES.find(c => c.category === 'Rides').match.prefix
+  // Legacy "2 legs" basis for the client-side legs toggle: completed
+  // round-trip RIDES only — the sheet's counter never doubled non-ride
+  // round trips, which do exist in live data.
+  const roundTripSum = (alias) =>
+    `COALESCE(SUM(${alias}.status = 'Completed' AND ${alias}.transportationType = 'Round Trip' AND ${alias}.serviceName LIKE '${ridePrefix}%'), 0)`
   const sql = `
     SELECT
       CAST(v.id AS CHAR) AS villageId,
       v.name AS villageName,
-      (SELECT JSON_OBJECT(
-          'draft',              COALESCE(SUM(sr.status = 'Draft'), 0),
-          'open',               COALESCE(SUM(sr.status = 'Open'), 0),
-          'confirmed',          COALESCE(SUM(sr.status = 'Confirmed'), 0),
-          'completed',          COALESCE(SUM(sr.status = 'Completed'), 0),
-          'unmatched',          COALESCE(SUM(sr.status = 'Unmatched'), 0),
-          'memberCancelled',    COALESCE(SUM(sr.status = 'Member cancelled'), 0),
-          'volunteerCancelled', COALESCE(SUM(sr.status = 'Volunteer cancelled'), 0)
-        )
+      (SELECT ${statusJson('sr')}
         FROM service_request sr
         WHERE sr.villageId = v.id
           AND sr.status != 'Hub cancelled'
           AND sr.serviceDate BETWEEN ? AND ?) AS byStatus,
+      (SELECT ${roundTripSum('sr')}
+        FROM service_request sr
+        WHERE sr.villageId = v.id
+          AND sr.status != 'Hub cancelled'
+          AND sr.serviceDate BETWEEN ? AND ?) AS totalsRoundTrips,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
-            value: `JSON_OBJECT('serviceName', t.serviceName, 'count', t.cnt)`,
-            orderBy: 't.cnt desc, t.serviceName'
+            value: `JSON_OBJECT('serviceName', t.serviceName, 'category', t.category, 'byStatus', t.statusCounts, 'completedRoundTrips', t.rt)`,
+            orderBy: `JSON_EXTRACT(t.statusCounts, '$.completed') DESC, t.serviceName`
           })}, JSON_ARRAY())
-        FROM (SELECT sr.serviceName, COUNT(*) AS cnt
+        FROM (SELECT sr.serviceName, ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
-                AND sr.status = 'Completed'
+                AND sr.status != 'Hub cancelled'
                 AND sr.serviceName IS NOT NULL
                 AND sr.serviceDate BETWEEN ? AND ?
               GROUP BY sr.serviceName) t) AS byServiceType,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
-            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            value: `JSON_OBJECT('category', t.category, 'byStatus', t.statusCounts, 'completedRoundTrips', t.rt)`,
+            orderBy: 't.category'
+          })}, JSON_ARRAY())
+        FROM (SELECT ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts, ${roundTripSum('sr')} AS rt
+              FROM service_request sr
+              WHERE sr.villageId = v.id
+                AND sr.status != 'Hub cancelled'
+                AND sr.serviceName IS NOT NULL
+                AND sr.serviceDate BETWEEN ? AND ?
+              GROUP BY 1
+              HAVING category IS NOT NULL) t) AS byCategoryRaw,
+      (SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt, 'completedRoundTrips', t.rt)`,
             orderBy: 'p.fullName'
           })}, JSON_ARRAY())
-        FROM (SELECT sr.memberPersonId AS pid, COUNT(*) AS cnt
+        FROM (SELECT sr.memberPersonId AS pid, COUNT(*) AS cnt, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
                 AND sr.status = 'Completed'
@@ -381,10 +337,10 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
         JOIN person p ON p.id = t.pid) AS byMember,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
-            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt)`,
+            value: `JSON_OBJECT('personId', CAST(p.id AS CHAR), 'fullName', p.fullName, 'count', t.cnt, 'completedRoundTrips', t.rt)`,
             orderBy: 'p.fullName'
           })}, JSON_ARRAY())
-        FROM (SELECT sr.volunteerPersonId AS pid, COUNT(*) AS cnt
+        FROM (SELECT sr.volunteerPersonId AS pid, COUNT(*) AS cnt, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
                 AND sr.status = 'Completed'
@@ -395,18 +351,26 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
     FROM village v
     WHERE v.id = ?
   `
-  const binds = [start, end, start, end, start, end, start, end, villageId]
+  const binds = [start, end, start, end, start, end, start, end, start, end, start, end, villageId]
   const [rows] = await dbUtils.pool.query(sql, binds)
   if (!rows[0]) return null
   const row = rows[0]
-  // mysql2 hydrates the JSON columns into JS objects/arrays with numeric
-  // counts already (JSON numbers), so no coercion is needed here.
+  // Fixed 5-entry byCategory in vocabulary order, zero-filled: chart colors
+  // and shapes stay stable regardless of which categories have data.
+  const zeroStatus = { open: 0, confirmed: 0, completed: 0,
+    unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
+  const found = new Map((row.byCategoryRaw ?? []).map(e => [e.category, e]))
+  const byCategory = dbUtils.SERVICE_CATEGORIES.map(({ category }) => {
+    const e = found.get(category)
+    return { category, byStatus: e?.byStatus ?? { ...zeroStatus }, completedRoundTrips: e?.completedRoundTrips ?? 0 }
+  })
   const totalRequests = Object.values(row.byStatus).reduce((a, b) => a + b, 0)
   return {
     villageId: row.villageId,
     villageName: row.villageName,
     range: { start, end },
-    totals: { totalRequests, byStatus: row.byStatus },
+    totals: { totalRequests, byStatus: row.byStatus, completedRoundTrips: row.totalsRoundTrips },
+    byCategory,
     byServiceType: row.byServiceType,
     byMember: row.byMember,
     byVolunteer: row.byVolunteer

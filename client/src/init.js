@@ -27,7 +27,6 @@ else {
     await setupGoogleWorker()
     const authorized = await authorize()
     if (authorized) {
-      // await setupServiceWorker()
       appendStatus('Fetching user profile')
       const userObj = await getUserObject()
       if (userObj) {
@@ -410,18 +409,6 @@ async function setupGoogleWorker() {
   } catch (error) {
     console.error('[init] Error setting up Google Sheets worker:', error)
     // Don't throw — Google Sheets export is optional, app should continue without it
-  }
-}
-
-async function setupServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    try {
-      await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}service-worker.js`)
-      appendStatus('Service Worker registered successfully')
-    }
-    catch (err) {
-      appendError(`Service Worker registration failed: ${err}`)
-    }
   }
 }
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'

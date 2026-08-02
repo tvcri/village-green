@@ -48,7 +48,7 @@ onMounted(async () => {
       original.value = { ...form }
     }
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load person', life: 3000 })
   }
 })
@@ -87,7 +87,7 @@ async function save () {
     toast.add({ severity: 'success', summary: 'Saved', detail: 'Member role saved', life: 2000 })
     back()
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to save member role', life: 3000 })
   }
 }
@@ -98,7 +98,7 @@ async function revoke () {
     toast.add({ severity: 'success', summary: 'Revoked', detail: 'Member role revoked', life: 2000 })
     back()
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to revoke', life: 3000 })
   }
 }

@@ -18,7 +18,7 @@ export default defineConfig(({ mode, command }) => {
         '/Env.js': {
           target: envOrigin,
           changeOrigin: true,
-          rewrite: (path) => `/Env.js`,
+          rewrite: () => `/Env.js`,
         },
         '/enroll-env.js': {
           target: envOrigin,

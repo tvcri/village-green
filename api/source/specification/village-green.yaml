@@ -1722,6 +1722,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ServiceRequestStatusQuery'
         - $ref: '#/components/parameters/HasNotificationsQuery'
+        - $ref: '#/components/parameters/ServiceDateStartQuery'
+        - $ref: '#/components/parameters/ServiceDateEndQuery'
         - name: villageId
           in: query
           description: Filter to specific villages (omit for all granted villages)
@@ -2306,12 +2308,17 @@ paths:
   /villages/{villageId}/service-requests:
     get:
       summary: List service requests for a village
+      description: >-
+        Hub cancelled requests are never returned at village scope — they are
+        treated as if they never existed, matching the metrics endpoint.
       tags:
       - Village
       operationId: getVillageServiceRequests
       parameters:
       - $ref: '#/components/parameters/VillageIdPath'
       - $ref: '#/components/parameters/ServiceRequestStatusQuery'
+      - $ref: '#/components/parameters/ServiceDateStartQuery'
+      - $ref: '#/components/parameters/ServiceDateEndQuery'
       responses:
         '200':
           description: Service request list for village
@@ -4080,7 +4087,6 @@ components:
           type: string
           nullable: true
           enum:
-          - Draft
           - Completed
           - Member cancelled
           - Volunteer cancelled
@@ -4100,7 +4106,6 @@ components:
         serviceDate:
           type: string
           format: date
-          nullable: true
         timesFlexible:
           type: boolean
         startTime:
@@ -4175,6 +4180,7 @@ components:
       required:
       - villageId
       - memberPersonId
+      - serviceDate
       properties:
         requestNumber:
           type: integer
@@ -4195,11 +4201,6 @@ components:
         notify:
           type: boolean
           default: false
-        status:
-          type: string
-          enum:
-          - Draft
-          nullable: true
         serviceName:
           type: string
           maxLength: 200
@@ -4215,7 +4216,6 @@ components:
         serviceDate:
           type: string
           format: date
-          nullable: true
         timesFlexible:
           type: boolean
         startTime:
@@ -4804,6 +4804,29 @@ components:
       $ref: '#/components/schemas/StringIntIdNullable'
     VillageName:
       $ref: '#/components/schemas/String45'
+    MetricsStatusCounts:
+      type: object
+      additionalProperties: false
+      required:
+      - open
+      - confirmed
+      - completed
+      - unmatched
+      - memberCancelled
+      - volunteerCancelled
+      properties:
+        open:
+          type: integer
+        confirmed:
+          type: integer
+        completed:
+          type: integer
+        unmatched:
+          type: integer
+        memberCancelled:
+          type: integer
+        volunteerCancelled:
+          type: integer
     VillageMetrics:
       type: object
       additionalProperties: false
@@ -4812,6 +4835,7 @@ components:
       - villageName
       - range
       - totals
+      - byCategory
       - byServiceType
       - byMember
       - byVolunteer
@@ -4839,35 +4863,31 @@ components:
           required:
           - totalRequests
           - byStatus
+          - completedRoundTrips
           properties:
             totalRequests:
               type: integer
             byStatus:
-              type: object
-              additionalProperties: false
-              required:
-              - draft
-              - open
-              - confirmed
-              - completed
-              - unmatched
-              - memberCancelled
-              - volunteerCancelled
-              properties:
-                draft:
-                  type: integer
-                open:
-                  type: integer
-                confirmed:
-                  type: integer
-                completed:
-                  type: integer
-                unmatched:
-                  type: integer
-                memberCancelled:
-                  type: integer
-                volunteerCancelled:
-                  type: integer
+              $ref: '#/components/schemas/MetricsStatusCounts'
+            completedRoundTrips:
+              type: integer
+        byCategory:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - category
+            - byStatus
+            - completedRoundTrips
+            properties:
+              category:
+                type: string
+                maxLength: 40
+              byStatus:
+                $ref: '#/components/schemas/MetricsStatusCounts'
+              completedRoundTrips:
+                type: integer
         byServiceType:
           type: array
           items:
@@ -4875,12 +4895,20 @@ components:
             additionalProperties: false
             required:
             - serviceName
-            - count
+            - category
+            - byStatus
+            - completedRoundTrips
             properties:
               serviceName:
                 type: string
                 maxLength: 200
-              count:
+              category:
+                type: string
+                maxLength: 40
+                nullable: true
+              byStatus:
+                $ref: '#/components/schemas/MetricsStatusCounts'
+              completedRoundTrips:
                 type: integer
         byMember:
           type: array
@@ -4897,6 +4925,7 @@ components:
       - personId
       - fullName
       - count
+      - completedRoundTrips
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
@@ -4904,6 +4933,8 @@ components:
           type: string
           maxLength: 200
         count:
+          type: integer
+        completedRoundTrips:
           type: integer
     VillagePatch:
       additionalProperties: false
@@ -5422,6 +5453,15 @@ components:
           type: object
           nullable: true
           additionalProperties: true
+        deviceClass:
+          type: string
+          enum: [mobile, tablet, desktop, unknown]
+      # Tightened deliberately. Without this a misspelled property name is
+      # accepted and silently dropped with a 204, and useAnalytics swallows
+      # post errors, so the data loss is invisible. Safe for cached older
+      # bundles: useAnalytics is the only producer and sends exactly this
+      # field set, so an older client sends a subset, never an extra.
+      additionalProperties: false
     AnalyticsSummaryRow:
       type: object
       properties:
@@ -5436,6 +5476,14 @@ components:
           type: string
           format: date-time
           nullable: true
+        mobileVisits:
+          type: integer
+        tabletVisits:
+          type: integer
+        desktopVisits:
+          type: integer
+        unknownVisits:
+          type: integer
   parameters:
     AppDataFormatQuery:
       name: format
@@ -5547,10 +5595,29 @@ components:
           enum:
           - open
           - confirmed
-          - draft
           - completed
           - unmatched
           - cancelled
+    ServiceDateStartQuery:
+      name: serviceDateStart
+      in: query
+      required: true
+      description: >-
+        Inclusive lower bound on serviceDate. Required: these lists can span
+        the full historic archive, so callers must state their window.
+      schema:
+        type: string
+        format: date
+    ServiceDateEndQuery:
+      name: serviceDateEnd
+      in: query
+      required: false
+      description: >-
+        Inclusive upper bound on serviceDate. Omit for no upper bound
+        (future-dated requests are returned).
+      schema:
+        type: string
+        format: date
     ServiceRequestProjectionQuery:
       name: projection
       in: query

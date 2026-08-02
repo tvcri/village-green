@@ -7,7 +7,6 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import SplitButton from 'primevue/splitbutton'
 import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
@@ -99,8 +98,6 @@ const form = ref({
 const isSubmitting = ref(false)
 const isCancelling = ref(false)
 const cancelPopover = ref(null)
-const isDraft = ref(false)
-const wasLoadedAsDraft = ref(false)
 
 // False while the existingRequest watcher is populating the form, so the
 // isRideService watcher does not overwrite the API's transportationType.
@@ -110,8 +107,6 @@ const formLoaded = ref(!isEdit.value)
 watch(existingRequest, async (val) => {
   if (val && isEdit.value) {
     formLoaded.value = false
-    isDraft.value = val.status === 'Draft'
-    wasLoadedAsDraft.value = val.status === 'Draft'
     const extractDate = (dateStr) => {
       if (!dateStr) return ''
       return new Date(dateStr)
@@ -328,12 +323,11 @@ watch([allVolunteerOptions, () => form.value.volunteerPersonId], ([volunteers, v
 
 const statusOverride = ref(null)
 
-const CLIENT_STATUSES = ['Draft', 'Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
+const CLIENT_STATUSES = ['Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
 
 const computedStatus = computed(() => {
   if (statusOverride.value) return statusOverride.value
-  if (isDraft.value) return 'Draft'
-  if (CLIENT_STATUSES.includes(form.value.status) && form.value.status !== 'Draft') return form.value.status
+  if (CLIENT_STATUSES.includes(form.value.status)) return form.value.status
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
@@ -368,12 +362,6 @@ const serviceNameOptions = [
   'Errand: Shopping',
   'Errand: Pick up/delivery',
   'Errand: Other'
-]
-
-const transportationTypeOptions = [
-  'Round Trip',
-  'One Way',
-  'None'
 ]
 
 const stateOptions = [
@@ -503,9 +491,6 @@ const isFormValid = computed(() => {
 
   if (!f.villageId) return false
 
-  // Draft only requires a village
-  if (isDraft.value) return true
-
   if (!f.serviceName || !f.memberPersonId || !f.serviceDate) return false
 
   // Ride-specific requirements
@@ -542,7 +527,6 @@ const timesInOrder = computed(() => {
 // chosen village so consecutive requests for the same village are quick.
 const resetForNewRequest = () => {
   const keepVillage = form.value.villageId
-  isDraft.value = false
   selectedMember.value = null
   selectedVolunteer.value = null
   form.value = {
@@ -597,54 +581,52 @@ const handleSubmit = async (notify = false) => {
       return
     }
 
-    if (!isDraft.value) {
-      if (!form.value.serviceName) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Service name is required', life: 3000 })
+    if (!form.value.serviceName) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Service name is required', life: 3000 })
+      return
+    }
+    if (!form.value.memberPersonId) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Member is required', life: 3000 })
+      return
+    }
+    if (!form.value.serviceDate) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Service date is required', life: 3000 })
+      return
+    }
+
+    if (isRideService.value) {
+      if (!form.value.destination) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Destination is required for ride services', life: 3000 })
         return
       }
-      if (!form.value.memberPersonId) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Member is required', life: 3000 })
-        return
-      }
-      if (!form.value.serviceDate) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Service date is required', life: 3000 })
+      if (!form.value.transportationType || !['Round Trip', 'One Way'].includes(form.value.transportationType)) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
         return
       }
 
-      if (isRideService.value) {
-        if (!form.value.destination) {
-          toast.add({ severity: 'error', summary: 'Error', detail: 'Destination is required for ride services', life: 3000 })
+      if (!form.value.timesFlexible) {
+        const requiredTimes = form.value.transportationType === 'Round Trip'
+          ? [form.value.startTime, form.value.apptTime, form.value.returnTime, form.value.finishTime]
+          : [form.value.startTime, form.value.finishTime]
+        if (requiredTimes.some((t) => t == null)) {
+          toast.add({ severity: 'error', summary: 'Error', detail: `Enter all times for ${form.value.transportationType}, or check "Times flexible"`, life: 3000 })
           return
         }
-        if (!form.value.transportationType || !['Round Trip', 'One Way'].includes(form.value.transportationType)) {
-          toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
-          return
-        }
-
-        if (!form.value.timesFlexible) {
-          const requiredTimes = form.value.transportationType === 'Round Trip'
-            ? [form.value.startTime, form.value.apptTime, form.value.returnTime, form.value.finishTime]
-            : [form.value.startTime, form.value.finishTime]
-          if (requiredTimes.some((t) => t == null)) {
-            toast.add({ severity: 'error', summary: 'Error', detail: `Enter all times for ${form.value.transportationType}, or check "Times flexible"`, life: 3000 })
-            return
-          }
-        }
       }
+    }
 
-      if (!form.value.timesFlexible && !timesInOrder.value) {
-        const f = form.value
-        const isRoundTrip = f.transportationType === 'Round Trip'
-        if (isRoundTrip && f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
-          toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time must be after Start time', life: 3000 })
-        } else if (isRoundTrip && f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
-          toast.add({ severity: 'error', summary: 'Error', detail: 'Return time must be after Arrival time', life: 3000 })
-        } else {
-          const finishAfterLabel = f.transportationType === 'Round Trip' ? 'Return' : 'Start'
-          toast.add({ severity: 'error', summary: 'Error', detail: `Finish time must be after ${finishAfterLabel} time`, life: 3000 })
-        }
-        return
+    if (!form.value.timesFlexible && !timesInOrder.value) {
+      const f = form.value
+      const isRoundTrip = f.transportationType === 'Round Trip'
+      if (isRoundTrip && f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time must be after Start time', life: 3000 })
+      } else if (isRoundTrip && f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Return time must be after Arrival time', life: 3000 })
+      } else {
+        const finishAfterLabel = f.transportationType === 'Round Trip' ? 'Return' : 'Start'
+        toast.add({ severity: 'error', summary: 'Error', detail: `Finish time must be after ${finishAfterLabel} time`, life: 3000 })
       }
+      return
     }
 
     isSubmitting.value = true
@@ -680,13 +662,9 @@ const handleSubmit = async (notify = false) => {
       destination: form.value.destination || null
     }
 
-    if (isDraft.value) {
-      payload.status = 'Draft'
-    } else if (isEdit.value) {
+    if (isEdit.value) {
       // Only send status on PATCH for non-derived client values.
-      // Draft is excluded here because isDraft.value is false in this branch.
-      const nonDraftClientStatuses = CLIENT_STATUSES.filter(s => s !== 'Draft')
-      if (nonDraftClientStatuses.includes(form.value.status)) {
+      if (CLIENT_STATUSES.includes(form.value.status)) {
         payload.status = form.value.status
       }
     }
@@ -731,8 +709,6 @@ const handleSubmit = async (notify = false) => {
   }
 }
 
-const isPublishing = computed(() => isEdit.value && wasLoadedAsDraft.value && !isDraft.value)
-
 const splitButtonModel = computed(() => {
   return [{ label: 'Save and Notify', icon: 'pi pi-envelope', command: () => handleSubmit(true) }]
 })
@@ -771,26 +747,6 @@ const handleComplete = async () => {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to complete service request', life: 5000 })
   } finally {
     isCompleting.value = false
-  }
-}
-
-const isDeleting = ref(false)
-
-const handleDeleteDraft = async () => {
-  isDeleting.value = true
-  try {
-    await apiCall('deleteServiceRequest', { serviceRequestId: serviceRequestId.value })
-    toast.add({ severity: 'success', summary: 'Success', detail: 'Draft deleted', life: 3000 })
-    setTimeout(() => {
-      setPendingHighlight(serviceRequestId.value)
-      router.push({ name: 'meta-service-requests' })
-    }, 500)
-  } catch (err) {
-    if (isPrivacyAckError(err)) return
-    console.error(err)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete draft', life: 5000 })
-  } finally {
-    isDeleting.value = false
   }
 }
 
@@ -855,7 +811,6 @@ const openPersonDialog = (personId) => {
               :severity="
                 computedStatus === 'Confirmed' ? 'info'
                 : computedStatus === 'Completed' ? 'success'
-                : computedStatus === 'Draft' ? 'secondary'
                 : computedStatus.includes('cancelled') ? 'danger'
                 : 'warn'
               "
@@ -1251,36 +1206,25 @@ const openPersonDialog = (personId) => {
           <div class="form-actions">
             <template v-if="isEdit">
               <Button
-                v-if="wasLoadedAsDraft"
                 type="button"
-                label="Delete Draft"
+                label="Cancel Request"
                 severity="danger"
-                :loading="isDeleting"
-                :disabled="isSubmitting || isDeleting"
-                @click="handleDeleteDraft"
+                :disabled="isSubmitting || isCancelling || isCancelled"
+                @click="(e) => cancelPopover.toggle(e)"
               />
-              <template v-else>
-                <Button
-                  type="button"
-                  label="Cancel Request"
-                  severity="danger"
-                  :disabled="isSubmitting || isCancelling || isCancelled"
-                  @click="(e) => cancelPopover.toggle(e)"
-                />
-                <Popover ref="cancelPopover">
-                  <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
-                    <Button
-                      v-for="reason in CANCEL_REASONS"
-                      :key="reason"
-                      :label="reason"
-                      text
-                      severity="danger"
-                      style="justify-content: flex-start;"
-                      @click="handleCancelRequest(reason)"
-                    />
-                  </div>
-                </Popover>
-              </template>
+              <Popover ref="cancelPopover">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
+                  <Button
+                    v-for="reason in CANCEL_REASONS"
+                    :key="reason"
+                    :label="reason"
+                    text
+                    severity="danger"
+                    style="justify-content: flex-start;"
+                    @click="handleCancelRequest(reason)"
+                  />
+                </div>
+              </Popover>
             </template>
             <div class="form-actions-right">
               <Button
@@ -1290,16 +1234,7 @@ const openPersonDialog = (personId) => {
                 @click="handleCancel"
                 :disabled="isSubmitting"
               />
-              <Button
-                v-if="isDraft"
-                type="button"
-                label="Save Draft"
-                :loading="isSubmitting"
-                :disabled="!isFormValid || isSubmitting"
-                @click="handleSubmit(false)"
-              />
               <SplitButton
-                v-else
                 label="Save"
                 icon="pi pi-upload"
                 :loading="isSubmitting"
@@ -1403,12 +1338,6 @@ const openPersonDialog = (personId) => {
   display: flex;
   align-items: center;
   gap: 1.75rem;
-}
-
-.draft-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
 }
 
 .form {

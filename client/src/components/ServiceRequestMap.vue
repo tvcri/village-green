@@ -1,5 +1,5 @@
 <script setup>
-const props = defineProps({
+defineProps({
   origin: { type: String, required: true },
   destination: { type: String, required: true },
   waypoint: { type: String, default: '' }

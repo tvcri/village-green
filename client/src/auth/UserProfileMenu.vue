@@ -6,7 +6,6 @@ import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getUser } from '../shared/api/userApi.js'
 
 const menuRef = ref()
-const isOpen = ref(false)
 
 const { state: user, isLoading } = useAsyncState(
   () => getUser(),

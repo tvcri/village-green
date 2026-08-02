@@ -195,7 +195,7 @@ export function uncertainMapForPerson (extraction, memberIndex) {
   return map
 }
 
-export function uncertainMapForMember (extraction, memberIndex) {
+export function uncertainMapForMember (extraction, _memberIndex) {
   return buildUncertainMap(extraction, memberFieldForPath)
 }
 

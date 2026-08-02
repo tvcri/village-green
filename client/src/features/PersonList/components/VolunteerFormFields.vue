@@ -28,11 +28,6 @@ const emit = defineEmits([
   'update:vettings',
 ])
 
-const providerTypeOptions = [
-  'Non-member Volunteer',
-  'Member Volunteer',
-].map(t => ({ label: t, value: t }))
-
 function uncertainText (field) {
   const u = props.uncertain[field]
   return u?.alternative ? `${u.reason} — alternative: ${u.alternative}` : u?.reason

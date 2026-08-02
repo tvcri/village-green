@@ -183,6 +183,65 @@ export const serviceRequests = {
     status: 'Open', serviceName: 'Ride to hospital', destination: 'Arkham Hospital',
     serviceDate: '2026-07-12', finishTime: '11:00:00',
   },
+  // Metrics matrix rows (all quahog). Dates cluster in 2026-06 so metrics
+  // tests can use a range that excludes srV1 (2026-07-10) when convenient.
+  srM1: { // completed round-trip RIDE: the one row that counts as 2 legs
+    id: 4, villageId: villages.quahog.id, requestNumber: 102,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
+    status: 'Completed', serviceName: 'Ride: Medical Appnt', destination: 'Clinic',
+    transportationType: 'Round Trip',
+    serviceDate: '2026-06-01', finishTime: '09:00:00',
+  },
+  srM2: { // completed one-way ride: never a leg double
+    id: 5, villageId: villages.quahog.id, requestNumber: 103,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
+    status: 'Completed', serviceName: 'Ride: Medical Appnt', destination: 'Clinic',
+    transportationType: 'One Way',
+    serviceDate: '2026-06-02', finishTime: '09:00:00',
+  },
+  srM3: {
+    id: 6, villageId: villages.quahog.id, requestNumber: 104,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: null,
+    status: 'Member cancelled', serviceName: 'Ride: Medical Appnt', destination: 'Clinic',
+    serviceDate: '2026-06-03', finishTime: null,
+  },
+  srM4: {
+    id: 7, villageId: villages.quahog.id, requestNumber: 105,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: null,
+    status: 'Open', serviceName: 'Errand: Shopping', destination: 'Market',
+    serviceDate: '2026-06-04', finishTime: null,
+  },
+  srM5: {
+    id: 8, villageId: villages.quahog.id, requestNumber: 106,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
+    status: 'Completed', serviceName: 'Household Chores/Handy Help', destination: null,
+    serviceDate: '2026-06-05', finishTime: '10:00:00',
+  },
+  srM6: { // Hub cancelled: must be invisible to every metrics section. A
+    // distinct serviceName (Tech Support, not shared with srM1-3's Ride) so
+    // the exclusion is load-bearing: if the status filter were ever dropped,
+    // this row would surface as its own visible byServiceType entry instead
+    // of silently merging into an existing group.
+    id: 9, villageId: villages.quahog.id, requestNumber: 107,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: null,
+    status: 'Hub cancelled', serviceName: 'Tech Support', destination: null,
+    serviceDate: '2026-06-06', finishTime: null,
+  },
+  srM7: { // outside the metrics test range
+    id: 10, villageId: villages.quahog.id, requestNumber: 108,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: null,
+    status: 'Completed', serviceName: 'Tech Support', destination: null,
+    serviceDate: '2025-01-15', finishTime: '11:00:00',
+  },
+  srM8: { // completed round-trip ERRAND: live data has these (404 rows) and
+    // the legacy legs rule (rides only) must NOT count it — load-bearing for
+    // the completedRoundTrips ride condition.
+    id: 11, villageId: villages.quahog.id, requestNumber: 109,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
+    status: 'Completed', serviceName: 'Errand: Shopping', destination: 'Market',
+    transportationType: 'Round Trip',
+    serviceDate: '2026-06-07', finishTime: '12:00:00',
+  },
 }
 
 // FCV (Friendly Caller/Visitor) submissions — the data behind GET /friends.

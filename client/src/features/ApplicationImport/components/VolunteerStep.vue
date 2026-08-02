@@ -59,7 +59,7 @@ onMounted(async () => {
       .filter(Boolean)
     await findDuplicates()
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load form data — go back and retry', life: 3000 })
   }
 })
@@ -157,7 +157,7 @@ async function submit () {
     createdPersonIsExisting = false
     await grantVolunteerRole(created.personId)
   }
-  catch (err) {
+  catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create person', life: 3000 })
   }
   finally {

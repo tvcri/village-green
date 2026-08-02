@@ -7,7 +7,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
-import { formatServiceDate } from '../lib/timeFields.js'
+import { formatServiceDate, serviceDateTimeSortKey } from '../lib/timeFields.js'
 
 defineOptions({ name: 'ServiceRequestTable' })
 
@@ -15,9 +15,13 @@ const props = defineProps({
   rows: { type: Array, required: true },
   isLoading: { type: Boolean, required: true },
   hasLoadedOnce: { type: Boolean, required: true },
-  error: { required: true },
+  error: { type: Error, required: true },
   showVillageColumn: { type: Boolean, default: false },
-  flashRowId: { type: [String, Number], default: null }
+  flashRowId: { type: [String, Number], default: null },
+  // Initial serviceDate sort: 1 = ascending (soonest first), -1 = descending.
+  // The lists default to ascending so upcoming work reads in the order it will
+  // happen. Users can still re-sort by clicking a column header.
+  sortOrder: { type: Number, default: 1 }
 })
 
 const emit = defineEmits(['row-click'])
@@ -26,6 +30,77 @@ const { trackEvent } = useAnalytics()
 const { getStatusSeverity } = useStatusSeverity()
 
 const pageRows = ref(10)
+
+// This component sorts; the DataTable does not. Binding it to pre-sorted rows
+// is what lets date+time act as an implicit secondary key under whatever
+// column the user picked -- PrimeVue's single-sort would just re-sort the
+// whole set by the clicked field and scramble dates within each group. The one
+// sorted array feeds both the table and the mobile cards -- though the table
+// still nudges empty values on its own, which is why compareField() below
+// carries a matching null rule.
+const DATE_SORT_FIELD = 'serviceDate'
+
+// Which column the user clicked. Starts on the date column so the initial view
+// is unchanged: soonest first, per the sortOrder prop.
+const sortField = ref(DATE_SORT_FIELD)
+const sortOrderRef = ref(props.sortOrder)
+
+// PrimeVue still renders the sort icons and toggles direction on header
+// clicks, so let it hold its own sort state and just mirror it here.
+const onSort = (event) => {
+  sortField.value = event.sortField ?? DATE_SORT_FIELD
+  sortOrderRef.value = event.sortOrder ?? 1
+}
+
+// Bound to the DataTable's sortField, which is documented as accepting either a
+// field name or a getter function. A getter returning a constant makes every row
+// compare equal, so PrimeVue's sort collapses to a stable no-op (ES2019) that
+// preserves the order computed below -- the supported way to keep its sort UI
+// while owning the ordering, since PrimeVue has no client-side equivalent of
+// "manual sorting". Passing null instead would disable sorting entirely -- and
+// take the header sort icons with it, since they key off the same sortField.
+const noopSortField = () => 0
+
+const compareDateTime = (a, b) =>
+  serviceDateTimeSortKey(a).localeCompare(serviceDateTimeSortKey(b))
+
+// Nullish values sort last regardless of direction -- an unassigned volunteer
+// belongs at the bottom whichever way the column is pointed, so this runs
+// before the direction multiplier is applied. This is NOT redundant with the
+// DataTable: PrimeVue's sort() substitutes nullSortOrder whenever either side
+// is empty, so the table relocates empty values on its own. Without this guard
+// the cards keep them mid-list and the two views disagree.
+const compareField = (field, dir) => (a, b) => {
+  const av = a?.[field]
+  const bv = b?.[field]
+  if (av == null && bv == null) return 0
+  if (av == null) return 1
+  if (bv == null) return -1
+  const result = typeof av === 'number' && typeof bv === 'number'
+    ? av - bv
+    : String(av).localeCompare(String(bv))
+  return dir * result
+}
+
+const sortedRows = computed(() => {
+  const field = sortField.value
+  const dir = sortOrderRef.value || 1
+
+  // Sorting by date means date+time IS the primary key; there is no separate
+  // tiebreak to append.
+  if (field === DATE_SORT_FIELD) {
+    return [...props.rows].sort((a, b) => dir * compareDateTime(a, b))
+  }
+
+  // Otherwise: date+time pass first, then a stable sort by the chosen column.
+  // Array.prototype.sort is required to be stable (ES2019+), so rows tying on
+  // the chosen column keep the date order established by the first pass. The
+  // appended key stays ascending even when the primary is descending -- within
+  // one member or village, dates should still read earliest-first.
+  return [...props.rows]
+    .sort(compareDateTime)
+    .sort(compareField(field, dir))
+})
 
 const rowClass = computed(() => {
   const id = props.flashRowId
@@ -48,12 +123,13 @@ const rowClass = computed(() => {
 
     <DataTable
       v-else
-      :value="rows"
+      :value="sortedRows"
       row-hover
       paginator
       :rows="pageRows"
-      sort-field="serviceDate"
-      :sort-order="1"
+      :sort-field="noopSortField"
+      :sort-order="sortOrderRef"
+      @sort="onSort"
       class="request-table-responsive desktop-only"
       :row-class="rowClass"
       :pt="{
@@ -105,7 +181,7 @@ const rowClass = computed(() => {
 
     <div class="request-cards mobile-only">
       <div
-        v-for="request in rows"
+        v-for="request in sortedRows"
         :key="request.serviceRequestId"
         class="request-card"
         :class="{ 'row-flash': String(request.serviceRequestId) === String(flashRowId) }"

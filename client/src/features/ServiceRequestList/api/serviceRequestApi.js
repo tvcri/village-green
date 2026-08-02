@@ -10,17 +10,24 @@ export const withDisplayNumber = (rows) =>
     displayNumber: r.requestNumber ?? Number(r.serviceRequestId),
   }))
 
-export const getVillageServiceRequests = (villageId) =>
-  apiCall('getVillageServiceRequests', { villageId }).then(withDisplayNumber)
+export const getVillageServiceRequests = (villageId, { status, serviceDateStart, serviceDateEnd } = {}) => {
+  const params = { villageId }
+  if (status?.length) params.status = status
+  if (serviceDateStart) params.serviceDateStart = serviceDateStart
+  if (serviceDateEnd) params.serviceDateEnd = serviceDateEnd
+  return apiCall('getVillageServiceRequests', params).then(withDisplayNumber)
+}
 
 export const getServiceRequest = (serviceRequestId, projection = []) =>
   apiCall('getServiceRequest', { serviceRequestId, ...(projection.length && { projection }) })
 
-export const getServiceRequests = ({ status, villageId, hasNotifications } = {}) => {
+export const getServiceRequests = ({ status, villageId, hasNotifications, serviceDateStart, serviceDateEnd } = {}) => {
   const params = {}
   if (status?.length) params.status = status
   if (villageId?.length) params.villageId = villageId
   if (hasNotifications === false) params.hasNotifications = false
+  if (serviceDateStart) params.serviceDateStart = serviceDateStart
+  if (serviceDateEnd) params.serviceDateEnd = serviceDateEnd
   return apiCall('getServiceRequests', params).then(withDisplayNumber)
 }
 
