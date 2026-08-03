@@ -452,7 +452,7 @@ const exportMenuItems = computed(() => [
       <p class="legs-info-body">
         Many health insurers count round-trip rides to medical appointments as
         TWO services even if the driver waited for the insured and provided the
-        return trip home. Following this practice, this workbook counts all
+        return trip home. Following this practice, these Metrics count all
         round-trip rides as two services.
       </p>
     </Dialog>
