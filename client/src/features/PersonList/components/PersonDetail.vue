@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
@@ -12,6 +13,7 @@ import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 const { hasPermission } = useCurrentUser()
 const canWritePerson = computed(() => hasPermission('person:write'))
 const canWriteMember = computed(() => hasPermission('member:write'))
@@ -50,16 +52,25 @@ function goEdit () { router.push({ name: 'meta-person-edit', params: { personId:
 function goMember () { router.push({ name: 'meta-person-member', params: { personId: personId.value } }) }
 function goVolunteer () { router.push({ name: 'meta-person-volunteer', params: { personId: personId.value } }) }
 
-async function removePerson () {
-  if (!confirm('Delete this person? This cannot be undone.')) return
-  try {
-    await deletePerson(personId.value)
-    toast.add({ severity: 'success', summary: 'Deleted', detail: 'Person deleted', life: 2000 })
-    router.push({ name: 'meta-persons' })
-  }
-  catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete person', life: 3000 })
-  }
+function removePerson () {
+  confirm.require({
+    header: 'Delete Person',
+    message: 'Delete this person? This cannot be undone.',
+    acceptLabel: 'Delete',
+    rejectLabel: 'Cancel',
+    acceptProps: { severity: 'danger' },
+    rejectProps: { severity: 'secondary' },
+    accept: async () => {
+      try {
+        await deletePerson(personId.value)
+        toast.add({ severity: 'success', summary: 'Deleted', detail: 'Person deleted', life: 2000 })
+        router.push({ name: 'meta-persons' })
+      }
+      catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete person', life: 3000 })
+      }
+    }
+  })
 }
 </script>
 

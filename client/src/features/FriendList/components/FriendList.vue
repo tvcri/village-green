@@ -550,7 +550,7 @@ function toggleNotes(event, friendId) {
 }
 
 .result-count {
-  color: var(--color-text-secondary, #666);
+  color: var(--color-text-dim);
   font-size: 0.9rem;
 }
 
@@ -608,7 +608,7 @@ function toggleNotes(event, friendId) {
 
 .empty-prompt,
 .loading-prompt {
-  color: var(--color-text-secondary, #666);
+  color: var(--color-text-dim);
   font-style: italic;
   padding: 2rem 0;
 }

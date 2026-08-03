@@ -136,7 +136,21 @@ async function saveVillageAndRetry () {
     </Message>
     <form @submit.prevent="submit">
       <MemberFormFields
-        :form="form" :uncertain="uncertain"
+        v-model:status="form.status"
+        v-model:member-number="form.memberNumber"
+        v-model:member-level="form.memberLevel"
+        v-model:primary-person-id="form.primaryPersonId"
+        v-model:join-date="form.joinDate"
+        v-model:drop-reason="form.dropReason"
+        v-model:household-size="form.householdSize"
+        v-model:household-dues="form.householdDues"
+        v-model:quickbooks-key="form.quickbooksKey"
+        v-model:printed-newsletter="form.printedNewsletter"
+        v-model:service-notes="form.serviceNotes"
+        v-model:confidential-notes="form.confidentialNotes"
+        v-model:status-change-notes="form.statusChangeNotes"
+        v-model:misc-notes="form.miscNotes"
+        :uncertain="uncertain"
         :primary-person-name="primaryPersonName"
         @edited="onEdited"
       />

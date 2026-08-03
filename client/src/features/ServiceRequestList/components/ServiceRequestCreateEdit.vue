@@ -1277,7 +1277,7 @@ const openPersonDialog = (personId) => {
 }
 
 .req {
-  color: var(--color-error);
+  color: var(--color-text-error);
   margin-left: 0.15rem;
 }
 
@@ -1360,7 +1360,7 @@ const openPersonDialog = (personId) => {
 
 .form-label.required::after {
   content: ' *';
-  color: var(--color-error);
+  color: var(--color-text-error);
 }
 
 .form-section {
@@ -1410,7 +1410,6 @@ const openPersonDialog = (personId) => {
 
 .status-display {
   padding: 0.5rem 0.75rem;
-  background-color: var(--color-background-secondary);
   border: 1px solid var(--color-border-default);
   border-radius: 4px;
   color: var(--color-text-primary);

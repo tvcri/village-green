@@ -2,42 +2,20 @@
 const dbUtils = require('./utils')
 const { hasPermission } = require('../utils/authz')
 
-const _this = this
-
-async function queryPersons (inPredicates = {}) {
-  const columns = [
-    'CAST(p.id AS CHAR) AS personId',
-    'p.fullName',
-    'p.lastName',
-    'p.firstName',
-    'p.middleInitial',
-    'p.nickname',
-    'p.street',
-    'p.unit',
-    'p.address',
-    'p.city',
-    'p.state',
-    "LPAD(p.zip, 5, '0') AS zip",
-    'p.email',
-    'p.phone',
-    'p.cell',
-    'p.emergencyContactName',
-    'p.emergencyContactRelationship',
-    'p.emergencyContactPhone',
-    'p.emergencyContactEmail',
-    "DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate",
-    `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
-    `CASE
+const ACTIVE_AS_COLUMN = `CASE
       WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
       WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
       WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
       ELSE JSON_ARRAY()
-    END AS activeAs`,
-    // communities + disabilities are `required` on the Person schema, so the
-    // list path must emit them just like getPerson does (this query had
-    // copy-diverged and dropped both, failing response validation). NULL-safe
-    // via COALESCE — a person with none yields JSON_ARRAY(), not null.
-    `(
+    END AS activeAs`
+
+const VILLAGE_COLUMN = `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`
+
+// communities + disabilities are `required` on the Person schema, so every
+// full-row path must emit them. NULL-safe via COALESCE — a person with none
+// yields JSON_ARRAY(), not null. Bare subqueries so they compose as top-level
+// columns (full rows) or JSON_OBJECT values (the detail projection).
+const COMMUNITIES_SUBQUERY = `(
       SELECT COALESCE(
         ${dbUtils.jsonArrayAgg({
           value: `JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name)`,
@@ -48,8 +26,9 @@ async function queryPersons (inPredicates = {}) {
       FROM person_community pc
       JOIN community c ON c.id = pc.communityId
       WHERE pc.personId = p.id
-    ) AS communities`,
-    `(
+    )`
+
+const DISABILITIES_SUBQUERY = `(
       SELECT COALESCE(
         ${dbUtils.jsonArrayAgg({
           value: `JSON_OBJECT('disabilityId', CAST(d.id AS CHAR), 'name', d.name, 'note', pd.note)`,
@@ -61,139 +40,40 @@ async function queryPersons (inPredicates = {}) {
       JOIN disability d ON d.id = pd.disabilityId
       WHERE pd.personId = p.id
         AND d.name IN ('Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane')
-    ) AS disabilities`
-  ]
-  const joins = new Set([
-    'person p',
-    'LEFT JOIN village v ON v.id = p.villageId',
-    'LEFT JOIN active_member m ON m.personId = p.id',
-    'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
-  ])
-  const orderBy = ['p.fullName']
-  const predicates = { statements: [], binds: [] }
+    )`
 
-  if (inPredicates?.personId) {
-    predicates.statements.push('p.id = ?')
-    predicates.binds.push(inPredicates.personId)
-  }
+const COMMUNITIES_COLUMN = `${COMMUNITIES_SUBQUERY} AS communities`
+const DISABILITIES_COLUMN = `${DISABILITIES_SUBQUERY} AS disabilities`
 
-  if (inPredicates?.villageId) {
-    predicates.statements.push('p.villageId = ?')
-    predicates.binds.push(inPredicates.villageId)
-  }
+// The getPersons `detail` projection: summary rows gain a same-named object
+// with the Person columns the summary lacks (projection convention — a
+// projection adds a property, it never reshapes the row). email/phone/cell
+// stay out: the summary root already carries them.
+const DETAIL_COLUMN = `JSON_OBJECT(
+      'lastName', p.lastName,
+      'firstName', p.firstName,
+      'middleInitial', p.middleInitial,
+      'nickname', p.nickname,
+      'street', p.street,
+      'unit', p.unit,
+      'address', p.address,
+      'city', p.city,
+      'state', p.state,
+      'zip', LPAD(p.zip, 5, '0'),
+      'birthDate', DATE_FORMAT(p.birthDate, '%Y-%m-%d'),
+      'emergencyContactName', p.emergencyContactName,
+      'emergencyContactRelationship', p.emergencyContactRelationship,
+      'emergencyContactPhone', p.emergencyContactPhone,
+      'emergencyContactEmail', p.emergencyContactEmail,
+      'communities', ${COMMUNITIES_SUBQUERY},
+      'disabilities', ${DISABILITIES_SUBQUERY}
+    ) AS detail`
 
-  const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
-  let [rows] = await dbUtils.pool.query(sql)
-  return rows
-}
-
-module.exports.getPerson = async function (personId, projections = [], userObject = null) {
-  // The member/volunteer projections carry village-scoped gated content:
-  // sensitive fields (financial/confidential) and inactive-row visibility
-  // (read_inactive). Gates must be evaluated against *this* person's
-  // village. getPerson is single-row (predicated on p.id), so that village
-  // is a query-level constant — a cheap pre-fetch resolves it before the
-  // main query is built. Federation-level grants are covered without the
-  // lookup running at all: hasPermission short-circuits on federation
-  // membership regardless of villageId.
-  const wantsMember = projections.includes('member')
-  const wantsVolunteer = projections.includes('volunteer')
-  let financial = false
-  let confidential = false
-  let memberInactive = false
-  let volunteerInactive = false
-  if (wantsMember) {
-    financial = hasPermission(userObject, 'member:read_financial')
-    confidential = hasPermission(userObject, 'person:read_confidential')
-    memberInactive = hasPermission(userObject, 'member:read_inactive')
-  }
-  if (wantsVolunteer) {
-    volunteerInactive = hasPermission(userObject, 'volunteer:read_inactive')
-  }
-  const unresolved =
-    (wantsMember && !(financial && confidential && memberInactive)) ||
-    (wantsVolunteer && !volunteerInactive)
-  if (unresolved) {
-    const [[personVillage]] = await dbUtils.pool.query('SELECT villageId FROM person WHERE id = ?', [personId])
-    const villageId = personVillage?.villageId
-    if (wantsMember) {
-      financial ||= hasPermission(userObject, 'member:read_financial', { villageId })
-      confidential ||= hasPermission(userObject, 'person:read_confidential', { villageId })
-      memberInactive ||= hasPermission(userObject, 'member:read_inactive', { villageId })
-    }
-    if (wantsVolunteer) {
-      volunteerInactive ||= hasPermission(userObject, 'volunteer:read_inactive', { villageId })
-    }
-  }
-  const columns = [
-    'CAST(p.id AS CHAR) AS personId',
-    'p.fullName',
-    'p.lastName',
-    'p.firstName',
-    'p.middleInitial',
-    'p.nickname',
-    'p.street',
-    'p.unit',
-    'p.address',
-    'p.city',
-    'p.state',
-    "LPAD(p.zip, 5, '0') AS zip",
-    'p.email',
-    'p.phone',
-    'p.cell',
-    'p.emergencyContactName',
-    'p.emergencyContactRelationship',
-    'p.emergencyContactPhone',
-    'p.emergencyContactEmail',
-    "DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate",
-    `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
-    `CASE
-      WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
-      WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
-      WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
-      ELSE JSON_ARRAY()
-    END AS activeAs`
-  ]
-  const joins = new Set([
-    'person p',
-    'LEFT JOIN village v ON v.id = p.villageId',
-    'LEFT JOIN active_member m ON m.personId = p.id',
-    'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
-  ])
-  const predicates = { statements: ['p.id = ?'], binds: [personId] }
-
-  columns.push(`(
-    SELECT COALESCE(
-      ${dbUtils.jsonArrayAgg({
-        value: `JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name)`,
-        orderBy: 'c.name'
-      })},
-      JSON_ARRAY()
-    )
-    FROM person_community pc
-    JOIN community c ON c.id = pc.communityId
-    WHERE pc.personId = p.id
-  ) AS communities`)
-
-  columns.push(`(
-    SELECT COALESCE(
-      ${dbUtils.jsonArrayAgg({
-        value: `JSON_OBJECT('disabilityId', CAST(d.id AS CHAR), 'name', d.name, 'note', pd.note)`,
-        orderBy: 'd.name'
-      })},
-      JSON_ARRAY()
-    )
-    FROM person_disability pd
-    JOIN disability d ON d.id = pd.disabilityId
-    WHERE pd.personId = p.id
-      AND d.name IN ('Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane')
-  ) AS disabilities`)
-
-  if (wantsMember) {
-    // Row gating: without member:read_inactive the source is the
-    // active_member view, so a dropped/deceased member yields NULL here.
-    const memberSource = memberInactive ? 'member' : 'active_member'
-    columns.push(`(SELECT JSON_OBJECT(
+function memberColumn ({ financial, confidential, inactive }) {
+  // Row gating: without member:read_inactive the source is the
+  // active_member view, so a dropped/deceased member yields NULL here.
+  const memberSource = inactive ? 'member' : 'active_member'
+  return `(SELECT JSON_OBJECT(
       'memberId', CAST(m2.id AS CHAR),
       'personId', CAST(m2.personId AS CHAR),
       'memberNumber', m2.memberNumber,
@@ -216,12 +96,12 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       ${confidential ? `'confidentialNotes', m2.confidentialNotes,` : ''}
       'statusChangeNotes', m2.statusChangeNotes,
       'miscNotes', m2.miscNotes
-    ) FROM ${memberSource} m2 WHERE m2.personId = p.id) AS \`member\``)
-  }
+    ) FROM ${memberSource} m2 WHERE m2.personId = p.id) AS \`member\``
+}
 
-  if (wantsVolunteer) {
-    const volunteerSource = volunteerInactive ? 'volunteer' : 'active_volunteer'
-    columns.push(`(SELECT JSON_OBJECT(
+function volunteerColumn ({ inactive }) {
+  const volunteerSource = inactive ? 'volunteer' : 'active_volunteer'
+  return `(SELECT JSON_OBJECT(
       'volunteerId', CAST(vol3.id AS CHAR),
       'personId', CAST(vol3.personId AS CHAR),
       'providerType', vol3.providerType,
@@ -263,16 +143,183 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
         JOIN vetting_type vt ON vt.id = vv.vettingTypeId
         WHERE vv.volunteerId = vol3.id
       )
-    ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``)
+    ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``
+}
+
+// Single query path for person reads: getPerson, getPersons, and
+// getPersonsByVillage all build here. These column fragments were once
+// copy-diverged across three functions (one copy dropped
+// communities/disabilities and failed response validation) — do not fork
+// them again.
+//
+// inPredicates:
+//   personId          - single row by id (p.id = ?)
+//   villageId         - scalar home-village restriction (p.villageId = ?)
+//   villageIds        - array filter from the ?villageId query param
+//   villageIdsGranted - grant scope; null/undefined = federation-wide read
+//                       (unrestricted), [] = no grants (empty result),
+//                       array = restrict to those villages
+//   firstName, lastName, phone, email - LIKE searches
+// inOptions:
+//   summary           - PersonSummary column set instead of full Person
+//   detail            - add the `detail` object to summary rows (getPersons projection)
+//   member            - { financial, confidential, inactive } projection gates
+//   volunteer         - { inactive } projection gates
+async function queryPersons (inPredicates = {}, inOptions = {}) {
+  const { summary = false, detail = false, member = null, volunteer = null } = inOptions
+
+  const columns = summary
+    ? [
+      'CAST(p.id AS CHAR) AS personId',
+      'p.fullName',
+      VILLAGE_COLUMN,
+      ACTIVE_AS_COLUMN,
+      `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,
+      'p.email'
+    ]
+    : [
+      'CAST(p.id AS CHAR) AS personId',
+      'p.fullName',
+      'p.lastName',
+      'p.firstName',
+      'p.middleInitial',
+      'p.nickname',
+      'p.street',
+      'p.unit',
+      'p.address',
+      'p.city',
+      'p.state',
+      "LPAD(p.zip, 5, '0') AS zip",
+      'p.email',
+      'p.phone',
+      'p.cell',
+      'p.emergencyContactName',
+      'p.emergencyContactRelationship',
+      'p.emergencyContactPhone',
+      'p.emergencyContactEmail',
+      "DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate",
+      VILLAGE_COLUMN,
+      ACTIVE_AS_COLUMN,
+      COMMUNITIES_COLUMN,
+      DISABILITIES_COLUMN
+    ]
+
+  if (detail) columns.push(DETAIL_COLUMN)
+  if (member) columns.push(memberColumn(member))
+  if (volunteer) columns.push(volunteerColumn(volunteer))
+
+  const joins = new Set([
+    'person p',
+    'LEFT JOIN village v ON v.id = p.villageId',
+    'LEFT JOIN active_member m ON m.personId = p.id',
+    'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
+  ])
+  const predicates = { statements: [], binds: [] }
+
+  if (inPredicates.personId) {
+    predicates.statements.push('p.id = ?')
+    predicates.binds.push(inPredicates.personId)
+  }
+  if (inPredicates.villageId) {
+    predicates.statements.push('p.villageId = ?')
+    predicates.binds.push(inPredicates.villageId)
+  }
+  if (inPredicates.villageIds?.length) {
+    predicates.statements.push('p.villageId IN (?)')
+    predicates.binds.push(inPredicates.villageIds)
+  }
+  if (inPredicates.villageIdsGranted) {
+    // Non-federation caller: restrict to the villages they were granted
+    // person:read in. A null/undefined villageIdsGranted means a
+    // federation-wide read, which is unrestricted here.
+    if (!inPredicates.villageIdsGranted.length) return []
+    predicates.statements.push('p.villageId IN (?)')
+    predicates.binds.push(inPredicates.villageIdsGranted)
+  }
+  if (inPredicates.firstName) {
+    predicates.statements.push('p.firstName LIKE ?')
+    predicates.binds.push(`%${inPredicates.firstName}%`)
+  }
+  if (inPredicates.lastName) {
+    predicates.statements.push('p.lastName LIKE ?')
+    predicates.binds.push(`%${inPredicates.lastName}%`)
+  }
+  if (inPredicates.phone) {
+    predicates.statements.push('(p.phone LIKE ? OR p.cell LIKE ?)')
+    predicates.binds.push(`%${inPredicates.phone}%`, `%${inPredicates.phone}%`)
+  }
+  if (inPredicates.email) {
+    predicates.statements.push('p.email LIKE ?')
+    predicates.binds.push(`%${inPredicates.email}%`)
   }
 
-  const sql = dbUtils.makeQueryString({ columns, joins, predicates, format: true })
+  const orderBy = ['p.fullName']
+  const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
+  return rows
+}
+
+module.exports.getPerson = async function (personId, projections = [], userObject = null) {
+  // The member/volunteer projections carry village-scoped gated content:
+  // sensitive fields (financial/confidential) and inactive-row visibility
+  // (read_inactive). Gates must be evaluated against *this* person's
+  // village. getPerson is single-row (predicated on p.id), so that village
+  // is a query-level constant — a cheap pre-fetch resolves it before the
+  // main query is built. Federation-level grants are covered without the
+  // lookup running at all: hasPermission short-circuits on federation
+  // membership regardless of villageId.
+  const wantsMember = projections.includes('member')
+  const wantsVolunteer = projections.includes('volunteer')
+  let financial = false
+  let confidential = false
+  let memberInactive = false
+  let volunteerInactive = false
+  if (wantsMember) {
+    financial = hasPermission(userObject, 'member:read_financial')
+    confidential = hasPermission(userObject, 'person:read_confidential')
+    memberInactive = hasPermission(userObject, 'member:read_inactive')
+  }
+  if (wantsVolunteer) {
+    volunteerInactive = hasPermission(userObject, 'volunteer:read_inactive')
+  }
+  const unresolved =
+    (wantsMember && !(financial && confidential && memberInactive)) ||
+    (wantsVolunteer && !volunteerInactive)
+  if (unresolved) {
+    const [[personVillage]] = await dbUtils.pool.query('SELECT villageId FROM person WHERE id = ?', [personId])
+    const villageId = personVillage?.villageId
+    if (wantsMember) {
+      financial ||= hasPermission(userObject, 'member:read_financial', { villageId })
+      confidential ||= hasPermission(userObject, 'person:read_confidential', { villageId })
+      memberInactive ||= hasPermission(userObject, 'member:read_inactive', { villageId })
+    }
+    if (wantsVolunteer) {
+      volunteerInactive ||= hasPermission(userObject, 'volunteer:read_inactive', { villageId })
+    }
+  }
+  const rows = await queryPersons(
+    { personId },
+    {
+      member: wantsMember ? { financial, confidential, inactive: memberInactive } : null,
+      volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null
+    }
+  )
   return rows[0] ?? null
 }
 
+module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, projection }) {
+  // 'detail' adds a same-named object with the full person columns (exports).
+  // Deliberately no member/volunteer options here: those projections carry
+  // per-village-gated fields, and this endpoint can span villages (see
+  // getPerson's gate logic).
+  return queryPersons(
+    { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email },
+    { summary: true, detail: projection?.includes('detail') }
+  )
+}
+
 module.exports.getPersonsByVillage = async function (villageId) {
-  return await queryPersons({villageId})
+  return await queryPersons({ villageId })
 }
 
 module.exports.createPerson = async function (body) {
@@ -325,61 +372,4 @@ module.exports.patchPerson = async function (personId, body) {
 
 module.exports.deletePerson = async function (personId) {
   await dbUtils.pool.query('DELETE FROM person WHERE id = ?', [personId])
-}
-
-module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email }) {
-  const columns = [
-    'CAST(p.id AS CHAR) AS personId',
-    'p.fullName',
-    `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`,
-    `CASE
-      WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
-      WHEN m.id IS NOT NULL THEN JSON_ARRAY('member')
-      WHEN vol.id IS NOT NULL THEN JSON_ARRAY('volunteer')
-      ELSE JSON_ARRAY()
-    END AS activeAs`,
-    `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,
-    'p.email'
-  ]
-  const joins = new Set([
-    'person p',
-    'LEFT JOIN village v ON v.id = p.villageId',
-    'LEFT JOIN active_member m ON m.personId = p.id',
-    'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
-  ])
-  const predicates = { statements: [], binds: [] }
-
-  if (villageIdsGranted !== null) {
-    // Non-federation caller: restrict to the villages they were granted
-    // person:read in. villageIdsGranted === null means a federation-wide
-    // read, which is unrestricted here.
-    if (!villageIdsGranted.length) return []
-    predicates.statements.push('p.villageId IN (?)')
-    predicates.binds.push(villageIdsGranted)
-  }
-  if (villageId && villageId.length > 0) {
-    predicates.statements.push('p.villageId IN (?)')
-    predicates.binds.push(villageId)
-  }
-  if (firstName) {
-    predicates.statements.push('p.firstName LIKE ?')
-    predicates.binds.push(`%${firstName}%`)
-  }
-  if (lastName) {
-    predicates.statements.push('p.lastName LIKE ?')
-    predicates.binds.push(`%${lastName}%`)
-  }
-  if (phone) {
-    predicates.statements.push('(p.phone LIKE ? OR p.cell LIKE ?)')
-    predicates.binds.push(`%${phone}%`, `%${phone}%`)
-  }
-  if (email) {
-    predicates.statements.push('p.email LIKE ?')
-    predicates.binds.push(`%${email}%`)
-  }
-
-  const orderBy = ['p.fullName']
-  const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
-  const [rows] = await dbUtils.pool.query(sql)
-  return rows
 }
