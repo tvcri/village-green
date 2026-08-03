@@ -452,8 +452,9 @@ const exportMenuItems = computed(() => [
       <p class="legs-info-body">
         Many health insurers count round-trip rides to medical appointments as
         TWO services even if the driver waited for the insured and provided the
-        return trip home. Following this practice, these Metrics count all
-        round-trip rides as two services.
+        return trip home. The "Round trip = 2 legs" toggle follows this
+        practice, counting each round-trip ride as two services. It is on by
+        default; turn it off to count each ride once.
       </p>
     </Dialog>
   </div>
