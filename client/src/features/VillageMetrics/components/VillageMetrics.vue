@@ -9,6 +9,8 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
 import SplitButton from 'primevue/splitbutton'
 import { captureChart } from '../lib/captureCharts.js'
@@ -127,6 +129,7 @@ const chartType = computed({
 
 // ---- view state ----
 const legs = ref(true) // default ON: a completed round trip counts as 2 legs
+const showLegsInfo = ref(false)
 const catStatus = ref('completed')
 const svcStatus = ref('completed')
 const svcCategory = ref('all')
@@ -352,6 +355,14 @@ const exportMenuItems = computed(() => [
           <div class="legs-toggle">
             <ToggleSwitch v-model="legs" inputId="legsToggle" />
             <label for="legsToggle">Round trip = 2 legs</label>
+            <Button
+              icon="pi pi-info-circle"
+              text
+              rounded
+              severity="secondary"
+              aria-label="About round-trip ride counting"
+              @click="showLegsInfo = true"
+            />
           </div>
 
         </div>
@@ -430,6 +441,21 @@ const exportMenuItems = computed(() => [
         </TabPanels>
       </Tabs>
     </template>
+
+    <Dialog
+      v-model:visible="showLegsInfo"
+      modal
+      header="Round-trip Rides"
+      :style="{ width: '28rem' }"
+      :breakpoints="{ '640px': '90vw' }"
+    >
+      <p class="legs-info-body">
+        Many health insurers count round-trip rides to medical appointments as
+        TWO services even if the driver waited for the insured and provided the
+        return trip home. Following this practice, this workbook counts all
+        round-trip rides as two services.
+      </p>
+    </Dialog>
   </div>
 </template>
 
@@ -463,6 +489,7 @@ const exportMenuItems = computed(() => [
   gap: 0.5rem;
 }
 .legs-toggle label { font-size: 0.9rem; cursor: pointer; }
+.legs-info-body { margin: 0; line-height: 1.5; }
 .panel-filters {
   display: flex;
   flex-wrap: wrap;
