@@ -18,5 +18,6 @@
   "volunteer_vetting.notes": "not exercised in demo",
   "notification_event.failedAt": "demo data has no failed sends",
   "fcv_submission.fuzzyVolunteerName": "populated by the app's FCV fuzzy-match intake",
-  "fcv_submission.fuzzyMemberName": "populated by the app's FCV fuzzy-match intake"
+  "fcv_submission.fuzzyMemberName": "populated by the app's FCV fuzzy-match intake",
+  "notification_event.payload": "app-populated notification payload; seeded rows predate real sends — intentionally NULL (matches prod rows)"
 }
