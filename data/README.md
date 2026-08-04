@@ -1,6 +1,6 @@
 # Village Green — demo dataset generator
 
-Deterministic demo data for Village Green: a roster of 316 RI-history/lore figures (116 of them gag cameos with bespoke service requests, plus a handful of invented descendants of real notables to fill out the rolls), spread across 10 villages. The dataset is fixed-seed so the same records load every time.
+Deterministic demo data for Village Green: RI-history/lore figures (a good share of them gag cameos with bespoke service requests, plus a handful of invented descendants of real notables to fill out the rolls), spread by default across all 10 villages. Most villages skew volunteer-heavy (~40/60 members:volunteers, the real-world norm); Quahog, Oldport, and Kingsport are flipped member-heavy (~60/40). The dataset is fixed-seed so the same records load every time — record counts scale with the sizing knobs below rather than being fixed numbers.
 
 ## Prerequisites
 
@@ -52,6 +52,15 @@ The commands split into two families: **seed** commands *generate* the dataset a
 | `VG_DEMO_OIDC_BASE` | `http://localhost:18080` | Mock OIDC base URL |
 | `VG_DEMO_SEED` | `20260630` | RNG seed (change to get a different but still deterministic dataset) |
 | `VG_DEMO_TOKEN` | _(unset)_ | Pre-minted bearer token (skips token mint from mock OIDC) |
+| `VG_DEMO_VILLAGES` | _(unset = all 10)_ | Which villages to build: a count (`3` → the first 3 villages in `constants.js`) or a comma-separated name list (`Arkham,Quahog`) |
+| `VG_DEMO_MEMBERS` | _(unset = per-class mix)_ | Uniform member headcount for **every** selected village, overriding the default big/medium/small/tiny × mix split |
+| `VG_DEMO_VOLUNTEERS` | _(unset = per-class mix)_ | Uniform volunteer headcount for **every** selected village, overriding the default split |
+
+`VG_DEMO_MEMBERS`/`VG_DEMO_VOLUNTEERS` are both-or-neither in practice — setting one overrides that side per village while the other keeps the mix-based default, which is rarely what you want. A small, fast dataset for local UI work:
+
+```bash
+VG_DEMO_VILLAGES=3 VG_DEMO_MEMBERS=15 VG_DEMO_VOLUNTEERS=20 npm run seed
+```
 
 ## App-data path (`seed:api` / `import` / `export` / `roundtrip`)
 
@@ -74,27 +83,53 @@ When using the mock OIDC login form, enter one of the usernames below. Leave the
 vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:friends:read
 ```
 
+Grants are drawn from the DB's static 7-role catalog (`role`/`role_grant`; the generator never seeds those catalog tables themselves — only `role_grant` rows against fixed role ids from `generator/constants.js`):
+
+| Role | Scope | Notes |
+|---|---|---|
+| Admin | federation-wide | Sees and can do everything, incl. elevate |
+| Staff | federation-wide | Full operational read/write; **creates service requests** |
+| Service Coordinator | federation-wide | Service-request coordination across villages; **creates service requests** |
+| Board | federation-wide | Redacted federation-wide visibility |
+| Village Lead | per-village | Village reads incl. member financials |
+| Steering Committee | per-village | Village governance read access |
+| Local Service Coordinator (LSC) | per-village | Village-scoped read access |
+
 | Username | Village | Role / notes |
 |---|---|---|
-| `admin` | all 10 | **Admin** privilege + **Owner** grant on every village (the mock-OIDC form's default username) |
-| `samuel.slater@millworks.test` | — | **Admin** privilege (realm role `admin`), no village grants — sees all villages via elevate |
-| `roger.williams@providence.test` | Arkham | Owner |
-| `hp.lovecraft@miskatonic.test` | Arkham | Full |
-| `peter.griffin@quahog.test` | Quahog | Owner |
-| `john.brown@brownbros.test` | Quahog + Innsmouth + Arkham | Full ×3 — exercises the **meta roll-up** (3+ villages) |
-| `nathanael.greene@newport.test` | Oldport | Manage |
-| `gilbert.stuart@gmail.test` | Quahog | Restricted |
-| `ann.franklin@providence.test` | New York System | Full (steward) |
-| `ida.lewis@lighthouse.test` | Oldport | Full (steward) |
-| `obed.marsh@innsmouth.test` | Innsmouth | Full (steward) |
-| `richard.pickman@kingsport.test` | Kingsport | Full (steward) |
-| `wilbur.whateley@dunwich.test` | Dunwich | Full (steward) |
-| `betty.bett@chepachet.test` | Chipwhich | Full (steward) |
-| `abraham.whipple@pawtuxet.test` | Pawstuxnet | Full (steward) |
-| `roger.mowry@cabinet.test` | Cabinet | Full (steward) |
+| `admin` | all 10 | **Admin** (the mock-OIDC form's default username) |
+| `samuel.slater@millworks.test` | — | **Admin**, no village grants — sees all villages via elevate |
+| `samuel.gorton@hub.test` | — | **Staff** — SR creator pool |
+| `elizabeth.chace@hub.test` | — | **Service Coordinator** — SR creator pool |
+| `moses.brown@board.test` | — | **Board** |
+| `roger.williams@providence.test` | Arkham | Village Lead |
+| `hp.lovecraft@miskatonic.test` | Arkham | Steering Committee |
+| `peter.griffin@quahog.test` | Quahog | Village Lead |
+| `john.brown@brownbros.test` | Quahog + Innsmouth + Arkham | Village Lead ×3 — exercises the **meta roll-up** (3+ villages) |
+| `nathanael.greene@newport.test` | Oldport | LSC |
+| `gilbert.stuart@gmail.test` | Quahog | Steering Committee |
+| `ann.franklin@providence.test` | New York System | Village Lead |
+| `ida.lewis@lighthouse.test` | Oldport | Village Lead |
+| `obed.marsh@innsmouth.test` | Innsmouth | Village Lead |
+| `richard.pickman@kingsport.test` | Kingsport | Village Lead |
+| `wilbur.whateley@dunwich.test` | Dunwich | Village Lead |
+| `betty.bett@chepachet.test` | Chipwhich | Village Lead |
+| `abraham.whipple@pawtuxet.test` | Pawstuxnet | Village Lead |
+| `roger.mowry@cabinet.test` | Cabinet | Village Lead |
 | `mr.calimari@quahog.test` | — | No grants — valid login, sees nothing |
 
-Beyond these bespoke personas, a **coverage fill** pass tops up every village so it has at least one user of **each** grant role (Owner / Manage / Full / Restricted); the two big villages get 2–3 of each. Fill users are themed per village (`herbert.west@miskatonic.test`, `lois.griffin@quahog.test`, `alva.vanderbilt@newport.test`, `zadok.allen@innsmouth.test`, …) — see `FILL_LOGINS` in `generator/builders/villages.js` for the full roster. Any of them works as a mock-OIDC login. Every user carries a `name` claim in `lastClaims`, so creator attribution renders a display name rather than an email.
+Beyond these bespoke personas, a **coverage fill** pass tops up every village so it has at least one user of **each** per-village role (Village Lead / Steering Committee / LSC); the two big villages get 2–3 of each. Fill users are themed per village (`herbert.west@miskatonic.test`, `lois.griffin@quahog.test`, `alva.vanderbilt@newport.test`, `zadok.allen@innsmouth.test`, …) — see `FILL_LOGINS` in `generator/builders/villages.js` for the full roster. Any of them works as a mock-OIDC login. Every user carries a `name` claim in `lastClaims`, so creator attribution renders a display name rather than an email.
+
+**Staff (`samuel.gorton@hub.test`) and Service Coordinator (`elizabeth.chace@hub.test`) are the only two service-request creators** — every `service_request.createdUserId` in the dataset points at one of them. Separately, a random ~25% of each village's active volunteers get a mock-OIDC login for **volunteer self-service (VSS)** demos (`generator/builders/vss.js`); a service request's `modifiedUserId` marks a VSS touch and, when set, always references one of these volunteer-only user ids, never a Staff/SC id. The full VSS login list is in `demo-logins.json`, not this table.
+
+## Demo guide & login roster
+
+Every *generating* command (`seed`/`seed:db`, `seed:api`, `emit`, `roundtrip`, `doctor`) writes two files to `data/` before doing anything else:
+
+- **`demo-guide.md`** — a map of the dataset: which login demos which grant, per-village member/volunteer counts, the planted scenarios (dual household, member-who-also-volunteers, duplicate email, inactive members/volunteers, confidential-notes member, flexible-time ride, out→home ride, the longest standing series, the privacy-ack-modal login) and their exact IDs/names, community-participant rosters, and a full gag-request index (figure → village → request #).
+- **`demo-logins.json`** — the complete login roster (every `user_data` row, incl. VSS volunteer accounts), each with role, village(s), and a one-line "demos" blurb. This is the droplist the demo mock-OIDC UI offers (spec §7); a `featured` flag marks the handful surfaced by default (the bespoke personas above, plus the first three VSS logins and the privacy-ack-modal login).
+
+Both are **gitignored** (`data/.gitignore`) and regenerated fresh on every generating run — treat them as build output, not source.
 
 ## Privacy rules and acknowledgements
 
@@ -107,16 +142,16 @@ The loader's machine account (`demo-loader@villagegreen.test`) is pre-seeded **w
 
 ## How the dataset is built
 
-Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows in a ~60/40 mix; ~66% of members get a standing `serviceNotes`, ~40% a staff-only `confidentialNotes`, and every member carries `householdDues` ($0–60, usually $40); ~5% of each side is inactive, drawn from the invented-descendant filler persons first) **→ service requests + FCV submissions**.
+Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows split per-village per the sizing knobs above — volunteer-heavy by default, member-heavy for Quahog/Oldport/Kingsport; ~66% of members get a standing `serviceNotes`, ~40% a staff-only `confidentialNotes`, and every member carries `householdDues` ($0–60, usually $40); ~5% of each side is inactive, drawn from the invented-descendant filler persons first) **→ service requests + FCV submissions**.
 
 Service requests are built in two passes:
 
 1. **Gag pass** — each gag-tagged figure who landed as a member gets one bespoke request from their `gag` block in `people.json`. The free-text gag title is keyword-mapped onto a real UI service name, title + blurb become the `description`, and the gag's destination is used as-is.
 2. **Volume pass** — each village gets ≈ 0.5 × its active-member count of ordinary bookings: a random active member × a weighted-random `catalog` entry (`Ride: Medical Appnt` ×6, other rides ×3 — prod is medical-ride-heavy) × a random destination from a pool matched to the service (medical → Miskatonic Health, shopping → grocery/food landmarks, personal care → the barber, activities → landmarks).
 
-Any booking (gag or ordinary) can become a **standing request**: the same trip re-booked every 1/2/4 weeks for a handful of occurrences spanning past and future — past ones mostly Completed, upcoming ones Confirmed/Open, usually with the same regular volunteer, all sharing one entry timestamp and staff creator. Medical rides recur most (think dialysis runs); we're deliberately loose about what "recurs" — it's demo data, so Roger Williams may well draw a second banishment ride a month later.
+Any booking (gag or ordinary) can become a **standing request**: the same trip re-booked every 1/2/4 weeks for a handful of occurrences spanning past and future — past ones mostly Completed, upcoming ones Confirmed/Open, usually with the same regular volunteer, all sharing one entry timestamp and creator. Medical rides recur most (think dialysis runs); we're deliberately loose about what "recurs" — it's demo data, so Roger Williams may well draw a second banishment ride a month later.
 
-Field rules mirror the client UI (`ServiceRequestCreateEdit.vue`): `serviceName` is always one of the ten `serviceNameOptions`; rides are `Round Trip` (~80%) or `One Way`, everything else `None`; Tech Support and Household Chores/Handy Help set no location fields, all others get destination/address/city/state; Round Trips carry `apptTime`/`returnTime` in Start → Arrival → Return → Finish slot order. A member's `serviceNotes` is echoed into `instructions` on every one of that member's requests, matching how prod repeats standing mobility notes. Members can hold several requests, but never two that overlap in time — the builder re-rolls the day/slot until it clears the member's other bookings. Every request's `createdUserId` points at a **manager or owner of its own village** (staff enter requests on behalf of members), so the app's creator attribution shows a plausible themed name.
+Field rules mirror the client UI (`ServiceRequestCreateEdit.vue`): `serviceName` is always one of the ten `serviceNameOptions`; rides are `Round Trip` (~80%) or `One Way`, everything else `None`; Tech Support and Household Chores/Handy Help set no location fields, all others get destination/address/city/state; Round Trips carry `apptTime`/`returnTime` in Start → Arrival → Return → Finish slot order; non-Ride requests never carry times at all (`timesFlexible: true`, all four TIME columns null) — times are a Rides-only concept, matching the client. A member's `serviceNotes` is echoed into `instructions` on every one of that member's requests, matching how prod repeats standing mobility notes. Members can hold several requests, but never two that overlap in time — the builder re-rolls the day/slot until it clears the member's other bookings. Every request's `createdUserId` points at the **Staff or Service Coordinator persona** (`samuel.gorton@hub.test` / `elizabeth.chace@hub.test` — staff enter requests on behalf of members), so the app's creator attribution shows a plausible name regardless of which village the request belongs to.
 
 ## Maintaining the generator through schema changes
 
@@ -131,6 +166,8 @@ After merging schema changes from main: `npm test && npm run roundtrip` exercise
 
 ## Determinism
 
-The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). Every run with the same seed produces the same 311 persons (~60/40 members:volunteers) and ~460 service requests — 101 bespoke gag bookings plus ordinary volume, with roughly 80 standing series among them — households, memberships, and notification records. Change `VG_DEMO_SEED` to generate a different (but equally deterministic) dataset.
+The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). **Same seed + same sizing knobs ⇒ byte-identical output** — every run rebuilds the same persons, households, memberships, service requests (gag bookings, ordinary volume, and standing series alike), notification records, `demo-guide.md`, and `demo-logins.json`. Change `VG_DEMO_SEED` for a different (but equally deterministic) dataset, or the `VG_DEMO_VILLAGES`/`VG_DEMO_MEMBERS`/`VG_DEMO_VOLUNTEERS` knobs for a different (equally deterministic) size.
+
+Two invariants hold regardless of seed or sizing: **vettings never expire** (`volunteer_vetting.dateExpired` is always drawn 60–700 days after the generator's fixed clock (`BASE_DATE`, 2026-06-30) — nothing in the demo data is stale-vetting-blocked, though it will eventually age past *today's* real-world date), and **non-Ride requests never carry times** (`timesFlexible: true`, all TIME columns null — times are a Rides-only concept).
 
 The cameos are real Rhode Island historical figures and Lovecraft-lore characters, with gag service requests written to match their biographies.
