@@ -68,11 +68,11 @@ export function buildMembership (plan, content, rng) {
       // 1-3 capabilities
       const caps = rng.shuffle(CAPABILITIES).slice(0, rng.int(1, 3))
       for (const c of caps) { vcId += 1; volunteer_capability.push({ id: vcId, volunteerId: vId, capabilityId: c.id }) }
-      // ~40% have a vetting record (some expired)
+      // ~40% have a vetting record; vettings never expire in practice (spec §6)
       if (rng.bool(0.4) && vetting_type.length) {
         vvId += 1
         const entered = addDays(BASE_DATE, -rng.int(60, 1500))
-        const expired = rng.bool(0.3) ? addDays(entered, 365) : addDays(BASE_DATE, rng.int(60, 700))
+        const expired = addDays(BASE_DATE, rng.int(60, 700))
         volunteer_vetting.push({ id: vvId, volunteerId: vId, vettingTypeId: rng.pick(vetting_type).id, dateEntered: isoDate(entered), dateExpired: isoDate(expired) })
       }
     }

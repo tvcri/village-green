@@ -51,10 +51,26 @@ test('persons: no generated-column keys, unique (village,name), themed big villa
   assert.ok(miShare > 0.4 && miShare < 0.6, `middleInitial share ${miShare.toFixed(2)} not ~0.5`)
   const salShare = person.filter(p => p.salutation).length / person.length
   assert.ok(salShare > 0.04 && salShare < 0.18, `salutation share ${salShare.toFixed(2)} not ~0.1`)
-  // big villages (Arkham=1, Quahog=2) each have >=50 members and >=50 volunteers
-  for (const vid of [villageIdByName['Arkham'], villageIdByName['Quahog']]) {
-    assert.ok(byVillage[vid].members.length >= 50, `members in ${vid}`)
-    assert.ok(byVillage[vid].volunteers.length >= 50, `volunteers in ${vid}`)
+})
+
+test('persons: village targets honor the resolved mix', () => {
+  const villagesList = resolveVillages({})
+  const { villageIdByName } = buildVillagesAndUsers(fullContent, makeRng(1), villagesList)
+  const { byVillage } = buildPersons(fullContent, villageIdByName, makeRng(1), villagesList)
+  const arkham = byVillage[villageIdByName['Arkham']]   // 45/68 volunteer-heavy
+  assert.ok(arkham.volunteers.length > arkham.members.length, 'Arkham should be volunteer-heavy')
+  assert.ok(Math.abs(arkham.members.length - 45) <= 2)
+  const quahog = byVillage[villageIdByName['Quahog']]   // 68/45 member-heavy
+  assert.ok(quahog.members.length > quahog.volunteers.length, 'Quahog should be member-heavy')
+})
+
+test('persons: trimmed uniform config', () => {
+  const villagesList = resolveVillages({ villages: '3', members: 15, volunteers: 20 })
+  const { villageIdByName } = buildVillagesAndUsers(fullContent, makeRng(1), villagesList)
+  const { byVillage } = buildPersons(fullContent, villageIdByName, makeRng(1), villagesList)
+  for (const vid of Object.keys(byVillage)) {
+    assert.ok(Math.abs(byVillage[vid].members.length - 15) <= 1)
+    assert.ok(Math.abs(byVillage[vid].volunteers.length - 20) <= 2) // ~6% member-reuse variance
   }
 })
 
@@ -92,9 +108,10 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   const inactiveVolShare = m.volunteer.filter(r => r.active === 0).length / m.volunteer.length
   assert.ok(inactiveVolShare > 0.02 && inactiveVolShare < 0.08, `inactive volunteer share ${inactiveVolShare.toFixed(2)} not ~0.05`)
 
-  // dataset-wide mix targets ~60/40 members:volunteers
+  // dataset-wide mix is now volunteer-heavy overall (most villages default to
+  // 40/60 members:volunteers; only the memberHeavy villages flip to 60/40)
   const memberShare = m.member.length / (m.member.length + m.volunteer.length)
-  assert.ok(memberShare > 0.55 && memberShare < 0.65, `member share ${memberShare.toFixed(2)} not ~0.60`)
+  assert.ok(memberShare > 0.40 && memberShare < 0.55, `member share ${memberShare.toFixed(2)} not ~0.45-0.50`)
   // ~66% of members carry a standing service note (echoed into request instructions)
   const noteShare = m.member.filter(r => r.serviceNotes).length / m.member.length
   assert.ok(noteShare > 0.55 && noteShare < 0.78, `serviceNotes share ${noteShare.toFixed(2)} not ~0.66`)
@@ -116,6 +133,15 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   for (const vv of m.volunteer_vetting) assert.ok(volIds.has(vv.volunteerId))
   const disIds = new Set(m.disability.map(d => d.id))
   for (const pd of m.person_disability) assert.ok(disIds.has(pd.disabilityId) && personIds.has(pd.personId))
+})
+
+test('membership: vettings never expired', () => {
+  const villagesList = resolveVillages({})
+  const { villageIdByName } = buildVillagesAndUsers(fullContent, makeRng(1), villagesList)
+  const plan = buildPersons(fullContent, villageIdByName, makeRng(1), villagesList)
+  const { volunteer_vetting } = buildMembership(plan, fullContent, makeRng(1))
+  assert.ok(volunteer_vetting.length > 0)
+  for (const vv of volunteer_vetting) assert.ok(vv.dateExpired > '2026-06-30', `expired vetting ${vv.dateExpired}`)
 })
 
 test('grants: role catalog coverage and federation personas', () => {
@@ -331,7 +357,7 @@ test('buildDataset is deterministic and complete', () => {
   assert.ok(a.fcv_submission.length >= 30, `fcv_submission count ${a.fcv_submission.length}`)
 })
 
-test('all 10 villages have >=1 member and >=1 volunteer; big villages have >=50 of each', () => {
+test('all 10 villages have >=1 member and >=1 volunteer; big villages honor their mix', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   // build village-id -> {members, volunteers} count map via person.villageId join
   const byVillage = {}
@@ -350,11 +376,11 @@ test('all 10 villages have >=1 member and >=1 volunteer; big villages have >=50 
     assert.ok(counts.m >= 1, `village ${counts.name} (id=${vid}) has 0 members`)
     assert.ok(counts.v >= 1, `village ${counts.name} (id=${vid}) has 0 volunteers`)
   }
-  // big villages (Arkham=id1, Quahog=id2) must have >=50 members and >=50 volunteers
+  // big villages (113 total) honor their resolved mix: Arkham is volunteer-heavy
+  // (~45/68), Quahog is memberHeavy (~68/45) — both sides comfortably >=40
   const villageByName = Object.fromEntries(ds.village.map(v => [v.name, v.id]))
-  for (const bigName of ['Arkham', 'Quahog']) {
-    const vid = villageByName[bigName]
-    assert.ok(byVillage[vid].m >= 50, `big village ${bigName} has only ${byVillage[vid].m} members`)
-    assert.ok(byVillage[vid].v >= 50, `big village ${bigName} has only ${byVillage[vid].v} volunteers`)
-  }
+  const arkham = byVillage[villageByName['Arkham']]
+  assert.ok(arkham.m >= 40 && arkham.v > arkham.m, `Arkham ${arkham.m}m/${arkham.v}v not volunteer-heavy`)
+  const quahog = byVillage[villageByName['Quahog']]
+  assert.ok(quahog.v >= 40 && quahog.m > quahog.v, `Quahog ${quahog.m}m/${quahog.v}v not member-heavy`)
 })

@@ -1,16 +1,5 @@
 import { RI_STREETS } from '../constants.js'
 
-// Target member/volunteer counts per village size. Members and volunteers are
-// mostly DISTINCT people (members receive services; volunteers provide them).
-// Dataset-wide the mix lands near 60/40 members:volunteers, while the big
-// villages still honor the >=50 members AND >=50 volunteers requirement.
-const SIZE = {
-  big: { members: 63, volunteers: 50 },
-  medium: { members: 13, volunteers: 7 },
-  small: { members: 6, volunteers: 3 },
-  tiny: { members: 3, volunteers: 2 },
-}
-
 const RI_TOWNS = { Arkham: 'Arkham', Quahog: 'Quahog', 'New York System': 'Providence',
   Oldport: 'Newport', Innsmouth: 'Innsmouth', Kingsport: 'Kingsport', Dunwich: 'Dunwich',
   Chipwhich: 'Chepachet', Pawstuxnet: 'Warwick', Cabinet: 'Glocester' }
@@ -103,7 +92,7 @@ export function buildPersons (content, villageIdByName, rng, villagesList) {
 
   for (const v of villagesList) {
     const villageId = villageIdByName[v.name]
-    const target = SIZE[v.size]
+    const target = { members: v.members, volunteers: v.volunteers }
     const pool = poolForVillage(v.name, v.theme, figures, used, rng)
     const members = []
     const volunteers = []
@@ -123,6 +112,10 @@ export function buildPersons (content, villageIdByName, rng, villagesList) {
     // every village must field at least one volunteer — if the name pool ran
     // dry (the last villages get the leftovers), reuse a member
     if (!volunteers.length && members.length) volunteers.push(rng.pick(members))
+    if (members.length < v.members || volunteers.length < v.volunteers) {
+      console.warn(`notice: figure roster exhausted — ${v.name} short-filled ` +
+        `(${members.length}/${v.members} members, ${volunteers.length}/${v.volunteers} volunteers)`)
+    }
     byVillage[villageId] = { members, volunteers }
   }
   return { person, byVillage, fillerIds, nameById }
