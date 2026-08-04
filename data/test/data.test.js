@@ -467,3 +467,28 @@ test('communities: catalog matches migration 0010; ~10-15% tagged; big-village c
     }
   }
 })
+
+test('plants: every scenario exists and is recorded', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const p = ds.__meta.plants
+  // duplicate email really is duplicated in person rows
+  const dupes = ds.person.filter(x => x.email === p.duplicateEmail.email)
+  assert.equal(dupes.length, 2)
+  // guarantees hold even where probabilities could round to zero
+  assert.ok(ds.member.some(m => m.primaryPersonId !== null), 'dual household')
+  assert.ok(ds.member.some(m => m.status !== 'Active'), 'inactive member')
+  assert.ok(ds.volunteer.some(v => v.active === 0), 'inactive volunteer')
+  assert.ok(ds.member.some(m => m.confidentialNotes), 'confidential notes')
+  assert.ok(ds.service_request.some(sr => sr.serviceName.startsWith('Ride:') && sr.timesFlexible === 1), 'flexible ride')
+  assert.ok(ds.service_request.some(sr => sr.destination === 'Home'), 'out->home ride')
+  assert.equal(p.ackModalUsername, 'ezra.stiles@newcomer.test')
+  assert.ok(!ds.user_data.some(u => u.username === p.ackModalUsername), 'ack-modal user must NOT be seeded')
+  assert.ok(p.standingSeries.count >= 2)
+  assert.ok(p.vssLogins.length > 0)
+})
+
+test('plants: guarantees survive a tiny config', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630, { villages: 'Cabinet', members: 3, volunteers: 3 })
+  assert.ok(ds.member.some(m => m.status !== 'Active'), 'forced inactive member')
+  assert.ok(ds.volunteer.some(v => v.active === 0), 'forced inactive volunteer')
+})

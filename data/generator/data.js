@@ -8,6 +8,7 @@ import { buildMembership } from './builders/membership.js'
 import { buildCommunities } from './builders/communities.js'
 import { buildVssUsers } from './builders/vss.js'
 import { buildRequests } from './builders/requests.js'
+import { applyPlants } from './plants.js'
 
 export function buildDataset (content, seed, sizing = {}) {
   const rng = makeRng(seed)
@@ -24,7 +25,7 @@ export function buildDataset (content, seed, sizing = {}) {
   const privacy = buildPrivacy(user_data, rng)
   const requests = buildRequests(personsPlan, membership, content, rng, creatorUserIds, vss.userIdByPersonId)
 
-  return {
+  const dataset = {
     village, user_data, role_grant,
     privacy_rules: privacy.privacy_rules, privacy_acknowledgement: privacy.privacy_acknowledgement,
     capability: CAPABILITIES.map(c => ({ id: c.id, name: c.name })),
@@ -38,6 +39,11 @@ export function buildDataset (content, seed, sizing = {}) {
     notification_event: requests.notification_event,
     fcv_submission: requests.fcv_submission,
   }
+
+  const plants = applyPlants(dataset, rng)
+  dataset.__meta = { plants, villagesList }
+
+  return dataset
 }
 
 // Convenience loader of the committed content packs (used by cli.js).
