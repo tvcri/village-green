@@ -26,19 +26,23 @@ export const RI_STREETS = ['Benefit St', 'Thayer St', 'Hope St', 'Wickenden St',
   'Westminster St', 'Spooner St', 'Water St', 'Bellevue Ave', 'Ocean Dr', 'Federal Hill',
   'Angell St', 'Power St', 'College St', 'Elmgrove Ave', 'Broadway', 'Smith St']
 
-// 10 villages; the two 'big' ones must reach 50+ members AND 50+ volunteers.
+// 10 villages. Per-village headcount = CLASS_TOTALS[size] split by mix:
+// most villages are volunteer-heavy (~40/60 members:volunteers — the real-world
+// norm); mix:'memberHeavy' flips to ~60/40 (spec §5).
 export const VILLAGES = [
   { name: 'Arkham', size: 'big', theme: 'lovecraft-health' },
-  { name: 'Quahog', size: 'big', theme: 'family-guy' },
+  { name: 'Quahog', size: 'big', theme: 'family-guy', mix: 'memberHeavy' },
   { name: 'New York System', size: 'medium', theme: 'providence' },
-  { name: 'Oldport', size: 'medium', theme: 'gilded-age' },
+  { name: 'Oldport', size: 'medium', theme: 'gilded-age', mix: 'memberHeavy' },
   { name: 'Innsmouth', size: 'small', theme: 'lovecraft' },
-  { name: 'Kingsport', size: 'small', theme: 'lovecraft' },
+  { name: 'Kingsport', size: 'small', theme: 'lovecraft', mix: 'memberHeavy' },
   { name: 'Dunwich', size: 'small', theme: 'lovecraft' },
   { name: 'Chipwhich', size: 'small', theme: 'chepachet' },
   { name: 'Pawstuxnet', size: 'small', theme: 'gaspee' },
   { name: 'Cabinet', size: 'tiny', theme: 'made-up' },
 ]
+
+export const CLASS_TOTALS = { big: 113, medium: 23, small: 10, tiny: 5 }
 
 // Parent-before-child insert order (FK checks are disabled during load, but stay tidy).
 export const TABLE_ORDER = [
