@@ -98,7 +98,7 @@ Grants are drawn from the DB's static 7-role catalog (`role`/`role_grant`; the g
 | Username | Village | Role / notes |
 |---|---|---|
 | `admin` | all 10 | **Admin** (the mock-OIDC form's default username) |
-| `samuel.slater@millworks.test` | — | **Admin**, no village grants — sees all villages via elevate |
+| `samuel.slater@millworks.test` | — | **Admin** — sees all villages directly via the Admin grant; he's kept with no village-level grants of his own so the elevate escalation can still be demoed |
 | `samuel.gorton@hub.test` | — | **Staff** — SR creator pool |
 | `elizabeth.chace@hub.test` | — | **Service Coordinator** — SR creator pool |
 | `moses.brown@board.test` | — | **Board** |
@@ -127,7 +127,7 @@ Beyond these bespoke personas, a **coverage fill** pass tops up every village so
 Every *generating* command (`seed`/`seed:db`, `seed:api`, `emit`, `roundtrip`, `doctor`) writes two files to `data/` before doing anything else:
 
 - **`demo-guide.md`** — a map of the dataset: which login demos which grant, per-village member/volunteer counts, the planted scenarios (dual household, member-who-also-volunteers, duplicate email, inactive members/volunteers, confidential-notes member, flexible-time ride, out→home ride, the longest standing series, the privacy-ack-modal login) and their exact IDs/names, community-participant rosters, and a full gag-request index (figure → village → request #).
-- **`demo-logins.json`** — the complete login roster (every `user_data` row, incl. VSS volunteer accounts), each with role, village(s), and a one-line "demos" blurb. This is the droplist the demo mock-OIDC UI offers (spec §7); a `featured` flag marks the handful surfaced by default (the bespoke personas above, plus the first three VSS logins and the privacy-ack-modal login).
+- **`demo-logins.json`** — the complete login roster (every `user_data` row, incl. VSS volunteer accounts), each with role, village(s), and a one-line "demos" blurb. This is the droplist the demo mock-OIDC UI offers (spec §7); a `featured` flag marks the handful surfaced by default (the 8 usernames in `FEATURED` in `generator/guide.js`, plus the first three VSS logins and the privacy-ack-modal login) — not the full bespoke-persona table above, which is larger.
 
 Both are **gitignored** (`data/.gitignore`) and regenerated fresh on every generating run — treat them as build output, not source.
 

@@ -141,7 +141,10 @@ export function buildRequests (plan, membership, content, rng, creatorUserIds = 
       const memberCity = home?.city || null
       const venue = opts.gag ? { name: opts.gag.destination, town: null } : rng.pick(destPoolFor(category))
       const venueCity = opts.gag ? memberCity : cityFromTown(venue.town, memberCity)
-      const shape = isRide ? rng.weighted([['homeOut', 70], ['outHome', 15], ['legacy', 15]]) : 'legacy'
+      // gags never roll outHome — that would bury the bespoke gag destination in
+      // `start` and show "Home" as the grid's Destination column
+      const shape = !isRide ? 'legacy' : opts.gag ? rng.weighted([['homeOut', 85], ['legacy', 15]])
+        : rng.weighted([['homeOut', 70], ['outHome', 15], ['legacy', 15]])
       if (shape === 'outHome') {
         start = venue.name
         startAddress = `${rng.int(1, 2400)} ${rng.pick(RI_STREETS)}`
@@ -198,7 +201,8 @@ export function buildRequests (plan, membership, content, rng, creatorUserIds = 
         memberPersonId: memberPersonId, volunteerPersonId: occVolunteer, status: occStatus,
         serviceName: category,
         transportationType: transportationType,
-        // staff attribution — entered by a manager or owner of the village
+        // staff attribution — entered by the federation Staff/Service Coordinator
+        // users, the only personas holding sr:write
         createdUserId: creatorId,
         createdAt: createdAtStr,
         serviceDate: isoDate(d),
@@ -215,7 +219,7 @@ export function buildRequests (plan, membership, content, rng, creatorUserIds = 
         modifiedUserId: (vssByPerson[occVolunteer] && (occStatus === 'Confirmed' || occStatus === 'Completed'))
           ? vssByPerson[occVolunteer] : null,
         modifiedAt: (vssByPerson[occVolunteer] && (occStatus === 'Confirmed' || occStatus === 'Completed'))
-          ? dt(addDays(createdAtDate, rng.int(0, 3))) : null,
+          ? dt(addDays(createdAtDate, rng.int(1, 3))) : null,
       })
       pushNotifications(service_request[service_request.length - 1])
       return srId

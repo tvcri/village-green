@@ -332,8 +332,11 @@ test('requests: ride geography — home->out majority, out->home and NULL-start 
   assert.ok(homeOut.length > outHome.length && homeOut.length > noStart.length)
   assert.ok(outHome.length > 0 && noStart.length > 0)
   for (const sr of outHome) assert.ok(sr.startAddress, 'out->home rides carry the venue start address')
-  // creators are the federation Staff/SC users (userIds 3 and 4 by construction order)
-  assert.ok(ds.service_request.every(sr => [3, 4].includes(sr.createdUserId)))
+  // creators are the federation Staff/SC users
+  const creatorIds = new Set(ds.role_grant
+    .filter(g => g.roleId === ROLE.staff || g.roleId === ROLE.serviceCoordinator)
+    .map(g => g.userId))
+  assert.ok(ds.service_request.every(sr => creatorIds.has(sr.createdUserId)))
 })
 
 test('members can hold several requests, but never two overlapping in time', () => {
@@ -396,7 +399,7 @@ test('vss: ~25% of active volunteers get accounts; modifiedUserId is the VSS mar
   for (const sr of marked) {
     assert.ok(vssIds.has(sr.modifiedUserId), 'modifiedUserId must be a volunteer user, never staff')
     assert.ok(['Confirmed', 'Completed'].includes(sr.status))
-    assert.ok(sr.modifiedAt >= sr.createdAt)
+    assert.ok(sr.modifiedAt > sr.createdAt)
   }
 })
 
