@@ -77,11 +77,13 @@ This path exercises the `/op/appdata` endpoint itself and **may surface endpoint
 
 ## Demo personas and mock-OIDC logins
 
-When using the mock OIDC login form, enter one of the usernames below. Leave the password field blank (or use whatever the mock OIDC accepts). Use the scope string:
+When using the mock OIDC login form, enter one of the usernames below. Leave the password field blank (or use whatever the mock OIDC accepts). The scope `vg` is sufficient:
 
 ```
-vg:op vg:village vg:person vg:service-request vg:member vg:volunteer vg:user vg:friends:read
+vg
 ```
+
+Scopes are **prefix-matched** (`validateOauthSecurity` in `api/source/utils/auth.js`), so a granted `vg` satisfies every `vg:*` requirement — longer scopes are restrictions of their shorter parents. Earlier revisions of this README recommended a long explicit scope string; that was never necessary. The playground picker sets `vg` for you.
 
 Grants are drawn from the DB's static 7-role catalog (`role`/`role_grant`; the generator never seeds those catalog tables themselves — only `role_grant` rows against fixed role ids from `generator/constants.js`):
 
@@ -131,6 +133,25 @@ Every *generating* command (`seed`/`seed:db`, `seed:api`, `emit`, `roundtrip`, `
 
 Both are **gitignored** (`data/.gitignore`) and regenerated fresh on every generating run — treat them as build output, not source.
 
+### `demo-logins.json` is a contract
+
+The playground mock-OIDC server (`~/dev/tvcri/vg-mock-oidc`) reads this file as its login droplist, so its shape is a contract between the two repos:
+
+```json
+{
+  "rosterVersion": 1,
+  "seed": 20260630,
+  "sizing": { "villages": null, "members": null, "volunteers": null },
+  "generatedAt": "2026-08-04T…",
+  "logins": [ { "username": "…", "name": "…", "villages": ["…"],
+                "role": "…", "demos": "…", "featured": true } ]
+}
+```
+
+`ROSTER_VERSION` lives in `generator/roster-file.js` here and in `roster.js` there — **bump both together** when the shape changes. The server refuses to start on a version mismatch, a missing required key on any entry, or a roster with no `featured` logins, and it re-reads the file on every sign-in render, so a re-seed is picked up without restarting its container.
+
+This is the only coupling between the two repos, and it is *data*, not schema: nothing in `vg-mock-oidc` queries the Village Green database.
+
 ## Privacy rules and acknowledgements
 
 The dataset publishes **one privacy-rules version** (a playground-flavored agreement, published and typo-fix-patched by `samuel.slater`) and an **acknowledgement for every user**, so no demo login ever hits the ack modal. This matters more than it looks: the API blocks nearly every endpoint (`privacy_ack_required`) for any user who hasn't acknowledged the current rules — only the spec, the rules text, the ack POST, and `/user` are reachable. Two consequences:
@@ -166,7 +187,7 @@ After merging schema changes from main: `npm test && npm run roundtrip` exercise
 
 ## Determinism
 
-The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). **Same seed + same sizing knobs ⇒ byte-identical output** — every run rebuilds the same persons, households, memberships, service requests (gag bookings, ordinary volume, and standing series alike), notification records, `demo-guide.md`, and `demo-logins.json`. Change `VG_DEMO_SEED` for a different (but equally deterministic) dataset, or the `VG_DEMO_VILLAGES`/`VG_DEMO_MEMBERS`/`VG_DEMO_VOLUNTEERS` knobs for a different (equally deterministic) size.
+The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). **Same seed + same sizing knobs ⇒ byte-identical output** — every run rebuilds the same persons, households, memberships, service requests (gag bookings, ordinary volume, and standing series alike), notification records, and `demo-guide.md`. The one exception is `demo-logins.json`, whose `generatedAt` stamp is real wall-clock time; its `logins` array is deterministic, and the stamp is written by the emitter rather than a builder, so `emit`'s byte-identical guarantee for `demo-appdata.jsonl` is unaffected. Change `VG_DEMO_SEED` for a different (but equally deterministic) dataset, or the `VG_DEMO_VILLAGES`/`VG_DEMO_MEMBERS`/`VG_DEMO_VOLUNTEERS` knobs for a different (equally deterministic) size.
 
 Two invariants hold regardless of seed or sizing: **vettings never expire** (`volunteer_vetting.dateExpired` is always drawn 60–700 days after the generator's fixed clock (`BASE_DATE`, 2026-06-30) — nothing in the demo data is stale-vetting-blocked, though it will eventually age past *today's* real-world date), and **non-Ride requests never carry times** (`timesFlexible: true`, all TIME columns null — times are a Rides-only concept).
 
