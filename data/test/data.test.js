@@ -485,6 +485,10 @@ test('plants: every scenario exists and is recorded', () => {
   assert.ok(!ds.user_data.some(u => u.username === p.ackModalUsername), 'ack-modal user must NOT be seeded')
   assert.ok(p.standingSeries.count >= 2)
   assert.ok(p.vssLogins.length > 0)
+  // forced member+volunteer overlap must not orphan service_request.volunteerPersonId
+  const volunteerIds = new Set(ds.volunteer.map(v => v.personId))
+  assert.ok(ds.service_request.every(sr => sr.volunteerPersonId == null || volunteerIds.has(sr.volunteerPersonId)),
+    'no service_request.volunteerPersonId dangles after plants')
 })
 
 test('plants: guarantees survive a tiny config', () => {

@@ -29,13 +29,29 @@ export function applyPlants (ds, rng) {
   }
   plants.dualHousehold = { village: who(hh.personId).village, primary: who(hh.primaryPersonId), secondary: who(hh.personId) }
 
-  // member + volunteer overlap — force one if the ~6% reuse produced none
+  // member + volunteer overlap — force one if the ~6% reuse produced none.
+  // buildRequests/buildVssUsers already ran, so service_request.volunteerPersonId
+  // and user_data both reference volunteers by their ORIGINAL personId — reassigning
+  // one out from under those references would leave them dangling/mismatched.
   const memberIds = new Set(ds.member.map(m => m.personId))
   let both = ds.volunteer.find(v => memberIds.has(v.personId))
   if (!both) {
+    const personEmailsForVss = new Set(ds.user_data.map(u => u.username))
+    const hasDependents = (v) =>
+      ds.service_request.some(sr => sr.volunteerPersonId === v.personId) ||
+      personEmailsForVss.has(personById[v.personId]?.email)
     const m = ds.member.find(x => x.status === 'Active')
-    const v = ds.volunteer[0]
+    const dependentFree = ds.volunteer.find(x => !hasDependents(x))
+    const v = dependentFree || ds.volunteer[0]
+    const oldPersonId = v.personId
     v.personId = m.personId
+    if (!dependentFree) {
+      // guard fallback: every volunteer had dependents — sweep references forward
+      // so the flipped volunteer's old service_request rows follow them
+      for (const sr of ds.service_request) {
+        if (sr.volunteerPersonId === oldPersonId) sr.volunteerPersonId = v.personId
+      }
+    }
     both = v
   }
   plants.memberAndVolunteer = who(both.personId)
@@ -67,12 +83,16 @@ export function applyPlants (ds, rng) {
   if (!outHome && rides.length > 1) {
     outHome = rides.find(sr => sr.start === 'Home') || rides[1]
     const home = personById[outHome.memberPersonId]
-    outHome.start = outHome.destination === 'Home' ? outHome.start : (outHome.destination || 'Clinic')
+    outHome.start = outHome.destination || 'Clinic'
     outHome.startAddress = outHome.address; outHome.startCity = outHome.city
     outHome.startState = 'RI'; outHome.startZip = null; outHome.startPhone = null
     outHome.destination = 'Home'
     outHome.address = home.street; outHome.city = home.city; outHome.state = 'RI'
     outHome.zip = home.zip; outHome.phone = home.phone
+    // the flipped ride is now a one-way trip home — the old round-trip appt/return
+    // times were computed for the original venue trip and no longer apply
+    outHome.transportationType = 'One Way'
+    outHome.apptTime = null; outHome.returnTime = null
   }
   if (outHome) plants.outHomeRide = { id: outHome.id, member: who(outHome.memberPersonId) }
 
