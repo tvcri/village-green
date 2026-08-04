@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { makeRng } from '../generator/rng.js'
 import { VILLAGES, ROLE, SERVICE_CATEGORIES, NO_LOCATION_SERVICES } from '../generator/constants.js'
+import { resolveVillages } from '../generator/sizing.js'
 import { buildVillagesAndUsers } from '../generator/builders/villages.js'
 import { buildPersons } from '../generator/builders/persons.js'
 import { buildMembership } from '../generator/builders/membership.js'
@@ -22,15 +23,16 @@ function fullContentWithDest () {
 }
 
 test('villages: 10 villages with 1-based ids', () => {
-  const { village, villageIdByName } = buildVillagesAndUsers(content, makeRng(1))
+  const { village, villageIdByName } = buildVillagesAndUsers(content, makeRng(1), resolveVillages({}))
   assert.equal(village.length, 10)
   assert.equal(village[0].id, 1)
   assert.equal(villageIdByName[VILLAGES[0].name], 1)
 })
 
 test('persons: no generated-column keys, unique (village,name), themed big villages', () => {
-  const { village, villageIdByName } = buildVillagesAndUsers(fullContent, makeRng(1))
-  const { person, byVillage, nameById } = buildPersons(fullContent, villageIdByName, makeRng(1))
+  const villagesList = resolveVillages({})
+  const { village, villageIdByName } = buildVillagesAndUsers(fullContent, makeRng(1), villagesList)
+  const { person, byVillage, nameById } = buildPersons(fullContent, villageIdByName, makeRng(1), villagesList)
   for (const p of person) {
     // address and fullName are DB-generated — builders must never set them
     assert.ok(!('address' in p), 'person rows must not set the generated address column')
@@ -57,8 +59,9 @@ test('persons: no generated-column keys, unique (village,name), themed big villa
 })
 
 test('membership: status/active invariants and <=10% member/volunteer overlap', () => {
-  const { villageIdByName } = buildVillagesAndUsers(fullContent, makeRng(1))
-  const { person, byVillage } = buildPersons(fullContent, villageIdByName, makeRng(1))
+  const villagesList = resolveVillages({})
+  const { villageIdByName } = buildVillagesAndUsers(fullContent, makeRng(1), villagesList)
+  const { person, byVillage } = buildPersons(fullContent, villageIdByName, makeRng(1), villagesList)
   const m = buildMembership({ person, byVillage }, fullContent, makeRng(1))
   const personIds = new Set(person.map(p => p.id))
 
@@ -115,52 +118,51 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   for (const pd of m.person_disability) assert.ok(disIds.has(pd.disabilityId) && personIds.has(pd.personId))
 })
 
-test('users/grants: admin, multi-village coordinator, and zero-grants user exist', () => {
-  const { user_data, village_grant } = buildVillagesAndUsers(content, makeRng(1))
-  // every grant references a real user and a village in 1..10, role 1..4
-  const userIds = new Set(user_data.map(u => u.userId))
-  for (const g of village_grant) {
-    assert.ok(userIds.has(g.userId))
-    assert.ok(g.villageId >= 1 && g.villageId <= 10)
-    assert.ok(g.roleId >= 1 && g.roleId <= 4)
-  }
-  // a coordinator with grants in >= 3 villages (meta roll-up)
-  const byUser = {}
-  for (const g of village_grant) (byUser[g.userId] ||= new Set()).add(g.villageId)
-  assert.ok(Object.values(byUser).some(s => s.size >= 3), 'need a 3+ village coordinator')
-  // at least one user with no grants at all
-  assert.ok(user_data.some(u => !village_grant.some(g => g.userId === u.userId)), 'need a zero-grants user')
-  // every role value appears somewhere
-  const roles = new Set(village_grant.map(g => g.roleId))
-  for (const r of Object.values(ROLE)) assert.ok(roles.has(r), `missing role ${r}`)
-})
-
-test('grants cover every role in every village; requests are attributed to a manager/owner', () => {
-  const ds = buildDataset(fullContentWithDest(), 20260630)
-  // the blanket-owner dev admin doesn't count toward per-village coverage
-  const adminIds = new Set(ds.user_data.filter(u => u.username === 'admin').map(u => u.userId))
-  const count = {}
-  for (const g of ds.village_grant) {
-    if (adminIds.has(g.userId)) continue
-    count[g.villageId] = count[g.villageId] || {}
-    count[g.villageId][g.roleId] = (count[g.villageId][g.roleId] || 0) + 1
-  }
-  const bigIds = new Set(ds.village.filter(v => ['Arkham', 'Quahog'].includes(v.name)).map(v => v.id))
-  for (const v of ds.village) {
-    for (const [roleName, roleId] of Object.entries(ROLE)) {
-      const n = (count[v.id] || {})[roleId] || 0
-      assert.ok(n >= 1, `village ${v.name} has no ${roleName} user`)
-      if (bigIds.has(v.id)) assert.ok(n >= 2 && n <= 3, `big village ${v.name} should have 2-3 ${roleName} users, has ${n}`)
+test('grants: role catalog coverage and federation personas', () => {
+  const villagesList = resolveVillages({})
+  const { village, user_data, role_grant } = buildVillagesAndUsers(fullContent, makeRng(1), villagesList)
+  assert.equal(village.length, 10)
+  const byUser = Object.fromEntries(user_data.map(u => [u.username, u.userId]))
+  // federation personas: Admin x2, Staff, Service Coordinator, Board
+  const fedGrants = role_grant.filter(g => g.villageId === null)
+  const roleOf = (username) => fedGrants.filter(g => g.userId === byUser[username]).map(g => g.roleId)
+  assert.deepEqual(roleOf('admin'), [ROLE.admin])
+  assert.deepEqual(roleOf('samuel.slater@millworks.test'), [ROLE.admin])
+  assert.deepEqual(roleOf('samuel.gorton@hub.test'), [ROLE.staff])
+  assert.deepEqual(roleOf('elizabeth.chace@hub.test'), [ROLE.serviceCoordinator])
+  assert.deepEqual(roleOf('moses.brown@board.test'), [ROLE.board])
+  // zero-grants user exists with no grants at all
+  assert.equal(role_grant.filter(g => g.userId === byUser['mr.calimari@quahog.test']).length, 0)
+  // every village fields all three village roles among its own users
+  for (const v of village) {
+    for (const roleId of [ROLE.lead, ROLE.steering, ROLE.lsc]) {
+      assert.ok(role_grant.some(g => g.villageId === v.id && g.roleId === roleId),
+        `village ${v.name} missing roleId ${roleId}`)
     }
   }
-  // every service request is created by a manager or owner of its own village
-  const creatorOk = new Set(ds.village_grant
-    .filter(g => !adminIds.has(g.userId) && (g.roleId === ROLE.manage || g.roleId === ROLE.owner))
-    .map(g => `${g.villageId}:${g.userId}`))
+  // meta roll-up persona holds Village Lead in 3 villages
+  assert.equal(role_grant.filter(g => g.userId === byUser['john.brown@brownbros.test']).length, 3)
+  // grantId omitted (auto-increment)
+  assert.ok(role_grant.every(g => !('grantId' in g)))
+})
+
+test('grants: unselected-village personas are skipped, not crashed', () => {
+  const villagesList = resolveVillages({ villages: 'Quahog, Cabinet' })
+  const { village, role_grant } = buildVillagesAndUsers(fullContent, makeRng(1), villagesList)
+  assert.equal(village.length, 2)
+  const villageIds = new Set(village.map(v => v.id))
+  assert.ok(role_grant.every(g => g.villageId === null || villageIds.has(g.villageId)))
+})
+
+test('requests are attributed to the federation creator pool; every user carries a name claim', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const creatorIds = new Set(ds.role_grant
+    .filter(g => g.roleId === ROLE.staff || g.roleId === ROLE.serviceCoordinator)
+    .map(g => g.userId))
   for (const sr of ds.service_request) {
     assert.ok(sr.createdUserId, `request ${sr.id} has no creating user`)
-    assert.ok(creatorOk.has(`${sr.villageId}:${sr.createdUserId}`),
-      `request ${sr.id} creator ${sr.createdUserId} is not a manager/owner of village ${sr.villageId}`)
+    assert.ok(creatorIds.has(sr.createdUserId),
+      `request ${sr.id} creator ${sr.createdUserId} is not Staff/Service Coordinator`)
   }
   // every user carries a display-name claim for creator attribution
   for (const u of ds.user_data) {

@@ -1,4 +1,4 @@
-import { VILLAGES, RI_STREETS } from '../constants.js'
+import { RI_STREETS } from '../constants.js'
 
 // Target member/volunteer counts per village size. Members and volunteers are
 // mostly DISTINCT people (members receive services; volunteers provide them).
@@ -52,7 +52,7 @@ function poolForVillage (vName, theme, figures, used, rng) {
   return out
 }
 
-export function buildPersons (content, villageIdByName, rng) {
+export function buildPersons (content, villageIdByName, rng, villagesList) {
   const figures = content.people.figures
   const used = new Set()
   const person = []
@@ -101,7 +101,7 @@ export function buildPersons (content, villageIdByName, rng) {
     return pid
   }
 
-  for (const v of VILLAGES) {
+  for (const v of villagesList) {
     const villageId = villageIdByName[v.name]
     const target = SIZE[v.size]
     const pool = poolForVillage(v.name, v.theme, figures, used, rng)

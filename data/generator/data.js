@@ -1,33 +1,31 @@
 import { makeRng } from './rng.js'
-import { CAPABILITIES, ROLE } from './constants.js'
+import { CAPABILITIES } from './constants.js'
+import { resolveVillages } from './sizing.js'
 import { buildVillagesAndUsers } from './builders/villages.js'
 import { buildPrivacy } from './builders/privacy.js'
 import { buildPersons } from './builders/persons.js'
 import { buildMembership } from './builders/membership.js'
 import { buildRequests } from './builders/requests.js'
 
-export function buildDataset (content, seed) {
+export function buildDataset (content, seed, sizing = {}) {
   const rng = makeRng(seed)
-  const { village, user_data, village_grant, villageIdByName, adminUserId } = buildVillagesAndUsers(content, rng)
+  const villagesList = resolveVillages(sizing)
+  const { village, user_data, role_grant, villageIdByName, creatorUserIds } =
+    buildVillagesAndUsers(content, rng, villagesList)
   const privacy = buildPrivacy(user_data, rng)
   // requests builder needs villageId -> name; pass via a private field
   content.__villageById = Object.fromEntries(village.map(v => [v.id, v.name]))
 
-  // Service requests are entered by village staff — any manager or owner of
-  // the village is a plausible creator (createdUserId attribution). The dev
-  // admin owns every village but shouldn't dominate the byline, so skip it.
-  const creatorsByVillage = {}
-  for (const g of village_grant) {
-    if (g.userId === adminUserId) continue
-    if (g.roleId === ROLE.manage || g.roleId === ROLE.owner) (creatorsByVillage[g.villageId] ??= []).push(g.userId)
-  }
-
-  const personsPlan = buildPersons(content, villageIdByName, rng)
+  const personsPlan = buildPersons(content, villageIdByName, rng, villagesList)
   const membership = buildMembership(personsPlan, content, rng)
+  // Task 4 replaces this shim: buildRequests still expects a per-village
+  // creator map, but creators are now federation-scoped (Staff + Service
+  // Coordinator), so fan the same pool out to every village for now.
+  const creatorsByVillage = Object.fromEntries(village.map(v => [v.id, creatorUserIds]))
   const requests = buildRequests(personsPlan, membership, content, rng, creatorsByVillage)
 
   return {
-    village, user_data, village_grant,
+    village, user_data, role_grant,
     privacy_rules: privacy.privacy_rules, privacy_acknowledgement: privacy.privacy_acknowledgement,
     capability: CAPABILITIES.map(c => ({ id: c.id, name: c.name })),
     disability: membership.disability, vetting_type: membership.vetting_type,

@@ -67,7 +67,7 @@ async function doctor (dataset) {
 // use the builders, so builder drift shouldn't block restoring a backup.
 const generates = args.length === 0 ||
   has('--seed-db') || has('--sql') || has('--seed-api') || has('--emit') || has('--roundtrip') || has('--doctor')
-const dataset = generates ? buildDataset(loadContent(), config.seed) : null
+const dataset = generates ? buildDataset(loadContent(), config.seed, config.sizing) : null
 if (generates) await doctor(dataset)
 
 if (has('--seed-db') || has('--sql') || args.length === 0) {

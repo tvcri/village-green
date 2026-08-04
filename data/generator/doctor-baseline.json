@@ -6,7 +6,7 @@
   "user_data.statusDate": "DB default (created) is correct",
   "user_data.statusUser": "runtime bookkeeping, set by the app",
   "user_data.webPreferences": "DB default preferences JSON is correct",
-  "village_grant.userGroupId": "demo grants are per-user, not per-group",
+  "role_grant.userGroupId": "demo grants are per-user, not per-group",
   "person.emailStatus": "app-managed email verification state",
   "member.memberLevel": "CE-era field, not exercised in demo",
   "member.createdDate": "joinDate covers demo needs",
