@@ -203,7 +203,7 @@ h1 {
 
 .village-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 1.5rem;
   margin-top: 2rem;
 }
@@ -313,7 +313,7 @@ h1 {
 }
 
 :deep(.sr-tag.p-tag) {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   padding: 0.25rem 0.5rem;
 }
 
