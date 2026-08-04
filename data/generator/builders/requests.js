@@ -3,12 +3,15 @@ import { NO_LOCATION_SERVICES, TRANSPORT_RIDE_W, RI_STREETS } from '../constants
 
 const dt = (d) => d.toISOString().slice(0, 19).replace('T', ' ')
 const addDays = (d, n) => new Date(d.getTime() + n * 86400000)
-// minutes-since-midnight (UTC) on d's date — mirrors the UI's 15-minute slots
+// minutes-since-midnight (UTC) on d's date — mirrors the UI's 15-minute slots.
+// Internal busy-slot math only; persisted values use isoDate/timeStr below.
 const atMinutes = (d, mins) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) + mins * 60000)
+const isoDate = (d) => d.toISOString().slice(0, 10)
+const timeStr = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}:00`
 
-// status weights -> ~40% Open, ~30% Confirmed, ~15% Completed, ~10% Draft, ~5% cancelled
-const STATUS_W = [['Open', 40], ['Confirmed', 30], ['Completed', 15], ['Draft', 10],
-  ['Member cancelled', 2], ['Volunteer cancelled', 2], ['Hub cancelled', 1]]
+// status weights -> ~42% Open, ~33% Confirmed, ~17% Completed, ~8% cancelled
+const STATUS_W = [['Open', 42], ['Confirmed', 33], ['Completed', 17],
+  ['Member cancelled', 3], ['Volunteer cancelled', 3], ['Hub cancelled', 2]]
 const CANCELLED = new Set(['Member cancelled', 'Volunteer cancelled', 'Hub cancelled'])
 
 // Real destinations carry a real town; ops-ish pseudo-towns fall back to the member's city.
@@ -32,7 +35,7 @@ const gagCategory = (name) => {
   return 'Errand: Other'
 }
 
-export function buildRequests (plan, membership, content, rng, creatorsByVillage = {}) {
+export function buildRequests (plan, membership, content, rng, creatorUserIds = []) {
   const { byVillage } = plan
   const personById = Object.fromEntries(plan.person.map(p => [p.id, p]))
   const allDest = [...content.destinations.destinations, ...content.destinations.miskatonicHealth]
@@ -91,11 +94,11 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
 
   const makeRequest = (villageId, memberPersonId, opts = {}) => {
     const vols = byVillage[villageId].volunteers
-    const creators = creatorsByVillage[villageId] || []
+    const creators = creatorUserIds
     let status = opts.status || rng.weighted(STATUS_W)
     // deriveStatus constraint: Confirmed/Completed MUST have a volunteer — if none in village, downgrade to Open
     if ((status === 'Confirmed' || status === 'Completed') && !vols.length) status = 'Open'
-    const wantsVol = status === 'Confirmed' || status === 'Completed' || (status === 'Draft' && rng.bool(0.3)) || (CANCELLED.has(status) && rng.bool(0.5))
+    const wantsVol = status === 'Confirmed' || status === 'Completed' || (CANCELLED.has(status) && rng.bool(0.5))
     // always null for Open; otherwise pick volunteer only if wantsVol
     const volunteerPersonId = status === 'Open' ? null : (wantsVol && vols.length ? rng.pick(vols) : null)
     const past = status === 'Completed' || CANCELLED.has(status)
@@ -107,11 +110,13 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
     const roundTrip = transportationType === 'Round Trip'
 
     // UI time flow — Round Trip: Start -> Arrival -> Return -> Finish; One Way: Start -> Finish.
-    // Some non-ride requests are date-only ("time to be arranged"), like prod.
+    // Rides are mostly timed; ~15% are "no specific times". Non-Rides never
+    // carry times (times are a Rides-only concept — CLAUDE.md).
     // Re-roll the day/slot until it clears the member's other requests; a
-    // date-only request blocks its nominal slot, so two "to be arranged"
-    // requests can't share a date either.
-    const dateOnly = !isRide && rng.bool(0.5)
+    // flexible request blocks its nominal slot, so two flexible requests
+    // can't share a date either.
+    const flexible = !isRide || rng.bool(0.15)
+    const dateOnly = flexible
     const busy = (busyByMember[memberPersonId] ??= [])
     let day, startMin, durMin, slot = null
     for (let attempt = 0; attempt < 10 && !slot; attempt++) {
@@ -126,23 +131,35 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
     busy.push(slot)
     const legMin = rng.int(1, 2) * 15 // travel leg used to seed arrival/return
 
-    // The grid's Destination/City columns come from these fields, so real
-    // places get a street address and their real town as the city.
+    // Ride geography (spec §2): most rides start from home; some return home
+    // from a venue; a few have NULL start* like migrated history.
+    const home = personById[memberPersonId]
+    let start = null; let startAddress = null; let startCity = null
+    let startState = null; let startZip = null; let startPhone = null
     let destination = null; let address = null; let city = null; let state = null; let zip = null; let phone = null
     if (!NO_LOCATION_SERVICES.includes(category)) {
-      const memberCity = personById[memberPersonId]?.city || null
-      if (opts.gag) {
-        destination = opts.gag.destination
-        city = memberCity
+      const memberCity = home?.city || null
+      const venue = opts.gag ? { name: opts.gag.destination, town: null } : rng.pick(destPoolFor(category))
+      const venueCity = opts.gag ? memberCity : cityFromTown(venue.town, memberCity)
+      const shape = isRide ? rng.weighted([['homeOut', 70], ['outHome', 15], ['legacy', 15]]) : 'legacy'
+      if (shape === 'outHome') {
+        start = venue.name
+        startAddress = `${rng.int(1, 2400)} ${rng.pick(RI_STREETS)}`
+        startCity = venueCity; startState = 'RI'
+        destination = 'Home'
+        address = home.street; city = home.city; state = 'RI'; zip = home.zip; phone = home.phone
       } else {
-        const dest = rng.pick(destPoolFor(category))
-        destination = dest.name
-        city = cityFromTown(dest.town, memberCity)
+        if (shape === 'homeOut') {
+          start = 'Home'
+          startAddress = home.street; startCity = home.city; startState = 'RI'
+          startZip = home.zip; startPhone = home.phone
+        }
+        destination = venue.name
+        address = `${rng.int(1, 2400)} ${rng.pick(RI_STREETS)}`
+        city = venueCity; state = 'RI'
+        zip = rng.bool(0.5) ? String(rng.int(2801, 2920)).padStart(5, '0') : null
+        phone = rng.bool(0.4) ? `401-${rng.int(200, 989)}-${String(rng.int(0, 9999)).padStart(4, '0')}` : null
       }
-      address = `${rng.int(1, 2400)} ${rng.pick(RI_STREETS)}`
-      state = 'RI'
-      zip = rng.bool(0.5) ? String(rng.int(2801, 2920)).padStart(5, '0') : null
-      phone = rng.bool(0.4) ? `401-${rng.int(200, 989)}-${String(rng.int(0, 9999)).padStart(4, '0')}` : null
     }
 
     const description = opts.gag
@@ -180,14 +197,17 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
         memberPersonId: memberPersonId, volunteerPersonId: occVolunteer, status: occStatus,
         serviceName: category,
         transportationType: transportationType,
-        destination, address, city, state, zip, phone,
         // staff attribution — entered by a manager or owner of the village
         createdUserId: creatorId,
         createdAt: createdAtStr,
-        startAt: dt(atMinutes(d, startMin)),
-        finishAt: dt(atMinutes(d, startMin + durMin)),
-        apptTime: roundTrip ? dt(atMinutes(d, startMin + legMin)) : null,
-        returnTime: roundTrip ? dt(atMinutes(d, startMin + durMin - legMin)) : null,
+        serviceDate: isoDate(d),
+        timesFlexible: flexible ? 1 : 0,
+        startTime: flexible ? null : timeStr(startMin),
+        finishTime: flexible ? null : timeStr(startMin + durMin),
+        apptTime: !flexible && roundTrip ? timeStr(startMin + legMin) : null,
+        returnTime: !flexible && roundTrip ? timeStr(startMin + durMin - legMin) : null,
+        start, startAddress, startCity, startState, startZip, startPhone,
+        destination, address, city, state, zip, phone,
         instructions: noteByPerson[memberPersonId] || null,
         description,
       })
@@ -222,7 +242,7 @@ export function buildRequests (plan, membership, content, rng, creatorsByVillage
     const p = personByName[fig.name.toLowerCase()]
     if (!p || !memberPersonIds.has(p.id)) continue
     makeRequest(p.villageId, p.id, {
-      status: rng.weighted([['Open', 3], ['Confirmed', 3], ['Completed', 2], ['Draft', 1]]),
+      status: rng.weighted([['Open', 3], ['Confirmed', 3], ['Completed', 2]]),
       gag: fig.gag,
     })
   }

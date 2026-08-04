@@ -18,11 +18,7 @@ export function buildDataset (content, seed, sizing = {}) {
 
   const personsPlan = buildPersons(content, villageIdByName, rng, villagesList)
   const membership = buildMembership(personsPlan, content, rng)
-  // Task 4 replaces this shim: buildRequests still expects a per-village
-  // creator map, but creators are now federation-scoped (Staff + Service
-  // Coordinator), so fan the same pool out to every village for now.
-  const creatorsByVillage = Object.fromEntries(village.map(v => [v.id, creatorUserIds]))
-  const requests = buildRequests(personsPlan, membership, content, rng, creatorsByVillage)
+  const requests = buildRequests(personsPlan, membership, content, rng, creatorUserIds)
 
   return {
     village, user_data, role_grant,

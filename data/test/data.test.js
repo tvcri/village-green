@@ -201,7 +201,7 @@ test('service requests honor deriveStatus and reference valid people', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   const personIds = new Set(ds.person.map(p => p.id))
   const villageIds = new Set(ds.village.map(v => v.id))
-  const statuses = new Set(['Draft', 'Open', 'Confirmed', 'Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled'])
+  const statuses = new Set(['Open', 'Confirmed', 'Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled'])
   for (const sr of ds.service_request) {
     assert.ok(villageIds.has(sr.villageId))
     assert.ok(statuses.has(sr.status), `bad status ${sr.status}`)
@@ -212,7 +212,7 @@ test('service requests honor deriveStatus and reference valid people', () => {
   }
   // a spread of statuses is present
   const seen = new Set(ds.service_request.map(s => s.status))
-  for (const s of ['Open', 'Confirmed', 'Completed', 'Draft']) assert.ok(seen.has(s), `missing status ${s}`)
+  for (const s of ['Open', 'Confirmed', 'Completed']) assert.ok(seen.has(s), `missing status ${s}`)
 })
 
 test('service requests match the UI-enforced category/transport/location rules', () => {
@@ -237,15 +237,21 @@ test('service requests match the UI-enforced category/transport/location rules',
       assert.ok(sr.city, 'location services need a city')
       assert.ok(sr.address, 'location services need an address')
     }
-    // UI time flow: RT = Start -> Arrival -> Return -> Finish; otherwise no appt/return
-    assert.ok(sr.startAt <= sr.finishAt)
-    if (sr.transportationType === 'Round Trip') {
-      assert.ok(sr.apptTime && sr.returnTime, 'round trips seed arrival + return')
-      assert.ok(sr.startAt < sr.apptTime && sr.apptTime < sr.returnTime && sr.returnTime < sr.finishAt,
-        `RT time order: ${sr.startAt} ${sr.apptTime} ${sr.returnTime} ${sr.finishAt}`)
+    // UI time flow: RT = Start -> Arrival -> Return -> Finish; otherwise no appt/return.
+    // Flexible requests (incl. all non-Rides) carry no times at all.
+    if (sr.timesFlexible) {
+      assert.equal(sr.startTime, null); assert.equal(sr.finishTime, null)
+      assert.equal(sr.apptTime, null); assert.equal(sr.returnTime, null)
     } else {
-      assert.equal(sr.apptTime, null)
-      assert.equal(sr.returnTime, null)
+      assert.ok(sr.startTime <= sr.finishTime)
+      if (sr.transportationType === 'Round Trip') {
+        assert.ok(sr.apptTime && sr.returnTime, 'round trips seed arrival + return')
+        assert.ok(sr.startTime < sr.apptTime && sr.apptTime < sr.returnTime && sr.returnTime < sr.finishTime,
+          `RT time order: ${sr.startTime} ${sr.apptTime} ${sr.returnTime} ${sr.finishTime}`)
+      } else {
+        assert.equal(sr.apptTime, null)
+        assert.equal(sr.returnTime, null)
+      }
     }
     // instructions echo the member's standing service note (or are absent)
     if (sr.instructions) assert.equal(sr.instructions, noteByPerson[sr.memberPersonId])
@@ -280,7 +286,7 @@ test('inactive members come from the invented filler pool first', () => {
 test('standing requests: series re-book the same trip and share one booking identity', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   // a series = same member + service + destination + time-of-day slot
-  const key = (s) => [s.memberPersonId, s.serviceName, s.destination, s.startAt.slice(11)].join('|')
+  const key = (s) => [s.memberPersonId, s.serviceName, s.destination, s.startTime].join('|')
   const groups = {}
   for (const s of ds.service_request) (groups[key(s)] ??= []).push(s)
   const series = Object.values(groups).filter(g => g.length > 1)
@@ -291,15 +297,55 @@ test('standing requests: series re-book the same trip and share one booking iden
     new Set(g.map(s => s.createdUserId)).size === 1 && new Set(g.map(s => s.createdAt)).size === 1)
   assert.ok(wellFormed.length >= 20, `only ${wellFormed.length} standing series`)
   for (const g of wellFormed) {
-    for (const s of g) assert.ok(s.createdAt <= s.startAt, 'booking predates every occurrence')
+    for (const s of g) assert.ok(s.createdAt.slice(0, 10) <= s.serviceDate, 'booking predates every occurrence')
   }
+})
+
+test('requests: wall-clock time model and Rides-only times', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  assert.ok(ds.service_request.length > 100)
+  for (const sr of ds.service_request) {
+    assert.ok(!('startAt' in sr) && !('finishAt' in sr), 'startAt/finishAt are dropped columns')
+    assert.match(sr.serviceDate, /^\d{4}-\d{2}-\d{2}$/)
+    assert.ok(sr.status !== 'Draft', 'Draft was excised in PR #83')
+    const isRide = sr.serviceName.startsWith('Ride:')
+    if (!isRide) {
+      assert.equal(sr.timesFlexible, 1, 'non-Rides are always flexible')
+      assert.equal(sr.startTime, null); assert.equal(sr.apptTime, null)
+    } else if (sr.timesFlexible === 0) {
+      assert.match(sr.startTime, /^\d{2}:\d{2}:00$/)
+      assert.match(sr.finishTime, /^\d{2}:\d{2}:00$/)
+      if (sr.transportationType === 'Round Trip') assert.match(sr.apptTime, /^\d{2}:\d{2}:00$/)
+      else assert.equal(sr.apptTime, null)
+    } else {
+      assert.equal(sr.startTime, null)
+    }
+  }
+})
+
+test('requests: ride geography — home->out majority, out->home and NULL-start minorities', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const rides = ds.service_request.filter(sr => sr.serviceName.startsWith('Ride:'))
+  const homeOut = rides.filter(sr => sr.start === 'Home')
+  const outHome = rides.filter(sr => sr.destination === 'Home')
+  const noStart = rides.filter(sr => sr.start === null)
+  assert.ok(homeOut.length > outHome.length && homeOut.length > noStart.length)
+  assert.ok(outHome.length > 0 && noStart.length > 0)
+  for (const sr of outHome) assert.ok(sr.startAddress, 'out->home rides carry the venue start address')
+  // creators are the federation Staff/SC users (userIds 3 and 4 by construction order)
+  assert.ok(ds.service_request.every(sr => [3, 4].includes(sr.createdUserId)))
 })
 
 test('members can hold several requests, but never two overlapping in time', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   const ms = (x) => Date.parse(x.replace(' ', 'T') + 'Z')
-  // date-only requests (start == finish) block their nominal 15-minute slot
-  const span = (sr) => [ms(sr.startAt), Math.max(ms(sr.finishAt), ms(sr.startAt) + 15 * 60000)]
+  // flexible requests (null times) block their nominal 15-minute slot, matching
+  // the generator's internal dateOnly/flexible slot math (startMin = 4*60, durMin = 0)
+  const span = (sr) => {
+    const start = ms(`${sr.serviceDate} ${sr.startTime || '04:00:00'}`)
+    const finish = sr.finishTime ? ms(`${sr.serviceDate} ${sr.finishTime}`) : start
+    return [start, Math.max(finish, start + 15 * 60000)]
+  }
   const byMember = {}
   for (const sr of ds.service_request) (byMember[sr.memberPersonId] ??= []).push(sr)
   const multi = Object.values(byMember).filter(list => list.length > 1)
@@ -309,7 +355,7 @@ test('members can hold several requests, but never two overlapping in time', () 
       for (let j = i + 1; j < list.length; j++) {
         const [aS, aE] = span(list[i]); const [bS, bE] = span(list[j])
         assert.ok(!(aS < bE && bS < aE),
-          `member ${list[i].memberPersonId} double-booked: [${list[i].startAt}..${list[i].finishAt}] vs [${list[j].startAt}..${list[j].finishAt}]`)
+          `member ${list[i].memberPersonId} double-booked: [${list[i].serviceDate} ${list[i].startTime}..${list[i].finishTime}] vs [${list[j].serviceDate} ${list[j].startTime}..${list[j].finishTime}]`)
       }
     }
   }
