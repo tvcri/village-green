@@ -47,7 +47,7 @@ export const VILLAGES = [
   { name: 'Cabinet', size: 'tiny', theme: 'made-up' },
 ]
 
-export const CLASS_TOTALS = { big: 113, medium: 23, small: 10, tiny: 5 }
+export const CLASS_TOTALS = { big: 113, medium: 20, small: 9, tiny: 5 }
 
 // Parent-before-child insert order (FK checks are disabled during load, but stay tidy).
 export const TABLE_ORDER = [
