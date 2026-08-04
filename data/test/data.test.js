@@ -447,3 +447,23 @@ test('all 10 villages have >=1 member and >=1 volunteer; big villages honor thei
   const quahog = byVillage[villageByName['Quahog']]
   assert.ok(quahog.v >= 40 && quahog.m > quahog.v, `Quahog ${quahog.m}m/${quahog.v}v not member-heavy`)
 })
+
+test('communities: catalog matches migration 0010; ~10-15% tagged; big-village coverage', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  assert.deepEqual(ds.community, [{ id: 1, name: 'Pride' }, { id: 2, name: 'Veteran' }])
+  const share = ds.person_community.length / ds.person.length
+  assert.ok(share > 0.08 && share < 0.2, `tag share ${share.toFixed(2)}`)
+  const keys = ds.person_community.map(pc => `${pc.personId}:${pc.communityId}`)
+  assert.equal(keys.length, new Set(keys).size, 'unique (person, community)')
+  // each community has >=1 active member and >=1 active volunteer in each big village (1=Arkham, 2=Quahog)
+  const activeMemberIds = new Set(ds.member.filter(m => m.status === 'Active').map(m => m.personId))
+  const activeVolIds = new Set(ds.volunteer.filter(v => v.active === 1).map(v => v.personId))
+  const personVillage = Object.fromEntries(ds.person.map(p => [p.id, p.villageId]))
+  for (const vid of [1, 2]) {
+    for (const cid of [1, 2]) {
+      const inVillage = ds.person_community.filter(pc => pc.communityId === cid && personVillage[pc.personId] === vid)
+      assert.ok(inVillage.some(pc => activeMemberIds.has(pc.personId)), `community ${cid} member in village ${vid}`)
+      assert.ok(inVillage.some(pc => activeVolIds.has(pc.personId)), `community ${cid} volunteer in village ${vid}`)
+    }
+  }
+})

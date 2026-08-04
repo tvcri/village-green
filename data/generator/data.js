@@ -5,6 +5,7 @@ import { buildVillagesAndUsers } from './builders/villages.js'
 import { buildPrivacy } from './builders/privacy.js'
 import { buildPersons } from './builders/persons.js'
 import { buildMembership } from './builders/membership.js'
+import { buildCommunities } from './builders/communities.js'
 import { buildVssUsers } from './builders/vss.js'
 import { buildRequests } from './builders/requests.js'
 
@@ -18,6 +19,7 @@ export function buildDataset (content, seed, sizing = {}) {
 
   const personsPlan = buildPersons(content, villageIdByName, rng, villagesList)
   const membership = buildMembership(personsPlan, content, rng)
+  const communities = buildCommunities(personsPlan, membership, rng, villagesList, villageIdByName)
   const vss = buildVssUsers(personsPlan, membership, user_data, rng)
   const privacy = buildPrivacy(user_data, rng)
   const requests = buildRequests(personsPlan, membership, content, rng, creatorUserIds, vss.userIdByPersonId)
@@ -26,12 +28,12 @@ export function buildDataset (content, seed, sizing = {}) {
     village, user_data, role_grant,
     privacy_rules: privacy.privacy_rules, privacy_acknowledgement: privacy.privacy_acknowledgement,
     capability: CAPABILITIES.map(c => ({ id: c.id, name: c.name })),
-    disability: membership.disability, vetting_type: membership.vetting_type,
+    disability: membership.disability, vetting_type: membership.vetting_type, community: communities.community,
     person: personsPlan.person,
     member: membership.member, volunteer: membership.volunteer,
     volunteer_capability: membership.volunteer_capability,
     volunteer_vetting: membership.volunteer_vetting,
-    person_disability: membership.person_disability,
+    person_disability: membership.person_disability, person_community: communities.person_community,
     service_request: requests.service_request,
     notification_event: requests.notification_event,
     fcv_submission: requests.fcv_submission,
