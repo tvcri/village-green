@@ -3,6 +3,7 @@ import { withDb } from './db.js'
 import { TABLE_ORDER } from './constants.js'
 import { buildDataset, loadContent } from './data.js'
 import { buildGuide, buildLogins } from './guide.js'
+import { wrapRoster } from './roster-file.js'
 import { seedSql } from './seed-sql.js'
 import { buildJsonl, columnMapFromDb } from './emit-appdata.js'
 import { columnMetaFromDb, analyzeDrift, loadBaseline } from './doctor.js'
@@ -74,7 +75,8 @@ const dataset = generates ? buildDataset(loadContent(), config.seed, config.sizi
 if (generates) await doctor(dataset)
 if (generates) {
   writeFileSync('demo-guide.md', buildGuide(dataset))
-  writeFileSync('demo-logins.json', JSON.stringify(buildLogins(dataset), null, 2) + '\n')
+  writeFileSync('demo-logins.json',
+    JSON.stringify(wrapRoster(buildLogins(dataset), { seed: config.seed, sizing: config.sizing }), null, 2) + '\n')
   console.log('wrote demo-guide.md, demo-logins.json')
 }
 
