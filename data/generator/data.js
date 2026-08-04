@@ -5,6 +5,7 @@ import { buildVillagesAndUsers } from './builders/villages.js'
 import { buildPrivacy } from './builders/privacy.js'
 import { buildPersons } from './builders/persons.js'
 import { buildMembership } from './builders/membership.js'
+import { buildVssUsers } from './builders/vss.js'
 import { buildRequests } from './builders/requests.js'
 
 export function buildDataset (content, seed, sizing = {}) {
@@ -12,13 +13,14 @@ export function buildDataset (content, seed, sizing = {}) {
   const villagesList = resolveVillages(sizing)
   const { village, user_data, role_grant, villageIdByName, creatorUserIds } =
     buildVillagesAndUsers(content, rng, villagesList)
-  const privacy = buildPrivacy(user_data, rng)
   // requests builder needs villageId -> name; pass via a private field
   content.__villageById = Object.fromEntries(village.map(v => [v.id, v.name]))
 
   const personsPlan = buildPersons(content, villageIdByName, rng, villagesList)
   const membership = buildMembership(personsPlan, content, rng)
-  const requests = buildRequests(personsPlan, membership, content, rng, creatorUserIds)
+  const vss = buildVssUsers(personsPlan, membership, user_data, rng)
+  const privacy = buildPrivacy(user_data, rng)
+  const requests = buildRequests(personsPlan, membership, content, rng, creatorUserIds, vss.userIdByPersonId)
 
   return {
     village, user_data, role_grant,

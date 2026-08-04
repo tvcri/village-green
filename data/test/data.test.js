@@ -383,6 +383,23 @@ test('privacy: one published rule, acknowledged by every user (incl. the loader 
   assert.ok(ackedUsers.has(loader.userId))
 })
 
+test('vss: ~25% of active volunteers get accounts; modifiedUserId is the VSS marker', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const vssUsers = ds.user_data.filter(u => u.username.endsWith('@residents.test'))
+  const activeVols = ds.volunteer.filter(v => v.active === 1).length
+  assert.ok(Math.abs(vssUsers.length - activeVols * 0.25) <= activeVols * 0.08)
+  // acks cover VSS users too (privacy built after them)
+  assert.equal(ds.privacy_acknowledgement.length, ds.user_data.length)
+  const vssIds = new Set(vssUsers.map(u => u.userId))
+  const marked = ds.service_request.filter(sr => sr.modifiedUserId !== null)
+  assert.ok(marked.length > 0, 'some requests carry the VSS marker')
+  for (const sr of marked) {
+    assert.ok(vssIds.has(sr.modifiedUserId), 'modifiedUserId must be a volunteer user, never staff')
+    assert.ok(['Confirmed', 'Completed'].includes(sr.status))
+    assert.ok(sr.modifiedAt >= sr.createdAt)
+  }
+})
+
 test('notifications reference requests; recipients is a JSON string', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   const srIds = new Set(ds.service_request.map(s => s.id))

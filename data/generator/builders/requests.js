@@ -35,7 +35,7 @@ const gagCategory = (name) => {
   return 'Errand: Other'
 }
 
-export function buildRequests (plan, membership, content, rng, creatorUserIds = []) {
+export function buildRequests (plan, membership, content, rng, creatorUserIds = [], vssByPerson = {}) {
   const { byVillage } = plan
   const personById = Object.fromEntries(plan.person.map(p => [p.id, p]))
   const allDest = [...content.destinations.destinations, ...content.destinations.miskatonicHealth]
@@ -186,7 +186,8 @@ export function buildRequests (plan, membership, content, rng, creatorUserIds = 
     // status, and volunteer vary per occurrence.
     const creatorId = creators.length ? rng.pick(creators) : null
     const earliestDay = recur ? addDays(day, -recur.stepDays * recur.back) : day
-    const createdAtStr = dt(addDays(earliestDay, -rng.int(1, 14)))
+    const createdAtDate = addDays(earliestDay, -rng.int(1, 14))
+    const createdAtStr = dt(createdAtDate)
     const emit = (d, occStatus, occVolunteer) => {
       srId += 1
       service_request.push({
@@ -210,14 +211,22 @@ export function buildRequests (plan, membership, content, rng, creatorUserIds = 
         destination, address, city, state, zip, phone,
         instructions: noteByPerson[memberPersonId] || null,
         description,
+        // VSS marker: only a volunteer's own self-service touch sets modified*
+        modifiedUserId: (vssByPerson[occVolunteer] && (occStatus === 'Confirmed' || occStatus === 'Completed'))
+          ? vssByPerson[occVolunteer] : null,
+        modifiedAt: (vssByPerson[occVolunteer] && (occStatus === 'Confirmed' || occStatus === 'Completed'))
+          ? dt(addDays(createdAtDate, rng.int(0, 3))) : null,
       })
       pushNotifications(service_request[service_request.length - 1])
     }
     emit(day, status, volunteerPersonId)
 
     if (recur) {
-      // regulars usually get the same driver for every occurrence
-      const regular = volunteerPersonId || (vols.length ? rng.pick(vols) : null)
+      // regulars usually get the same driver for every occurrence; prefer a
+      // VSS-enabled volunteer so most series have a regular who can self-serve
+      const vssVols = vols.filter(v => vssByPerson[v])
+      const regular = volunteerPersonId ||
+        (vssVols.length && rng.bool(0.7) ? rng.pick(vssVols) : (vols.length ? rng.pick(vols) : null))
       for (let k = -recur.back; k <= recur.extra - recur.back; k++) {
         if (k === 0) continue // the base occurrence, already emitted
         const d = addDays(day, recur.stepDays * k)
