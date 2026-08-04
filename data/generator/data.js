@@ -41,7 +41,7 @@ export function buildDataset (content, seed, sizing = {}) {
   }
 
   const plants = applyPlants(dataset, rng)
-  dataset.__meta = { plants, villagesList }
+  dataset.__meta = { plants, villagesList, gagIndex: requests.gagIndex }
 
   return dataset
 }

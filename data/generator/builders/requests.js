@@ -218,8 +218,9 @@ export function buildRequests (plan, membership, content, rng, creatorUserIds = 
           ? dt(addDays(createdAtDate, rng.int(0, 3))) : null,
       })
       pushNotifications(service_request[service_request.length - 1])
+      return srId
     }
-    emit(day, status, volunteerPersonId)
+    const baseSrId = emit(day, status, volunteerPersonId)
 
     if (recur) {
       // regulars usually get the same driver for every occurrence; prefer a
@@ -244,16 +245,19 @@ export function buildRequests (plan, membership, content, rng, creatorUserIds = 
         emit(d, occStatus, occVolunteer)
       }
     }
+    return baseSrId
   }
 
   // 1) Bespoke gag requests for gag cameos who landed as members.
+  const gagIndex = []
   for (const fig of gagFigures) {
     const p = personByName[fig.name.toLowerCase()]
     if (!p || !memberPersonIds.has(p.id)) continue
-    makeRequest(p.villageId, p.id, {
+    const srId = makeRequest(p.villageId, p.id, {
       status: rng.weighted([['Open', 3], ['Confirmed', 3], ['Completed', 2]]),
       gag: fig.gag,
     })
+    if (srId !== undefined) gagIndex.push({ figure: fig.name, srId })
   }
 
   // 2) Ordinary requests, concentrated in big villages, to reach a healthy volume.
@@ -286,5 +290,5 @@ export function buildRequests (plan, membership, content, rng, creatorUserIds = 
     }
   }
 
-  return { service_request, notification_event, fcv_submission }
+  return { service_request, notification_event, fcv_submission, gagIndex }
 }
