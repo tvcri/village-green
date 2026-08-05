@@ -26,7 +26,6 @@ function makeMetrics () {
       { category: 'Errands', byStatus: { ...emptyStatus(), completed: 20, volunteerCancelled: 2 }, completedRoundTrips: 2 },
       { category: 'Home Help', byStatus: { ...emptyStatus(), completed: 10 }, completedRoundTrips: 0 },
       { category: 'Tech Support', byStatus: { ...emptyStatus() }, completedRoundTrips: 0 },
-      { category: 'Member Added', byStatus: { ...emptyStatus() }, completedRoundTrips: 0 },
     ],
     byServiceType: [
       { serviceName: 'Ride: Medical', category: 'Rides', byStatus: { ...emptyStatus(), completed: 30 }, completedRoundTrips: 5 },
@@ -69,13 +68,12 @@ describe('STATUS_ORDER / STATUS_LABELS / STATUS_OPTIONS', () => {
 })
 
 describe('CATEGORY_COLORS', () => {
-  it('has the 5 category hues (mirrors VolunteerHome --cat-* vars)', () => {
+  it('has the 4 category hues (mirrors VolunteerHome --cat-* vars)', () => {
     expect(CATEGORY_COLORS).toEqual({
       Rides: '#22c55e',
       Errands: '#f59e0b',
       'Home Help': '#3b82f6',
       'Tech Support': '#8b5cf6',
-      'Member Added': '#64748b',
     })
   })
 })
@@ -128,22 +126,21 @@ describe('adjustedCount', () => {
 describe('categoryChart', () => {
   const metrics = makeMetrics()
 
-  it('omits zero-value slices but keeps all 5 rows with pct', () => {
+  it('omits zero-value slices but keeps all 4 rows with pct', () => {
     const { slices, rows } = categoryChart(metrics.byCategory, 'completed', false)
-    // Rides 40, Errands 20, Home Help 10 are nonzero; Tech Support and Member Added are 0
+    // Rides 40, Errands 20, Home Help 10 are nonzero; Tech Support is 0
     expect(slices).toEqual([
       { label: 'Rides', value: 40, color: '#22c55e' },
       { label: 'Errands', value: 20, color: '#f59e0b' },
       { label: 'Home Help', value: 10, color: '#3b82f6' },
     ])
-    expect(rows).toHaveLength(5)
+    expect(rows).toHaveLength(4)
     const total = 70 // 40 + 20 + 10
     expect(rows).toEqual([
       { label: 'Rides', value: 40, color: '#22c55e', pct: 40 / total },
       { label: 'Errands', value: 20, color: '#f59e0b', pct: 20 / total },
       { label: 'Home Help', value: 10, color: '#3b82f6', pct: 10 / total },
       { label: 'Tech Support', value: 0, color: '#8b5cf6', pct: 0 },
-      { label: 'Member Added', value: 0, color: '#64748b', pct: 0 },
     ])
   })
 
@@ -162,7 +159,6 @@ describe('categoryChart', () => {
       { category: 'Errands', byStatus: emptyStatus(), completedRoundTrips: 0 },
       { category: 'Home Help', byStatus: emptyStatus(), completedRoundTrips: 0 },
       { category: 'Tech Support', byStatus: emptyStatus(), completedRoundTrips: 0 },
-      { category: 'Member Added', byStatus: emptyStatus(), completedRoundTrips: 0 },
     ]
     const { slices, rows } = categoryChart(zeroCategories, 'unmatched', false)
     expect(slices).toEqual([])
@@ -179,7 +175,6 @@ describe('categoryChart', () => {
       { category: 'Errands', byStatus: { ...emptyStatus(), completed: 20 } },
       { category: 'Home Help', byStatus: emptyStatus() },
       { category: 'Tech Support', byStatus: emptyStatus() },
-      { category: 'Member Added', byStatus: emptyStatus() },
     ]
     const { slices, rows } = categoryChart(categoriesMissingField, 'completed', true)
     expect(rows.every(r => Number.isFinite(r.value) && Number.isFinite(r.pct))).toBe(true)

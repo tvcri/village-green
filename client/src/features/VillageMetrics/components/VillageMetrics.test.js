@@ -72,7 +72,6 @@ const METRICS = {
     { category: 'Errands', byStatus: byStatus({ completed: 4 }), completedRoundTrips: 0 },
     { category: 'Home Help', byStatus: byStatus(), completedRoundTrips: 0 },
     { category: 'Tech Support', byStatus: byStatus(), completedRoundTrips: 0 },
-    { category: 'Member Added', byStatus: byStatus(), completedRoundTrips: 0 },
   ],
   byServiceType: [
     { serviceName: 'Ride: Medical', category: 'Rides', byStatus: byStatus({ completed: 6 }), completedRoundTrips: 4 },
