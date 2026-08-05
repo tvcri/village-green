@@ -321,12 +321,33 @@ const exportMenuItems = computed(() => [
   },
 ])
 
+// Dashboard-wide help. The round-trip dialog (showLegsInfo) stays scoped to its
+// toggle; this one covers the whole page and links out to the full guide.
+const showDashboardHelp = ref(false)
+
+// Prefix-aware, following init.js/router: under a prefixed deployment the asset
+// lives at `${pathPrefix}guides/...`, not at the domain root. NOT '/docs/' —
+// the API mounts Sphinx output there (bootstrap/docs.js), and the client only
+// wins today by middleware registration order.
+const GUIDE_URL = `${globalThis.VG?.Env?.pathPrefix ?? '/'}guides/village-metrics-guide.pdf`
+
 </script>
 
 <template>
   <div class="village-metrics">
     <header class="metrics-header">
-      <h1>{{ metrics?.villageName || 'Village' }} — Metrics</h1>
+      <div class="header-row">
+        <h1>{{ metrics?.villageName || 'Village' }} — Metrics</h1>
+        <Button
+          icon="pi pi-question-circle"
+          text
+          rounded
+          class="help-button"
+          v-tooltip.left="'About the Metrics Dashboard'"
+          aria-label="About the Metrics Dashboard"
+          @click="showDashboardHelp = true"
+        />
+      </div>
       <p class="exclusion-note">Hub-cancelled requests are excluded from all counts.</p>
       <MetricsRangePicker
         v-if="isValidRange(range)"
@@ -443,6 +464,30 @@ const exportMenuItems = computed(() => [
     </template>
 
     <Dialog
+      v-model:visible="showDashboardHelp"
+      modal
+      header="About the Metrics Dashboard"
+      :style="{ width: '32rem' }"
+      :breakpoints="{ '640px': '90vw' }"
+    >
+      <p class="help-body">
+        The Metrics Dashboard provides information about service requests,
+        outcomes, volunteers, and members for each Village. Users can view a
+        Village, choose a reporting period, explore different measures, change
+        how information is displayed, and download reports. The dashboard
+        updates automatically as new information is entered into the system.
+      </p>
+      <p class="help-body">
+        For more details, see
+        <a :href="GUIDE_URL" target="_blank" rel="noopener">
+          How to Use the Village Metrics Dashboard
+          <i class="pi pi-external-link help-link-icon" aria-hidden="true" />
+        </a>
+        <span class="help-meta">(PDF, 8 pages)</span>
+      </p>
+    </Dialog>
+
+    <Dialog
       v-model:visible="showLegsInfo"
       modal
       header="Round-trip Rides"
@@ -491,6 +536,31 @@ const exportMenuItems = computed(() => [
 }
 .legs-toggle label { font-size: 0.9rem; cursor: pointer; }
 .legs-info-body { margin: 0; line-height: 1.5; }
+/* Title left, Help right. The h1 keeps its own margin; align to the baseline-ish
+   center so the small button sits with the heading rather than above it. */
+.header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.header-row h1 { margin: 0; }
+/* Deliberately understated: this is a secondary affordance next to the page
+   title, not a call to action. Opacity rather than a fixed color so it stays
+   correct in both themes; full strength on hover/focus keeps it discoverable.
+   Focus-visible is excluded from the dimming so keyboard focus stays obvious. */
+.help-button {
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+.help-button :deep(.pi) { font-size: 1.25rem; }
+.help-button:hover,
+.help-button:focus-visible { opacity: 1; }
+.help-body { margin: 0 0 0.75rem; line-height: 1.5; }
+.help-body:last-child { margin-bottom: 0; }
+.help-link-icon { font-size: 0.75rem; margin-left: 0.25rem; }
+.help-meta { color: var(--color-text-muted, #6b7280); font-size: 0.85rem; margin-left: 0.35rem; }
 .panel-filters {
   display: flex;
   flex-wrap: wrap;

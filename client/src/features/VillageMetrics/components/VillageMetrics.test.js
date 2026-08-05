@@ -264,6 +264,53 @@ describe('VillageMetrics container', () => {
     expect(screen.getByRole('button', { name: /download pdf/i })).toBeTruthy()
   })
 
+  // The Help button lives in the page header, which renders before the fetch
+  // resolves — someone confused enough to want the guide may be staring at an
+  // empty state, so it must not depend on loaded data.
+  it('offers dashboard Help in the header linking to the guide PDF', async () => {
+    await renderLoaded()
+    const help = screen.getByRole('button', { name: /about the metrics dashboard/i })
+
+    await fireEvent.click(help)
+    await waitFor(() => expect(screen.getByText(/provides information about service requests/i)).toBeTruthy())
+
+    const link = screen.getByRole('link', { name: /how to use the village metrics dashboard/i })
+    // NOT '/docs/...': the API mounts Sphinx output at /docs (bootstrap/docs.js).
+    expect(link.getAttribute('href')).toBe('/guides/village-metrics-guide.pdf')
+    expect(link.getAttribute('target')).toBe('_blank')
+    // target=_blank without noopener hands the PDF tab a window.opener handle.
+    expect(link.getAttribute('rel')).toContain('noopener')
+  })
+
+  // A prefixed deployment serves the client under e.g. /vg/, so a root-absolute
+  // link would point at a path the asset does not occupy. init.js and the router
+  // both branch on pathPrefix for exactly this reason.
+  it('resolves the guide link against VG.Env.pathPrefix when deployed under a prefix', async () => {
+    const prior = globalThis.VG
+    globalThis.VG = { ...(prior ?? {}), Env: { ...(prior?.Env ?? {}), pathPrefix: '/vg/' } }
+    try {
+      await renderLoaded()
+      await fireEvent.click(screen.getByRole('button', { name: /about the metrics dashboard/i }))
+      await waitFor(() => expect(screen.getByRole('link', { name: /how to use the village metrics dashboard/i })).toBeTruthy())
+
+      const link = screen.getByRole('link', { name: /how to use the village metrics dashboard/i })
+      expect(link.getAttribute('href')).toBe('/vg/guides/village-metrics-guide.pdf')
+    } finally {
+      globalThis.VG = prior
+    }
+  })
+
+  // The round-trip icon keeps its own narrow scope; the dashboard guide is a
+  // separate affordance, not a replacement for it.
+  it('keeps the round-trip info dialog separate from dashboard Help', async () => {
+    await renderLoaded()
+    const legsInfo = screen.getByRole('button', { name: /about round-trip ride counting/i })
+
+    await fireEvent.click(legsInfo)
+    await waitFor(() => expect(screen.getByText(/Many health insurers count round-trip rides/i)).toBeTruthy())
+    expect(screen.queryByRole('link', { name: /how to use the village metrics dashboard/i })).toBeNull()
+  })
+
   // The JSON item lives in the SplitButton's dropdown, which PrimeVue renders
   // only once opened — so drive it through the toggle rather than asserting on
   // markup that isn't mounted yet.
