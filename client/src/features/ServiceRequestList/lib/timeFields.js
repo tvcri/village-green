@@ -3,6 +3,12 @@
 // NEVER pass these strings to new Date(): 'YYYY-MM-DD' parses as UTC
 // midnight (off-by-one day in western zones) and 'HH:MM:SS' is invalid.
 
+// dateToServiceDate / serviceDateToDate now live in shared/lib/civilDate.js.
+// Re-exported here so existing importers of this module are unaffected, and
+// imported locally so formatServiceDate (below) can call serviceDateToDate.
+import { dateToServiceDate, serviceDateToDate } from '../../../shared/lib/civilDate.js'
+export { dateToServiceDate, serviceDateToDate }
+
 export function minutesToTimeString (mins) {
   if (mins == null) return null
   const h = String(Math.floor(mins / 60)).padStart(2, '0')
@@ -24,20 +30,6 @@ export function timeStringToLabel (t) {
   const period = h24 < 12 ? 'AM' : 'PM'
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12
   return `${h12}:${String(m).padStart(2, '0')} ${period}`
-}
-
-export function dateToServiceDate (d) {
-  if (!d) return null
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-export function serviceDateToDate (s) {
-  if (!s) return null
-  const [y, m, d] = s.split('-').map(Number)
-  return new Date(y, m - 1, d)
 }
 
 // Sort key that groups by serviceDate and orders within a date by startTime.

@@ -268,13 +268,13 @@ module.exports.getVillagePerson = async function (villageId, personId) {
 }
 
 module.exports.getVillageMetrics = async function (villageId, start, end) {
-  // Business rule: 'Hub cancelled' requests are treated as if they never
-  // existed — excluded from every section. byMember/byVolunteer count
-  // Completed only; byStatus/byServiceType/byCategory carry the full mix.
+  // Business rule: metrics report on TERMINAL requests only — see
+  // dbUtils.TERMINAL_SR_STATUSES. 'Open'/'Confirmed' are still in flight and
+  // would make a report irreproducible; 'Hub cancelled' is treated as if it
+  // never existed. byMember/byVolunteer count Completed only;
+  // byStatus/byServiceType/byCategory carry the full terminal mix.
   // Breakdown arrays are ordered in SQL (jsonArrayAgg orderBy).
   const statusJson = (alias) => `JSON_OBJECT(
-    'open',               COALESCE(SUM(${alias}.status = 'Open'), 0),
-    'confirmed',          COALESCE(SUM(${alias}.status = 'Confirmed'), 0),
     'completed',          COALESCE(SUM(${alias}.status = 'Completed'), 0),
     'unmatched',          COALESCE(SUM(${alias}.status = 'Unmatched'), 0),
     'memberCancelled',    COALESCE(SUM(${alias}.status = 'Member cancelled'), 0),
@@ -294,12 +294,12 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
       (SELECT ${statusJson('sr')}
         FROM service_request sr
         WHERE sr.villageId = v.id
-          AND sr.status != 'Hub cancelled'
+          AND ${dbUtils.sqlTerminalStatus('sr.status')}
           AND sr.serviceDate BETWEEN ? AND ?) AS byStatus,
       (SELECT ${roundTripSum('sr')}
         FROM service_request sr
         WHERE sr.villageId = v.id
-          AND sr.status != 'Hub cancelled'
+          AND ${dbUtils.sqlTerminalStatus('sr.status')}
           AND sr.serviceDate BETWEEN ? AND ?) AS totalsRoundTrips,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
@@ -309,7 +309,7 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
         FROM (SELECT sr.serviceName, ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
-                AND sr.status != 'Hub cancelled'
+                AND ${dbUtils.sqlTerminalStatus('sr.status')}
                 AND sr.serviceName IS NOT NULL
                 AND sr.serviceDate BETWEEN ? AND ?
               GROUP BY sr.serviceName) t) AS byServiceType,
@@ -321,7 +321,7 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
         FROM (SELECT ${categoryCase} AS category, ${statusJson('sr')} AS statusCounts, ${roundTripSum('sr')} AS rt
               FROM service_request sr
               WHERE sr.villageId = v.id
-                AND sr.status != 'Hub cancelled'
+                AND ${dbUtils.sqlTerminalStatus('sr.status')}
                 AND sr.serviceName IS NOT NULL
                 AND sr.serviceDate BETWEEN ? AND ?
               GROUP BY 1
@@ -361,8 +361,8 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
   const row = rows[0]
   // Fixed 5-entry byCategory in vocabulary order, zero-filled: chart colors
   // and shapes stay stable regardless of which categories have data.
-  const zeroStatus = { open: 0, confirmed: 0, completed: 0,
-    unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
+  const zeroStatus = { completed: 0, unmatched: 0,
+    memberCancelled: 0, volunteerCancelled: 0 }
   const found = new Map((row.byCategoryRaw ?? []).map(e => [e.category, e]))
   const byCategory = dbUtils.SERVICE_CATEGORIES.map(({ category }) => {
     const e = found.get(category)

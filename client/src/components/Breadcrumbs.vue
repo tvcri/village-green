@@ -246,6 +246,9 @@ const breadcrumbs = computed(() => {
       }
       crumbs.push({ label: 'Request' })
       break
+    case 'metrics':
+      crumbs.push({ label: 'Metrics', siblings: getSiblings('metrics', { villageId: vId }) })
+      break
     case 'volunteer-request-detail':
       // Grantless VSS volunteer viewing a request: root is "Home" (set above),
       // this is its "Request" child.

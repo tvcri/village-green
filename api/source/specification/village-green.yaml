@@ -4903,17 +4903,11 @@ components:
       type: object
       additionalProperties: false
       required:
-      - open
-      - confirmed
       - completed
       - unmatched
       - memberCancelled
       - volunteerCancelled
       properties:
-        open:
-          type: integer
-        confirmed:
-          type: integer
         completed:
           type: integer
         unmatched:
