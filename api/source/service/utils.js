@@ -425,15 +425,17 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
 //  - VolunteerRequestService.buildCapabilityPrefixCase (capability -> prefix)
 //  - metrics byCategory derivation (serviceName -> category)
 // Prefix matches cut at the colon, absorbing the legacy whitespace-after-colon
-// variants. 'Member Added' is a legacy stats category, not a volunteer
-// capability (capability: null). Order = fixed byCategory display order.
+// variants. Order = fixed byCategory display order.
 // Replaced transparently when the serviceName lookup table lands.
+// 'Member Added' was a legacy stats category (capability: null) retired in
+// 2026-08: it was never offered by ServiceRequestCreateEdit's serviceNameOptions,
+// so nothing could create one, and its historical rows were deleted from
+// production. Every remaining serviceName maps to one of the four below.
 module.exports.SERVICE_CATEGORIES = [
   { category: 'Rides',        capability: 'Rides',        match: { prefix: 'Ride:' } },
   { category: 'Errands',      capability: 'Errands',      match: { prefix: 'Errand:' } },
   { category: 'Home Help',    capability: 'Home Help',    match: { exact: 'Household Chores/Handy Help' } },
   { category: 'Tech Support', capability: 'Tech Support', match: { exact: 'Tech Support' } },
-  { category: 'Member Added', capability: null,           match: { exact: 'Member Added' } },
 ]
 
 // serviceName -> category as a SQL CASE over `colExpr`. Vocabulary values are

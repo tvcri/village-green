@@ -24,13 +24,14 @@ export const STATUS_OPTIONS = [
 
 // Category slice colors — mirrors VolunteerHome's --cat-* hues (client/src/features/VolunteerHome/components/VolunteerHome.vue).
 // Keep these two in sync: VolunteerHome uses the same 4 hues for Rides/Errands/Home Help/Tech
-// Support (color-mixed into --cat-*-bg/-border); Member Added is metrics-only, no VolunteerHome equivalent.
+// Support (color-mixed into --cat-*-bg/-border). Must also stay in step with
+// SERVICE_CATEGORIES in api/source/service/utils.js, which is the vocabulary's
+// source of truth — a category present there but missing here renders colorless.
 export const CATEGORY_COLORS = {
   Rides: '#22c55e',
   Errands: '#f59e0b',
   'Home Help': '#3b82f6',
   'Tech Support': '#8b5cf6',
-  'Member Added': '#64748b',
 }
 
 // TEMPORARY display-only shortening, pending a serviceName rename in the SR table.

@@ -5,10 +5,13 @@ import { tokens } from '../../lib/context.js'
 import { villages } from '../../setup/fixtures.js'
 
 // Status-aware metrics (spec 2026-07-26): byServiceType carries a per-status
-// matrix + derived category; byCategory is a fixed, zero-filled 5-entry array.
+// matrix + derived category; byCategory is a fixed, zero-filled 4-entry array.
 // Range 2026-06 isolates the srM* fixture rows (srV1 is 2026-07-10).
 const RANGE = { start: '2026-06-01', end: '2026-06-30' }
-const CATEGORIES = ['Rides', 'Errands', 'Home Help', 'Tech Support', 'Member Added']
+// 'Member Added' was retired in 2026-08 (see SERVICE_CATEGORIES in
+// api/source/service/utils.js): uncreatable in the UI, and its historical rows
+// were deleted from production, so it is no longer zero-filled into byCategory.
+const CATEGORIES = ['Rides', 'Errands', 'Home Help', 'Tech Support']
 const ZERO = { completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 }
 
 async function getMetrics () {
@@ -18,7 +21,7 @@ async function getMetrics () {
   return json
 }
 
-test('byCategory: always all 5 categories in fixed order, zero-filled', async () => {
+test('byCategory: always all 4 categories in fixed order, zero-filled', async () => {
   const { byCategory } = await getMetrics()
   assert.deepEqual(byCategory.map(c => c.category), CATEGORIES)
   // Tech Support has no in-range rows (srM7 is 2025) -> present but all-zero
