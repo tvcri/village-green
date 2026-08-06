@@ -193,13 +193,35 @@ describe('mapMemberForm', () => {
     expect(f.joinDate).toBeUndefined()   // join date is set when the member record is created, not from the application
     expect(f.printedNewsletter).toBe(true)
     expect(f.householdSize).toBe(2)
-    expect(f.householdDues).toBe(120)
     expect(f.primaryPersonId).toBe('')
     expect(f.miscNotes).toContain('Pronouns: she/her')
   })
   it('sets primaryPersonId for the second member', () => {
     const f = mapMemberForm(extraction(), 1, 42)
     expect(f.primaryPersonId).toBe(42)
+  })
+
+  describe('householdDues is always monthly', () => {
+    const withDues = (duesMonthly, duesYearly) => {
+      const e = extraction()
+      Object.assign(e.memberDefaults, { duesMonthly, duesYearly })
+      return mapMemberForm(e, 0, null).householdDues
+    }
+    it('divides a yearly amount by 12', () => {
+      expect(withDues(null, 120)).toBe(10)
+    })
+    it('rounds a yearly amount that does not divide evenly to cents', () => {
+      expect(withDues(null, 125)).toBe(10.42)
+    })
+    it('uses a monthly amount as-is', () => {
+      expect(withDues(25, null)).toBe(25)
+    })
+    it('prefers the monthly amount when the form carries both', () => {
+      expect(withDues(25, 120)).toBe(25)
+    })
+    it('is null when neither amount was extracted', () => {
+      expect(withDues(null, null)).toBeNull()
+    })
   })
 })
 
