@@ -96,6 +96,16 @@ export function personDisabilities (extraction, memberIndex) {
   return result
 }
 
+// member.householdDues is a MONTHLY amount, but the application form offers a
+// monthly line and a yearly line. Prefer whichever the applicant filled in,
+// converting a yearly figure to its monthly equivalent (rounded to cents, the
+// column's precision) — never store the yearly amount verbatim.
+function monthlyDues (d) {
+  if (d.duesMonthly !== null && d.duesMonthly !== undefined) return d.duesMonthly
+  if (d.duesYearly !== null && d.duesYearly !== undefined) return Math.round(d.duesYearly / 12 * 100) / 100
+  return null
+}
+
 export function mapMemberForm (extraction, memberIndex, primaryPersonId) {
   const d = extraction.memberDefaults
   return {
@@ -103,7 +113,7 @@ export function mapMemberForm (extraction, memberIndex, primaryPersonId) {
     // date — leave it for the operator to set, same as a non-import grant.
     printedNewsletter: !!d.printedNewsletter,
     householdSize: extraction.application.householdType === 'Dual' ? 2 : 1,
-    householdDues: d.duesYearly ?? d.duesMonthly ?? null,
+    householdDues: monthlyDues(d),
     primaryPersonId: memberIndex > 0 ? primaryPersonId : '',
     miscNotes: composeNotes(extraction, memberIndex),
   }
