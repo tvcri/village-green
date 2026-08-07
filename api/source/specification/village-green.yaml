@@ -4157,6 +4157,23 @@ components:
       additionalProperties: false
       type: object
       minProperties: 1
+      # Completed is the one status with no notification to send -- every other
+      # status maps to an eventType (cancelled/confirmed/open). Reject the pair
+      # at the edge: writeNotificationEvent throws for Completed *after* the
+      # UPDATE has run inside the transaction, so letting it through rolls back
+      # the status change along with the notification. `required` keeps this
+      # from also rejecting a bare {notify: true} with no status.
+      not:
+        required:
+        - status
+        - notify
+        properties:
+          status:
+            enum:
+            - Completed
+          notify:
+            enum:
+            - true
       properties:
         requestNumber:
           type: integer
