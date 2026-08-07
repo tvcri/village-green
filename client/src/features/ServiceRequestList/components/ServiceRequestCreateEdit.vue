@@ -710,7 +710,7 @@ const handleSubmit = async (notify = false) => {
 }
 
 const splitButtonModel = computed(() => {
-  return [{ label: 'Save and Notify', icon: 'pi pi-envelope', command: () => handleSubmit(true) }]
+  return [{ label: 'Save only', icon: 'pi pi-upload', command: () => handleSubmit(false) }]
 })
 
 const handleCancel = () => {
@@ -1235,12 +1235,12 @@ const openPersonDialog = (personId) => {
                 :disabled="isSubmitting"
               />
               <SplitButton
-                label="Save"
-                icon="pi pi-upload"
+                label="Save and Notify"
+                icon="pi pi-envelope"
                 :loading="isSubmitting"
                 :disabled="!isFormValid || isSubmitting"
                 :model="splitButtonModel"
-                @click="handleSubmit(false)"
+                @click="handleSubmit(true)"
               />
             </div>
           </div>
