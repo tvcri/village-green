@@ -1,5 +1,6 @@
 const config = require('../utils/config')
 const OperationService = require(`../service/OperationService`)
+const TownResolutionService = require('../service/TownResolutionService')
 const escape = require('../utils/escape')
 const {JSONPath} = require('jsonpath-plus')
 const SmError = require('../utils/error.js')
@@ -190,4 +191,14 @@ module.exports.getRoles = async function getRoles (req, res, next) {
     res.json(await OperationService.getRoles())
   }
   catch (e) { next(e) }
+}
+
+module.exports.geocodeTown = async function geocodeTown (req, res, next) {
+  try {
+    const { town } = await TownResolutionService.resolveTown(req.body)
+    res.json({ town })
+  }
+  catch (err) {
+    next(err)
+  }
 }
