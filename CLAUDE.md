@@ -26,12 +26,27 @@ builds its schema, and the `test/api` harness boots off them too.
 
 They are **not** regenerated automatically. After adding a migration:
 
-1. Migrate a dev DB to head.
+1. Migrate a DB to head — see "Verifying a new migration" below.
 2. Run `api/source/service/migrations/sql/generateSchema.sh --container
    [name]` (defaults to `village-green-orch-db-1`, or set
    `VG_SCHEMA_DB_CONTAINER`). The flag re-execs the script inside the
-   container so `mysqldump` matches the server version.
+   container so `mysqldump` matches the server version. Any container name
+   works, including the `test/api` stack's.
 3. Commit both regenerated files.
+
+### Verifying a new migration
+
+Use the **`test/api` harness**, which brings up its own MySQL (port 3307,
+database `vg_test`) and its own API from `test/api/docker-compose.yml`. Its
+scaffold marks `0001`–`00NN` executed, so a *new* migration runs its real
+`up()` there. `npm run test:keep` leaves the DB container up afterward, so
+the scaffold can be regenerated from it.
+
+**Never ask the user to restore a dump, restart the dev API, or migrate the
+dev stack for migration work.** The harness is self-contained and needs
+nothing from the dev environment. (Editing an *already-applied* migration in
+place is the one case that still needs a pre-migration dump restore — that
+is the user's call, not something to assume.)
 
 If the migration seeds **catalog rows**, also add its table(s) to
 `static_data_tables` in `generateSchema.sh`. Otherwise the dump marks the
