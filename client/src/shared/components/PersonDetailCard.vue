@@ -137,6 +137,11 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.city }}{{ person.state ? ', ' + person.state : '' }}{{ person.zip ? ' ' + person.zip : '' }}</span>
         </div>
 
+        <div v-if="person.town" class="detail-field">
+          <span class="label">Municipality:</span>
+          <span class="value">{{ person.town || '—' }}</span>
+        </div>
+
         <div v-if="person.birthDate" class="detail-field">
           <span class="label">Birth Date:</span>
           <span class="value">{{ person.birthDate }}</span>
