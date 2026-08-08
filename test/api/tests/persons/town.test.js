@@ -46,6 +46,17 @@ test('person.town accepts an out-of-region municipality (free-form field)', asyn
   await vgCall('deletePerson', { personId }, { token: tokens.users.staff })
 })
 
+test('person.town accepts a value on POST create and returns it', async () => {
+  const created = await vgCall('createPerson', {}, {
+    token: tokens.users.staff,
+    body: { villageId: scratch, firstName: 'Town', lastName: 'CreateProbe', town: 'Warwick' },
+  })
+  assert.equal(created.status, 201)
+  assert.equal(created.json.town, 'Warwick')
+
+  await vgCall('deletePerson', { personId: created.json.personId }, { token: tokens.users.staff })
+})
+
 test('person.town is null for a person who has none', async () => {
   const created = await vgCall('createPerson', {}, {
     token: tokens.users.staff,

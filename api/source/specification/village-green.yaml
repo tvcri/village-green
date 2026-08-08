@@ -3831,6 +3831,10 @@ components:
         zip:
           type: string
           maxLength: 20
+        town:
+          type: string
+          maxLength: 50
+          nullable: true
         email:
           type: string
           maxLength: 200
