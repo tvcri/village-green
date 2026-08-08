@@ -31,7 +31,8 @@ They are **not** regenerated automatically. After adding a migration:
    [name]` (defaults to `village-green-orch-db-1`, or set
    `VG_SCHEMA_DB_CONTAINER`). The flag re-execs the script inside the
    container so `mysqldump` matches the server version. Any container name
-   works, including the `test/api` stack's.
+   works, including the `test/api` stack's — set `VG_SCHEMA_DB_NAME` when the
+   source database isn't named `vg`, e.g. `vg_test` for that harness.
 3. Commit both regenerated files.
 
 ### Verifying a new migration
