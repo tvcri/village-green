@@ -3525,6 +3525,10 @@ components:
           type: string
           maxLength: 20
           nullable: true
+        town:
+          type: string
+          maxLength: 50
+          nullable: true
         email:
           type: string
           maxLength: 200
@@ -3673,6 +3677,10 @@ components:
           type: string
           maxLength: 20
           nullable: true
+        town:
+          type: string
+          maxLength: 50
+          nullable: true
         birthDate:
           type: string
           format: date
@@ -3741,6 +3749,10 @@ components:
         zip:
           type: string
           maxLength: 20
+          nullable: true
+        town:
+          type: string
+          maxLength: 50
           nullable: true
         email:
           type: string
