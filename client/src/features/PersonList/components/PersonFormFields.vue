@@ -1,8 +1,10 @@
 <script setup>
+import { ref } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
+import { geocodeTown } from '../api/personApi.js'
 
 const props = defineProps({
   errors: { type: Object, required: true },
@@ -25,6 +27,7 @@ const unit = defineModel('unit')
 const city = defineModel('city')
 const state = defineModel('state')
 const zip = defineModel('zip')
+const town = defineModel('town')
 const birthDate = defineModel('birthDate')
 const villageId = defineModel('villageId')
 const emergencyContactName = defineModel('emergencyContactName')
@@ -38,6 +41,28 @@ function edited (field) {
 }
 
 function uncertainText (field) { return sharedUncertainText(props.uncertain, field) }
+
+const townPending = ref(false)
+const townFailed = ref(false)
+
+// Municipality is a calculated value: it always re-derives from the address.
+// There is no user-entered value to protect.
+async function lookupTown () {
+  if (!street.value || !zip.value) return
+  townPending.value = true
+  townFailed.value = false
+  try {
+    const { town: found } = await geocodeTown({ street: street.value, city: city.value, state: state.value, zip: zip.value })
+    town.value = found ?? null
+    townFailed.value = !found
+  }
+  catch {
+    townFailed.value = true
+  }
+  finally {
+    townPending.value = false
+  }
+}
 </script>
 
 <template>
@@ -174,8 +199,21 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
         class="w-full"
         :class="{ 'p-invalid': errors.zip }"
         @input="edited('zip')"
+        @blur="lookupTown()"
       />
       <small class="field-error" v-if="errors.zip">{{ errors.zip }}</small>
+    </div>
+
+    <div class="form-field">
+      <label class="label" for="town">Municipality
+        <i class="pi pi-info-circle" v-tooltip.top="'The city or town that governs this address, from the US Census. Mailing addresses often use a village or postal name instead — Wood River Junction is in Hopkinton.'" />
+      </label>
+      <div id="town" class="calculated-value">
+        <span v-if="townPending" class="pi pi-spin pi-spinner" aria-label="Looking up municipality" />
+        <span v-else-if="townFailed" class="muted">Couldn't determine automatically</span>
+        <span v-else-if="town">{{ town }}</span>
+        <span v-else class="muted">&mdash;</span>
+      </div>
     </div>
 
     <div class="form-field">
@@ -327,6 +365,21 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
   color: var(--color-text-error);
   font-size: 0.8rem;
   margin-top: 0.25rem;
+}
+
+.calculated-value {
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-bg-hover-light);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+}
+
+.calculated-value .muted {
+  color: var(--color-text-dim);
 }
 
 .communities-row {

@@ -23,7 +23,7 @@ const personId = computed(() => route.params.personId)
 
 const form = reactive({
   firstName: '', middleInitial: '', lastName: '', nickname: '',
-  street: '', unit: '', city: '', state: '', zip: '',
+  street: '', unit: '', city: '', state: '', zip: '', town: '',
   email: '', phone: '', cell: '', birthDate: '',
   emergencyContactName: '', emergencyContactRelationship: '',
   emergencyContactPhone: '', emergencyContactEmail: '',
@@ -149,6 +149,7 @@ function cancel () {
           v-model:city="form.city"
           v-model:state="form.state"
           v-model:zip="form.zip"
+          v-model:town="form.town"
           v-model:birth-date="form.birthDate"
           v-model:village-id="form.villageId"
           v-model:emergency-contact-name="form.emergencyContactName"

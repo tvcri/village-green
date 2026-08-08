@@ -21,6 +21,8 @@ export const patchPerson = (personId, body) =>
 
 export const deletePerson = (personId) => apiCall('deletePerson', { personId })
 
+export const geocodeTown = (body) => apiCall('geocodeTown', {}, body)
+
 // Lookups (Plan A Task 8.5): full lists for id<->name resolution.
 export const getCommunities  = () => apiCall('getCommunities')
 export const getCapabilities = () => apiCall('getCapabilities')
