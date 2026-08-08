@@ -45,29 +45,84 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
 const townPending = ref(false)
 const townFailed = ref(false)
 
+// Blurring an untouched address must not refire the POST, so remember the
+// last address that settled definitively (resolved, cleared, or too empty to
+// look up). A transport error deliberately does not memoize: the next blur or
+// submit retries.
+let lastLookedUp = null
+let inflight = null           // { key, promise } for the lookup in progress
+let addressDirty = false      // user typed in an address field since the last settle
+
+function addressKey () {
+  return [street.value, city.value, state.value, zip.value].map(v => (v ?? '').trim()).join('|')
+}
+
+function editedAddress (field) {
+  addressDirty = true
+  edited(field)
+}
+
 // Municipality is a calculated value: it always re-derives from the address.
 // There is no user-entered value to protect.
-async function lookupTown () {
-  if (!street.value || !zip.value) return
+function lookupTown () {
+  const key = addressKey()
+  if (!street.value || !zip.value) {
+    // An address without street or zip has no municipality. Clear rather than
+    // skip, so blanking the address can't keep the previous municipality.
+    town.value = ''
+    townFailed.value = false
+    lastLookedUp = key
+    addressDirty = false
+    return Promise.resolve()
+  }
+  if (key === lastLookedUp) return Promise.resolve()
+  if (inflight?.key === key) return inflight.promise
+  const promise = runLookup(key)
+  inflight = { key, promise }
+  return promise
+}
+
+async function runLookup (key) {
   townPending.value = true
   townFailed.value = false
   try {
     const { town: found } = await geocodeTown({ street: street.value, city: city.value, state: state.value, zip: zip.value })
+    // Apply only if the address is still the one this lookup was made for —
+    // a response for an already-edited address must never win.
+    if (addressKey() !== key) return
     // A null result clears the value (empty string, not null) so the edit-path
     // payload sends an explicit null and the stale municipality isn't silently
     // kept when a changed address fails to resolve.
     town.value = found ?? ''
     townFailed.value = !found
+    lastLookedUp = key
+    addressDirty = false
   }
   catch {
-    // Transport error: leave the existing value as-is. It may still be right —
-    // a network failure shouldn't wipe a value we simply couldn't refresh.
+    if (addressKey() !== key) return
+    // Transport error: clear, exactly like an unresolved address. The display
+    // shows the failure text, so a kept value would be submitted invisibly —
+    // and the lookup only ran because the address wasn't already settled.
+    town.value = ''
     townFailed.value = true
   }
   finally {
-    townPending.value = false
+    if (inflight?.key === key) {
+      inflight = null
+      townPending.value = false
+    }
   }
 }
+
+// For parents to await before building a payload: starts a lookup if the
+// address changed without a settling blur (an Enter-key submit fires none)
+// and resolves when any in-flight lookup lands, so the payload never carries
+// a municipality the address has outrun.
+function townSettled () {
+  if (addressDirty || inflight) return lookupTown()
+  return Promise.resolve()
+}
+defineExpose({ townSettled })
 
 // Programmatically prefilled forms (the application import wizard) set
 // street/city/state/zip directly without ever firing a blur event, so
@@ -180,7 +235,7 @@ onMounted(() => {
       <label class="label" for="street">Street
         <i v-if="uncertain.street" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('street')" />
       </label>
-      <InputText id="street" v-model="street" class="w-full" @input="edited('street')" @blur="lookupTown()" />
+      <InputText id="street" v-model="street" class="w-full" @input="editedAddress('street')" @blur="lookupTown()" />
     </div>
 
     <div class="form-field">
@@ -194,14 +249,14 @@ onMounted(() => {
       <label class="label" for="city">City
         <i v-if="uncertain.city" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('city')" />
       </label>
-      <InputText id="city" v-model="city" class="w-full" @input="edited('city')" @blur="lookupTown()" />
+      <InputText id="city" v-model="city" class="w-full" @input="editedAddress('city')" @blur="lookupTown()" />
     </div>
 
     <div class="form-field">
       <label class="label" for="state">State
         <i v-if="uncertain.state" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('state')" />
       </label>
-      <InputText id="state" v-model="state" class="w-full" @input="edited('state')" @blur="lookupTown()" />
+      <InputText id="state" v-model="state" class="w-full" @input="editedAddress('state')" @blur="lookupTown()" />
     </div>
 
     <div class="form-field">
@@ -213,17 +268,19 @@ onMounted(() => {
         v-model="zip"
         class="w-full"
         :class="{ 'p-invalid': errors.zip }"
-        @input="edited('zip')"
+        @input="editedAddress('zip')"
         @blur="lookupTown()"
       />
       <small class="field-error" v-if="errors.zip">{{ errors.zip }}</small>
     </div>
 
     <div class="form-field">
-      <label class="label" for="town">Municipality
+      <!-- A div is not a labelable element, so label[for] would associate with
+           nothing; a span plus aria-labelledby carries the name instead. -->
+      <span class="label" id="town-label">Municipality
         <i class="pi pi-info-circle" v-tooltip.top="'The city or town that governs this address, from the US Census. Mailing addresses often use a village or postal name instead — Wood River Junction is in Hopkinton.'" />
-      </label>
-      <div id="town" class="calculated-value">
+      </span>
+      <div id="town" class="calculated-value" role="status" aria-labelledby="town-label">
         <span v-if="townPending" class="pi pi-spin pi-spinner" aria-label="Looking up municipality" />
         <span v-else-if="townFailed" class="muted">Couldn't determine automatically</span>
         <span v-else-if="town">{{ town }}</span>

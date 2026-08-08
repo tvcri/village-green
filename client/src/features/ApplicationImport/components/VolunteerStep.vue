@@ -25,6 +25,7 @@ const toast = useToast()
 
 const form = reactive(mapVolunteerPersonForm(props.extraction))
 const errors = reactive({})
+const fields = ref(null)
 const uncertain = reactive(uncertainMapForVolunteerPerson(props.extraction))
 const communityNames = ref(volunteerPersonCommunityNames(props.extraction))
 const disabilities = ref(new Map())        // this form has no accessibility section
@@ -147,6 +148,9 @@ async function submit () {
   }
   saving.value = true
   try {
+    // The on-mount municipality lookup for the prefilled address may still be
+    // in flight — settle it before the payload reads form.town.
+    await fields.value?.townSettled()
     const payload = buildPersonCreatePayload(form)
     payload.communities = [...communityNames.value]
       .map(n => communityNameToId.value.get(n))
@@ -193,6 +197,7 @@ async function submit () {
 
     <form @submit.prevent="submit">
       <PersonFormFields
+        ref="fields"
         v-model:first-name="form.firstName"
         v-model:middle-initial="form.middleInitial"
         v-model:last-name="form.lastName"

@@ -3,6 +3,7 @@
 const config = require('../utils/config')
 const retry = require('async-retry')
 const { fetch } = require('undici')
+const { safeReadBody } = require('../utils/safeReadBody')
 
 function parseAuthority(authority) {
   const marker = '/realms/'
@@ -33,16 +34,6 @@ const tokenState = {
   expiresAt: 0
 }
 const TOKEN_REFRESH_BUFFER_MS = 30 * 1000
-
-async function safeReadBody(res) {
-  try {
-    const text = await res.text()
-    return text || '<empty body>'
-  }
-  catch (err) {
-    return `<failed to read body: ${err.message}>`
-  }
-}
 
 async function fetchToken() {
   const { baseUrl, realm } = parseAuthority(config.oauth.authority)

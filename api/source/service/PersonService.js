@@ -347,6 +347,13 @@ module.exports.createPerson = async function (body) {
 
 module.exports.patchPerson = async function (personId, body) {
   const { communities, disabilities, ...personFields } = body
+  // town derives from the address (the client recalculates it and sends it
+  // with every address edit). A PATCH that changes address fields without
+  // supplying town would otherwise keep the previous municipality against
+  // the new address — clear it instead.
+  if (!('town' in personFields) && ['street', 'city', 'state', 'zip'].some(f => f in personFields)) {
+    personFields.town = null
+  }
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       if (Object.keys(personFields).length > 0) {

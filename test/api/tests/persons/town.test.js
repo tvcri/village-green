@@ -10,64 +10,79 @@ import { villages } from '../../setup/fixtures.js'
 // canonical fixture, matching write.test.js's pattern.
 const scratch = String(villages.scratch.id)
 
-test('person.town accepts a value on PATCH and returns it', async () => {
+// Every test here uses the same token and village and differs only in the
+// created body and the probe; the try/finally also deletes the scratch person
+// when an assertion throws mid-test.
+async function withScratchPerson (body, fn) {
   const created = await vgCall('createPerson', {}, {
     token: tokens.users.staff,
-    body: { villageId: scratch, firstName: 'Town', lastName: 'Probe' },
+    body: { villageId: scratch, firstName: 'Town', ...body },
   })
   assert.equal(created.status, 201)
-  const personId = created.json.personId
+  try {
+    await fn(created.json.personId, created)
+  }
+  finally {
+    await vgCall('deletePerson', { personId: created.json.personId }, { token: tokens.users.staff })
+  }
+}
 
-  const patched = await vgCall('patchPerson', { personId }, {
-    token: tokens.users.staff,
-    body: { town: 'South Kingstown' },
+test('person.town accepts a value on PATCH and returns it', async () => {
+  await withScratchPerson({ lastName: 'Probe' }, async (personId) => {
+    const patched = await vgCall('patchPerson', { personId }, {
+      token: tokens.users.staff,
+      body: { town: 'South Kingstown' },
+    })
+    assert.equal(patched.status, 200)
+    assert.equal(patched.json.town, 'South Kingstown')
   })
-  assert.equal(patched.status, 200)
-  assert.equal(patched.json.town, 'South Kingstown')
-
-  await vgCall('deletePerson', { personId }, { token: tokens.users.staff })
 })
 
 test('person.town accepts an out-of-region municipality (free-form field)', async () => {
-  const created = await vgCall('createPerson', {}, {
-    token: tokens.users.staff,
-    body: { villageId: scratch, firstName: 'Town', lastName: 'Probe2' },
+  await withScratchPerson({ lastName: 'Probe2' }, async (personId) => {
+    const patched = await vgCall('patchPerson', { personId }, {
+      token: tokens.users.staff,
+      body: { town: 'Seattle' },
+    })
+    assert.equal(patched.status, 200)
+    assert.equal(patched.json.town, 'Seattle')
   })
-  assert.equal(created.status, 201)
-  const personId = created.json.personId
-
-  const patched = await vgCall('patchPerson', { personId }, {
-    token: tokens.users.staff,
-    body: { town: 'Seattle' },
-  })
-  assert.equal(patched.status, 200)
-  assert.equal(patched.json.town, 'Seattle')
-
-  await vgCall('deletePerson', { personId }, { token: tokens.users.staff })
 })
 
 test('person.town accepts a value on POST create and returns it', async () => {
-  const created = await vgCall('createPerson', {}, {
-    token: tokens.users.staff,
-    body: { villageId: scratch, firstName: 'Town', lastName: 'CreateProbe', town: 'Warwick' },
+  await withScratchPerson({ lastName: 'CreateProbe', town: 'Warwick' }, async (personId, created) => {
+    assert.equal(created.json.town, 'Warwick')
   })
-  assert.equal(created.status, 201)
-  assert.equal(created.json.town, 'Warwick')
-
-  await vgCall('deletePerson', { personId: created.json.personId }, { token: tokens.users.staff })
 })
 
 test('person.town is null for a person who has none', async () => {
-  const created = await vgCall('createPerson', {}, {
-    token: tokens.users.staff,
-    body: { villageId: scratch, firstName: 'Town', lastName: 'Untouched' },
+  await withScratchPerson({ lastName: 'Untouched' }, async (personId) => {
+    const { status, json } = await vgCall('getPerson', { personId }, { token: tokens.users.staff })
+    assert.equal(status, 200)
+    assert.equal(json.town, null)
   })
-  assert.equal(created.status, 201)
-  const personId = created.json.personId
+})
 
-  const { status, json } = await vgCall('getPerson', { personId }, { token: tokens.users.staff })
-  assert.equal(status, 200)
-  assert.equal(json.town, null)
+test('patching an address field without town clears the stored town', async () => {
+  await withScratchPerson({ lastName: 'ClearProbe', town: 'Hopkinton' }, async (personId) => {
+    const patched = await vgCall('patchPerson', { personId }, {
+      token: tokens.users.staff,
+      body: { street: '1 New St' },
+    })
+    assert.equal(patched.status, 200)
+    // town derives from the address; an address change that doesn't carry a
+    // recalculated town must not keep the old municipality.
+    assert.equal(patched.json.town, null)
+  })
+})
 
-  await vgCall('deletePerson', { personId }, { token: tokens.users.staff })
+test('patching an address field with town keeps the supplied town', async () => {
+  await withScratchPerson({ lastName: 'KeepProbe', town: 'Hopkinton' }, async (personId) => {
+    const patched = await vgCall('patchPerson', { personId }, {
+      token: tokens.users.staff,
+      body: { street: '2 Main St', town: 'Richmond' },
+    })
+    assert.equal(patched.status, 200)
+    assert.equal(patched.json.town, 'Richmond')
+  })
 })

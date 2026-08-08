@@ -42,7 +42,7 @@ const baseProps = {
 }
 
 describe('PersonFormFields Municipality display', () => {
-  it('fills Municipality from the geocoder on zip blur', async () => {
+  it('fills Municipality from the geocoder when the zip changes and blurs', async () => {
     const { geocodeTown } = await import('../api/personApi.js')
     geocodeTown.mockResolvedValue({ town: 'South Kingstown' })
 
@@ -52,16 +52,40 @@ describe('PersonFormFields Municipality display', () => {
     })
 
     // street+zip are prefilled and town starts empty, so the on-mount lookup
-    // also fires here — wait for it to settle before blurring, so the
+    // also fires here — wait for it to settle before editing, so the
     // post-blur assertion below counts only the blur-triggered call.
     await screen.findByText('South Kingstown')
     geocodeTown.mockClear()
+    geocodeTown.mockResolvedValue({ town: 'Narragansett' })
 
+    const zipInput = screen.getByLabelText(/zip/i)
+    await fireEvent.update(zipInput, '02882')
+    await fireEvent.blur(zipInput)
+
+    expect(await screen.findByText('Narragansett')).toBeInTheDocument()
+    expect(geocodeTown).toHaveBeenCalledTimes(1)
+    expect(geocodeTown).toHaveBeenCalledWith({ street: '123 Main St', city: '', state: 'RI', zip: '02882' })
+  })
+
+  it('does not refire the geocoder when blurring an unchanged address', async () => {
+    const { geocodeTown } = await import('../api/personApi.js')
+    geocodeTown.mockResolvedValue({ town: 'South Kingstown' })
+
+    render(PersonFormFields, {
+      props: { ...baseProps, street: '123 Main St', city: '', state: 'RI', zip: '02879', town: '' },
+      global: globalOpts
+    })
+
+    await screen.findByText('South Kingstown')
+    geocodeTown.mockClear()
+
+    // Tabbing through a filled address blurs every field without editing any.
+    await fireEvent.blur(screen.getByLabelText(/^street/i))
+    await fireEvent.blur(screen.getByLabelText(/city/i))
     await fireEvent.blur(screen.getByLabelText(/zip/i))
 
-    expect(await screen.findByText('South Kingstown')).toBeInTheDocument()
-    expect(geocodeTown).toHaveBeenCalledTimes(1)
-    expect(geocodeTown).toHaveBeenCalledWith({ street: '123 Main St', city: '', state: 'RI', zip: '02879' })
+    await waitFor(() => expect(geocodeTown).not.toHaveBeenCalled())
+    expect(screen.getByText('South Kingstown')).toBeInTheDocument()
   })
 
   it('recalculates over an existing value when the address changes', async () => {
@@ -124,12 +148,50 @@ describe('PersonFormFields Municipality display', () => {
     // let it settle first so the assertions below isolate the blur call.
     await screen.findByText('Charlestown')
     geocodeTown.mockClear()
+    geocodeTown.mockResolvedValue({ town: 'Hopkinton' })
 
-    await fireEvent.blur(screen.getByLabelText(/^street/i))
+    const streetInput = screen.getByLabelText(/^street/i)
+    await fireEvent.update(streetInput, '10 Ross Hill Road')
+    await fireEvent.blur(streetInput)
 
-    expect(await screen.findByText('Charlestown')).toBeInTheDocument()
+    expect(await screen.findByText('Hopkinton')).toBeInTheDocument()
     expect(geocodeTown).toHaveBeenCalledTimes(1)
-    expect(geocodeTown).toHaveBeenCalledWith({ street: '10 Ross Hill Rd', city: '', state: 'RI', zip: '02813' })
+    expect(geocodeTown).toHaveBeenCalledWith({ street: '10 Ross Hill Road', city: '', state: 'RI', zip: '02813' })
+  })
+
+  it('clears the value and shows the failure text on a transport error', async () => {
+    const { geocodeTown } = await import('../api/personApi.js')
+    geocodeTown.mockRejectedValue(new Error('network down'))
+
+    const { emitted } = render(PersonFormFields, {
+      props: { ...baseProps, street: '456 Elm St', city: '', state: 'RI', zip: '02898', town: 'Hopkinton' },
+      global: globalOpts
+    })
+
+    const zipInput = screen.getByLabelText(/zip/i)
+    await fireEvent.update(zipInput, '02813')
+    await fireEvent.blur(zipInput)
+
+    expect(await screen.findByText(/Couldn't determine automatically/i)).toBeInTheDocument()
+    // The display shows the failure text, so the model must not silently keep
+    // a value the form isn't showing (it likely belongs to the old address).
+    await waitFor(() => expect(emitted()['update:town'].at(-1)).toEqual(['']))
+  })
+
+  it('clears the municipality without calling the geocoder when the street is blanked', async () => {
+    const { geocodeTown } = await import('../api/personApi.js')
+
+    const { emitted } = render(PersonFormFields, {
+      props: { ...baseProps, street: '10 Ross Hill Rd', city: '', state: 'RI', zip: '02813', town: 'Hopkinton' },
+      global: globalOpts
+    })
+
+    const streetInput = screen.getByLabelText(/^street/i)
+    await fireEvent.update(streetInput, '')
+    await fireEvent.blur(streetInput)
+
+    await waitFor(() => expect(emitted()['update:town'].at(-1)).toEqual(['']))
+    expect(geocodeTown).not.toHaveBeenCalled()
   })
 
   it('fires the geocoder on mount when street and zip are prefilled and town is empty', async () => {
