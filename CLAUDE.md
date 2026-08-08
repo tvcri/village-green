@@ -87,6 +87,29 @@ Inside running text (sentences, dialogs, toasts) a name reads
 to get the informal form — serve `firstName`/`lastName` alongside it and
 compose client-side. Emergency-contact names are free-text and exempt.
 
+## UI vocabulary vs data vocabulary
+
+Two terms deliberately differ between what the UI displays and what the
+code/schema calls them. Both are **intentional — do not "fix" either by
+renaming one side to match the other**, and when adding related code, keep
+the split.
+
+- **`town` → UI says "Municipality".** The `person.town` column,
+  `TownResolutionService.js`, and `POST /op/geocode/town` all keep `town`.
+  Every user-facing string says *Municipality*: the form label, the
+  detail-card label, and the Member/Volunteer CSV + Google Sheets column
+  header. Reason: the roster's municipalities include seven RI cities
+  (Providence, Cranston, Warwick, Pawtucket, Newport, Woonsocket, Central
+  Falls) alongside towns, and the value stored is Census's `BASENAME` — the
+  name with its type suffix already removed. "Municipality" is the only term
+  correct for both. The field is free-form and read-only in the UI; it is
+  calculated from the person's address.
+- **`federation` → UI says "Hub".** API vocabulary is unchanged.
+
+Because the UI term is unguessable from the code term, grepping the display
+word finds only a handful of lines. Search the data term when tracing these
+features end to end.
+
 ## API conventions
 
 - **Transaction read-back:** a `retryOnDeadlock2` `transactionFn` returns
