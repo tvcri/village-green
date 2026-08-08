@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.2, for Linux (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.10, for Linux (x86_64)
 --
--- Host: 127.0.0.1    Database: vg
+-- Host: 127.0.0.1    Database: vg_test
 -- ------------------------------------------------------
--- Server version	8.4.2
+-- Server version	8.4.10
 
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
@@ -256,6 +256,7 @@ CREATE TABLE `person` (
   `city` varchar(100) DEFAULT NULL,
   `state` varchar(50) DEFAULT NULL,
   `zip` varchar(20) DEFAULT NULL,
+  `town` varchar(50) DEFAULT NULL,
   `email` varchar(200) DEFAULT NULL,
   `emailStatus` varchar(50) DEFAULT NULL,
   `phone` varchar(50) DEFAULT NULL,
@@ -597,7 +598,7 @@ CREATE TABLE `volunteer_village_associate` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Dumping events for database 'vg'
+-- Dumping events for database 'vg_test'
 --
 /*!50106 SET @save_time_zone= @@TIME_ZONE */ ;
 /*!50106 DROP EVENT IF EXISTS `evt_auto_complete_service_requests` */;
@@ -643,7 +644,7 @@ DELIMITER ;
 /*!50106 SET TIME_ZONE= @save_time_zone */ ;
 
 --
--- Dumping routines for database 'vg'
+-- Dumping routines for database 'vg_test'
 --
 
 --
@@ -675,4 +676,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-28  1:25:31
+-- Dump completed on 2026-08-08  2:37:33

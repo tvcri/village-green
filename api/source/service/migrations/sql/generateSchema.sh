@@ -13,6 +13,10 @@
 # docker cp + docker exec) and copies the output back, so mysqldump's version
 # always matches the server's.
 #
+# VG_SCHEMA_DB_NAME selects the database to dump (default 'vg'); set it when
+# the source isn't named 'vg', e.g. VG_SCHEMA_DB_NAME=vg_test for the test/api
+# harness.
+#
 # WHEN TO RUN THIS: after adding a migration. The scaffold is NOT regenerated
 # automatically — a new migration is invisible to fresh installs until someone
 # runs this, and stale output shows up in the test harness too.
@@ -37,6 +41,8 @@
 
 set -euo pipefail
 
+db="${VG_SCHEMA_DB_NAME:-vg}"
+
 #List of table names for static data.
 static_data_tables="capability role role_permission _migrations"
 
@@ -53,7 +59,7 @@ if [ "${1:-}" = "--container" ]; then
 
   echo "generating scaffold SQL from container: $container"
   docker cp "$here/generateSchema.sh" "$container:/tmp/generateSchema.sh"
-  docker exec -i "$container" bash -c "cd /tmp && chmod +x generateSchema.sh && ./generateSchema.sh"
+  docker exec -i -e VG_SCHEMA_DB_NAME="${VG_SCHEMA_DB_NAME:-vg}" "$container" bash -c "cd /tmp && chmod +x generateSchema.sh && ./generateSchema.sh"
   docker cp "$container:/tmp/10-vg-tables.sql" "$here/current/10-vg-tables.sql"
   docker cp "$container:/tmp/20-vg-static.sql" "$here/current/20-vg-static.sql"
 
@@ -78,7 +84,7 @@ fi
 # `root`@`%`) would otherwise carry that definer into the scaffold, and a fresh
 # install connecting as `vg` fails with "you need SUPER or SET_ANY_DEFINER".
 # Stripping it lets each install own the objects it creates.
-mysqldump -h 127.0.0.1 -P 3306 -u root -prootpw --routines --events --no-data --no-create-db vg |
+mysqldump -h 127.0.0.1 -P 3306 -u root -prootpw --routines --events --no-data --no-create-db "$db" |
   sed --expression='s/ AUTO_INCREMENT=[0-9]\+//'  \
       --expression='s/DEFINER=`[^`]*`@`[^`]*` *//' \
       --expression '/SQL SECURITY DEFINER/d' \
@@ -87,5 +93,5 @@ mysqldump -h 127.0.0.1 -P 3306 -u root -prootpw --routines --events --no-data --
 
 # Export only the data from specific tables listed in $static_data_tables into a separate SQL file.
 # '--no-create-info' flag ensures that table creation statements are not included, just the row insertions.
-mysqldump -h 127.0.0.1 -P 3306 -u root -prootpw --no-create-info vg $static_data_tables |
+mysqldump -h 127.0.0.1 -P 3306 -u root -prootpw --no-create-info "$db" $static_data_tables |
   awk 'tolower($0) !~ /character_set|set names/' > 20-vg-static.sql
