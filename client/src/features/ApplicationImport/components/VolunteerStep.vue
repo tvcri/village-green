@@ -205,6 +205,7 @@ async function submit () {
         v-model:city="form.city"
         v-model:state="form.state"
         v-model:zip="form.zip"
+        v-model:town="form.town"
         v-model:birth-date="form.birthDate"
         v-model:village-id="form.villageId"
         v-model:emergency-contact-name="form.emergencyContactName"

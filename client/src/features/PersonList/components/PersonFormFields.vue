@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
@@ -68,6 +68,16 @@ async function lookupTown () {
     townPending.value = false
   }
 }
+
+// Programmatically prefilled forms (the application import wizard) set
+// street/city/state/zip directly without ever firing a blur event, so
+// lookupTown() would otherwise never run for them. Fire it once on mount —
+// but only when there's no town yet, so a value already carried in (e.g.
+// PersonEditForm loading an existing person) is never overwritten, and only
+// when the existing guard would pass anyway.
+onMounted(() => {
+  if (!town.value) lookupTown()
+})
 </script>
 
 <template>

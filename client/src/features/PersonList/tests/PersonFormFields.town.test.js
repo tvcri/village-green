@@ -51,9 +51,16 @@ describe('PersonFormFields Municipality display', () => {
       global: globalOpts
     })
 
+    // street+zip are prefilled and town starts empty, so the on-mount lookup
+    // also fires here — wait for it to settle before blurring, so the
+    // post-blur assertion below counts only the blur-triggered call.
+    await screen.findByText('South Kingstown')
+    geocodeTown.mockClear()
+
     await fireEvent.blur(screen.getByLabelText(/zip/i))
 
     expect(await screen.findByText('South Kingstown')).toBeInTheDocument()
+    expect(geocodeTown).toHaveBeenCalledTimes(1)
     expect(geocodeTown).toHaveBeenCalledWith({ street: '123 Main St', city: '', state: 'RI', zip: '02879' })
   })
 
@@ -113,9 +120,42 @@ describe('PersonFormFields Municipality display', () => {
       global: globalOpts
     })
 
+    // Prefilled street+zip with empty town also triggers the on-mount lookup;
+    // let it settle first so the assertions below isolate the blur call.
+    await screen.findByText('Charlestown')
+    geocodeTown.mockClear()
+
     await fireEvent.blur(screen.getByLabelText(/^street/i))
 
     expect(await screen.findByText('Charlestown')).toBeInTheDocument()
+    expect(geocodeTown).toHaveBeenCalledTimes(1)
     expect(geocodeTown).toHaveBeenCalledWith({ street: '10 Ross Hill Rd', city: '', state: 'RI', zip: '02813' })
+  })
+
+  it('fires the geocoder on mount when street and zip are prefilled and town is empty', async () => {
+    const { geocodeTown } = await import('../api/personApi.js')
+    geocodeTown.mockResolvedValue({ town: 'Charlestown' })
+
+    render(PersonFormFields, {
+      props: { ...baseProps, street: '10 Ross Hill Rd', city: '', state: 'RI', zip: '02813', town: '' },
+      global: globalOpts
+    })
+
+    expect(await screen.findByText('Charlestown')).toBeInTheDocument()
+    expect(geocodeTown).toHaveBeenCalledTimes(1)
+    expect(geocodeTown).toHaveBeenCalledWith({ street: '10 Ross Hill Rd', city: '', state: 'RI', zip: '02813' })
+  })
+
+  it('does not call the geocoder on mount when town is already populated', async () => {
+    const { geocodeTown } = await import('../api/personApi.js')
+    geocodeTown.mockResolvedValue({ town: 'Charlestown' })
+
+    render(PersonFormFields, {
+      props: { ...baseProps, street: '10 Ross Hill Rd', city: '', state: 'RI', zip: '02813', town: 'Hopkinton' },
+      global: globalOpts
+    })
+
+    expect(screen.getByText('Hopkinton')).toBeInTheDocument()
+    await waitFor(() => expect(geocodeTown).not.toHaveBeenCalled())
   })
 })

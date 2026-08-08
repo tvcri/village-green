@@ -71,6 +71,10 @@ describe('mapPersonForm', () => {
     expect(f.cell).toBe('401-555-2222')
     expect(f.birthDate).toBe('1946-07-19')
   })
+  it('seeds town empty — PersonFormFields calculates it on mount, not the extraction', () => {
+    const f = mapPersonForm(extraction(), 0)
+    expect(f.town).toBe('')
+  })
 })
 
 describe('personCommunityNames', () => {
@@ -279,6 +283,12 @@ describe('buildPersonCreatePayload', () => {
     const p = buildPersonCreatePayload({ firstName: 'Al', lastName: 'Innovera', nickname: '', email: null, villageId: 1 })
     expect(p).toEqual({ firstName: 'Al', lastName: 'Innovera', villageId: 1 })
   })
+  it('carries a calculated town through, and drops it when still empty', () => {
+    const withTown = buildPersonCreatePayload({ firstName: 'Al', town: 'South Kingstown' })
+    expect(withTown.town).toBe('South Kingstown')
+    const withoutTown = buildPersonCreatePayload({ firstName: 'Al', town: '' })
+    expect(withoutTown.town).toBeUndefined()
+  })
 })
 
 function volunteerExtraction () {
@@ -319,6 +329,10 @@ describe('mapVolunteerPersonForm', () => {
     expect(f.emergencyContactName).toBe('Laurie Brown')
     expect(f.emergencyContactPhone).toBe('401-497-0470')
     expect(f.emergencyContactRelationship).toBe('Parent/Guardian')
+  })
+  it('seeds town empty — PersonFormFields calculates it on mount, not the extraction', () => {
+    const f = mapVolunteerPersonForm(volunteerExtraction())
+    expect(f.town).toBe('')
   })
 })
 
