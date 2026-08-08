@@ -386,7 +386,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   min-height: 2.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.75rem 0.75rem;
   background-color: var(--color-bg-hover-light);
   border: 1px solid var(--color-border-default);
   border-radius: 6px;
