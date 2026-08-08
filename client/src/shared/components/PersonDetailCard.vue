@@ -139,7 +139,7 @@ const copyEmail = async (email) => {
 
         <div v-if="person.town" class="detail-field">
           <span class="label">Municipality:</span>
-          <span class="value">{{ person.town || '—' }}</span>
+          <span class="value">{{ person.town }}</span>
         </div>
 
         <div v-if="person.birthDate" class="detail-field">

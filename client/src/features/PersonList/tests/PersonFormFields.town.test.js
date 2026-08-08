@@ -74,18 +74,21 @@ describe('PersonFormFields Municipality display', () => {
     expect(screen.queryByText('Hopkinton')).not.toBeInTheDocument()
   })
 
-  it('shows the could-not-determine text when the lookup returns null', async () => {
+  it('shows the could-not-determine text and clears the model when the lookup returns null', async () => {
     const { geocodeTown } = await import('../api/personApi.js')
     geocodeTown.mockResolvedValue({ town: null })
 
-    render(PersonFormFields, {
-      props: { ...baseProps, street: '789 Oak St', city: '', state: 'RI', zip: '02891', town: '' },
+    const { emitted } = render(PersonFormFields, {
+      props: { ...baseProps, street: '789 Oak St', city: '', state: 'RI', zip: '02891', town: 'Hopkinton' },
       global: globalOpts
     })
 
     await fireEvent.blur(screen.getByLabelText(/zip/i))
 
     expect(await screen.findByText(/Couldn't determine automatically/i)).toBeInTheDocument()
+    // A null result must clear the model to '' (not null) so the edit-path payload
+    // sends an explicit null instead of silently keeping the stale municipality.
+    await waitFor(() => expect(emitted()['update:town'].at(-1)).toEqual(['']))
   })
 
   it('does not call the geocoder when street or zip is empty', async () => {
@@ -99,5 +102,20 @@ describe('PersonFormFields Municipality display', () => {
 
     await fireEvent.blur(screen.getByLabelText(/zip/i))
     await waitFor(() => expect(geocodeTown).not.toHaveBeenCalled())
+  })
+
+  it('recalculates on street blur, not only zip blur', async () => {
+    const { geocodeTown } = await import('../api/personApi.js')
+    geocodeTown.mockResolvedValue({ town: 'Charlestown' })
+
+    render(PersonFormFields, {
+      props: { ...baseProps, street: '10 Ross Hill Rd', city: '', state: 'RI', zip: '02813', town: '' },
+      global: globalOpts
+    })
+
+    await fireEvent.blur(screen.getByLabelText(/^street/i))
+
+    expect(await screen.findByText('Charlestown')).toBeInTheDocument()
+    expect(geocodeTown).toHaveBeenCalledWith({ street: '10 Ross Hill Rd', city: '', state: 'RI', zip: '02813' })
   })
 })

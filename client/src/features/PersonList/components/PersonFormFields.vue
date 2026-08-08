@@ -53,10 +53,15 @@ async function lookupTown () {
   townFailed.value = false
   try {
     const { town: found } = await geocodeTown({ street: street.value, city: city.value, state: state.value, zip: zip.value })
-    town.value = found ?? null
+    // A null result clears the value (empty string, not null) so the edit-path
+    // payload sends an explicit null and the stale municipality isn't silently
+    // kept when a changed address fails to resolve.
+    town.value = found ?? ''
     townFailed.value = !found
   }
   catch {
+    // Transport error: leave the existing value as-is. It may still be right —
+    // a network failure shouldn't wipe a value we simply couldn't refresh.
     townFailed.value = true
   }
   finally {
@@ -165,7 +170,7 @@ async function lookupTown () {
       <label class="label" for="street">Street
         <i v-if="uncertain.street" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('street')" />
       </label>
-      <InputText id="street" v-model="street" class="w-full" @input="edited('street')" />
+      <InputText id="street" v-model="street" class="w-full" @input="edited('street')" @blur="lookupTown()" />
     </div>
 
     <div class="form-field">
@@ -179,14 +184,14 @@ async function lookupTown () {
       <label class="label" for="city">City
         <i v-if="uncertain.city" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('city')" />
       </label>
-      <InputText id="city" v-model="city" class="w-full" @input="edited('city')" />
+      <InputText id="city" v-model="city" class="w-full" @input="edited('city')" @blur="lookupTown()" />
     </div>
 
     <div class="form-field">
       <label class="label" for="state">State
         <i v-if="uncertain.state" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('state')" />
       </label>
-      <InputText id="state" v-model="state" class="w-full" @input="edited('state')" />
+      <InputText id="state" v-model="state" class="w-full" @input="edited('state')" @blur="lookupTown()" />
     </div>
 
     <div class="form-field">
