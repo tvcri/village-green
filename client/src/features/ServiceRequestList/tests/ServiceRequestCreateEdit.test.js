@@ -275,6 +275,53 @@ describe('cancelled request status editing', () => {
   })
 })
 
+describe('completing a cancelled request by attaching a volunteer', () => {
+  const cancelledRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  it('previews Completed and shows the commitment notice once a volunteer is set', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+
+    // No volunteer yet: the stored cancelled status shows, and no notice.
+    expect(unref(vm.computedStatus)).toBe('Member cancelled')
+    expect(unref(vm.willCompleteOnSave)).toBe(false)
+    expect(screen.queryByText(/will mark this request Completed/i)).toBeNull()
+
+    vm.form.volunteerPersonId = '9'
+    await waitFor(() => {
+      expect(screen.getByText(/will mark this request Completed/i)).toBeTruthy()
+    })
+    expect(unref(vm.computedStatus)).toBe('Completed')
+  })
+
+  it('drops the notice and restores the cancelled status when the volunteer is cleared', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+
+    vm.form.volunteerPersonId = '9'
+    await waitFor(() => {
+      expect(screen.getByText(/will mark this request Completed/i)).toBeTruthy()
+    })
+
+    vm.form.volunteerPersonId = null
+    await waitFor(() => {
+      expect(screen.queryByText(/will mark this request Completed/i)).toBeNull()
+    })
+    expect(unref(vm.computedStatus)).toBe('Member cancelled')
+  })
+
+  it('still derives Confirmed, not Completed, on a non-cancelled request', async () => {
+    const vm = await mountEditAndExpose({ ...cancelledRequest, status: 'Open' })
+
+    vm.form.volunteerPersonId = '9'
+    await waitFor(() => expect(unref(vm.computedStatus)).toBe('Confirmed'))
+    expect(unref(vm.willCompleteOnSave)).toBe(false)
+    expect(screen.queryByText(/will mark this request Completed/i)).toBeNull()
+  })
+})
+
 // Vue unwraps top-level refs on the setupState proxy in most cases, but a
 // computed may surface as a ref — read through this to be safe.
 function unref (v) {

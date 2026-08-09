@@ -14,6 +14,7 @@ import AutoComplete from 'primevue/autocomplete'
 import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
 import Popover from 'primevue/popover'
+import Message from 'primevue/message'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
@@ -328,9 +329,19 @@ const CLIENT_STATUSES = ['Completed', 'Member cancelled', 'Volunteer cancelled',
 
 const computedStatus = computed(() => {
   if (statusOverride.value) return statusOverride.value
+  // Attaching a volunteer to a cancelled request completes it on save —
+  // the same shape as Open -> Confirmed, but terminal and not reversible
+  // by clearing the field after save.
+  if (isCancelled.value) {
+    return form.value.volunteerPersonId ? 'Completed' : existingRequest.value.status
+  }
   if (CLIENT_STATUSES.includes(form.value.status)) return form.value.status
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
+
+const willCompleteOnSave = computed(() =>
+  isCancelled.value && !!form.value.volunteerPersonId
+)
 
 const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
 const modifiedByDisplayName = computed(() => existingRequest.value?.modifiedByDisplayName || '')
@@ -665,8 +676,8 @@ const handleSubmit = async (notify = false) => {
 
     if (isEdit.value) {
       // Only send status on PATCH for non-derived client values.
-      if (CLIENT_STATUSES.includes(form.value.status)) {
-        payload.status = form.value.status
+      if (CLIENT_STATUSES.includes(computedStatus.value)) {
+        payload.status = computedStatus.value
       }
     }
 
@@ -926,6 +937,13 @@ const openPersonDialog = (personId) => {
                   @click="openPersonDialog(form.volunteerPersonId)"
                 />
               </div>
+              <Message
+                v-if="willCompleteOnSave"
+                severity="warn"
+                :closable="false"
+              >
+                Saving will mark this request Completed.
+              </Message>
             </div>
           </div>
 
