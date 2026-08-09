@@ -7,6 +7,14 @@ const SmError = require('../utils/error')
 
 const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
 
+// The five end states. A request in any of these never returns to Open or
+// Confirmed — customer-agreed policy, enforced in patchServiceRequest.
+const END_STATES = [...CANCELLED_STATUSES, 'Completed', 'Unmatched']
+
+function isEndState(status) {
+  return END_STATES.includes(status)
+}
+
 // Escaped inline rather than bound: makeQueryString applies binds positionally
 // across the whole query, and this path is static server config, not user input.
 const NAME_CLAIM_PATH = mysql.escape(`$.${config.oauth.claims.name}`)
@@ -338,6 +346,16 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       )
       const current = currentRows[0]
       if (!current) return null
+
+      // Rule 2: never backward. The Patch enum already excludes Open and
+      // Confirmed, so this is normally unreachable — it is stated here so the
+      // invariant does not silently depend on the enum's vocabulary.
+      if (isEndState(current.status) && payload.status !== undefined &&
+          payload.status !== null && !isEndState(payload.status)) {
+        throw new SmError.UnprocessableError(
+          `Cannot change status from ${current.status} to ${payload.status}: a request never moves backward in its lifecycle.`
+        )
+      }
 
       const updateFields = {}
       if (payload.memberPersonId !== undefined) updateFields.memberPersonId = payload.memberPersonId || null

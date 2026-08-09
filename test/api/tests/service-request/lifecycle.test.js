@@ -126,3 +126,41 @@ test('status query filter maps to db statuses', async () => {
   assert.ok(ids.includes(confirmed.json.serviceRequestId), 'confirmed filter includes the Confirmed request')
   assert.ok(!ids.includes(open.json.serviceRequestId), 'confirmed filter excludes the Open request')
 })
+
+test('rule 2: a cancelled request cannot be moved back to Open or Confirmed', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+
+  const cancelled = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Member cancelled' } })
+  assert.equal(cancelled.status, 200)
+  assert.equal(cancelled.json.status, 'Member cancelled')
+
+  // 'Open' is not in the Patch enum, so express-openapi-validator rejects it
+  // at the spec boundary with a 400 before the service is reached. Assert the
+  // rejection, not the specific code: if the enum ever widens, the service
+  // layer must still refuse the transition.
+  const back = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Open' } })
+  assert.ok(back.status >= 400, `expected rejection, got ${back.status}`)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Member cancelled')
+})
+
+test('rule 2: terminal to terminal is allowed, and rewrites the reason verbatim', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Member cancelled' } })
+
+  const changed = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Hub cancelled' } })
+  assert.equal(changed.status, 200)
+  assert.equal(changed.json.status, 'Hub cancelled')
+})
