@@ -45,6 +45,10 @@ onMounted(async () => {
         if (k === 'primaryPersonId') {
           form.primaryPersonId = d.primaryPerson?.personId ?? ''
         }
+        // The new-grant default must not survive onto an existing member whose
+        // stored joinDate is NULL — it would show as saved data and then diff
+        // away in patchPayload(). Leave it blank so validation demands a date.
+        else if (k === 'joinDate') form.joinDate = d.joinDate ?? ''
         else if (d[k] != null) form[k] = d[k]
       })
       primaryPersonName.value = d.primaryPerson?.fullName ?? ''
