@@ -386,6 +386,21 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       const newVolunteerPersonId = payload.volunteerPersonId !== undefined
         ? (payload.volunteerPersonId || null)
         : current.volunteerPersonId
+
+      // Rule 1: on a cancelled or Unmatched row, CHANGING the volunteer is
+      // only meaningful as a step toward Confirmed — the backward move. Judge
+      // a change of value, not the presence of the key: the Vue form always
+      // sends volunteerPersonId, so keying on presence would refuse every
+      // ordinary save on a cancelled request. Completed is exempt: correcting
+      // who performed the service moves no status.
+      const volunteerChanged = String(newVolunteerPersonId ?? '') !== String(current.volunteerPersonId ?? '')
+      const ruleOneApplies = isEndState(current.status) && current.status !== 'Completed'
+      if (ruleOneApplies && volunteerChanged && !isEndState(payload.status)) {
+        throw new SmError.UnprocessableError(
+          `Cannot change the volunteer on a request with status ${current.status}.`
+        )
+      }
+
       const resolvedStatus = deriveStatus(payload.status, newVolunteerPersonId)
       updateFields.status = resolvedStatus
 

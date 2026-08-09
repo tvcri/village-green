@@ -15,6 +15,10 @@ import { villages, persons } from '../../setup/fixtures.js'
 const quahog = String(villages.quahog.id)
 const member = String(persons.quahogMember.id)
 const volunteer = String(persons.quahogVolunteer.id)
+// No second Quahog volunteer fixture exists; vssHouseholdSibling (id 7) is an
+// active volunteer in a different village, which is all rule 1's exemption
+// test needs: a volunteer id different from `volunteer`.
+const otherVolunteer = String(persons.vssHouseholdSibling.id)
 
 // Every request this file creates is deleted afterward — the seeded DB is
 // shared with parallel test files.
@@ -163,4 +167,95 @@ test('rule 2: terminal to terminal is allowed, and rewrites the reason verbatim'
     { token: tokens.users.sc, body: { status: 'Hub cancelled' } })
   assert.equal(changed.status, 200)
   assert.equal(changed.json.status, 'Hub cancelled')
+})
+
+test('rule 1: changing the volunteer on a cancelled request without a status is refused', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Member cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { volunteerPersonId: volunteer } })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Member cancelled')
+  assert.equal(after.json.volunteerPersonId, null)
+})
+
+test('rule 1: re-sending the SAME volunteer on a cancelled request is a no-op, not a 422', async () => {
+  // This is the ordinary-Save case. handleSubmit always includes
+  // volunteerPersonId, so a rule keyed on the key's presence rather than a
+  // change of value would break every save on a cancelled request.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  assert.equal(json.status, 'Confirmed')
+
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Volunteer cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, serviceName: 'Errand', status: 'Volunteer cancelled' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Volunteer cancelled')
+  assert.equal(res.json.serviceName, 'Errand')
+})
+
+test('rule 1: null-to-null on a cancelled request is not a change', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Hub cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: null, status: 'Hub cancelled' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Hub cancelled')
+})
+
+test('rule 1: Completed is exempt — the volunteer may be corrected', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: otherVolunteer, status: 'Completed' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Completed')
+  assert.equal(String(res.json.volunteerPersonId), otherVolunteer)
+})
+
+test('rule 1: the feature write path — volunteer plus Completed on a cancelled row', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Member cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, status: 'Completed' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Completed')
+  assert.equal(String(res.json.volunteerPersonId), volunteer)
 })
