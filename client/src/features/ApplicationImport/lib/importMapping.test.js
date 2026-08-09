@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   mapPersonForm, personCommunityNames, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
@@ -194,7 +194,6 @@ describe('personDisabilities', () => {
 describe('mapMemberForm', () => {
   it('maps defaults and household size for Dual', () => {
     const f = mapMemberForm(extraction(), 0, null)
-    expect(f.joinDate).toBeUndefined()   // join date is set when the member record is created, not from the application
     expect(f.printedNewsletter).toBe(true)
     expect(f.householdSize).toBe(2)
     expect(f.primaryPersonId).toBe('')
@@ -203,6 +202,34 @@ describe('mapMemberForm', () => {
   it('sets primaryPersonId for the second member', () => {
     const f = mapMemberForm(extraction(), 1, 42)
     expect(f.primaryPersonId).toBe(42)
+  })
+
+  describe('memberLevel is derived from the member index', () => {
+    it('makes the first member Primary', () => {
+      expect(mapMemberForm(extraction(), 0, null).memberLevel).toBe('Primary')
+    })
+    it('makes a subsequent member Secondary', () => {
+      expect(mapMemberForm(extraction(), 1, 42).memberLevel).toBe('Secondary')
+    })
+  })
+
+  describe('joinDate defaults to today', () => {
+    // joinDate is when the member record is created, not the application date.
+    afterEach(() => { vi.useRealTimers() })
+
+    it('prefills the current date', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2026, 7, 9, 12, 0, 0))   // 2026-08-09, local
+      expect(mapMemberForm(extraction(), 0, null).joinDate).toBe('2026-08-09')
+    })
+
+    it('uses the local civil date, not UTC', () => {
+      // 8pm local in a negative-offset zone is already the next day in UTC;
+      // joinDate is a civil DATE and must not roll forward.
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2026, 7, 9, 20, 30, 0))
+      expect(mapMemberForm(extraction(), 0, null).joinDate).toBe('2026-08-09')
+    })
   })
 
   describe('householdDues is always monthly', () => {

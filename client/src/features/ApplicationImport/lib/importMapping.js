@@ -1,5 +1,7 @@
 // Maps the POST /applications/extract response onto the person/member form shapes.
 
+import { todayCivilDate } from '../../../shared/lib/civilDate.js'
+
 const s = v => v ?? ''
 
 export function mapPersonForm (extraction, memberIndex) {
@@ -110,8 +112,11 @@ function monthlyDues (d) {
 export function mapMemberForm (extraction, memberIndex, primaryPersonId) {
   const d = extraction.memberDefaults
   return {
-    // joinDate is when the member record is created, not the application
-    // date — leave it for the operator to set, same as a non-import grant.
+    // The wizard walks members in application order: the first is the Primary
+    // member, any later one is Secondary tied to that Primary.
+    memberLevel: memberIndex > 0 ? 'Secondary' : 'Primary',
+    // joinDate is the day the member record is created, not the application date.
+    joinDate: todayCivilDate(),
     printedNewsletter: !!d.printedNewsletter,
     householdSize: extraction.application.householdType === 'Dual' ? 2 : 1,
     householdDues: monthlyDues(d),

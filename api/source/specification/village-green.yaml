@@ -3430,6 +3430,9 @@ components:
     MemberPut:
       additionalProperties: false
       type: object
+      required:
+      - memberLevel
+      - joinDate
       properties:
         memberLevel:  { type: string, maxLength: 100 }
         memberType:   { type: string, maxLength: 50 }

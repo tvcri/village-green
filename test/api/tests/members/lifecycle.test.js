@@ -28,7 +28,7 @@ test('PUT grants the member role with an auto-assigned memberNumber', async () =
   const personId = await makePerson('MbrPut')
   const { status, json } = await vgCall('putPersonMember', { personId }, {
     token: staff,
-    body: { status: 'Active', memberLevel: 'Household' },
+    body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(status, 200)
   assert.equal(json.personId, personId, 'responds with the person')
@@ -42,13 +42,13 @@ test('PUT grants the member role with an auto-assigned memberNumber', async () =
 test('PUT on an existing member updates the provided fields, keeping the number', async () => {
   const personId = await makePerson('MbrPut2')
   const first = await vgCall('putPersonMember', { personId }, {
-    token: staff, body: { status: 'Active', memberLevel: 'Household' },
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(first.status, 200)
   const number = first.json.member.memberNumber
 
   const second = await vgCall('putPersonMember', { personId }, {
-    token: staff, body: { status: 'Active', memberLevel: 'Individual' },
+    token: staff, body: { status: 'Active', memberLevel: 'Individual', joinDate: '2026-01-15' },
   })
   assert.equal(second.status, 200)
   assert.equal(second.json.member.memberLevel, 'Individual')
@@ -58,7 +58,7 @@ test('PUT on an existing member updates the provided fields, keeping the number'
 test('PATCH updates mutable member fields (including memberNumber)', async () => {
   const personId = await makePerson('MbrPatch')
   const put = await vgCall('putPersonMember', { personId }, {
-    token: staff, body: { status: 'Active' },
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(put.status, 200)
 
@@ -76,7 +76,7 @@ test('member row visibility tracks status + caller\'s member:read_inactive', asy
   // so a Dropped member yields null; with it (staff) the row stays visible.
   // board is the federation reader WITHOUT read_inactive.
   const personId = await makePerson('MbrDrop')
-  await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active' } })
+  await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })
   const active = await vgCall('getPerson', { personId, projection: ['member'] }, {
     token: tokens.users.board,
   })
@@ -98,7 +98,7 @@ test('member row visibility tracks status + caller\'s member:read_inactive', asy
 
 test('DELETE revokes the member role; a second DELETE 404s', async () => {
   const personId = await makePerson('MbrDel')
-  await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active' } })
+  await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })
   const del = await vgCall('deletePersonMember', { personId }, { token: staff })
   assert.equal(del.status, 204)
   const again = await vgCall('deletePersonMember', { personId }, { token: staff })
@@ -121,15 +121,43 @@ test('PUT for a person with no home village -> 422', async () => {
   })
   assert.equal(res.status, 201, 'precondition: villageless person created')
   const { status } = await vgCall('putPersonMember', { personId: res.json.personId }, {
-    token: staff, body: { status: 'Active' },
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(status, 422)
   await vgCall('deletePerson', { personId: res.json.personId }, { token: staff })
 })
 
+// ---- MemberPut requires memberLevel and joinDate ----
+// A member with neither could previously be created, leaving a row with no
+// level and no join date.
+
+test('PUT with no memberLevel -> 400', async () => {
+  const personId = await makePerson('MbrNoLevel')
+  const { status } = await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', joinDate: '2026-01-15' },
+  })
+  assert.equal(status, 400)
+})
+
+test('PUT with no joinDate -> 400', async () => {
+  const personId = await makePerson('MbrNoJoinDate')
+  const { status } = await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household' },
+  })
+  assert.equal(status, 400)
+})
+
+test('PUT with an empty body -> 400', async () => {
+  const personId = await makePerson('MbrEmptyBody')
+  const { status } = await vgCall('putPersonMember', { personId }, {
+    token: staff, body: {},
+  })
+  assert.equal(status, 400)
+})
+
 test('PUT for a nonexistent person -> 404', async () => {
   const { status } = await vgCall('putPersonMember', { personId: 999999 }, {
-    token: staff, body: { status: 'Active' },
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(status, 404)
 })
@@ -140,7 +168,7 @@ test('PUT member by a village user -> 403 (member:write is federation-only)', as
   const id = await makePerson('MbrCross')
   for (const token of [tokens.users.full_v1, tokens.users.full_v2]) {
     const res = await vgCall('putPersonMember', { personId: id }, {
-      token, body: { status: 'Active' },
+      token, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
     })
     if (res.status === 200) { // regression guard: undo
       await vgCall('deletePersonMember', { personId: id }, { token: staff })
