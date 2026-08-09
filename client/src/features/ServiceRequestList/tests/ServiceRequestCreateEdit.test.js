@@ -4,9 +4,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import ServiceRequestCreateEdit from '../components/ServiceRequestCreateEdit.vue'
 
+const routeParams = { value: {} }
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), afterEach: () => () => {} }),
-  useRoute: () => ({ params: {} })
+  useRoute: () => ({ params: routeParams.value })
 }))
 vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
 vi.mock('primevue/useconfirm', () => ({ useConfirm: () => ({ require: vi.fn() }) }))
@@ -50,6 +51,7 @@ afterEach(() => {
   // (e.g. a Ride render's "Starting Location" leaking into an Errand assertion).
   cleanup()
   vi.clearAllMocks()
+  routeParams.value = {}
 })
 
 const globalOpts = {
@@ -78,6 +80,17 @@ async function mountAndExpose () {
   })
   await waitFor(() => expect(setupState).not.toBeNull())
   return setupState
+}
+
+// Mounts in edit mode with a stored request. `mountAndExpose` always mounts in
+// create mode, because edit mode is driven by route.params.id.
+async function mountEditAndExpose (request) {
+  const { getServiceRequest } = await import('../api/serviceRequestApi.js')
+  getServiceRequest.mockResolvedValue(request)
+  routeParams.value = { id: String(request.serviceRequestId) }
+  const vm = await mountAndExpose()
+  await waitFor(() => expect(vm.existingRequest).toBeTruthy())
+  return vm
 }
 
 describe('ServiceRequestCreateEdit start section', () => {
@@ -233,6 +246,32 @@ describe('ServiceRequestCreateEdit start section', () => {
       expect(vm.form.apptTime).toBeNull()
       expect(vm.form.returnTime).toBeNull()
     })
+  })
+})
+
+describe('cancelled request status editing', () => {
+  const cancelledRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  it('shows the reason-changer and hides Cancel Request when cancelled', async () => {
+    await mountEditAndExpose(cancelledRequest)
+    await waitFor(() => expect(screen.getByText('Change Reason')).toBeTruthy())
+    expect(screen.queryByText('Cancel Request')).toBeNull()
+  })
+
+  it('shows Cancel Request and no reason-changer when not cancelled', async () => {
+    await mountEditAndExpose({ ...cancelledRequest, status: 'Open' })
+    await waitFor(() => expect(screen.getByText('Cancel Request')).toBeTruthy())
+    expect(screen.queryByText('Change Reason')).toBeNull()
+  })
+
+  it('offers only the two other cancellation reasons, never Completed', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+    expect(unref(vm.changeReasonOptions)).toEqual(['Volunteer cancelled', 'Hub cancelled'])
+    expect(unref(vm.changeReasonOptions)).not.toContain('Completed')
   })
 })
 

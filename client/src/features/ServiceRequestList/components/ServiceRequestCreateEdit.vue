@@ -98,6 +98,7 @@ const form = ref({
 const isSubmitting = ref(false)
 const isCancelling = ref(false)
 const cancelPopover = ref(null)
+const changeReasonPopover = ref(null)
 
 // False while the existingRequest watcher is populating the form, so the
 // isRideService watcher does not overwrite the API's transportationType.
@@ -782,6 +783,25 @@ const handleCancelRequest = (reason) => {
   })
 }
 
+// Only the two reasons the request is not already in. Completed is
+// deliberately absent — completing is a consequence of attaching a volunteer,
+// handled by the form and Save.
+const changeReasonOptions = computed(() =>
+  CANCEL_REASONS.filter(r => r !== existingRequest.value?.status)
+)
+
+const handleChangeReason = (reason) => {
+  changeReasonPopover.value.hide()
+  confirm.require({
+    header: 'Change Cancellation Reason',
+    message: 'Should notifications be sent for this change?',
+    acceptLabel: 'Change and Notify',
+    rejectLabel: 'Change without Notification',
+    accept: () => doCancelRequest(reason, true),
+    reject: () => doCancelRequest(reason, false)
+  })
+}
+
 const personDialogVisible = ref(false)
 const personDialogPersonId = ref(null)
 
@@ -1205,26 +1225,50 @@ const openPersonDialog = (personId) => {
           <!-- Actions -->
           <div class="form-actions">
             <template v-if="isEdit">
-              <Button
-                type="button"
-                label="Cancel Request"
-                severity="danger"
-                :disabled="isSubmitting || isCancelling || isCancelled"
-                @click="(e) => cancelPopover.toggle(e)"
-              />
-              <Popover ref="cancelPopover">
-                <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
-                  <Button
-                    v-for="reason in CANCEL_REASONS"
-                    :key="reason"
-                    :label="reason"
-                    text
-                    severity="danger"
-                    style="justify-content: flex-start;"
-                    @click="handleCancelRequest(reason)"
-                  />
-                </div>
-              </Popover>
+              <template v-if="isCancelled">
+                <Button
+                  type="button"
+                  label="Change Reason"
+                  severity="danger"
+                  :disabled="isSubmitting"
+                  @click="(e) => changeReasonPopover.toggle(e)"
+                />
+                <Popover ref="changeReasonPopover">
+                  <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
+                    <Button
+                      v-for="reason in changeReasonOptions"
+                      :key="reason"
+                      :label="reason"
+                      text
+                      severity="danger"
+                      style="justify-content: flex-start;"
+                      @click="handleChangeReason(reason)"
+                    />
+                  </div>
+                </Popover>
+              </template>
+              <template v-else>
+                <Button
+                  type="button"
+                  label="Cancel Request"
+                  severity="danger"
+                  :disabled="isSubmitting || isCancelling || isCancelled"
+                  @click="(e) => cancelPopover.toggle(e)"
+                />
+                <Popover ref="cancelPopover">
+                  <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
+                    <Button
+                      v-for="reason in CANCEL_REASONS"
+                      :key="reason"
+                      :label="reason"
+                      text
+                      severity="danger"
+                      style="justify-content: flex-start;"
+                      @click="handleCancelRequest(reason)"
+                    />
+                  </div>
+                </Popover>
+              </template>
             </template>
             <div class="form-actions-right">
               <Button
