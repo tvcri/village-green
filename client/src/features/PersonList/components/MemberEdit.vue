@@ -8,6 +8,8 @@ import MemberFormFields from './MemberFormFields.vue'
 import { getPerson } from '../api/personApi.js'
 import { putMember, patchMember, deleteMember } from '../api/roleApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
+import { validateMemberForm } from '../lib/memberFormValidation.js'
+import { todayCivilDate } from '../../../shared/lib/civilDate.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -20,7 +22,9 @@ const hasMember = ref(false)
 const hasHomeVillage = computed(() => !!person.value?.village?.villageId)
 const form = reactive({
   memberNumber: '', memberLevel: '', memberType: '', primaryPersonId: '',
-  serviceNotes: '', joinDate: '',
+  // A new grant joins today; an existing member's stored date overwrites this
+  // in onMounted.
+  serviceNotes: '', joinDate: todayCivilDate(),
   status: 'Active', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   confidentialNotes: '', statusChangeNotes: '', miscNotes: '',
@@ -28,7 +32,7 @@ const form = reactive({
 const createdDate = ref('')
 const primaryPersonName = ref('')
 const original = ref({ ...form })
-const canSave = computed(() => form.memberLevel !== 'Secondary' || !!form.primaryPersonId)
+const errors = reactive({})
 
 onMounted(async () => {
   try {
@@ -78,6 +82,10 @@ function patchPayload () {
 }
 
 async function save () {
+  if (!validateMemberForm(form, errors)) {
+    toast.add({ severity: 'warn', summary: 'Check the form', detail: 'Fix the highlighted fields', life: 3000 })
+    return
+  }
   try {
     if (hasMember.value) {
       const body = patchPayload()
@@ -131,6 +139,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           v-model:confidential-notes="form.confidentialNotes"
           v-model:status-change-notes="form.statusChangeNotes"
           v-model:misc-notes="form.miscNotes"
+          :errors="errors"
           :primary-person-name="primaryPersonName"
           primary-person-editable
           :village-id="person?.village?.villageId"
@@ -141,7 +150,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
         <div class="form-footer">
           <Button v-if="hasMember" type="button" label="Revoke Role" severity="danger" @click="revoke" />
           <Button type="button" label="Cancel" severity="secondary" @click="back" />
-          <Button type="submit" :disabled="!canSave" :label="hasMember ? 'Save' : 'Grant Member Role'" />
+          <Button type="submit" :label="hasMember ? 'Save' : 'Grant Member Role'" />
         </div>
       </form>
     </template>

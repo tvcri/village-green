@@ -16,3 +16,9 @@ export function serviceDateToDate (s) {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
+
+// Today as a civil 'YYYY-MM-DD' string in the viewer's local zone. Not
+// toISOString(): an evening entry west of UTC would render as tomorrow.
+export function todayCivilDate () {
+  return dateToServiceDate(new Date())
+}

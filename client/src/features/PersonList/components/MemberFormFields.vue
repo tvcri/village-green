@@ -10,6 +10,7 @@ import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 
 const props = defineProps({
+  errors: { type: Object, default: () => ({}) },
   uncertain: { type: Object, default: () => ({}) },
   primaryPersonName: { type: String, default: '' },
   primaryPersonEditable: { type: Boolean, default: false },
@@ -37,7 +38,12 @@ const miscNotes = defineModel('miscNotes')
 const statusOptions = ['Active', 'Pending', 'Dropped'].map(s => ({ label: s, value: s }))
 const memberLevelOptions = ['Primary', 'Secondary'].map(s => ({ label: s, value: s }))
 
-function edited (field) { emit('edited', field) }
+// Clear a field's validation error as soon as the user changes it, so the
+// message disappears on correction rather than lingering until the next save.
+function edited (field) {
+  delete props.errors[field]
+  emit('edited', field)
+}
 
 function uncertainText (field) { return sharedUncertainText(props.uncertain, field) }
 
@@ -95,7 +101,9 @@ watch(memberLevel, (level) => {
         <i v-if="uncertain.memberLevel" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('memberLevel')" />
       </label>
       <Select id="memberLevel" v-model="memberLevel" :options="memberLevelOptions"
-              optionLabel="label" optionValue="value" placeholder="Select level" class="w-full" @update:modelValue="edited('memberLevel')" />
+              optionLabel="label" optionValue="value" placeholder="Select level" class="w-full"
+              :class="{ 'p-invalid': errors.memberLevel }" @update:modelValue="edited('memberLevel')" />
+      <small class="field-error" v-if="errors.memberLevel">{{ errors.memberLevel }}</small>
     </div>
 
     <div v-if="memberLevel === 'Secondary'" class="form-field">
@@ -113,13 +121,16 @@ watch(memberLevel, (level) => {
         @item-select="onPrimaryPersonSelect"
       />
       <InputText v-else id="primaryPersonId" :model-value="primaryPersonName" class="w-full" disabled />
+      <small class="field-error" v-if="errors.primaryPersonId">{{ errors.primaryPersonId }}</small>
     </div>
 
     <div class="form-field">
       <label class="label" for="joinDate">Join Date
         <i v-if="uncertain.joinDate" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('joinDate')" />
       </label>
-      <InputText id="joinDate" v-model="joinDate" placeholder="YYYY-MM-DD" class="w-full" @input="edited('joinDate')" />
+      <InputText id="joinDate" v-model="joinDate" placeholder="YYYY-MM-DD" class="w-full"
+                 :class="{ 'p-invalid': errors.joinDate }" @input="edited('joinDate')" />
+      <small class="field-error" v-if="errors.joinDate">{{ errors.joinDate }}</small>
     </div>
 
     <div v-if="status === 'Dropped'" class="form-field">

@@ -72,3 +72,9 @@
   margin-left: 0.35rem;
   cursor: help;
 }
+
+.field-error {
+  color: var(--color-text-error);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}

@@ -1,5 +1,7 @@
 // Maps the POST /applications/extract response onto the person/member form shapes.
 
+import { todayCivilDate } from '../../../shared/lib/civilDate.js'
+
 const s = v => v ?? ''
 
 export function mapPersonForm (extraction, memberIndex) {
@@ -107,22 +109,14 @@ function monthlyDues (d) {
   return null
 }
 
-// joinDate is a civil DATE: the day the member record is created, not the
-// application date and not an instant. Build it from local calendar parts —
-// toISOString() would roll to the next day for an evening entry west of UTC.
-function today () {
-  const now = new Date()
-  const pad = n => String(n).padStart(2, '0')
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-}
-
 export function mapMemberForm (extraction, memberIndex, primaryPersonId) {
   const d = extraction.memberDefaults
   return {
     // The wizard walks members in application order: the first is the Primary
     // member, any later one is Secondary tied to that Primary.
     memberLevel: memberIndex > 0 ? 'Secondary' : 'Primary',
-    joinDate: today(),
+    // joinDate is the day the member record is created, not the application date.
+    joinDate: todayCivilDate(),
     printedNewsletter: !!d.printedNewsletter,
     householdSize: extraction.application.householdType === 'Dual' ? 2 : 1,
     householdDues: monthlyDues(d),

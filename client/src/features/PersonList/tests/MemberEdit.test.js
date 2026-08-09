@@ -99,4 +99,51 @@ describe('MemberEdit', () => {
     const [, body] = patchMember.mock.calls[0]
     expect(body.printedNewsletter).toBe(true)
   })
+
+  // A person with no member role yet: the grant path is where a member could
+  // previously be created with no level and no join date.
+  describe('granting a new member role', () => {
+    beforeEach(async () => {
+      const { getPerson } = await import('../api/personApi.js')
+      getPerson.mockResolvedValue({
+        personId: '5', fullName: 'Smith, Alice', village: { villageId: '1' },
+      })
+    })
+
+    it('defaults joinDate to today', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2026, 7, 9, 20, 30, 0))
+      try {
+        render(MemberEdit, { global: globalOpts })
+        await vi.waitFor(() => expect(screen.getByText('Grant Member Role')).toBeInTheDocument())
+        expect(screen.getByDisplayValue('2026-08-09')).toBeInTheDocument()
+      }
+      finally { vi.useRealTimers() }
+    })
+
+    it('blocks the grant and shows an error when memberLevel is empty', async () => {
+      const { putMember } = await import('../api/roleApi.js')
+      render(MemberEdit, { global: globalOpts })
+
+      await screen.findByText('Grant Member Role')
+      await fireEvent.click(screen.getByText('Grant Member Role'))
+
+      await waitFor(() => expect(screen.getByText('Member level is required')).toBeInTheDocument())
+      expect(putMember).not.toHaveBeenCalled()
+    })
+
+    it('blocks the grant when joinDate is cleared', async () => {
+      const { putMember } = await import('../api/roleApi.js')
+      render(MemberEdit, { global: globalOpts })
+
+      await screen.findByText('Grant Member Role')
+      const joinDateInput = document.querySelector('#joinDate')
+      await fireEvent.update(joinDateInput, '')
+
+      await fireEvent.click(screen.getByText('Grant Member Role'))
+
+      await waitFor(() => expect(screen.getByText('Join date is required')).toBeInTheDocument())
+      expect(putMember).not.toHaveBeenCalled()
+    })
+  })
 })
