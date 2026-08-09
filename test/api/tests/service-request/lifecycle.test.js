@@ -259,3 +259,67 @@ test('rule 1: the feature write path — volunteer plus Completed on a cancelled
   assert.equal(res.json.status, 'Completed')
   assert.equal(String(res.json.volunteerPersonId), volunteer)
 })
+
+test('rule 3: completing a request with no volunteer is refused', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  assert.equal(json.status, 'Open')
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Open')
+})
+
+test('rule 3: clearing the volunteer on a Completed request is refused', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: null, status: 'Completed' }
+  })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(String(after.json.volunteerPersonId), volunteer)
+})
+
+test('rule 3: judges the resulting row, so volunteer plus Completed together is fine', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, status: 'Completed' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Completed')
+})
+
+test('a single-field patch on a terminal request leaves its status alone', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { serviceName: 'Errand' } })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.serviceName, 'Errand')
+  assert.equal(res.json.status, 'Completed', 'omitting status must not re-derive a terminal row')
+})

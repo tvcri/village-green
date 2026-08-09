@@ -348,8 +348,10 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       if (!current) return null
 
       // Rule 2: never backward. The Patch enum already excludes Open and
-      // Confirmed, so this is normally unreachable — it is stated here so the
-      // invariant does not silently depend on the enum's vocabulary.
+      // Confirmed, so a caller cannot request this directly today — it is
+      // stated here so the invariant does not silently depend on the enum's
+      // vocabulary, and it stays live alongside rules 1 and 3 below, which
+      // guard the same terminal-row neighborhood.
       if (isEndState(current.status) && payload.status !== undefined &&
           payload.status !== null && !isEndState(payload.status)) {
         throw new SmError.UnprocessableError(
@@ -401,8 +403,25 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
         )
       }
 
-      const resolvedStatus = deriveStatus(payload.status, newVolunteerPersonId)
+      // Absence must never imply an operation on a terminal row: omitting
+      // status means "leave it alone", not "recompute". Non-terminal rows are
+      // untouched — they still derive from volunteer presence exactly as
+      // before, which is what keeps { volunteerPersonId } on an Open row
+      // working. Only `undefined` short-circuits; an explicit null still means
+      // recompute.
+      const resolvedStatus = payload.status === undefined && isEndState(current.status)
+        ? current.status
+        : deriveStatus(payload.status, newVolunteerPersonId)
       updateFields.status = resolvedStatus
+
+      // Rule 3: a Completed request must credit a volunteer. deriveStatus
+      // passes an explicit Completed through untouched, so without this a
+      // caller can record a completed service nobody performed.
+      if (resolvedStatus === 'Completed' && !newVolunteerPersonId) {
+        throw new SmError.UnprocessableError(
+          'A Completed service request must have a volunteer.'
+        )
+      }
 
       await connection.query('UPDATE service_request SET ? WHERE id = ?', [updateFields, serviceRequestId])
 
