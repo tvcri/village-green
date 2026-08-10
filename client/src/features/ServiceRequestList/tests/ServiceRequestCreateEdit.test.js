@@ -36,6 +36,10 @@ vi.mock('../../VolunteerList/api/volunteerApi.js', () => ({
   getVillageVolunteers: vi.fn().mockResolvedValue([]),
   getVolunteers: vi.fn().mockResolvedValue([])
 }))
+vi.mock('../../../shared/api/apiClient.js', () => ({
+  apiCall: vi.fn().mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 }),
+  isPrivacyAckError: () => false
+}))
 
 beforeEach(() => {
   // jsdom has no matchMedia; PrimeVue Select uses it on mount.
@@ -319,6 +323,44 @@ describe('completing a cancelled request by attaching a volunteer', () => {
     await waitFor(() => expect(unref(vm.computedStatus)).toBe('Confirmed'))
     expect(unref(vm.willCompleteOnSave)).toBe(false)
     expect(screen.queryByText(/will mark this request Completed/i)).toBeNull()
+  })
+})
+
+// The OAS rejects {status: Completed, notify: true} outright, so the primary
+// save action must neither promise nor send a notification once the resolved
+// status is Completed.
+describe('the primary save action never notifies when the status is Completed', () => {
+  const baseRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  it('relabels to Save and submits notify:false when completing a cancelled request', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    apiCall.mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 })
+    const vm = await mountEditAndExpose(baseRequest)
+
+    // Still cancelled, so the ordinary notifying save is offered.
+    await waitFor(() => expect(screen.getByText('Save and Notify')).toBeTruthy())
+
+    vm.form.volunteerPersonId = '9'
+    await waitFor(() => expect(screen.getByText('Save')).toBeTruthy())
+    expect(screen.queryByText('Save and Notify')).toBeNull()
+
+    await vm.handleSubmit(unref(vm.notifyOnPrimarySave))
+    await waitFor(() => expect(apiCall).toHaveBeenCalled())
+    const [operationId, , payload] = apiCall.mock.calls.at(-1)
+    expect(operationId).toBe('patchServiceRequest')
+    expect(payload.status).toBe('Completed')
+    expect(payload.notify).toBe(false)
+  })
+
+  it('relabels an already-Completed request, which notified and 400d before', async () => {
+    await mountEditAndExpose({ ...baseRequest, status: 'Completed', volunteerPersonId: '9' })
+
+    await waitFor(() => expect(screen.getByText('Save')).toBeTruthy())
+    expect(screen.queryByText('Save and Notify')).toBeNull()
   })
 })
 

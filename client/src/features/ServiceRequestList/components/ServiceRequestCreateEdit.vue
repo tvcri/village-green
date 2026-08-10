@@ -721,7 +721,22 @@ const handleSubmit = async (notify = false) => {
   }
 }
 
+// Completed is the one status that can never carry a notification: the OAS
+// rejects {status: Completed, notify: true} outright. So on that path the
+// primary action must not promise one. Label, icon and the notify flag all
+// come from this single computed, so the button cannot say one thing and
+// send another.
+const notifyOnPrimarySave = computed(() => computedStatus.value !== 'Completed')
+
+const primarySaveAction = computed(() => notifyOnPrimarySave.value
+  ? { label: 'Save and Notify', icon: 'pi pi-envelope' }
+  : { label: 'Save', icon: 'pi pi-upload' }
+)
+
 const splitButtonModel = computed(() => {
+  // With no notification to suppress, "Save only" would just duplicate the
+  // primary action, so it is dropped in that state.
+  if (!notifyOnPrimarySave.value) return []
   return [{ label: 'Save only', icon: 'pi pi-upload', command: () => handleSubmit(false) }]
 })
 
@@ -1297,12 +1312,24 @@ const openPersonDialog = (personId) => {
                 :disabled="isSubmitting"
               />
               <SplitButton
-                label="Save and Notify"
-                icon="pi pi-envelope"
+                v-if="splitButtonModel.length"
+                :label="primarySaveAction.label"
+                :icon="primarySaveAction.icon"
                 :loading="isSubmitting"
                 :disabled="!isFormValid || isSubmitting"
                 :model="splitButtonModel"
-                @click="handleSubmit(true)"
+                @click="handleSubmit(notifyOnPrimarySave)"
+              />
+              <!-- Nothing to choose between once the save cannot notify: a
+                   SplitButton would still render a chevron opening an empty menu. -->
+              <Button
+                v-else
+                type="button"
+                :label="primarySaveAction.label"
+                :icon="primarySaveAction.icon"
+                :loading="isSubmitting"
+                :disabled="!isFormValid || isSubmitting"
+                @click="handleSubmit(notifyOnPrimarySave)"
               />
             </div>
           </div>
