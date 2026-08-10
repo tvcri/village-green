@@ -269,13 +269,28 @@ describe('the primary save action never notifies when the status is Completed', 
 
   // Attaching a volunteer no longer completes a cancelled request as of this
   // task (#27233) — the status droplist (Task 2) is the only way to reach
-  // Completed from a cancelled request. Coverage for "already Completed"
-  // below still exercises the never-notify guarantee this block documents.
+  // Completed from a cancelled request, so the derivation this block used to
+  // exercise that way is gone. The guarantee itself (never notify once the
+  // resolved status is Completed) is still asserted below via a request that
+  // arrives at Completed by already being Completed.
   it('relabels an already-Completed request, which notified and 400d before', async () => {
     await mountEditAndExpose({ ...baseRequest, status: 'Completed', volunteerPersonId: '9' })
 
     await waitFor(() => expect(screen.getByText('Save')).toBeTruthy())
     expect(screen.queryByText('Save and Notify')).toBeNull()
+  })
+
+  it('submits notify:false for an already-Completed request', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    apiCall.mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 })
+    const vm = await mountEditAndExpose({ ...baseRequest, status: 'Completed', volunteerPersonId: '9' })
+
+    await vm.handleSubmit(unref(vm.notifyOnPrimarySave))
+    await waitFor(() => expect(apiCall).toHaveBeenCalled())
+    const [operationId, , payload] = apiCall.mock.calls.at(-1)
+    expect(operationId).toBe('patchServiceRequest')
+    expect(payload.status).toBe('Completed')
+    expect(payload.notify).toBe(false)
   })
 })
 
