@@ -926,7 +926,11 @@ const openPersonDialog = (personId) => {
 
         <div v-else-if="isUnmatched" class="loading">Unmatched requests cannot be edited yet. Redirecting…</div>
 
-        <form v-else-if="!isLoadingRequest || !isEdit" class="form" style="display: flex; flex-direction: column; gap: 1.5rem;" @submit.prevent="handleSubmit">
+        <!-- Enter-to-save must match the primary button exactly. Passing the
+             method by name would hand handleSubmit the SubmitEvent as its
+             `notify` argument, defeating the default and sending a non-boolean
+             the OAS rejects; the inline call binds the flag instead. -->
+        <form v-else-if="!isLoadingRequest || !isEdit" class="form" style="display: flex; flex-direction: column; gap: 1.5rem;" @submit.prevent="handleSubmit(notifyOnPrimarySave)">
           <!-- Persons Section -->
           <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
             <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Persons</h3>

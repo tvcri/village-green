@@ -418,6 +418,53 @@ describe('status droplist', () => {
   })
 })
 
+describe('submitting the form with the keyboard', () => {
+  // Enter in a text field fires a native submit, which bypasses the Save
+  // buttons entirely. Binding the method by name would pass the SubmitEvent
+  // as handleSubmit's `notify` argument — the default never applies to a
+  // defined value — sending notify: [object Event]. Bodies are not coerced
+  // (coerceTypes: false), so the OAS rejects it and the save is lost.
+  const openRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Open', volunteerPersonId: null
+  }
+
+  async function submitViaForm () {
+    const form = document.querySelector('form.form')
+    expect(form).toBeTruthy()
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await waitFor(async () => {
+      const { apiCall } = await import('../../../shared/api/apiClient.js')
+      expect(apiCall).toHaveBeenCalled()
+    })
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    return apiCall.mock.calls.at(-1)[2]
+  }
+
+  it('sends a boolean notify, never the submit event', async () => {
+    await mountEditAndExpose(openRequest)
+    const payload = await submitViaForm()
+    expect(typeof payload.notify).toBe('boolean')
+  })
+
+  it('matches the primary button: an Open request still offers to notify', async () => {
+    const vm = await mountEditAndExpose(openRequest)
+    expect(unref(vm.notifyOnPrimarySave)).toBe(true)
+    const payload = await submitViaForm()
+    expect(payload.notify).toBe(true)
+  })
+
+  it('matches the primary button: a terminal request notifies nobody', async () => {
+    const vm = await mountEditAndExpose({
+      ...openRequest, status: 'Member cancelled'
+    })
+    expect(unref(vm.notifyOnPrimarySave)).toBe(false)
+    const payload = await submitViaForm()
+    expect(payload.notify).toBe(false)
+  })
+})
+
 describe('volunteer requirement when completing', () => {
   const cancelledRequest = {
     serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
