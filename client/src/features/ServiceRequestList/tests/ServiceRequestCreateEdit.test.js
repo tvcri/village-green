@@ -497,14 +497,17 @@ describe('a rejected save explains itself', () => {
   // The API's lifecycle rules throw SmError.UnprocessableError(detail), which
   // errorHandlers.js serializes as { error, code, detail } and apiClient parses
   // onto ApiError.body. Without surfacing body.detail the user sees only
-  // "Failed to update service request" — e.g. on an Unmatched row, where
-  // changing the volunteer is a 422 by policy. The client no longer offers a
-  // pencil for those rows, but the API rule stands on its own and the client
-  // must still surface the reason whenever a save is rejected.
-  const unmatchedRequest = {
+  // "Failed to update service request" — e.g. rule 1's refusal to reassign the
+  // volunteer on a cancelled row.
+  //
+  // Uses a CANCELLED row, not an Unmatched one: the edit route redirects away
+  // from Unmatched without populating the form, so a save there never reaches
+  // the API at all — validation stops it first. Cancelled rows are editable and
+  // are where these 422s actually surface to a user.
+  const rejectedRequest = {
     serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
     serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
-    status: 'Unmatched', volunteerPersonId: null
+    status: 'Member cancelled', volunteerPersonId: null
   }
 
   function apiError (body) {
@@ -517,10 +520,10 @@ describe('a rejected save explains itself', () => {
 
   it("shows the server's explanation instead of the generic failure", async () => {
     const { apiCall } = await import('../../../shared/api/apiClient.js')
-    const vm = await mountEditAndExpose(unmatchedRequest)
+    const vm = await mountEditAndExpose(rejectedRequest)
     apiCall.mockRejectedValueOnce(apiError({
       error: 'Unprocessable Entity.',
-      detail: 'Cannot change the volunteer on a request with status Unmatched.'
+      detail: 'Cannot change the volunteer on a request with status Member cancelled.'
     }))
     toastAdd.mockClear()
 
@@ -528,12 +531,12 @@ describe('a rejected save explains itself', () => {
     await vm.handleSubmit(false)
 
     const errorToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'error')
-    expect(errorToast?.detail).toBe('Cannot change the volunteer on a request with status Unmatched.')
+    expect(errorToast?.detail).toBe('Cannot change the volunteer on a request with status Member cancelled.')
   })
 
   it('falls back to the generic message when the error carries no detail string', async () => {
     const { apiCall } = await import('../../../shared/api/apiClient.js')
-    const vm = await mountEditAndExpose(unmatchedRequest)
+    const vm = await mountEditAndExpose(rejectedRequest)
     // A structured detail object (some endpoints send one) carries no sentence.
     apiCall.mockRejectedValueOnce(apiError({ error: 'Unprocessable Entity.', detail: { reason: 'nope' } }))
     toastAdd.mockClear()
@@ -568,6 +571,19 @@ describe('editing an Unmatched request is disallowed', () => {
     // No editable form should ever appear for an Unmatched request.
     expect(screen.queryByRole('form')).toBeNull()
     expect(document.querySelector('form')).toBeNull()
+  })
+
+  it('does not populate the form for a component that is navigating away', async () => {
+    // The watcher returns after redirecting. Populating would fire the
+    // villageId and isRideService watchers, issuing member/volunteer fetches
+    // for a component on its way out.
+    const { getVillageMembers } = await import('../../MemberList/api/memberApi.js')
+    const vm = await mountEditAndExpose(unmatchedRequest)
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalled())
+    expect(vm.form.memberPersonId).toBe('')
+    expect(vm.form.serviceName).toBe('')
+    expect(getVillageMembers).not.toHaveBeenCalled()
   })
 
   it('warns the user why they were redirected', async () => {

@@ -117,10 +117,13 @@ const formLoaded = ref(!isEdit.value)
 // the read-only detail view rather than rendering the form. Uses router.push,
 // like every other navigation in this component (handleCancel, handleSubmit,
 // handleComplete) — this route has no back-history worth suppressing the way
-// useRequirePermission's replace() does for a forbidden page. The form is
-// still populated below so any in-flight/direct script access (e.g. a caller
-// that already holds a reference) sees consistent state; only rendering is
-// gated on isUnmatched in the template.
+// useRequirePermission's replace() does for a forbidden page.
+//
+// Returning here matters: populating the form would fire the villageId and
+// isRideService watchers, issuing member/volunteer fetches for a component
+// that is on its way out. formLoaded and the form ref are read only by this
+// component's own watchers, so leaving them untouched is invisible to the
+// detail view we redirect to — it fetches its own copy.
 watch(existingRequest, async (val) => {
   if (val && isEdit.value && val.status === 'Unmatched') {
     toast.add({
@@ -130,6 +133,7 @@ watch(existingRequest, async (val) => {
       life: 4000
     })
     router.push({ name: 'service-request-detail', params: { villageId: val.villageId, id: serviceRequestId.value }, query: { from: 'meta' } })
+    return
   }
   if (val && isEdit.value) {
     formLoaded.value = false
