@@ -782,7 +782,13 @@ const handleSubmit = async (notify = false) => {
 // primary action must not promise one. Label, icon and the notify flag all
 // come from this single computed, so the button cannot say one thing and
 // send another.
-const notifyOnPrimarySave = computed(() => computedStatus.value !== 'Completed')
+// Only a save that lands the request in a notifiable state offers to notify.
+// notification_event has open/confirmed/cancelled, but the cancelled event
+// belongs to the act of cancelling (doCancelRequest sends it) — saving an
+// edit to an already-terminal request announces nothing, so Completed and
+// the cancel reasons all get a plain Save. The API refuses Completed and
+// Unmatched outright; this keeps the button honest for the rest.
+const notifyOnPrimarySave = computed(() => !END_STATES.includes(computedStatus.value))
 
 const primarySaveAction = computed(() => notifyOnPrimarySave.value
   ? { label: 'Save and Notify', icon: 'pi pi-envelope' }

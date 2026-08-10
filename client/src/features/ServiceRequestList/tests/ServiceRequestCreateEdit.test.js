@@ -295,6 +295,39 @@ describe('the primary save action never notifies when the status is Completed', 
     expect(payload.status).toBe('Completed')
     expect(payload.notify).toBe(false)
   })
+
+  // Saving an edit to an already-cancelled request announces nothing: the
+  // cancelled event belongs to the act of cancelling, which doCancelRequest
+  // sends. Offering "Save and Notify" here promised a message that describes
+  // no event.
+  it.each(['Member cancelled', 'Volunteer cancelled', 'Hub cancelled'])(
+    'offers a plain Save on an already-%s request',
+    async (status) => {
+      await mountEditAndExpose({ ...baseRequest, status })
+
+      await waitFor(() => expect(screen.getByText('Save')).toBeTruthy())
+      expect(screen.queryByText('Save and Notify')).toBeNull()
+      expect(screen.queryByText('Save only')).toBeNull()
+    }
+  )
+
+  it('submits notify:false when saving an edit to a cancelled request', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    apiCall.mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 })
+    const vm = await mountEditAndExpose(baseRequest)
+
+    await vm.handleSubmit(unref(vm.notifyOnPrimarySave))
+    await waitFor(() => expect(apiCall).toHaveBeenCalled())
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.status).toBe('Member cancelled')
+    expect(payload.notify).toBe(false)
+  })
+
+  it('still offers Save and Notify on an Open request', async () => {
+    await mountEditAndExpose({ ...baseRequest, status: 'Open' })
+
+    await waitFor(() => expect(screen.getByText('Save and Notify')).toBeTruthy())
+  })
 })
 
 describe('Completed requests require a volunteer', () => {
