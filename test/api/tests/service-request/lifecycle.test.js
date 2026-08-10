@@ -331,12 +331,11 @@ test('rule 3: judges the resulting row, so volunteer plus Completed together is 
   assert.equal(res.json.status, 'Completed')
 })
 
-test('notify on an Unmatched request with no status change is refused, and leaves the row untouched', async () => {
+test('notify on an Unmatched request is refused — Unmatched has no notification_event surface, changed or not', async () => {
   // Unmatched is unreachable through the API (see the rule-1 Unmatched test
-  // above for why) and must be seeded directly. The short-circuit at
-  // patchServiceRequest resolves status to current.status here, so there is
-  // no transition — notify: true must 422, not silently invent an 'open'
-  // event for a row that is not open.
+  // above for why) and must be seeded directly. notification_event.eventType
+  // has no value for Unmatched, so notify: true must 422 regardless of
+  // whether the status itself changed.
   const { json } = await create({
     villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
   })
@@ -349,7 +348,7 @@ test('notify on an Unmatched request with no status change is refused, and leave
     body: { description: 'x', notify: true }
   })
   assert.equal(res.status, 422)
-  assert.match(res.json.detail, /did not change/)
+  assert.match(res.json.detail, /Unmatched/)
   assert.equal((await notificationEvents(serviceRequestId)).length, 0, 'no notification_event row inserted')
 
   const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
@@ -374,6 +373,38 @@ test('the same patch without notify succeeds and updates the description', async
   assert.equal((await notificationEvents(serviceRequestId)).length, 0)
 })
 
+test('notify on a patch resulting in Completed is refused — Completed has no notification_event surface', async () => {
+  // The OAS itself rejects { status: 'Completed', notify: true } as a direct
+  // pair (ServiceRequestPatch's `not/required` guard, village-green.yaml
+  // ~4238), so the service-layer refusal is reached the other way: a row
+  // already Completed, patched again with notify: true and no `status` key.
+  // The terminal short-circuit resolves status to current.status ('Completed')
+  // and this must still 422 — it is the case writeNotificationEvent has
+  // always refused.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  const completed = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { status: 'Completed' }
+  })
+  assert.equal(completed.status, 200)
+  assert.equal(completed.json.status, 'Completed')
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { description: 'x', notify: true }
+  })
+  assert.equal(res.status, 422)
+  assert.match(res.json.detail, /Completed/)
+  assert.equal((await notificationEvents(serviceRequestId)).length, 0, 'no notification_event row inserted')
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Completed')
+  assert.notEqual(after.json.description, 'x', 'the failed notify must not leave the description update applied either')
+})
+
 test('notify on a patch that genuinely changes status still writes the correct event', async () => {
   const { json } = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
   const serviceRequestId = json.serviceRequestId
@@ -386,6 +417,24 @@ test('notify on a patch that genuinely changes status still writes the correct e
   assert.equal(res.status, 200)
   assert.equal(res.json.status, 'Confirmed')
   assert.deepEqual(await notificationEvents(serviceRequestId), ['confirmed'])
+})
+
+test('resending a notification on an unchanged Open request succeeds — the NotificationHistoryDialog resend path', async () => {
+  // Mirrors exactly what NotificationHistoryDialog.vue's Send/Resend button
+  // PATCHes: { notify: true } alone, on a row whose status is already Open
+  // and does not change. Re-broadcasting an Open request to drum up
+  // volunteer signups is the deliberate feature this guards.
+  const { json } = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
+  const serviceRequestId = json.serviceRequestId
+  assert.equal(json.status, 'Open')
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { notify: true }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Open')
+  assert.deepEqual(await notificationEvents(serviceRequestId), ['open'])
 })
 
 test('a single-field patch on a terminal request leaves its status alone', async () => {

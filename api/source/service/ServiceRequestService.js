@@ -11,6 +11,13 @@ const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub canc
 // Confirmed — customer-agreed policy, enforced in patchServiceRequest.
 const END_STATES = [...CANCELLED_STATUSES, 'Completed', 'Unmatched']
 
+// notification_event.eventType covers open/confirmed/cancelled (plus
+// reminder, which isn't status-driven). Completed and Unmatched have no
+// corresponding event, so a status resolving to either cannot be notified —
+// enforced in writeNotificationEvent, the sole place that maps a status to
+// an event.
+const NON_NOTIFIABLE_STATUSES = ['Completed', 'Unmatched']
+
 function isEndState(status) {
   return END_STATES.includes(status)
 }
@@ -27,8 +34,10 @@ function deriveStatus(clientStatus, volunteerPersonId) {
 }
 
 async function writeNotificationEvent(connection, serviceRequestId, resolvedStatus) {
-  if (resolvedStatus === 'Completed') {
-    throw new SmError.UnprocessableError()
+  if (NON_NOTIFIABLE_STATUSES.includes(resolvedStatus)) {
+    throw new SmError.UnprocessableError(
+      `A ${resolvedStatus} service request has no notification to send.`
+    )
   }
   let eventType
   if (CANCELLED_STATUSES.includes(resolvedStatus)) {
@@ -429,20 +438,7 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
 
       await connection.query('UPDATE service_request SET ? WHERE id = ?', [updateFields, serviceRequestId])
 
-      // A notification announces a transition. If this PATCH left the status
-      // exactly as it was — the terminal short-circuit above, or a caller
-      // re-sending the row's current status — there is no transition to
-      // announce, and writeNotificationEvent has no branch for "nothing
-      // happened" (its Completed/cancelled/Confirmed/else branches all assume
-      // a real change). Silently skipping would leave the caller believing a
-      // notification went out, so this refuses instead, matching the
-      // Completed precedent in writeNotificationEvent itself.
       if (payload.notify) {
-        if (resolvedStatus === current.status) {
-          throw new SmError.UnprocessableError(
-            `Cannot send a notification: the status of this request did not change (still ${current.status}).`
-          )
-        }
         await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
       }
 
