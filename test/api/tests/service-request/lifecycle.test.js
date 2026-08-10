@@ -248,6 +248,30 @@ test('rule 1: null-to-null on a cancelled request is not a change', async () => 
   assert.equal(res.json.status, 'Hub cancelled')
 })
 
+test('rule 1: changing the volunteer alongside a cancel reason is refused', async () => {
+  // The droplist form sends volunteerPersonId on every save, so a cancelled
+  // row can be re-cancelled under a different reason with a NEW volunteer in
+  // one write. Only Completed is exempt from rule 1 — not every end state.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Hub cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: otherVolunteer, status: 'Member cancelled' }
+  })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc })
+  assert.equal(String(after.json.volunteerPersonId), volunteer)
+  assert.equal(after.json.status, 'Hub cancelled')
+})
+
 test('rule 1: Completed is exempt — the volunteer may be corrected', async () => {
   const { json } = await create({
     villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,

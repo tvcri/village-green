@@ -405,11 +405,14 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       // only meaningful as a step toward Confirmed — the backward move. Judge
       // a change of value, not the presence of the key: the Vue form always
       // sends volunteerPersonId, so keying on presence would refuse every
-      // ordinary save on a cancelled request. Completed is exempt: correcting
-      // who performed the service moves no status.
+      // ordinary save on a cancelled request. Completed is the one exempt
+      // destination: recording who performed the service is the whole point of
+      // that write, and rule 3 below in fact requires a volunteer for it. Any
+      // OTHER end state is not exempt — re-cancelling under a different reason
+      // is no license to reassign the volunteer.
       const volunteerChanged = String(newVolunteerPersonId ?? '') !== String(current.volunteerPersonId ?? '')
       const ruleOneApplies = isEndState(current.status) && current.status !== 'Completed'
-      if (ruleOneApplies && volunteerChanged && !isEndState(payload.status)) {
+      if (ruleOneApplies && volunteerChanged && payload.status !== 'Completed') {
         throw new SmError.UnprocessableError(
           `Cannot change the volunteer on a request with status ${current.status}.`
         )
