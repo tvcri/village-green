@@ -641,6 +641,19 @@ const handleSubmit = async (notify = false) => {
       return
     }
 
+    // Mirrors API rule 3: a Completed request must credit a volunteer. Checked
+    // here rather than in isFormValid so it can explain itself (see the note
+    // above timesInOrder).
+    if (computedStatus.value === 'Completed' && !form.value.volunteerPersonId) {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'A completed request must have a volunteer',
+        life: 3000
+      })
+      return
+    }
+
     isSubmitting.value = true
 
     const payload = {

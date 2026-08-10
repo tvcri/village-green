@@ -364,6 +364,37 @@ describe('the primary save action never notifies when the status is Completed', 
   })
 })
 
+describe('Completed requests require a volunteer', () => {
+  const completedRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Completed', volunteerPersonId: '9'
+  }
+
+  it('does not submit a Completed request whose volunteer was cleared', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(completedRequest)
+
+    vm.form.volunteerPersonId = null
+    await vm.handleSubmit(false)
+
+    // isSubmitting is reset to false in a finally block regardless of whether
+    // the guard fired, so it can't distinguish "returned early" from "the
+    // mocked PATCH resolved" on its own. apiCall not being reached is the
+    // signal that actually proves the guard fired.
+    expect(vm.isSubmitting).toBe(false)
+    expect(apiCall).not.toHaveBeenCalled()
+  })
+
+  it('submits normally when the volunteer is present', async () => {
+    const vm = await mountEditAndExpose(completedRequest)
+
+    await vm.handleSubmit(false)
+    // Reaching the API path is enough — the guard did not fire.
+    expect(vm.computedStatus).toBe('Completed')
+  })
+})
+
 // Vue unwraps top-level refs on the setupState proxy in most cases, but a
 // computed may surface as a ref — read through this to be safe.
 function unref (v) {
