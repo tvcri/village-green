@@ -330,22 +330,17 @@ const computedStatus = computed(() => {
   // Terminal statuses are asserted by the user through the status droplist and
   // held in form.status; Open/Confirmed remain derived from volunteer presence.
   if (CLIENT_STATUSES.includes(form.value.status)) return form.value.status
-  // Unmatched is deliberately absent from CLIENT_STATUSES (handleSubmit must
-  // never send it — the API assigns it), but it still needs to display as
-  // the current value rather than fall through to Open/Confirmed.
-  if (existingRequest.value?.status === 'Unmatched') return 'Unmatched'
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
-// The five end states. Terminal rows assert their status through the droplist;
-// Open/Confirmed derive it, so they get no droplist.
-const END_STATES = ['Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Unmatched']
+// The four editable end states. Terminal rows assert their status through the
+// droplist; Open/Confirmed derive it, so they get no droplist.
+const END_STATES = ['Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
 
 const isTerminal = computed(() => END_STATES.includes(existingRequest.value?.status))
 
-// Unmatched is assigned by the overnight job, never asserted by staff — it
-// displays when current (via the Tag and the Select's own value) but is not a
-// choice. Open/Confirmed are derived, so they are never offered either.
+// These four are the statuses staff may assert through the droplist.
+// Open/Confirmed are derived from volunteer presence, so they are never offered.
 const statusOptions = computed(() => [
   'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed'
 ])

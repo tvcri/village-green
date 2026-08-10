@@ -348,14 +348,6 @@ describe('status droplist', () => {
     expect(unref(vm.isTerminal)).toBe(false)
   })
 
-  it('shows Unmatched as the current value but never as a choice', async () => {
-    const vm = await mountEditAndExpose({ ...cancelledRequest, status: 'Unmatched' })
-    expect(unref(vm.isTerminal)).toBe(true)
-    expect(unref(vm.statusOptions)).not.toContain('Unmatched')
-    // The stored value still displays, so the user can see what the request is.
-    expect(unref(vm.computedStatus)).toBe('Unmatched')
-  })
-
   it('previews the pending selection in the header Tag before saving', async () => {
     const vm = await mountEditAndExpose(cancelledRequest)
     expect(unref(vm.computedStatus)).toBe('Member cancelled')
