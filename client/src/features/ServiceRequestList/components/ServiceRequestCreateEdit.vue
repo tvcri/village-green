@@ -777,10 +777,6 @@ const handleCancel = () => {
 
 const CANCEL_REASONS = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
 
-const isCancelled = computed(() =>
-  existingRequest.value?.status?.toLowerCase().includes('cancelled') ?? false
-)
-
 const isConfirmed = computed(() =>
   existingRequest.value?.status?.toLowerCase() === 'confirmed'
 )
@@ -1280,7 +1276,7 @@ const openPersonDialog = (personId) => {
                   type="button"
                   label="Cancel Request"
                   severity="danger"
-                  :disabled="isSubmitting || isCancelling || isCancelled"
+                  :disabled="isSubmitting || isCancelling"
                   @click="(e) => cancelPopover.toggle(e)"
                 />
                 <Popover ref="cancelPopover">
@@ -1490,14 +1486,6 @@ const openPersonDialog = (personId) => {
   padding: 2rem;
   text-align: center;
   color: var(--color-text-dim);
-}
-
-.status-display {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  color: var(--color-text-primary);
-  font-size: 0.95rem;
 }
 
 @media (max-width: 768px) {

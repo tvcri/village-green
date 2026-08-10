@@ -405,7 +405,7 @@ describe('a rejected save explains itself', () => {
   // onto ApiError.body. Without surfacing body.detail the user sees only
   // "Failed to update service request" — e.g. on an Unmatched row, where the
   // pencil is enabled but changing the volunteer is a 422 by policy.
-  const openRequest = {
+  const unmatchedRequest = {
     serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
     serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
     status: 'Unmatched', volunteerPersonId: null
@@ -421,7 +421,7 @@ describe('a rejected save explains itself', () => {
 
   it("shows the server's explanation instead of the generic failure", async () => {
     const { apiCall } = await import('../../../shared/api/apiClient.js')
-    const vm = await mountEditAndExpose(openRequest)
+    const vm = await mountEditAndExpose(unmatchedRequest)
     apiCall.mockRejectedValueOnce(apiError({
       error: 'Unprocessable Entity.',
       detail: 'Cannot change the volunteer on a request with status Unmatched.'
@@ -437,7 +437,7 @@ describe('a rejected save explains itself', () => {
 
   it('falls back to the generic message when the error carries no detail string', async () => {
     const { apiCall } = await import('../../../shared/api/apiClient.js')
-    const vm = await mountEditAndExpose(openRequest)
+    const vm = await mountEditAndExpose(unmatchedRequest)
     // A structured detail object (some endpoints send one) carries no sentence.
     apiCall.mockRejectedValueOnce(apiError({ error: 'Unprocessable Entity.', detail: { reason: 'nope' } }))
     toastAdd.mockClear()
