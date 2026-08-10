@@ -65,6 +65,12 @@ const { state: existingRequest, isLoading: isLoadingRequest } = useAsyncState(
   { immediate: true }
 )
 
+// Drives both the redirect-away watcher (below) and the template's form gate
+// — the form must not render editable while the redirect is in flight, and
+// this doubles as a defensive gate if the redirect is ever a no-op (e.g. a
+// test/harness that stubs router.push without actually navigating).
+const isUnmatched = computed(() => isEdit.value && existingRequest.value?.status === 'Unmatched')
+
 const form = ref({
   villageId: '',
   memberPersonId: '',
@@ -104,7 +110,27 @@ const cancelPopover = ref(null)
 // Starts true in create mode (no load needed); starts false in edit mode.
 const formLoaded = ref(!isEdit.value)
 
+// Editing an Unmatched request is disallowed for now — the rules around what
+// may change on one are unsettled. A direct/bookmarked/stale URL can still
+// reach this route (the list already hides the pencil, see
+// MetaServiceRequestList.vue), so the guard has to live here too. Redirect to
+// the read-only detail view rather than rendering the form. Uses router.push,
+// like every other navigation in this component (handleCancel, handleSubmit,
+// handleComplete) — this route has no back-history worth suppressing the way
+// useRequirePermission's replace() does for a forbidden page. The form is
+// still populated below so any in-flight/direct script access (e.g. a caller
+// that already holds a reference) sees consistent state; only rendering is
+// gated on isUnmatched in the template.
 watch(existingRequest, async (val) => {
+  if (val && isEdit.value && val.status === 'Unmatched') {
+    toast.add({
+      severity: 'warn',
+      summary: 'Editing unavailable',
+      detail: 'Unmatched requests cannot be edited yet.',
+      life: 4000
+    })
+    router.push({ name: 'service-request-detail', params: { villageId: val.villageId, id: serviceRequestId.value }, query: { from: 'meta' } })
+  }
   if (val && isEdit.value) {
     formLoaded.value = false
     const extractDate = (dateStr) => {
@@ -883,7 +909,9 @@ const openPersonDialog = (personId) => {
       <template #content>
         <div v-if="isLoadingRequest && isEdit" class="loading">Loading...</div>
 
-        <form v-if="!isLoadingRequest || !isEdit" class="form" style="display: flex; flex-direction: column; gap: 1.5rem;" @submit.prevent="handleSubmit">
+        <div v-else-if="isUnmatched" class="loading">Unmatched requests cannot be edited yet. Redirecting…</div>
+
+        <form v-else-if="!isLoadingRequest || !isEdit" class="form" style="display: flex; flex-direction: column; gap: 1.5rem;" @submit.prevent="handleSubmit">
           <!-- Persons Section -->
           <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
             <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Persons</h3>

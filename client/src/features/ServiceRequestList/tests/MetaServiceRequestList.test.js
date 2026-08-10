@@ -203,6 +203,35 @@ describe('MetaServiceRequestList CSV download', () => {
     expect(getServiceRequests).not.toHaveBeenCalled()
   })
 
+  it('hides the edit pencil for an Unmatched row but shows it for a non-Unmatched row', async () => {
+    const { getServiceRequests } = await import('../api/serviceRequestApi.js')
+    // The default client-side status filter is Open+Confirmed only (see
+    // "shows only open and confirmed rows on first load" above), so an
+    // Unmatched row needs the filter cleared to be visible at all.
+    getServiceRequests.mockResolvedValueOnce([
+      { serviceRequestId: 1, displayNumber: 'M-1', status: 'Unmatched', serviceDate: '2026-07-20' },
+      { serviceRequestId: 2, displayNumber: 'M-2', status: 'Open', serviceDate: '2026-07-19' }
+    ])
+    const { container, findAllByText, getByTitle } = render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
+
+    await findAllByText('M-2')
+    await waitFor(() => expect(container.querySelector('#window-start')).toBeTruthy())
+    await fireEvent.click(getByTitle('Clear all filters'))
+
+    await findAllByText('M-1')
+    await findAllByText('M-2')
+
+    const rows = Array.from(container.querySelectorAll('.desktop-only tbody tr'))
+    const unmatchedRow = rows.find(r => r.textContent.includes('M-1'))
+    const openRow = rows.find(r => r.textContent.includes('M-2'))
+
+    expect(unmatchedRow.querySelector('.pi-pencil')).toBeNull()
+    expect(openRow.querySelector('.pi-pencil')).not.toBeNull()
+    // Prove the bell itself is unaffected by the missing pencil — the gate is
+    // the status, not a broader loss of row actions.
+    expect(unmatchedRow.querySelector('.pi-bell')).not.toBeNull()
+  })
+
   it('shows only VSS signup rows when the VSS Signup checkbox is checked', async () => {
     render(MetaServiceRequestList, { global: { plugins: [PrimeVue] } })
 

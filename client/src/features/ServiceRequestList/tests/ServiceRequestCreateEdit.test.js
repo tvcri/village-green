@@ -5,8 +5,11 @@ import PrimeVue from 'primevue/config'
 import ServiceRequestCreateEdit from '../components/ServiceRequestCreateEdit.vue'
 
 const routeParams = { value: {} }
+// Shared spy (vi.hoisted, same reasoning as toastAdd below) so tests can
+// assert on navigation the component triggers, e.g. the Unmatched redirect.
+const routerPush = vi.hoisted(() => vi.fn())
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn(), afterEach: () => () => {} }),
+  useRouter: () => ({ push: routerPush, afterEach: () => () => {} }),
   useRoute: () => ({ params: routeParams.value })
 }))
 // One shared spy across mounts so tests can assert on what the component
@@ -446,6 +449,48 @@ describe('a rejected save explains itself', () => {
 
     const errorToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'error')
     expect(errorToast?.detail).toBe('Failed to update service request')
+  })
+})
+
+describe('editing an Unmatched request is disallowed', () => {
+  // The rules for editing an Unmatched request are unsettled, so the edit
+  // route refuses to present the form for one even when reached directly
+  // (bookmark, back button, hand-typed URL) — the list already hides the
+  // pencil, but the route itself must independently refuse to render.
+  const unmatchedRequest = {
+    serviceRequestId: 5, requestNumber: 5, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Unmatched', volunteerPersonId: null
+  }
+
+  it('redirects to the detail view instead of rendering an editable form', async () => {
+    await mountEditAndExpose(unmatchedRequest)
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'service-request-detail',
+        params: { villageId: '1', id: '5' }
+      })
+    ))
+    // No editable form should ever appear for an Unmatched request.
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(document.querySelector('form')).toBeNull()
+  })
+
+  it('warns the user why they were redirected', async () => {
+    await mountEditAndExpose(unmatchedRequest)
+
+    await waitFor(() => expect(toastAdd).toHaveBeenCalled())
+    const warnToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'warn')
+    expect(warnToast?.detail).toMatch(/cannot be edited/i)
+  })
+
+  it('still renders an editable form for a non-Unmatched request', async () => {
+    const vm = await mountEditAndExpose({ ...unmatchedRequest, status: 'Open' })
+
+    await waitFor(() => expect(document.querySelector('form')).not.toBeNull())
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(vm.form.villageId).toBe('1')
   })
 })
 
