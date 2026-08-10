@@ -935,7 +935,11 @@ const openPersonDialog = (personId) => {
 
             <div v-if="form.villageId">
               <label class="volunteer-label">
-                <span>Volunteer</span>
+                <span>Volunteer<span
+                  v-if="computedStatus === 'Completed'"
+                  class="req"
+                  data-testid="volunteer-required"
+                >*</span></span>
                 <span class="any-village-toggle">
                   <Checkbox v-model="anyVillageVolunteers" binary input-id="any-village-volunteers" />
                   <label for="any-village-volunteers">From any village</label>

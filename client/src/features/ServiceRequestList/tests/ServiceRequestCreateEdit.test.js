@@ -371,6 +371,34 @@ describe('status droplist', () => {
   })
 })
 
+describe('volunteer requirement when completing', () => {
+  const cancelledRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  it('marks the volunteer field required once Completed is selected', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+    expect(screen.queryByTestId('volunteer-required')).toBeNull()
+
+    vm.form.status = 'Completed'
+    await waitFor(() => {
+      expect(screen.getByTestId('volunteer-required')).toBeTruthy()
+    })
+  })
+
+  it('drops the marker when a non-completing status is selected', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+
+    vm.form.status = 'Completed'
+    await waitFor(() => expect(screen.getByTestId('volunteer-required')).toBeTruthy())
+
+    vm.form.status = 'Hub cancelled'
+    await waitFor(() => expect(screen.queryByTestId('volunteer-required')).toBeNull())
+  })
+})
+
 describe('a rejected save explains itself', () => {
   // The API's lifecycle rules throw SmError.UnprocessableError(detail), which
   // errorHandlers.js serializes as { error, code, detail } and apiClient parses
