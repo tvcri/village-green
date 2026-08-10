@@ -330,8 +330,25 @@ const computedStatus = computed(() => {
   // Terminal statuses are asserted by the user through the status droplist and
   // held in form.status; Open/Confirmed remain derived from volunteer presence.
   if (CLIENT_STATUSES.includes(form.value.status)) return form.value.status
+  // Unmatched is deliberately absent from CLIENT_STATUSES (handleSubmit must
+  // never send it — the API assigns it), but it still needs to display as
+  // the current value rather than fall through to Open/Confirmed.
+  if (existingRequest.value?.status === 'Unmatched') return 'Unmatched'
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
+
+// The five end states. Terminal rows assert their status through the droplist;
+// Open/Confirmed derive it, so they get no droplist.
+const END_STATES = ['Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Unmatched']
+
+const isTerminal = computed(() => END_STATES.includes(existingRequest.value?.status))
+
+// Unmatched is assigned by the overnight job, never asserted by staff — it
+// displays when current (via the Tag and the Select's own value) but is not a
+// choice. Open/Confirmed are derived, so they are never offered either.
+const statusOptions = computed(() => [
+  'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed'
+])
 
 const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
 const modifiedByDisplayName = computed(() => existingRequest.value?.modifiedByDisplayName || '')
@@ -1250,26 +1267,37 @@ const openPersonDialog = (personId) => {
           <!-- Actions -->
           <div class="form-actions">
             <template v-if="isEdit">
-              <Button
-                type="button"
-                label="Cancel Request"
-                severity="danger"
-                :disabled="isSubmitting || isCancelling || isCancelled"
-                @click="(e) => cancelPopover.toggle(e)"
+              <Select
+                v-if="isTerminal"
+                v-model="form.status"
+                :options="statusOptions"
+                placeholder="Status"
+                aria-label="Request status"
+                :disabled="isSubmitting"
+                style="min-width: 12rem;"
               />
-              <Popover ref="cancelPopover">
-                <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
-                  <Button
-                    v-for="reason in CANCEL_REASONS"
-                    :key="reason"
-                    :label="reason"
-                    text
-                    severity="danger"
-                    style="justify-content: flex-start;"
-                    @click="handleCancelRequest(reason)"
-                  />
-                </div>
-              </Popover>
+              <template v-else>
+                <Button
+                  type="button"
+                  label="Cancel Request"
+                  severity="danger"
+                  :disabled="isSubmitting || isCancelling || isCancelled"
+                  @click="(e) => cancelPopover.toggle(e)"
+                />
+                <Popover ref="cancelPopover">
+                  <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
+                    <Button
+                      v-for="reason in CANCEL_REASONS"
+                      :key="reason"
+                      :label="reason"
+                      text
+                      severity="danger"
+                      style="justify-content: flex-start;"
+                      @click="handleCancelRequest(reason)"
+                    />
+                  </div>
+                </Popover>
+              </template>
             </template>
             <div class="form-actions-right">
               <Button

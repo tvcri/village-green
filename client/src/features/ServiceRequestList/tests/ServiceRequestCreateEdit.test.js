@@ -328,6 +328,57 @@ describe('Completed requests require a volunteer', () => {
   })
 })
 
+describe('status droplist', () => {
+  const cancelledRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  it('offers the other cancel reasons plus Completed on a cancelled request', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+    expect(unref(vm.isTerminal)).toBe(true)
+    expect(unref(vm.statusOptions)).toEqual([
+      'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed'
+    ])
+  })
+
+  it('does not render the droplist on a non-terminal request', async () => {
+    const vm = await mountEditAndExpose({ ...cancelledRequest, status: 'Open' })
+    expect(unref(vm.isTerminal)).toBe(false)
+  })
+
+  it('shows Unmatched as the current value but never as a choice', async () => {
+    const vm = await mountEditAndExpose({ ...cancelledRequest, status: 'Unmatched' })
+    expect(unref(vm.isTerminal)).toBe(true)
+    expect(unref(vm.statusOptions)).not.toContain('Unmatched')
+    // The stored value still displays, so the user can see what the request is.
+    expect(unref(vm.computedStatus)).toBe('Unmatched')
+  })
+
+  it('previews the pending selection in the header Tag before saving', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+    expect(unref(vm.computedStatus)).toBe('Member cancelled')
+
+    vm.form.status = 'Hub cancelled'
+    await waitFor(() => expect(unref(vm.computedStatus)).toBe('Hub cancelled'))
+    // Nothing was saved — the preview is local until Save.
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    expect(apiCall).not.toHaveBeenCalled()
+  })
+
+  it('sends the selected status on save', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(cancelledRequest)
+
+    vm.form.status = 'Hub cancelled'
+    await vm.handleSubmit(false)
+
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.status).toBe('Hub cancelled')
+  })
+})
+
 describe('a rejected save explains itself', () => {
   // The API's lifecycle rules throw SmError.UnprocessableError(detail), which
   // errorHandlers.js serializes as { error, code, detail } and apiClient parses
