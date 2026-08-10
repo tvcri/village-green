@@ -351,9 +351,12 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       // Confirmed, so a caller cannot request this directly today — it is
       // stated here so the invariant does not silently depend on the enum's
       // vocabulary, and it stays live alongside rules 1 and 3 below, which
-      // guard the same terminal-row neighborhood.
+      // guard the same terminal-row neighborhood. Only `undefined` is exempt:
+      // absence means "leave it alone", but an explicit null would fall
+      // through to deriveStatus(null, ...) and re-derive Open/Confirmed, which
+      // is exactly the backward move this rule exists to refuse.
       if (isEndState(current.status) && payload.status !== undefined &&
-          payload.status !== null && !isEndState(payload.status)) {
+          !isEndState(payload.status)) {
         throw new SmError.UnprocessableError(
           `Cannot change status from ${current.status} to ${payload.status}: a request never moves backward in its lifecycle.`
         )
@@ -407,8 +410,9 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       // status means "leave it alone", not "recompute". Non-terminal rows are
       // untouched — they still derive from volunteer presence exactly as
       // before, which is what keeps { volunteerPersonId } on an Open row
-      // working. Only `undefined` short-circuits; an explicit null still means
-      // recompute.
+      // working. Only `undefined` short-circuits here; an explicit null still
+      // means recompute — which on a terminal row rule 2 above has already
+      // refused, so this ternary only ever sees null on a non-terminal row.
       const resolvedStatus = payload.status === undefined && isEndState(current.status)
         ? current.status
         : deriveStatus(payload.status, newVolunteerPersonId)

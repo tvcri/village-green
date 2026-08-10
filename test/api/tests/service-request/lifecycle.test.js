@@ -186,6 +186,29 @@ test('rule 1: changing the volunteer on a cancelled request without a status is 
   assert.equal(after.json.volunteerPersonId, null)
 })
 
+test('rule 1: changing the volunteer on an Unmatched request without a status is refused', async () => {
+  // Unmatched is an end state the API itself never accepts on PATCH — the
+  // nightly MySQL event evt_auto_complete_service_requests writes it, and
+  // production has such rows. It is therefore unreachable through the API and
+  // must be seeded directly. This is the one end state in rule 1's scope with
+  // no other coverage, and it is the shape the Vue edit form actually sends on
+  // such a row: volunteerPersonId with no status at all.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await withDb(c =>
+    c.query('UPDATE service_request SET status = ? WHERE id = ?', ['Unmatched', serviceRequestId]))
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { volunteerPersonId: volunteer } })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Unmatched', 'the refused patch must leave the row untouched')
+  assert.equal(after.json.volunteerPersonId, null)
+})
+
 test('rule 1: re-sending the SAME volunteer on a cancelled request is a no-op, not a 422', async () => {
   // This is the ordinary-Save case. handleSubmit always includes
   // volunteerPersonId, so a rule keyed on the key's presence rather than a

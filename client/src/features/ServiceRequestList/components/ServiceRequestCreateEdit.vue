@@ -586,6 +586,20 @@ watch(isRideService, (newIsRide) => {
   }
 })
 
+// The API's error handler serializes SmError as
+// `{ error, code, detail }` (api/source/bootstrap/errorHandlers.js), and
+// apiClient parses that body onto ApiError.body. For the lifecycle rules in
+// patchServiceRequest the whole user-meaningful sentence is the `detail`
+// string ("Cannot change the volunteer on a request with status Unmatched.");
+// `error` is only the generic class label ("Unprocessable Entity."), so it is
+// not worth showing. Some endpoints send a structured `detail` object instead
+// — those carry no sentence, so only a string is used and everything else
+// falls back to the generic message.
+function serverErrorDetail (err) {
+  const detail = err?.body?.detail
+  return typeof detail === 'string' && detail.trim() ? detail : null
+}
+
 const handleSubmit = async (notify = false) => {
   try {
     if (!form.value.villageId) {
@@ -726,7 +740,8 @@ const handleSubmit = async (notify = false) => {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: isEdit.value ? 'Failed to update service request' : 'Failed to create service request',
+      detail: serverErrorDetail(err)
+        ?? (isEdit.value ? 'Failed to update service request' : 'Failed to create service request'),
       life: 5000
     })
   } finally {

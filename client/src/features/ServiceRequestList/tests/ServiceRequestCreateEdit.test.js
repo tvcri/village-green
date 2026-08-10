@@ -9,7 +9,11 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), afterEach: () => () => {} }),
   useRoute: () => ({ params: routeParams.value })
 }))
-vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
+// One shared spy across mounts so tests can assert on what the component
+// actually told the user (useToast: () => ({ add: vi.fn() }) would hand back a
+// fresh, uninspectable fn on every call).
+const toastAdd = vi.hoisted(() => vi.fn())
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 vi.mock('primevue/useconfirm', () => ({ useConfirm: () => ({ require: vi.fn() }) }))
 vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
   useRequirePermission: () => {}
@@ -387,11 +391,64 @@ describe('Completed requests require a volunteer', () => {
   })
 
   it('submits normally when the volunteer is present', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
     const vm = await mountEditAndExpose(completedRequest)
 
     await vm.handleSubmit(false)
-    // Reaching the API path is enough — the guard did not fire.
-    expect(vm.computedStatus).toBe('Completed')
+    // apiCall being reached is what proves the guard did not fire —
+    // computedStatus is the same either way.
+    expect(apiCall).toHaveBeenCalled()
+    expect(unref(vm.computedStatus)).toBe('Completed')
+  })
+})
+
+describe('a rejected save explains itself', () => {
+  // The API's lifecycle rules throw SmError.UnprocessableError(detail), which
+  // errorHandlers.js serializes as { error, code, detail } and apiClient parses
+  // onto ApiError.body. Without surfacing body.detail the user sees only
+  // "Failed to update service request" — e.g. on an Unmatched row, where the
+  // pencil is enabled but changing the volunteer is a 422 by policy.
+  const openRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Unmatched', volunteerPersonId: null
+  }
+
+  function apiError (body) {
+    const err = new Error('HTTP 422')
+    err.name = 'ApiError'
+    err.status = 422
+    err.body = body
+    return err
+  }
+
+  it("shows the server's explanation instead of the generic failure", async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(openRequest)
+    apiCall.mockRejectedValueOnce(apiError({
+      error: 'Unprocessable Entity.',
+      detail: 'Cannot change the volunteer on a request with status Unmatched.'
+    }))
+    toastAdd.mockClear()
+
+    vm.form.volunteerPersonId = '9'
+    await vm.handleSubmit(false)
+
+    const errorToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'error')
+    expect(errorToast?.detail).toBe('Cannot change the volunteer on a request with status Unmatched.')
+  })
+
+  it('falls back to the generic message when the error carries no detail string', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(openRequest)
+    // A structured detail object (some endpoints send one) carries no sentence.
+    apiCall.mockRejectedValueOnce(apiError({ error: 'Unprocessable Entity.', detail: { reason: 'nope' } }))
+    toastAdd.mockClear()
+
+    await vm.handleSubmit(false)
+
+    const errorToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'error')
+    expect(errorToast?.detail).toBe('Failed to update service request')
   })
 })
 
