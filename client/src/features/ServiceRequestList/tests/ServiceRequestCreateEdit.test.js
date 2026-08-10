@@ -406,8 +406,10 @@ describe('a rejected save explains itself', () => {
   // The API's lifecycle rules throw SmError.UnprocessableError(detail), which
   // errorHandlers.js serializes as { error, code, detail } and apiClient parses
   // onto ApiError.body. Without surfacing body.detail the user sees only
-  // "Failed to update service request" — e.g. on an Unmatched row, where the
-  // pencil is enabled but changing the volunteer is a 422 by policy.
+  // "Failed to update service request" — e.g. on an Unmatched row, where
+  // changing the volunteer is a 422 by policy. The client no longer offers a
+  // pencil for those rows, but the API rule stands on its own and the client
+  // must still surface the reason whenever a save is rejected.
   const unmatchedRequest = {
     serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
     serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
