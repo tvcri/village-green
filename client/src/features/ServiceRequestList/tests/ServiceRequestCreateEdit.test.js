@@ -257,79 +257,6 @@ describe('ServiceRequestCreateEdit start section', () => {
   })
 })
 
-describe('cancelled request status editing', () => {
-  const cancelledRequest = {
-    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
-    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
-    status: 'Member cancelled', volunteerPersonId: null
-  }
-
-  it('shows the reason-changer and hides Cancel Request when cancelled', async () => {
-    await mountEditAndExpose(cancelledRequest)
-    await waitFor(() => expect(screen.getByText('Change Reason')).toBeTruthy())
-    expect(screen.queryByText('Cancel Request')).toBeNull()
-  })
-
-  it('shows Cancel Request and no reason-changer when not cancelled', async () => {
-    await mountEditAndExpose({ ...cancelledRequest, status: 'Open' })
-    await waitFor(() => expect(screen.getByText('Cancel Request')).toBeTruthy())
-    expect(screen.queryByText('Change Reason')).toBeNull()
-  })
-
-  it('offers only the two other cancellation reasons, never Completed', async () => {
-    const vm = await mountEditAndExpose(cancelledRequest)
-    expect(unref(vm.changeReasonOptions)).toEqual(['Volunteer cancelled', 'Hub cancelled'])
-    expect(unref(vm.changeReasonOptions)).not.toContain('Completed')
-  })
-})
-
-describe('completing a cancelled request by attaching a volunteer', () => {
-  const cancelledRequest = {
-    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
-    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
-    status: 'Member cancelled', volunteerPersonId: null
-  }
-
-  it('previews Completed and shows the commitment notice once a volunteer is set', async () => {
-    const vm = await mountEditAndExpose(cancelledRequest)
-
-    // No volunteer yet: the stored cancelled status shows, and no notice.
-    expect(unref(vm.computedStatus)).toBe('Member cancelled')
-    expect(unref(vm.willCompleteOnSave)).toBe(false)
-    expect(screen.queryByText(/will mark this request Completed/i)).toBeNull()
-
-    vm.form.volunteerPersonId = '9'
-    await waitFor(() => {
-      expect(screen.getByText(/will mark this request Completed/i)).toBeTruthy()
-    })
-    expect(unref(vm.computedStatus)).toBe('Completed')
-  })
-
-  it('drops the notice and restores the cancelled status when the volunteer is cleared', async () => {
-    const vm = await mountEditAndExpose(cancelledRequest)
-
-    vm.form.volunteerPersonId = '9'
-    await waitFor(() => {
-      expect(screen.getByText(/will mark this request Completed/i)).toBeTruthy()
-    })
-
-    vm.form.volunteerPersonId = null
-    await waitFor(() => {
-      expect(screen.queryByText(/will mark this request Completed/i)).toBeNull()
-    })
-    expect(unref(vm.computedStatus)).toBe('Member cancelled')
-  })
-
-  it('still derives Confirmed, not Completed, on a non-cancelled request', async () => {
-    const vm = await mountEditAndExpose({ ...cancelledRequest, status: 'Open' })
-
-    vm.form.volunteerPersonId = '9'
-    await waitFor(() => expect(unref(vm.computedStatus)).toBe('Confirmed'))
-    expect(unref(vm.willCompleteOnSave)).toBe(false)
-    expect(screen.queryByText(/will mark this request Completed/i)).toBeNull()
-  })
-})
-
 // The OAS rejects {status: Completed, notify: true} outright, so the primary
 // save action must neither promise nor send a notification once the resolved
 // status is Completed.
@@ -340,26 +267,10 @@ describe('the primary save action never notifies when the status is Completed', 
     status: 'Member cancelled', volunteerPersonId: null
   }
 
-  it('relabels to Save and submits notify:false when completing a cancelled request', async () => {
-    const { apiCall } = await import('../../../shared/api/apiClient.js')
-    apiCall.mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 })
-    const vm = await mountEditAndExpose(baseRequest)
-
-    // Still cancelled, so the ordinary notifying save is offered.
-    await waitFor(() => expect(screen.getByText('Save and Notify')).toBeTruthy())
-
-    vm.form.volunteerPersonId = '9'
-    await waitFor(() => expect(screen.getByText('Save')).toBeTruthy())
-    expect(screen.queryByText('Save and Notify')).toBeNull()
-
-    await vm.handleSubmit(unref(vm.notifyOnPrimarySave))
-    await waitFor(() => expect(apiCall).toHaveBeenCalled())
-    const [operationId, , payload] = apiCall.mock.calls.at(-1)
-    expect(operationId).toBe('patchServiceRequest')
-    expect(payload.status).toBe('Completed')
-    expect(payload.notify).toBe(false)
-  })
-
+  // Attaching a volunteer no longer completes a cancelled request as of this
+  // task (#27233) — the status droplist (Task 2) is the only way to reach
+  // Completed from a cancelled request. Coverage for "already Completed"
+  // below still exercises the never-notify guarantee this block documents.
   it('relabels an already-Completed request, which notified and 400d before', async () => {
     await mountEditAndExpose({ ...baseRequest, status: 'Completed', volunteerPersonId: '9' })
 

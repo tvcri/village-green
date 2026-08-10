@@ -14,7 +14,6 @@ import AutoComplete from 'primevue/autocomplete'
 import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
 import Popover from 'primevue/popover'
-import Message from 'primevue/message'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
@@ -99,7 +98,6 @@ const form = ref({
 const isSubmitting = ref(false)
 const isCancelling = ref(false)
 const cancelPopover = ref(null)
-const changeReasonPopover = ref(null)
 
 // False while the existingRequest watcher is populating the form, so the
 // isRideService watcher does not overwrite the API's transportationType.
@@ -329,19 +327,11 @@ const CLIENT_STATUSES = ['Completed', 'Member cancelled', 'Volunteer cancelled',
 
 const computedStatus = computed(() => {
   if (statusOverride.value) return statusOverride.value
-  // Attaching a volunteer to a cancelled request completes it on save —
-  // the same shape as Open -> Confirmed, but terminal and not reversible
-  // by clearing the field after save.
-  if (isCancelled.value) {
-    return form.value.volunteerPersonId ? 'Completed' : existingRequest.value.status
-  }
+  // Terminal statuses are asserted by the user through the status droplist and
+  // held in form.status; Open/Confirmed remain derived from volunteer presence.
   if (CLIENT_STATUSES.includes(form.value.status)) return form.value.status
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
-
-const willCompleteOnSave = computed(() =>
-  isCancelled.value && !!form.value.volunteerPersonId
-)
 
 const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
 const modifiedByDisplayName = computed(() => existingRequest.value?.modifiedByDisplayName || '')
@@ -837,25 +827,6 @@ const handleCancelRequest = (reason) => {
   })
 }
 
-// Only the two reasons the request is not already in. Completed is
-// deliberately absent — completing is a consequence of attaching a volunteer,
-// handled by the form and Save.
-const changeReasonOptions = computed(() =>
-  CANCEL_REASONS.filter(r => r !== existingRequest.value?.status)
-)
-
-const handleChangeReason = (reason) => {
-  changeReasonPopover.value.hide()
-  confirm.require({
-    header: 'Change Cancellation Reason',
-    message: 'Should notifications be sent for this change?',
-    acceptLabel: 'Change and Notify',
-    rejectLabel: 'Change without Notification',
-    accept: () => doCancelRequest(reason, true),
-    reject: () => doCancelRequest(reason, false)
-  })
-}
-
 const personDialogVisible = ref(false)
 const personDialogPersonId = ref(null)
 
@@ -980,13 +951,6 @@ const openPersonDialog = (personId) => {
                   @click="openPersonDialog(form.volunteerPersonId)"
                 />
               </div>
-              <Message
-                v-if="willCompleteOnSave"
-                severity="warn"
-                :closable="false"
-              >
-                Saving will mark this request Completed.
-              </Message>
             </div>
           </div>
 
@@ -1286,50 +1250,26 @@ const openPersonDialog = (personId) => {
           <!-- Actions -->
           <div class="form-actions">
             <template v-if="isEdit">
-              <template v-if="isCancelled">
-                <Button
-                  type="button"
-                  label="Change Reason"
-                  severity="danger"
-                  :disabled="isSubmitting"
-                  @click="(e) => changeReasonPopover.toggle(e)"
-                />
-                <Popover ref="changeReasonPopover">
-                  <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
-                    <Button
-                      v-for="reason in changeReasonOptions"
-                      :key="reason"
-                      :label="reason"
-                      text
-                      severity="danger"
-                      style="justify-content: flex-start;"
-                      @click="handleChangeReason(reason)"
-                    />
-                  </div>
-                </Popover>
-              </template>
-              <template v-else>
-                <Button
-                  type="button"
-                  label="Cancel Request"
-                  severity="danger"
-                  :disabled="isSubmitting || isCancelling || isCancelled"
-                  @click="(e) => cancelPopover.toggle(e)"
-                />
-                <Popover ref="cancelPopover">
-                  <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
-                    <Button
-                      v-for="reason in CANCEL_REASONS"
-                      :key="reason"
-                      :label="reason"
-                      text
-                      severity="danger"
-                      style="justify-content: flex-start;"
-                      @click="handleCancelRequest(reason)"
-                    />
-                  </div>
-                </Popover>
-              </template>
+              <Button
+                type="button"
+                label="Cancel Request"
+                severity="danger"
+                :disabled="isSubmitting || isCancelling || isCancelled"
+                @click="(e) => cancelPopover.toggle(e)"
+              />
+              <Popover ref="cancelPopover">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
+                  <Button
+                    v-for="reason in CANCEL_REASONS"
+                    :key="reason"
+                    :label="reason"
+                    text
+                    severity="danger"
+                    style="justify-content: flex-start;"
+                    @click="handleCancelRequest(reason)"
+                  />
+                </div>
+              </Popover>
             </template>
             <div class="form-actions-right">
               <Button
