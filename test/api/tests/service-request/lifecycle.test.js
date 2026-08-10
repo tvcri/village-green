@@ -331,6 +331,63 @@ test('rule 3: judges the resulting row, so volunteer plus Completed together is 
   assert.equal(res.json.status, 'Completed')
 })
 
+test('notify on an Unmatched request with no status change is refused, and leaves the row untouched', async () => {
+  // Unmatched is unreachable through the API (see the rule-1 Unmatched test
+  // above for why) and must be seeded directly. The short-circuit at
+  // patchServiceRequest resolves status to current.status here, so there is
+  // no transition — notify: true must 422, not silently invent an 'open'
+  // event for a row that is not open.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await withDb(c =>
+    c.query('UPDATE service_request SET status = ? WHERE id = ?', ['Unmatched', serviceRequestId]))
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { description: 'x', notify: true }
+  })
+  assert.equal(res.status, 422)
+  assert.match(res.json.detail, /did not change/)
+  assert.equal((await notificationEvents(serviceRequestId)).length, 0, 'no notification_event row inserted')
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Unmatched')
+})
+
+test('the same patch without notify succeeds and updates the description', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await withDb(c =>
+    c.query('UPDATE service_request SET status = ? WHERE id = ?', ['Unmatched', serviceRequestId]))
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { description: 'x' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.description, 'x')
+  assert.equal(res.json.status, 'Unmatched')
+  assert.equal((await notificationEvents(serviceRequestId)).length, 0)
+})
+
+test('notify on a patch that genuinely changes status still writes the correct event', async () => {
+  const { json } = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
+  const serviceRequestId = json.serviceRequestId
+  assert.equal(json.status, 'Open')
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, notify: true }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Confirmed')
+  assert.deepEqual(await notificationEvents(serviceRequestId), ['confirmed'])
+})
+
 test('a single-field patch on a terminal request leaves its status alone', async () => {
   const { json } = await create({
     villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,

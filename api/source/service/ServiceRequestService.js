@@ -429,7 +429,20 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
 
       await connection.query('UPDATE service_request SET ? WHERE id = ?', [updateFields, serviceRequestId])
 
+      // A notification announces a transition. If this PATCH left the status
+      // exactly as it was — the terminal short-circuit above, or a caller
+      // re-sending the row's current status — there is no transition to
+      // announce, and writeNotificationEvent has no branch for "nothing
+      // happened" (its Completed/cancelled/Confirmed/else branches all assume
+      // a real change). Silently skipping would leave the caller believing a
+      // notification went out, so this refuses instead, matching the
+      // Completed precedent in writeNotificationEvent itself.
       if (payload.notify) {
+        if (resolvedStatus === current.status) {
+          throw new SmError.UnprocessableError(
+            `Cannot send a notification: the status of this request did not change (still ${current.status}).`
+          )
+        }
         await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
       }
 
