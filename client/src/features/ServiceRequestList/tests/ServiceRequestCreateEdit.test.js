@@ -449,6 +449,37 @@ describe('a rejected save explains itself', () => {
   })
 })
 
+describe('#27233 — a cancelled request that already has a volunteer', () => {
+  // The request was Confirmed with a volunteer, then cancelled. The volunteer
+  // is still recorded on it. Before the droplist, computedStatus tested
+  // volunteer *presence*, so this previewed Completed on load and any save
+  // silently completed the request.
+  const cancelledWithVolunteer = {
+    serviceRequestId: 27233, requestNumber: 27233, villageId: '1',
+    memberPersonId: '7', serviceName: 'Errand: Shopping',
+    serviceDate: '2026-08-01', status: 'Member cancelled',
+    volunteerPersonId: '9', description: 'original note'
+  }
+
+  it('loads showing its cancelled status, not Completed', async () => {
+    const vm = await mountEditAndExpose(cancelledWithVolunteer)
+    expect(unref(vm.computedStatus)).toBe('Member cancelled')
+    expect(screen.queryByTestId('volunteer-required')).toBeNull()
+  })
+
+  it('saves an unrelated edit without changing status', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(cancelledWithVolunteer)
+
+    vm.form.description = 'edited note'
+    await vm.handleSubmit(false)
+
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.description).toBe('edited note')
+    expect(payload.status).toBe('Member cancelled')
+  })
+})
+
 // Vue unwraps top-level refs on the setupState proxy in most cases, but a
 // computed may surface as a ref — read through this to be safe.
 function unref (v) {
