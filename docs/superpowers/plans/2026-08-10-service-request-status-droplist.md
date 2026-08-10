@@ -507,4 +507,6 @@ Report what was observed, including anything that reads awkwardly. The droplist'
 
 **Do not widen the droplist to `Open`/`Confirmed`.** They are derived. Offering them would mean reversing the derivation, and the API refuses the transition anyway.
 
-**Open question with the customer, not a blocker:** the droplist gives `Unmatched` requests a completion path the earlier plan deferred. It falls out of treating end states uniformly. If the customer says no, the fix is one condition in `isTerminal`.
+**`Unmatched` editability is provisional — do not treat it as settled.** The customer never raised `Unmatched`; it is in the droplist because treating all five end states uniformly is the clean rule, not because anyone established that staff should edit these rows. It is the one end state the *system* assigns rather than a person, so it may well come out.
+
+This is deliberately being demoed rather than asked about in advance — the user will raise it with the customer **after** they see the implementation. Build it as specified, and keep the seam cheap to reverse: `isTerminal` is the single point of control, so excluding `Unmatched` later is one condition, and `statusOptions` already never offers it. Do not spread `Unmatched` handling anywhere else.
