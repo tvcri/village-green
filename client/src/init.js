@@ -266,6 +266,17 @@ async function setupOidcWorker() {
 
   OW = VG.oidcWorker
   OW.worker.port.start()
+
+  // If this document is restored from bfcache (user pressed Back from the
+  // OP's logged-out page), the logout navigation is no longer pending here.
+  // Clear the flag so the re-auth prompt and token-absence handling behave
+  // normally again in the resurrected tab.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      OW.isLoggingOut = false
+    }
+  })
+
   const response = await initializeOidcWorker()
   if (response.error) {
     appendError(response.error)
