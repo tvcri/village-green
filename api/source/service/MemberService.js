@@ -68,8 +68,16 @@ module.exports.putMember = async function (personId, body, userObject) {
 module.exports.patchMember = async function (personId, body, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      // Read the before-state inside the transaction: this is the path a
+      // Pending -> Active activation actually takes from the client.
+      const [existing] = await connection.query(
+        'SELECT status FROM member WHERE personId = ?', [personId]
+      )
       if (Object.keys(body).length) {
         await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+      }
+      if (isActivation(existing[0]?.status, body.status)) {
+        await writeMemberWelcomeEvent(connection, personId)
       }
     },
     statusObj: undefined

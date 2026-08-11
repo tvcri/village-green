@@ -239,3 +239,60 @@ test('PUT creating a Pending member enqueues nothing', async () => {
   })
   assert.equal((await welcomeEvents(personId)).length, 0, 'Pending is not an activation')
 })
+
+test('PATCH Pending -> Active enqueues exactly one member_welcome', async () => {
+  const personId = await makePerson('MbrWelcomePatch')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Pending', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 0, 'precondition: Pending enqueued nothing')
+
+  const patched = await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { status: 'Active' },
+  })
+  assert.equal(patched.status, 200)
+  assert.equal((await welcomeEvents(personId)).length, 1, 'the common activation flow welcomes')
+})
+
+test('PATCH of an already-Active member enqueues nothing (THE HAZARD)', async () => {
+  const personId = await makePerson('MbrWelcomePatchActive')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'precondition: welcomed once')
+
+  // Both an unrelated field change and a redundant status: 'Active' must be inert.
+  await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { serviceNotes: 'Prefers morning rides' },
+  })
+  await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { status: 'Active' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'editing an Active member must not re-welcome')
+})
+
+test('reactivation (Active -> Dropped -> Active) enqueues nothing further', async () => {
+  const personId = await makePerson('MbrWelcomeReactivate')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'precondition: welcomed on activation')
+
+  await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { status: 'Dropped', dropReason: 'Moved away' },
+  })
+  await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { status: 'Active' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'a returning member is not re-welcomed')
+})
+
+test('a member activated with no email address still enqueues', async () => {
+  // Deliverability is the sidecar's problem: it marks the event failed without
+  // sending. The producer must not second-guess it.
+  const personId = await makePerson('MbrWelcomeNoEmail')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'enqueued regardless of email')
+})
