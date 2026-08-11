@@ -142,10 +142,12 @@ async function logout() {
   // Capture before clearing -- ending the OP session cleanly depends on it.
   const idToken = tokens.idToken
 
-  // Stale authorizations must go before the broadcast: broadcastNoToken()
-  // mints a fresh one for reauthUri and ships its codeVerifier to every tab,
-  // so clearing afterwards would delete the verifier those tabs need to
-  // complete re-authentication.
+  // Housekeeping: drop authorizations left pending for a session that is
+  // ending. Must run BEFORE the broadcast -- broadcastNoToken() mints a fresh
+  // authorization for reauthUri, and clearing afterwards would delete the very
+  // entry re-auth needs. Losing it fails silently rather than loudly:
+  // exchangeCodeForToken() guards with `if (authorizations[redirectUri] && ...)`,
+  // so a missing entry SKIPS the verifier check instead of erroring.
   for (const key of Object.keys(authorizations)) {
     delete authorizations[key]
   }
