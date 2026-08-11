@@ -154,6 +154,7 @@ const columnsForCsv = [
   { header: 'City', key: 'city' },
   { header: 'State', key: 'state' },
   { header: 'Zip', key: 'zip' },
+  { header: 'Municipality', key: 'town' },
   { header: 'Birth Date', key: 'birthDate' },
   { header: 'Emergency Contact Name', key: 'emergencyContactName' },
   { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },

@@ -26,12 +26,28 @@ builds its schema, and the `test/api` harness boots off them too.
 
 They are **not** regenerated automatically. After adding a migration:
 
-1. Migrate a dev DB to head.
+1. Migrate a DB to head — see "Verifying a new migration" below.
 2. Run `api/source/service/migrations/sql/generateSchema.sh --container
    [name]` (defaults to `village-green-orch-db-1`, or set
    `VG_SCHEMA_DB_CONTAINER`). The flag re-execs the script inside the
-   container so `mysqldump` matches the server version.
+   container so `mysqldump` matches the server version. Any container name
+   works, including the `test/api` stack's — set `VG_SCHEMA_DB_NAME` when the
+   source database isn't named `vg`, e.g. `vg_test` for that harness.
 3. Commit both regenerated files.
+
+### Verifying a new migration
+
+Use the **`test/api` harness**, which brings up its own MySQL (port 3307,
+database `vg_test`) and its own API from `test/api/docker-compose.yml`. Its
+scaffold marks `0001`–`00NN` executed, so a *new* migration runs its real
+`up()` there. `npm run test:keep` leaves the DB container up afterward, so
+the scaffold can be regenerated from it.
+
+**Never ask the user to restore a dump, restart the dev API, or migrate the
+dev stack for migration work.** The harness is self-contained and needs
+nothing from the dev environment. (Editing an *already-applied* migration in
+place is the one case that still needs a pre-migration dump restore — that
+is the user's call, not something to assume.)
 
 If the migration seeds **catalog rows**, also add its table(s) to
 `static_data_tables` in `generateSchema.sh`. Otherwise the dump marks the
@@ -70,6 +86,29 @@ Inside running text (sentences, dialogs, toasts) a name reads
 `CONCAT_WS(', ', lastName, firstName)`). Never string-unparse `fullName`
 to get the informal form — serve `firstName`/`lastName` alongside it and
 compose client-side. Emergency-contact names are free-text and exempt.
+
+## UI vocabulary vs data vocabulary
+
+Two terms deliberately differ between what the UI displays and what the
+code/schema calls them. Both are **intentional — do not "fix" either by
+renaming one side to match the other**, and when adding related code, keep
+the split.
+
+- **`town` → UI says "Municipality".** The `person.town` column,
+  `TownResolutionService.js`, and `POST /op/geocode/town` all keep `town`.
+  Every user-facing string says *Municipality*: the form label, the
+  detail-card label, and the Member/Volunteer CSV + Google Sheets column
+  header. Reason: the roster's municipalities include seven RI cities
+  (Providence, Cranston, Warwick, Pawtucket, Newport, Woonsocket, Central
+  Falls) alongside towns, and the value stored is Census's `BASENAME` — the
+  name with its type suffix already removed. "Municipality" is the only term
+  correct for both. The field is free-form and read-only in the UI; it is
+  calculated from the person's address.
+- **`federation` → UI says "Hub".** API vocabulary is unchanged.
+
+Because the UI term is unguessable from the code term, grepping the display
+word finds only a handful of lines. Search the data term when tracing these
+features end to end.
 
 ## API conventions
 

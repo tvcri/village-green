@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -9,6 +9,7 @@ import { mapMemberForm, uncertainMapForMember, composeNotes } from '../lib/impor
 import { getPerson, patchPerson } from '../../PersonList/api/personApi.js'
 import { putMember, patchMember } from '../../PersonList/api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { validateMemberForm } from '../../PersonList/lib/memberFormValidation.js'
 
 const props = defineProps({
   extraction: { type: Object, required: true },
@@ -30,7 +31,7 @@ const form = reactive({
   ...mapMemberForm(props.extraction, props.memberIndex, props.primaryPersonId),
 })
 const uncertain = reactive(uncertainMapForMember(props.extraction, props.memberIndex))
-const canSubmit = computed(() => form.memberLevel !== 'Secondary' || !!form.primaryPersonId)
+const errors = reactive({})
 const hasMember = ref(false)
 const saving = ref(false)
 const needsVillage = ref(false)
@@ -73,6 +74,7 @@ function payload () {
 }
 
 async function submit () {
+  if (!validateMemberForm(form, errors)) return
   saving.value = true
   needsVillage.value = false
   try {
@@ -150,12 +152,13 @@ async function saveVillageAndRetry () {
         v-model:confidential-notes="form.confidentialNotes"
         v-model:status-change-notes="form.statusChangeNotes"
         v-model:misc-notes="form.miscNotes"
+        :errors="errors"
         :uncertain="uncertain"
         :primary-person-name="primaryPersonName"
         @edited="onEdited"
       />
       <div class="step-footer">
-        <Button type="submit" :disabled="!canSubmit" :label="hasMember ? 'Update Member & Continue' : 'Grant Member Role & Continue'" :loading="saving" />
+        <Button type="submit" :label="hasMember ? 'Update Member & Continue' : 'Grant Member Role & Continue'" :loading="saving" />
       </div>
     </form>
   </div>

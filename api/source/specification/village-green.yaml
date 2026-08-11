@@ -593,6 +593,59 @@ paths:
       - oauth:
         - vg:read
       x-elevation-required: true
+  /op/geocode/town:
+    post:
+      tags:
+      - Operation
+      summary: Resolve the civic town for an address
+      description: 'Asks the US Census geocoder which municipality governs an
+        address. Writes nothing. Returns null when the address cannot be
+        resolved or when candidate matches disagree.
+
+        '
+      operationId: geocodeTown
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [street, city, state, zip]
+              additionalProperties: false
+              properties:
+                street:
+                  type: string
+                  maxLength: 300
+                city:
+                  type: string
+                  maxLength: 100
+                state:
+                  type: string
+                  maxLength: 50
+                zip:
+                  type: string
+                  maxLength: 20
+      responses:
+        '200':
+          description: The resolved town, or null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [town]
+                properties:
+                  town:
+                    type: string
+                    nullable: true
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:read
   /op/roles:
     get:
       summary: List roles and their permissions
@@ -3377,6 +3430,9 @@ components:
     MemberPut:
       additionalProperties: false
       type: object
+      required:
+      - memberLevel
+      - joinDate
       properties:
         memberLevel:  { type: string, maxLength: 100 }
         memberType:   { type: string, maxLength: 50 }
@@ -3524,6 +3580,10 @@ components:
         zip:
           type: string
           maxLength: 20
+          nullable: true
+        town:
+          type: string
+          maxLength: 50
           nullable: true
         email:
           type: string
@@ -3673,6 +3733,10 @@ components:
           type: string
           maxLength: 20
           nullable: true
+        town:
+          type: string
+          maxLength: 50
+          nullable: true
         birthDate:
           type: string
           format: date
@@ -3741,6 +3805,10 @@ components:
         zip:
           type: string
           maxLength: 20
+          nullable: true
+        town:
+          type: string
+          maxLength: 50
           nullable: true
         email:
           type: string
@@ -3819,6 +3887,10 @@ components:
         zip:
           type: string
           maxLength: 20
+        town:
+          type: string
+          maxLength: 50
+          nullable: true
         email:
           type: string
           maxLength: 200
@@ -4157,6 +4229,23 @@ components:
       additionalProperties: false
       type: object
       minProperties: 1
+      # Completed is the one status with no notification to send -- every other
+      # status maps to an eventType (cancelled/confirmed/open). Reject the pair
+      # at the edge: writeNotificationEvent throws for Completed *after* the
+      # UPDATE has run inside the transaction, so letting it through rolls back
+      # the status change along with the notification. `required` keeps this
+      # from also rejecting a bare {notify: true} with no status.
+      not:
+        required:
+        - status
+        - notify
+        properties:
+          status:
+            enum:
+            - Completed
+          notify:
+            enum:
+            - true
       properties:
         requestNumber:
           type: integer
@@ -4903,17 +4992,11 @@ components:
       type: object
       additionalProperties: false
       required:
-      - open
-      - confirmed
       - completed
       - unmatched
       - memberCancelled
       - volunteerCancelled
       properties:
-        open:
-          type: integer
-        confirmed:
-          type: integer
         completed:
           type: integer
         unmatched:

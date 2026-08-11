@@ -188,7 +188,7 @@ textarea:focus {
   --box-shadow-card: 0 2px 8px rgb(225 225 225 / 10%);
 
   --color-bg-hover: rgba(255, 255, 255, 0.05);
-  --color-bg-hover-light: #76767c;
+  --color-bg-hover-light: #252525;
 }
 
 :root.app-dark body {

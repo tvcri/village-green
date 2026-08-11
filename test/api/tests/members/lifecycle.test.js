@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
+import { withDb } from '../../lib/db.js'
 import { villages } from '../../setup/fixtures.js'
 
 // Member-role lifecycle on the person sub-resource: PUT/PATCH/DELETE
@@ -24,11 +25,26 @@ async function makePerson (lastName, body = {}) {
   return res.json.personId
 }
 
+// member_welcome is payload-driven: no serviceRequestId to key on, so match on
+// the event type plus the JSON payload path.
+//
+// The Number() bind is load-bearing. personId arrives from vgCall as a STRING,
+// and JSON_EXTRACT returns a JSON integer; MySQL matches zero rows comparing
+// the two, with no error. Binding a string here would make every
+// "enqueues nothing" assertion below pass vacuously.
+async function welcomeEvents (personId) {
+  const [rows] = await withDb(c => c.query(
+    `SELECT id, serviceRequestId, payload FROM notification_event
+     WHERE eventType = 'member_welcome'
+       AND JSON_EXTRACT(payload, '$.memberPersonId') = ?`, [Number(personId)]))
+  return rows
+}
+
 test('PUT grants the member role with an auto-assigned memberNumber', async () => {
   const personId = await makePerson('MbrPut')
   const { status, json } = await vgCall('putPersonMember', { personId }, {
     token: staff,
-    body: { status: 'Active', memberLevel: 'Household' },
+    body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(status, 200)
   assert.equal(json.personId, personId, 'responds with the person')
@@ -42,13 +58,13 @@ test('PUT grants the member role with an auto-assigned memberNumber', async () =
 test('PUT on an existing member updates the provided fields, keeping the number', async () => {
   const personId = await makePerson('MbrPut2')
   const first = await vgCall('putPersonMember', { personId }, {
-    token: staff, body: { status: 'Active', memberLevel: 'Household' },
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(first.status, 200)
   const number = first.json.member.memberNumber
 
   const second = await vgCall('putPersonMember', { personId }, {
-    token: staff, body: { status: 'Active', memberLevel: 'Individual' },
+    token: staff, body: { status: 'Active', memberLevel: 'Individual', joinDate: '2026-01-15' },
   })
   assert.equal(second.status, 200)
   assert.equal(second.json.member.memberLevel, 'Individual')
@@ -58,7 +74,7 @@ test('PUT on an existing member updates the provided fields, keeping the number'
 test('PATCH updates mutable member fields (including memberNumber)', async () => {
   const personId = await makePerson('MbrPatch')
   const put = await vgCall('putPersonMember', { personId }, {
-    token: staff, body: { status: 'Active' },
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(put.status, 200)
 
@@ -76,7 +92,7 @@ test('member row visibility tracks status + caller\'s member:read_inactive', asy
   // so a Dropped member yields null; with it (staff) the row stays visible.
   // board is the federation reader WITHOUT read_inactive.
   const personId = await makePerson('MbrDrop')
-  await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active' } })
+  await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })
   const active = await vgCall('getPerson', { personId, projection: ['member'] }, {
     token: tokens.users.board,
   })
@@ -98,7 +114,7 @@ test('member row visibility tracks status + caller\'s member:read_inactive', asy
 
 test('DELETE revokes the member role; a second DELETE 404s', async () => {
   const personId = await makePerson('MbrDel')
-  await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active' } })
+  await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })
   const del = await vgCall('deletePersonMember', { personId }, { token: staff })
   assert.equal(del.status, 204)
   const again = await vgCall('deletePersonMember', { personId }, { token: staff })
@@ -121,15 +137,43 @@ test('PUT for a person with no home village -> 422', async () => {
   })
   assert.equal(res.status, 201, 'precondition: villageless person created')
   const { status } = await vgCall('putPersonMember', { personId: res.json.personId }, {
-    token: staff, body: { status: 'Active' },
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(status, 422)
   await vgCall('deletePerson', { personId: res.json.personId }, { token: staff })
 })
 
+// ---- MemberPut requires memberLevel and joinDate ----
+// A member with neither could previously be created, leaving a row with no
+// level and no join date.
+
+test('PUT with no memberLevel -> 400', async () => {
+  const personId = await makePerson('MbrNoLevel')
+  const { status } = await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', joinDate: '2026-01-15' },
+  })
+  assert.equal(status, 400)
+})
+
+test('PUT with no joinDate -> 400', async () => {
+  const personId = await makePerson('MbrNoJoinDate')
+  const { status } = await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household' },
+  })
+  assert.equal(status, 400)
+})
+
+test('PUT with an empty body -> 400', async () => {
+  const personId = await makePerson('MbrEmptyBody')
+  const { status } = await vgCall('putPersonMember', { personId }, {
+    token: staff, body: {},
+  })
+  assert.equal(status, 400)
+})
+
 test('PUT for a nonexistent person -> 404', async () => {
   const { status } = await vgCall('putPersonMember', { personId: 999999 }, {
-    token: staff, body: { status: 'Active' },
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
   })
   assert.equal(status, 404)
 })
@@ -140,11 +184,115 @@ test('PUT member by a village user -> 403 (member:write is federation-only)', as
   const id = await makePerson('MbrCross')
   for (const token of [tokens.users.full_v1, tokens.users.full_v2]) {
     const res = await vgCall('putPersonMember', { personId: id }, {
-      token, body: { status: 'Active' },
+      token, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
     })
     if (res.status === 200) { // regression guard: undo
       await vgCall('deletePersonMember', { personId: id }, { token: staff })
     }
     assert.equal(res.status, 403)
   }
+})
+
+// ---- member_welcome event producer ----
+// The hazard: ~712 existing Active members with email addresses must never be
+// welcomed by an ordinary save. See
+// docs/superpowers/specs/2026-08-11-member-welcome-producer-design.md
+
+test('PUT creating an Active member enqueues exactly one member_welcome', async () => {
+  const personId = await makePerson('MbrWelcomePut')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  const events = await welcomeEvents(personId)
+  assert.equal(events.length, 1, 'exactly one welcome event')
+})
+
+test('member_welcome payload carries the person id and a null serviceRequestId', async () => {
+  const personId = await makePerson('MbrWelcomePayload')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  const [event] = await welcomeEvents(personId)
+  assert.ok(event, 'precondition: an event was enqueued')
+  assert.equal(event.serviceRequestId, null, 'not tied to a service request')
+  const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
+  assert.equal(String(payload.memberPersonId), String(personId), 'payload carries person.id')
+})
+
+test('re-PUT of an already-Active member enqueues nothing (THE HAZARD)', async () => {
+  const personId = await makePerson('MbrWelcomeRePut')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'precondition: welcomed once')
+
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Individual', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'a second save must not re-welcome')
+})
+
+test('PUT creating a Pending member enqueues nothing', async () => {
+  const personId = await makePerson('MbrWelcomePending')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Pending', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 0, 'Pending is not an activation')
+})
+
+test('PATCH Pending -> Active enqueues exactly one member_welcome', async () => {
+  const personId = await makePerson('MbrWelcomePatch')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Pending', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 0, 'precondition: Pending enqueued nothing')
+
+  const patched = await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { status: 'Active' },
+  })
+  assert.equal(patched.status, 200)
+  assert.equal((await welcomeEvents(personId)).length, 1, 'the common activation flow welcomes')
+})
+
+test('PATCH of an already-Active member enqueues nothing (THE HAZARD)', async () => {
+  const personId = await makePerson('MbrWelcomePatchActive')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'precondition: welcomed once')
+
+  // Both an unrelated field change and a redundant status: 'Active' must be inert.
+  await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { serviceNotes: 'Prefers morning rides' },
+  })
+  await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { status: 'Active' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'editing an Active member must not re-welcome')
+})
+
+test('reactivation (Active -> Dropped -> Active) enqueues nothing further', async () => {
+  const personId = await makePerson('MbrWelcomeReactivate')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'precondition: welcomed on activation')
+
+  await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { status: 'Dropped', dropReason: 'Moved away' },
+  })
+  await vgCall('patchPersonMember', { personId }, {
+    token: staff, body: { status: 'Active' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'a returning member is not re-welcomed')
+})
+
+test('a member activated with no email address still enqueues', async () => {
+  // Deliverability is the sidecar's problem: it marks the event failed without
+  // sending. The producer must not second-guess it.
+  const personId = await makePerson('MbrWelcomeNoEmail')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'enqueued regardless of email')
 })

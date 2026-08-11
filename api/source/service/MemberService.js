@@ -2,6 +2,25 @@
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
 
+// A member is welcomed when they genuinely become Active. Prior 'Active' is the
+// hazard this guard exists for: ~712 existing Active members with email would
+// otherwise be welcomed the first time each record is touched. Prior 'Dropped'
+// is reactivation, which gets no welcome by customer decision.
+// See docs/superpowers/specs/2026-08-11-member-welcome-producer-design.md
+function isActivation (priorStatus, nextStatus) {
+  return nextStatus === 'Active' && priorStatus !== 'Active' && priorStatus !== 'Dropped'
+}
+
+// Written on the caller's transaction connection so the event commits with the
+// member row — never dbUtils.pool.query. The sidecar resolves the person's
+// name, email, and village at send time, so nothing is snapshotted here.
+async function writeMemberWelcomeEvent (connection, personId) {
+  await connection.query(
+    `INSERT INTO notification_event (eventType, serviceRequestId, payload) VALUES (?, NULL, ?)`,
+    ['member_welcome', JSON.stringify({ memberPersonId: Number(personId) })]
+  )
+}
+
 module.exports.personHasHomeVillage = async function (personId) {
   const [rows] = await dbUtils.pool.query(
     'SELECT villageId FROM person WHERE id = ?', [personId]
@@ -20,8 +39,10 @@ module.exports.memberExists = async function (personId) {
 module.exports.putMember = async function (personId, body, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      // status comes back alongside id: it is the before-state the welcome
+      // guard compares against. Undefined on the insert branch (no prior row).
       const [existing] = await connection.query(
-        'SELECT id FROM member WHERE personId = ?', [personId]
+        'SELECT id, status FROM member WHERE personId = ?', [personId]
       )
       if (existing.length) {
         if (Object.keys(body).length) {
@@ -34,6 +55,9 @@ module.exports.putMember = async function (personId, body, userObject) {
         )
         await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...body })
       }
+      if (isActivation(existing[0]?.status, body.status)) {
+        await writeMemberWelcomeEvent(connection, personId)
+      }
     },
     statusObj: undefined
   })
@@ -44,8 +68,16 @@ module.exports.putMember = async function (personId, body, userObject) {
 module.exports.patchMember = async function (personId, body, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      // Read the before-state inside the transaction: this is the path a
+      // Pending -> Active activation actually takes from the client.
+      const [existing] = await connection.query(
+        'SELECT status FROM member WHERE personId = ?', [personId]
+      )
       if (Object.keys(body).length) {
         await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+      }
+      if (isActivation(existing[0]?.status, body.status)) {
+        await writeMemberWelcomeEvent(connection, personId)
       }
     },
     statusObj: undefined

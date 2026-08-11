@@ -60,6 +60,7 @@ const DETAIL_COLUMN = `JSON_OBJECT(
       'city', p.city,
       'state', p.state,
       'zip', LPAD(p.zip, 5, '0'),
+      'town', p.town,
       'birthDate', DATE_FORMAT(p.birthDate, '%Y-%m-%d'),
       'emergencyContactName', p.emergencyContactName,
       'emergencyContactRelationship', p.emergencyContactRelationship,
@@ -190,6 +191,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       'p.city',
       'p.state',
       "LPAD(p.zip, 5, '0') AS zip",
+      'p.town',
       'p.email',
       'p.phone',
       'p.cell',
@@ -345,6 +347,13 @@ module.exports.createPerson = async function (body) {
 
 module.exports.patchPerson = async function (personId, body) {
   const { communities, disabilities, ...personFields } = body
+  // town derives from the address (the client recalculates it and sends it
+  // with every address edit). A PATCH that changes address fields without
+  // supplying town would otherwise keep the previous municipality against
+  // the new address — clear it instead.
+  if (!('town' in personFields) && ['street', 'city', 'state', 'zip'].some(f => f in personFields)) {
+    personFields.town = null
+  }
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       if (Object.keys(personFields).length > 0) {

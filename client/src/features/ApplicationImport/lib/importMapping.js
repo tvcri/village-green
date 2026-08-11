@@ -1,5 +1,7 @@
 // Maps the POST /applications/extract response onto the person/member form shapes.
 
+import { todayCivilDate } from '../../../shared/lib/civilDate.js'
+
 const s = v => v ?? ''
 
 export function mapPersonForm (extraction, memberIndex) {
@@ -11,6 +13,7 @@ export function mapPersonForm (extraction, memberIndex) {
     lastName: s(m.lastName), nickname: s(m.nickname),
     street: s(m.street ?? p1.street), unit: s(m.unit ?? p1.unit),
     city: s(m.city ?? p1.city), state: s(m.state ?? p1.state), zip: s(m.zip ?? p1.zip),
+    town: '',
     email: s(m.email),
     phone: s(m.phone ?? p1.phone), cell: s(m.cell),
     birthDate: s(m.birthDate),
@@ -96,14 +99,27 @@ export function personDisabilities (extraction, memberIndex) {
   return result
 }
 
+// member.householdDues is a MONTHLY amount, but the application form offers a
+// monthly line and a yearly line. Prefer whichever the applicant filled in,
+// converting a yearly figure to its monthly equivalent (rounded to cents, the
+// column's precision) — never store the yearly amount verbatim.
+function monthlyDues (d) {
+  if (d.duesMonthly !== null && d.duesMonthly !== undefined) return d.duesMonthly
+  if (d.duesYearly !== null && d.duesYearly !== undefined) return Math.round(d.duesYearly / 12 * 100) / 100
+  return null
+}
+
 export function mapMemberForm (extraction, memberIndex, primaryPersonId) {
   const d = extraction.memberDefaults
   return {
-    // joinDate is when the member record is created, not the application
-    // date — leave it for the operator to set, same as a non-import grant.
+    // The wizard walks members in application order: the first is the Primary
+    // member, any later one is Secondary tied to that Primary.
+    memberLevel: memberIndex > 0 ? 'Secondary' : 'Primary',
+    // joinDate is the day the member record is created, not the application date.
+    joinDate: todayCivilDate(),
     printedNewsletter: !!d.printedNewsletter,
     householdSize: extraction.application.householdType === 'Dual' ? 2 : 1,
-    householdDues: d.duesYearly ?? d.duesMonthly ?? null,
+    householdDues: monthlyDues(d),
     primaryPersonId: memberIndex > 0 ? primaryPersonId : '',
     miscNotes: composeNotes(extraction, memberIndex),
   }
@@ -216,6 +232,7 @@ export function mapVolunteerPersonForm (extraction) {
     lastName: s(p.lastName), nickname: s(p.nickname),
     street: s(p.street), unit: s(p.unit),
     city: s(p.city), state: s(p.state), zip: s(p.zip),
+    town: '',
     email: s(p.email),
     phone: s(p.phone), cell: s(p.cell),
     birthDate: s(p.birthDate),

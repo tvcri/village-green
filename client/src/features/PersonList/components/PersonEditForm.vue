@@ -23,7 +23,7 @@ const personId = computed(() => route.params.personId)
 
 const form = reactive({
   firstName: '', middleInitial: '', lastName: '', nickname: '',
-  street: '', unit: '', city: '', state: '', zip: '',
+  street: '', unit: '', city: '', state: '', zip: '', town: '',
   email: '', phone: '', cell: '', birthDate: '',
   emergencyContactName: '', emergencyContactRelationship: '',
   emergencyContactPhone: '', emergencyContactEmail: '',
@@ -31,6 +31,7 @@ const form = reactive({
 })
 
 const errors = reactive({})
+const fields = ref(null)
 
 const villages = ref([])          // [{ villageId, name }]
 const allCommunities = ref([])    // [{ communityId, name }] from getCommunities()
@@ -87,6 +88,10 @@ async function handleSubmit () {
     return
   }
   try {
+    // An edited address may have a municipality lookup still in flight (or,
+    // for an Enter-key submit, not yet started) — settle it before reading
+    // form.town into the payload.
+    await fields.value?.townSettled()
     let id = personId.value
     if (isEdit.value) {
       await patchPerson(id, buildPayload())
@@ -137,6 +142,7 @@ function cancel () {
       <form @submit.prevent="handleSubmit">
 
         <PersonFormFields
+          ref="fields"
           v-model:first-name="form.firstName"
           v-model:middle-initial="form.middleInitial"
           v-model:last-name="form.lastName"
@@ -149,6 +155,7 @@ function cancel () {
           v-model:city="form.city"
           v-model:state="form.state"
           v-model:zip="form.zip"
+          v-model:town="form.town"
           v-model:birth-date="form.birthDate"
           v-model:village-id="form.villageId"
           v-model:emergency-contact-name="form.emergencyContactName"

@@ -470,7 +470,10 @@ function goToDetail(row) {
      Each hue yields a soft fill (-bg) and a stronger border (-border), derived
      following the status-bg recipe in style.css: color-mixed into the theme
      background so they adapt to light/dark automatically. --color-background-light
-     is the tag/pill surface. */
+     is the tag/pill surface.
+     Sync note: these 4 hues (Rides/Errands/Home Help/Tech Support) are mirrored as
+     flat hex in CATEGORY_COLORS, client/src/features/VillageMetrics/lib/metricsView.js,
+     for the metrics chart slices. Keep both in sync if a hue changes here. */
   --cat-home-help-bg: color-mix(in srgb, #3b82f6 26%, var(--color-background-light));
   --cat-home-help-border: color-mix(in srgb, #3b82f6 55%, var(--color-background-light));
   --cat-errands-bg: color-mix(in srgb, #f59e0b 26%, var(--color-background-light));

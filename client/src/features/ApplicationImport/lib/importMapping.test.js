@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   mapPersonForm, personCommunityNames, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
@@ -70,6 +70,10 @@ describe('mapPersonForm', () => {
     expect(f.phone).toBe('401-555-1111')
     expect(f.cell).toBe('401-555-2222')
     expect(f.birthDate).toBe('1946-07-19')
+  })
+  it('seeds town empty — PersonFormFields calculates it on mount, not the extraction', () => {
+    const f = mapPersonForm(extraction(), 0)
+    expect(f.town).toBe('')
   })
 })
 
@@ -190,16 +194,65 @@ describe('personDisabilities', () => {
 describe('mapMemberForm', () => {
   it('maps defaults and household size for Dual', () => {
     const f = mapMemberForm(extraction(), 0, null)
-    expect(f.joinDate).toBeUndefined()   // join date is set when the member record is created, not from the application
     expect(f.printedNewsletter).toBe(true)
     expect(f.householdSize).toBe(2)
-    expect(f.householdDues).toBe(120)
     expect(f.primaryPersonId).toBe('')
     expect(f.miscNotes).toContain('Pronouns: she/her')
   })
   it('sets primaryPersonId for the second member', () => {
     const f = mapMemberForm(extraction(), 1, 42)
     expect(f.primaryPersonId).toBe(42)
+  })
+
+  describe('memberLevel is derived from the member index', () => {
+    it('makes the first member Primary', () => {
+      expect(mapMemberForm(extraction(), 0, null).memberLevel).toBe('Primary')
+    })
+    it('makes a subsequent member Secondary', () => {
+      expect(mapMemberForm(extraction(), 1, 42).memberLevel).toBe('Secondary')
+    })
+  })
+
+  describe('joinDate defaults to today', () => {
+    // joinDate is when the member record is created, not the application date.
+    afterEach(() => { vi.useRealTimers() })
+
+    it('prefills the current date', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2026, 7, 9, 12, 0, 0))   // 2026-08-09, local
+      expect(mapMemberForm(extraction(), 0, null).joinDate).toBe('2026-08-09')
+    })
+
+    it('uses the local civil date, not UTC', () => {
+      // 8pm local in a negative-offset zone is already the next day in UTC;
+      // joinDate is a civil DATE and must not roll forward.
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(2026, 7, 9, 20, 30, 0))
+      expect(mapMemberForm(extraction(), 0, null).joinDate).toBe('2026-08-09')
+    })
+  })
+
+  describe('householdDues is always monthly', () => {
+    const withDues = (duesMonthly, duesYearly) => {
+      const e = extraction()
+      Object.assign(e.memberDefaults, { duesMonthly, duesYearly })
+      return mapMemberForm(e, 0, null).householdDues
+    }
+    it('divides a yearly amount by 12', () => {
+      expect(withDues(null, 120)).toBe(10)
+    })
+    it('rounds a yearly amount that does not divide evenly to cents', () => {
+      expect(withDues(null, 125)).toBe(10.42)
+    })
+    it('uses a monthly amount as-is', () => {
+      expect(withDues(25, null)).toBe(25)
+    })
+    it('prefers the monthly amount when the form carries both', () => {
+      expect(withDues(25, 120)).toBe(25)
+    })
+    it('is null when neither amount was extracted', () => {
+      expect(withDues(null, null)).toBeNull()
+    })
   })
 })
 
@@ -257,6 +310,12 @@ describe('buildPersonCreatePayload', () => {
     const p = buildPersonCreatePayload({ firstName: 'Al', lastName: 'Innovera', nickname: '', email: null, villageId: 1 })
     expect(p).toEqual({ firstName: 'Al', lastName: 'Innovera', villageId: 1 })
   })
+  it('carries a calculated town through, and drops it when still empty', () => {
+    const withTown = buildPersonCreatePayload({ firstName: 'Al', town: 'South Kingstown' })
+    expect(withTown.town).toBe('South Kingstown')
+    const withoutTown = buildPersonCreatePayload({ firstName: 'Al', town: '' })
+    expect(withoutTown.town).toBeUndefined()
+  })
 })
 
 function volunteerExtraction () {
@@ -297,6 +356,10 @@ describe('mapVolunteerPersonForm', () => {
     expect(f.emergencyContactName).toBe('Laurie Brown')
     expect(f.emergencyContactPhone).toBe('401-497-0470')
     expect(f.emergencyContactRelationship).toBe('Parent/Guardian')
+  })
+  it('seeds town empty — PersonFormFields calculates it on mount, not the extraction', () => {
+    const f = mapVolunteerPersonForm(volunteerExtraction())
+    expect(f.town).toBe('')
   })
 })
 

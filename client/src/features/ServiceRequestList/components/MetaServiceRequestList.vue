@@ -369,7 +369,7 @@ const clearFilters = () => {
           <Button icon="pi pi-bell" v-tooltip="'Show Notifications'" class="p-button-rounded p-button-text p-button-sm" aria-label="Notification history" @click.stop="openHistory(data)" />
           <span v-if="data.notifications?.length === 0 && !data.requestNumber" class="bell-alert-icon" aria-hidden="true"></span>
         </span>
-        <Button v-if="canWriteSr" icon="pi pi-pencil" v-tooltip="'Edit Request'" class="p-button-rounded p-button-text p-button-sm" @click.stop="navigateToEditRequest(data.serviceRequestId)" />
+        <Button v-if="canWriteSr && data.status !== 'Unmatched'" icon="pi pi-pencil" v-tooltip="'Edit Request'" class="p-button-rounded p-button-text p-button-sm" @click.stop="navigateToEditRequest(data.serviceRequestId)" />
       </template>
     </ServiceRequestTable>
 

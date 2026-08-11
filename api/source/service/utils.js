@@ -425,15 +425,17 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
 //  - VolunteerRequestService.buildCapabilityPrefixCase (capability -> prefix)
 //  - metrics byCategory derivation (serviceName -> category)
 // Prefix matches cut at the colon, absorbing the legacy whitespace-after-colon
-// variants. 'Member Added' is a legacy stats category, not a volunteer
-// capability (capability: null). Order = fixed byCategory display order.
+// variants. Order = fixed byCategory display order.
 // Replaced transparently when the serviceName lookup table lands.
+// 'Member Added' was a legacy stats category (capability: null) retired in
+// 2026-08: it was never offered by ServiceRequestCreateEdit's serviceNameOptions,
+// so nothing could create one, and its historical rows were deleted from
+// production. Every remaining serviceName maps to one of the four below.
 module.exports.SERVICE_CATEGORIES = [
   { category: 'Rides',        capability: 'Rides',        match: { prefix: 'Ride:' } },
   { category: 'Errands',      capability: 'Errands',      match: { prefix: 'Errand:' } },
   { category: 'Home Help',    capability: 'Home Help',    match: { exact: 'Household Chores/Handy Help' } },
   { category: 'Tech Support', capability: 'Tech Support', match: { exact: 'Tech Support' } },
-  { category: 'Member Added', capability: null,           match: { exact: 'Member Added' } },
 ]
 
 // serviceName -> category as a SQL CASE over `colExpr`. Vocabulary values are
@@ -445,6 +447,27 @@ module.exports.buildServiceNameCategoryCase = function (colExpr) {
       : `WHEN ${colExpr} = '${match.exact}' THEN '${category}'`
   )
   return `CASE ${whens.join(' ')} ELSE NULL END`
+}
+
+// The statuses a service request can be in once it is settled. Metrics report
+// on these only: 'Open' and 'Confirmed' are still in flight, and
+// evt_auto_complete_service_requests rewrites them to 'Unmatched'/'Completed'
+// the day after serviceDate — so counting them makes a report irreproducible,
+// its numbers changing between runs of the same range. 'Hub cancelled' is
+// absent because those requests are treated as if they never existed.
+//
+// An inclusion list, deliberately: a status added to the enum later is not
+// retroactively terminal, and inclusion ignores it. Exclusion would silently
+// count it into every report.
+module.exports.TERMINAL_SR_STATUSES = [
+  'Completed', 'Unmatched', 'Member cancelled', 'Volunteer cancelled'
+]
+
+// Closed developer-controlled vocabulary, not user input — inlined for the
+// same reason buildServiceNameCategoryCase inlines its category literals.
+module.exports.sqlTerminalStatus = function (colExpr) {
+  const list = module.exports.TERMINAL_SR_STATUSES.map(s => `'${s}'`).join(', ')
+  return `${colExpr} IN (${list})`
 }
 
 // Runtime VSS identity (set form). Resolves the ACTIVE VOLUNTEERS behind a

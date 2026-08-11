@@ -15,6 +15,10 @@ import { villages, persons } from '../../setup/fixtures.js'
 const quahog = String(villages.quahog.id)
 const member = String(persons.quahogMember.id)
 const volunteer = String(persons.quahogVolunteer.id)
+// No second Quahog volunteer fixture exists; vssHouseholdSibling (id 7) is an
+// active volunteer in a different village, which is all rule 1's exemption
+// test needs: a volunteer id different from `volunteer`.
+const otherVolunteer = String(persons.vssHouseholdSibling.id)
 
 // Every request this file creates is deleted afterward — the seeded DB is
 // shared with parallel test files.
@@ -125,4 +129,350 @@ test('status query filter maps to db statuses', async () => {
   const ids = json.map(r => r.serviceRequestId)
   assert.ok(ids.includes(confirmed.json.serviceRequestId), 'confirmed filter includes the Confirmed request')
   assert.ok(!ids.includes(open.json.serviceRequestId), 'confirmed filter excludes the Open request')
+})
+
+test('rule 2: a cancelled request cannot be moved back to Open or Confirmed', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+
+  const cancelled = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Member cancelled' } })
+  assert.equal(cancelled.status, 200)
+  assert.equal(cancelled.json.status, 'Member cancelled')
+
+  // 'Open' is not in the Patch enum, so express-openapi-validator rejects it
+  // at the spec boundary with a 400 before the service is reached. Assert the
+  // rejection, not the specific code: if the enum ever widens, the service
+  // layer must still refuse the transition.
+  const back = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Open' } })
+  assert.ok(back.status >= 400, `expected rejection, got ${back.status}`)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Member cancelled')
+})
+
+test('rule 2: terminal to terminal is allowed, and rewrites the reason verbatim', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Member cancelled' } })
+
+  const changed = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Hub cancelled' } })
+  assert.equal(changed.status, 200)
+  assert.equal(changed.json.status, 'Hub cancelled')
+})
+
+test('rule 1: changing the volunteer on a cancelled request without a status is refused', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Member cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { volunteerPersonId: volunteer } })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Member cancelled')
+  assert.equal(after.json.volunteerPersonId, null)
+})
+
+test('rule 1: changing the volunteer on an Unmatched request without a status is refused', async () => {
+  // Unmatched is an end state the API itself never accepts on PATCH — the
+  // nightly MySQL event evt_auto_complete_service_requests writes it, and
+  // production has such rows. It is therefore unreachable through the API and
+  // must be seeded directly. This is the one end state in rule 1's scope with
+  // no other coverage, and it is the shape the Vue edit form actually sends on
+  // such a row: volunteerPersonId with no status at all.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await withDb(c =>
+    c.query('UPDATE service_request SET status = ? WHERE id = ?', ['Unmatched', serviceRequestId]))
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { volunteerPersonId: volunteer } })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Unmatched', 'the refused patch must leave the row untouched')
+  assert.equal(after.json.volunteerPersonId, null)
+})
+
+test('rule 1: re-sending the SAME volunteer on a cancelled request is a no-op, not a 422', async () => {
+  // This is the ordinary-Save case. handleSubmit always includes
+  // volunteerPersonId, so a rule keyed on the key's presence rather than a
+  // change of value would break every save on a cancelled request.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  assert.equal(json.status, 'Confirmed')
+
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Volunteer cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, serviceName: 'Errand', status: 'Volunteer cancelled' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Volunteer cancelled')
+  assert.equal(res.json.serviceName, 'Errand')
+})
+
+test('rule 1: null-to-null on a cancelled request is not a change', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Hub cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: null, status: 'Hub cancelled' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Hub cancelled')
+})
+
+test('rule 1: changing the volunteer alongside a cancel reason is refused', async () => {
+  // The droplist form sends volunteerPersonId on every save, so a cancelled
+  // row can be re-cancelled under a different reason with a NEW volunteer in
+  // one write. Only Completed is exempt from rule 1 — not every end state.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Hub cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: otherVolunteer, status: 'Member cancelled' }
+  })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc })
+  assert.equal(String(after.json.volunteerPersonId), volunteer)
+  assert.equal(after.json.status, 'Hub cancelled')
+})
+
+test('rule 1: Completed is exempt — the volunteer may be corrected', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: otherVolunteer, status: 'Completed' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Completed')
+  assert.equal(String(res.json.volunteerPersonId), otherVolunteer)
+})
+
+test('rule 1: the feature write path — volunteer plus Completed on a cancelled row', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Member cancelled' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, status: 'Completed' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Completed')
+  assert.equal(String(res.json.volunteerPersonId), volunteer)
+})
+
+test('rule 3: completing a request with no volunteer is refused', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  assert.equal(json.status, 'Open')
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Open')
+})
+
+test('rule 3: clearing the volunteer on a Completed request is refused', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: null, status: 'Completed' }
+  })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(String(after.json.volunteerPersonId), volunteer)
+})
+
+test('rule 3: judges the resulting row, so volunteer plus Completed together is fine', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, status: 'Completed' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Completed')
+})
+
+test('notify on an Unmatched request is refused — Unmatched has no notification_event surface, changed or not', async () => {
+  // Unmatched is unreachable through the API (see the rule-1 Unmatched test
+  // above for why) and must be seeded directly. notification_event.eventType
+  // has no value for Unmatched, so notify: true must 422 regardless of
+  // whether the status itself changed.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await withDb(c =>
+    c.query('UPDATE service_request SET status = ? WHERE id = ?', ['Unmatched', serviceRequestId]))
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { description: 'x', notify: true }
+  })
+  assert.equal(res.status, 422)
+  assert.match(res.json.detail, /Unmatched/)
+  assert.equal((await notificationEvents(serviceRequestId)).length, 0, 'no notification_event row inserted')
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Unmatched')
+})
+
+test('the same patch without notify succeeds and updates the description', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await withDb(c =>
+    c.query('UPDATE service_request SET status = ? WHERE id = ?', ['Unmatched', serviceRequestId]))
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { description: 'x' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.description, 'x')
+  assert.equal(res.json.status, 'Unmatched')
+  assert.equal((await notificationEvents(serviceRequestId)).length, 0)
+})
+
+test('notify on a patch resulting in Completed is refused — Completed has no notification_event surface', async () => {
+  // The OAS itself rejects { status: 'Completed', notify: true } as a direct
+  // pair (ServiceRequestPatch's `not/required` guard, village-green.yaml
+  // ~4238), so the service-layer refusal is reached the other way: a row
+  // already Completed, patched again with notify: true and no `status` key.
+  // The terminal short-circuit resolves status to current.status ('Completed')
+  // and this must still 422 — it is the case writeNotificationEvent has
+  // always refused.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer, serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  const completed = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { status: 'Completed' }
+  })
+  assert.equal(completed.status, 200)
+  assert.equal(completed.json.status, 'Completed')
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { description: 'x', notify: true }
+  })
+  assert.equal(res.status, 422)
+  assert.match(res.json.detail, /Completed/)
+  assert.equal((await notificationEvents(serviceRequestId)).length, 0, 'no notification_event row inserted')
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Completed')
+  assert.notEqual(after.json.description, 'x', 'the failed notify must not leave the description update applied either')
+})
+
+test('notify on a patch that genuinely changes status still writes the correct event', async () => {
+  const { json } = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
+  const serviceRequestId = json.serviceRequestId
+  assert.equal(json.status, 'Open')
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, notify: true }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Confirmed')
+  assert.deepEqual(await notificationEvents(serviceRequestId), ['confirmed'])
+})
+
+test('resending a notification on an unchanged Open request succeeds — the NotificationHistoryDialog resend path', async () => {
+  // Mirrors exactly what NotificationHistoryDialog.vue's Send/Resend button
+  // PATCHes: { notify: true } alone, on a row whose status is already Open
+  // and does not change. Re-broadcasting an Open request to drum up
+  // volunteer signups is the deliberate feature this guards.
+  const { json } = await create({ villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01' })
+  const serviceRequestId = json.serviceRequestId
+  assert.equal(json.status, 'Open')
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { notify: true }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Open')
+  assert.deepEqual(await notificationEvents(serviceRequestId), ['open'])
+})
+
+test('a single-field patch on a terminal request leaves its status alone', async () => {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { serviceName: 'Errand' } })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.serviceName, 'Errand')
+  assert.equal(res.json.status, 'Completed', 'omitting status must not re-derive a terminal row')
 })

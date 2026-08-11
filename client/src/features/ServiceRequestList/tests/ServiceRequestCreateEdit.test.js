@@ -4,11 +4,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import ServiceRequestCreateEdit from '../components/ServiceRequestCreateEdit.vue'
 
+const routeParams = { value: {} }
+// Shared spy (vi.hoisted, same reasoning as toastAdd below) so tests can
+// assert on navigation the component triggers, e.g. the Unmatched redirect.
+const routerPush = vi.hoisted(() => vi.fn())
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn(), afterEach: () => () => {} }),
-  useRoute: () => ({ params: {} })
+  useRouter: () => ({ push: routerPush, afterEach: () => () => {} }),
+  useRoute: () => ({ params: routeParams.value })
 }))
-vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
+// One shared spy across mounts so tests can assert on what the component
+// actually told the user (useToast: () => ({ add: vi.fn() }) would hand back a
+// fresh, uninspectable fn on every call).
+const toastAdd = vi.hoisted(() => vi.fn())
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 vi.mock('primevue/useconfirm', () => ({ useConfirm: () => ({ require: vi.fn() }) }))
 vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
   useRequirePermission: () => {}
@@ -35,6 +43,10 @@ vi.mock('../../VolunteerList/api/volunteerApi.js', () => ({
   getVillageVolunteers: vi.fn().mockResolvedValue([]),
   getVolunteers: vi.fn().mockResolvedValue([])
 }))
+vi.mock('../../../shared/api/apiClient.js', () => ({
+  apiCall: vi.fn().mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 }),
+  isPrivacyAckError: () => false
+}))
 
 beforeEach(() => {
   // jsdom has no matchMedia; PrimeVue Select uses it on mount.
@@ -50,6 +62,7 @@ afterEach(() => {
   // (e.g. a Ride render's "Starting Location" leaking into an Errand assertion).
   cleanup()
   vi.clearAllMocks()
+  routeParams.value = {}
 })
 
 const globalOpts = {
@@ -78,6 +91,17 @@ async function mountAndExpose () {
   })
   await waitFor(() => expect(setupState).not.toBeNull())
   return setupState
+}
+
+// Mounts in edit mode with a stored request. `mountAndExpose` always mounts in
+// create mode, because edit mode is driven by route.params.id.
+async function mountEditAndExpose (request) {
+  const { getServiceRequest } = await import('../api/serviceRequestApi.js')
+  getServiceRequest.mockResolvedValue(request)
+  routeParams.value = { id: String(request.serviceRequestId) }
+  const vm = await mountAndExpose()
+  await waitFor(() => expect(vm.existingRequest).toBeTruthy())
+  return vm
 }
 
 describe('ServiceRequestCreateEdit start section', () => {
@@ -233,6 +257,380 @@ describe('ServiceRequestCreateEdit start section', () => {
       expect(vm.form.apptTime).toBeNull()
       expect(vm.form.returnTime).toBeNull()
     })
+  })
+})
+
+// The OAS rejects {status: Completed, notify: true} outright, so the primary
+// save action must neither promise nor send a notification once the resolved
+// status is Completed.
+describe('the primary save action never notifies when the status is Completed', () => {
+  const baseRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  // Attaching a volunteer no longer completes a cancelled request as of this
+  // task (#27233) — the status droplist (Task 2) is the only way to reach
+  // Completed from a cancelled request, so the derivation this block used to
+  // exercise that way is gone. The guarantee itself (never notify once the
+  // resolved status is Completed) is still asserted below via a request that
+  // arrives at Completed by already being Completed.
+  it('relabels an already-Completed request, which notified and 400d before', async () => {
+    await mountEditAndExpose({ ...baseRequest, status: 'Completed', volunteerPersonId: '9' })
+
+    await waitFor(() => expect(screen.getByText('Save')).toBeTruthy())
+    expect(screen.queryByText('Save and Notify')).toBeNull()
+  })
+
+  it('submits notify:false for an already-Completed request', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    apiCall.mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 })
+    const vm = await mountEditAndExpose({ ...baseRequest, status: 'Completed', volunteerPersonId: '9' })
+
+    await vm.handleSubmit(unref(vm.notifyOnPrimarySave))
+    await waitFor(() => expect(apiCall).toHaveBeenCalled())
+    const [operationId, , payload] = apiCall.mock.calls.at(-1)
+    expect(operationId).toBe('patchServiceRequest')
+    expect(payload.status).toBe('Completed')
+    expect(payload.notify).toBe(false)
+  })
+
+  // Saving an edit to an already-cancelled request announces nothing: the
+  // cancelled event belongs to the act of cancelling, which doCancelRequest
+  // sends. Offering "Save and Notify" here promised a message that describes
+  // no event.
+  it.each(['Member cancelled', 'Volunteer cancelled', 'Hub cancelled'])(
+    'offers a plain Save on an already-%s request',
+    async (status) => {
+      await mountEditAndExpose({ ...baseRequest, status })
+
+      await waitFor(() => expect(screen.getByText('Save')).toBeTruthy())
+      expect(screen.queryByText('Save and Notify')).toBeNull()
+      expect(screen.queryByText('Save only')).toBeNull()
+    }
+  )
+
+  it('submits notify:false when saving an edit to a cancelled request', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    apiCall.mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 })
+    const vm = await mountEditAndExpose(baseRequest)
+
+    await vm.handleSubmit(unref(vm.notifyOnPrimarySave))
+    await waitFor(() => expect(apiCall).toHaveBeenCalled())
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.status).toBe('Member cancelled')
+    expect(payload.notify).toBe(false)
+  })
+
+  it('still offers Save and Notify on an Open request', async () => {
+    await mountEditAndExpose({ ...baseRequest, status: 'Open' })
+
+    await waitFor(() => expect(screen.getByText('Save and Notify')).toBeTruthy())
+  })
+})
+
+describe('Completed requests require a volunteer', () => {
+  const completedRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Completed', volunteerPersonId: '9'
+  }
+
+  it('does not submit a Completed request whose volunteer was cleared', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(completedRequest)
+
+    vm.form.volunteerPersonId = null
+    await vm.handleSubmit(false)
+
+    // isSubmitting is reset to false in a finally block regardless of whether
+    // the guard fired, so it can't distinguish "returned early" from "the
+    // mocked PATCH resolved" on its own. apiCall not being reached is the
+    // signal that actually proves the guard fired.
+    expect(vm.isSubmitting).toBe(false)
+    expect(apiCall).not.toHaveBeenCalled()
+  })
+
+  it('submits normally when the volunteer is present', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(completedRequest)
+
+    await vm.handleSubmit(false)
+    // apiCall being reached is what proves the guard did not fire —
+    // computedStatus is the same either way.
+    expect(apiCall).toHaveBeenCalled()
+    expect(unref(vm.computedStatus)).toBe('Completed')
+  })
+})
+
+describe('status droplist', () => {
+  const cancelledRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  it('offers the other cancel reasons plus Completed on a cancelled request', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+    expect(unref(vm.isTerminal)).toBe(true)
+    expect(unref(vm.statusOptions)).toEqual([
+      'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed'
+    ])
+  })
+
+  it('does not render the droplist on a non-terminal request', async () => {
+    const vm = await mountEditAndExpose({ ...cancelledRequest, status: 'Open' })
+    expect(unref(vm.isTerminal)).toBe(false)
+  })
+
+  it('withholds the cancel reasons on an already-Completed request', async () => {
+    // Reversing a delivered service is not a status correction: the droplist
+    // has no confirm step, sends no notification, and Completed is a metrics
+    // bucket. The control stays visible but offers nothing to change.
+    const vm = await mountEditAndExpose({
+      ...cancelledRequest, status: 'Completed', volunteerPersonId: '9'
+    })
+    expect(unref(vm.isTerminal)).toBe(true)
+    expect(unref(vm.statusOptions)).toEqual(['Completed'])
+  })
+
+  it('previews the pending selection in the header Tag before saving', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+    expect(unref(vm.computedStatus)).toBe('Member cancelled')
+
+    vm.form.status = 'Hub cancelled'
+    await waitFor(() => expect(unref(vm.computedStatus)).toBe('Hub cancelled'))
+    // Nothing was saved — the preview is local until Save.
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    expect(apiCall).not.toHaveBeenCalled()
+  })
+
+  it('sends the selected status on save', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(cancelledRequest)
+
+    vm.form.status = 'Hub cancelled'
+    await vm.handleSubmit(false)
+
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.status).toBe('Hub cancelled')
+  })
+})
+
+describe('submitting the form with the keyboard', () => {
+  // Enter in a text field fires a native submit, which bypasses the Save
+  // buttons entirely. Binding the method by name would pass the SubmitEvent
+  // as handleSubmit's `notify` argument — the default never applies to a
+  // defined value — sending notify: [object Event]. Bodies are not coerced
+  // (coerceTypes: false), so the OAS rejects it and the save is lost.
+  const openRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Open', volunteerPersonId: null
+  }
+
+  async function submitViaForm () {
+    const form = document.querySelector('form.form')
+    expect(form).toBeTruthy()
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await waitFor(async () => {
+      const { apiCall } = await import('../../../shared/api/apiClient.js')
+      expect(apiCall).toHaveBeenCalled()
+    })
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    return apiCall.mock.calls.at(-1)[2]
+  }
+
+  it('sends a boolean notify, never the submit event', async () => {
+    await mountEditAndExpose(openRequest)
+    const payload = await submitViaForm()
+    expect(typeof payload.notify).toBe('boolean')
+  })
+
+  it('matches the primary button: an Open request still offers to notify', async () => {
+    const vm = await mountEditAndExpose(openRequest)
+    expect(unref(vm.notifyOnPrimarySave)).toBe(true)
+    const payload = await submitViaForm()
+    expect(payload.notify).toBe(true)
+  })
+
+  it('matches the primary button: a terminal request notifies nobody', async () => {
+    const vm = await mountEditAndExpose({
+      ...openRequest, status: 'Member cancelled'
+    })
+    expect(unref(vm.notifyOnPrimarySave)).toBe(false)
+    const payload = await submitViaForm()
+    expect(payload.notify).toBe(false)
+  })
+})
+
+describe('volunteer requirement when completing', () => {
+  const cancelledRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  it('marks the volunteer field required once Completed is selected', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+    expect(screen.queryByTestId('volunteer-required')).toBeNull()
+
+    vm.form.status = 'Completed'
+    await waitFor(() => {
+      expect(screen.getByTestId('volunteer-required')).toBeTruthy()
+    })
+  })
+
+  it('drops the marker when a non-completing status is selected', async () => {
+    const vm = await mountEditAndExpose(cancelledRequest)
+
+    vm.form.status = 'Completed'
+    await waitFor(() => expect(screen.getByTestId('volunteer-required')).toBeTruthy())
+
+    vm.form.status = 'Hub cancelled'
+    await waitFor(() => expect(screen.queryByTestId('volunteer-required')).toBeNull())
+  })
+})
+
+describe('a rejected save explains itself', () => {
+  // The API's lifecycle rules throw SmError.UnprocessableError(detail), which
+  // errorHandlers.js serializes as { error, code, detail } and apiClient parses
+  // onto ApiError.body. Without surfacing body.detail the user sees only
+  // "Failed to update service request" — e.g. rule 1's refusal to reassign the
+  // volunteer on a cancelled row.
+  //
+  // Uses a CANCELLED row, not an Unmatched one: the edit route redirects away
+  // from Unmatched without populating the form, so a save there never reaches
+  // the API at all — validation stops it first. Cancelled rows are editable and
+  // are where these 422s actually surface to a user.
+  const rejectedRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Member cancelled', volunteerPersonId: null
+  }
+
+  function apiError (body) {
+    const err = new Error('HTTP 422')
+    err.name = 'ApiError'
+    err.status = 422
+    err.body = body
+    return err
+  }
+
+  it("shows the server's explanation instead of the generic failure", async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(rejectedRequest)
+    apiCall.mockRejectedValueOnce(apiError({
+      error: 'Unprocessable Entity.',
+      detail: 'Cannot change the volunteer on a request with status Member cancelled.'
+    }))
+    toastAdd.mockClear()
+
+    vm.form.volunteerPersonId = '9'
+    await vm.handleSubmit(false)
+
+    const errorToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'error')
+    expect(errorToast?.detail).toBe('Cannot change the volunteer on a request with status Member cancelled.')
+  })
+
+  it('falls back to the generic message when the error carries no detail string', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(rejectedRequest)
+    // A structured detail object (some endpoints send one) carries no sentence.
+    apiCall.mockRejectedValueOnce(apiError({ error: 'Unprocessable Entity.', detail: { reason: 'nope' } }))
+    toastAdd.mockClear()
+
+    await vm.handleSubmit(false)
+
+    const errorToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'error')
+    expect(errorToast?.detail).toBe('Failed to update service request')
+  })
+})
+
+describe('editing an Unmatched request is disallowed', () => {
+  // The rules for editing an Unmatched request are unsettled, so the edit
+  // route refuses to present the form for one even when reached directly
+  // (bookmark, back button, hand-typed URL) — the list already hides the
+  // pencil, but the route itself must independently refuse to render.
+  const unmatchedRequest = {
+    serviceRequestId: 5, requestNumber: 5, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
+    status: 'Unmatched', volunteerPersonId: null
+  }
+
+  it('redirects to the detail view instead of rendering an editable form', async () => {
+    await mountEditAndExpose(unmatchedRequest)
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'service-request-detail',
+        params: { villageId: '1', id: '5' }
+      })
+    ))
+    // No editable form should ever appear for an Unmatched request.
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(document.querySelector('form')).toBeNull()
+  })
+
+  it('does not populate the form for a component that is navigating away', async () => {
+    // The watcher returns after redirecting. Populating would fire the
+    // villageId and isRideService watchers, issuing member/volunteer fetches
+    // for a component on its way out.
+    const { getVillageMembers } = await import('../../MemberList/api/memberApi.js')
+    const vm = await mountEditAndExpose(unmatchedRequest)
+
+    await waitFor(() => expect(routerPush).toHaveBeenCalled())
+    expect(vm.form.memberPersonId).toBe('')
+    expect(vm.form.serviceName).toBe('')
+    expect(getVillageMembers).not.toHaveBeenCalled()
+  })
+
+  it('warns the user why they were redirected', async () => {
+    await mountEditAndExpose(unmatchedRequest)
+
+    await waitFor(() => expect(toastAdd).toHaveBeenCalled())
+    const warnToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'warn')
+    expect(warnToast?.detail).toMatch(/cannot be edited/i)
+  })
+
+  it('still renders an editable form for a non-Unmatched request', async () => {
+    const vm = await mountEditAndExpose({ ...unmatchedRequest, status: 'Open' })
+
+    await waitFor(() => expect(document.querySelector('form')).not.toBeNull())
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(vm.form.villageId).toBe('1')
+  })
+})
+
+describe('#27233 — a cancelled request that already has a volunteer', () => {
+  // The request was Confirmed with a volunteer, then cancelled. The volunteer
+  // is still recorded on it. Before the droplist, computedStatus tested
+  // volunteer *presence*, so this previewed Completed on load and any save
+  // silently completed the request.
+  const cancelledWithVolunteer = {
+    serviceRequestId: 27233, requestNumber: 27233, villageId: '1',
+    memberPersonId: '7', serviceName: 'Errand: Shopping',
+    serviceDate: '2026-08-01', status: 'Member cancelled',
+    volunteerPersonId: '9', description: 'original note'
+  }
+
+  it('loads showing its cancelled status, not Completed', async () => {
+    const vm = await mountEditAndExpose(cancelledWithVolunteer)
+    expect(unref(vm.computedStatus)).toBe('Member cancelled')
+    expect(screen.queryByTestId('volunteer-required')).toBeNull()
+  })
+
+  it('saves an unrelated edit without changing status', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(cancelledWithVolunteer)
+
+    vm.form.description = 'edited note'
+    await vm.handleSubmit(false)
+
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.description).toBe('edited note')
+    expect(payload.status).toBe('Member cancelled')
   })
 })
 
