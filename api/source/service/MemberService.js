@@ -11,6 +11,16 @@ function isActivation (priorStatus, nextStatus) {
   return nextStatus === 'Active' && priorStatus !== 'Active' && priorStatus !== 'Dropped'
 }
 
+// Written on the caller's transaction connection so the event commits with the
+// member row — never dbUtils.pool.query. The sidecar resolves the person's
+// name, email, and village at send time, so nothing is snapshotted here.
+async function writeMemberWelcomeEvent (connection, personId) {
+  await connection.query(
+    `INSERT INTO notification_event (eventType, serviceRequestId, payload) VALUES (?, NULL, ?)`,
+    ['member_welcome', JSON.stringify({ memberPersonId: Number(personId) })]
+  )
+}
+
 module.exports.personHasHomeVillage = async function (personId) {
   const [rows] = await dbUtils.pool.query(
     'SELECT villageId FROM person WHERE id = ?', [personId]
@@ -29,8 +39,10 @@ module.exports.memberExists = async function (personId) {
 module.exports.putMember = async function (personId, body, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      // status comes back alongside id: it is the before-state the welcome
+      // guard compares against. Undefined on the insert branch (no prior row).
       const [existing] = await connection.query(
-        'SELECT id FROM member WHERE personId = ?', [personId]
+        'SELECT id, status FROM member WHERE personId = ?', [personId]
       )
       if (existing.length) {
         if (Object.keys(body).length) {
@@ -42,6 +54,9 @@ module.exports.putMember = async function (personId, body, userObject) {
           'SELECT COALESCE(MAX(CAST(memberNumber AS SIGNED)), 0) + 1 AS nextNumber FROM member FOR UPDATE'
         )
         await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...body })
+      }
+      if (isActivation(existing[0]?.status, body.status)) {
+        await writeMemberWelcomeEvent(connection, personId)
       }
     },
     statusObj: undefined

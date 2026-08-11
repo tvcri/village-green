@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
+import { withDb } from '../../lib/db.js'
 import { villages } from '../../setup/fixtures.js'
 
 // Member-role lifecycle on the person sub-resource: PUT/PATCH/DELETE
@@ -22,6 +23,21 @@ async function makePerson (lastName, body = {}) {
   })
   assert.equal(res.status, 201, 'precondition: person created')
   return res.json.personId
+}
+
+// member_welcome is payload-driven: no serviceRequestId to key on, so match on
+// the event type plus the JSON payload path.
+//
+// The Number() bind is load-bearing. personId arrives from vgCall as a STRING,
+// and JSON_EXTRACT returns a JSON integer; MySQL matches zero rows comparing
+// the two, with no error. Binding a string here would make every
+// "enqueues nothing" assertion below pass vacuously.
+async function welcomeEvents (personId) {
+  const [rows] = await withDb(c => c.query(
+    `SELECT id, serviceRequestId, payload FROM notification_event
+     WHERE eventType = 'member_welcome'
+       AND JSON_EXTRACT(payload, '$.memberPersonId') = ?`, [Number(personId)]))
+  return rows
 }
 
 test('PUT grants the member role with an auto-assigned memberNumber', async () => {
@@ -175,4 +191,51 @@ test('PUT member by a village user -> 403 (member:write is federation-only)', as
     }
     assert.equal(res.status, 403)
   }
+})
+
+// ---- member_welcome event producer ----
+// The hazard: ~712 existing Active members with email addresses must never be
+// welcomed by an ordinary save. See
+// docs/superpowers/specs/2026-08-11-member-welcome-producer-design.md
+
+test('PUT creating an Active member enqueues exactly one member_welcome', async () => {
+  const personId = await makePerson('MbrWelcomePut')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  const events = await welcomeEvents(personId)
+  assert.equal(events.length, 1, 'exactly one welcome event')
+})
+
+test('member_welcome payload carries the person id and a null serviceRequestId', async () => {
+  const personId = await makePerson('MbrWelcomePayload')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  const [event] = await welcomeEvents(personId)
+  assert.ok(event, 'precondition: an event was enqueued')
+  assert.equal(event.serviceRequestId, null, 'not tied to a service request')
+  const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
+  assert.equal(String(payload.memberPersonId), String(personId), 'payload carries person.id')
+})
+
+test('re-PUT of an already-Active member enqueues nothing (THE HAZARD)', async () => {
+  const personId = await makePerson('MbrWelcomeRePut')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'precondition: welcomed once')
+
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Active', memberLevel: 'Individual', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 1, 'a second save must not re-welcome')
+})
+
+test('PUT creating a Pending member enqueues nothing', async () => {
+  const personId = await makePerson('MbrWelcomePending')
+  await vgCall('putPersonMember', { personId }, {
+    token: staff, body: { status: 'Pending', memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  assert.equal((await welcomeEvents(personId)).length, 0, 'Pending is not an activation')
 })
