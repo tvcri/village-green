@@ -232,6 +232,10 @@ async function setupOidcWorker() {
       if (response.success) {
         this.token = null
         this.tokenParsed = null
+        // Marks the deliberate teardown so token-absence checks (e.g.
+        // reloadIfExpired) don't mistake the cleared token for staleness
+        // while the end-session navigation is pending.
+        this.isLoggingOut = true
         window.location.href = response.redirect
       }
     },
@@ -254,6 +258,7 @@ async function setupOidcWorker() {
     },
     channelName: null,
     logoutAvailable: true,
+    isLoggingOut: false,
     token: null,
     tokenParsed: null,
     worker: new SharedWorker(oidcworkerUrl, { name: 'vg-oidc-worker', type: 'module' }),
