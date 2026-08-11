@@ -2,6 +2,15 @@
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
 
+// A member is welcomed when they genuinely become Active. Prior 'Active' is the
+// hazard this guard exists for: ~712 existing Active members with email would
+// otherwise be welcomed the first time each record is touched. Prior 'Dropped'
+// is reactivation, which gets no welcome by customer decision.
+// See docs/superpowers/specs/2026-08-11-member-welcome-producer-design.md
+function isActivation (priorStatus, nextStatus) {
+  return nextStatus === 'Active' && priorStatus !== 'Active' && priorStatus !== 'Dropped'
+}
+
 module.exports.personHasHomeVillage = async function (personId) {
   const [rows] = await dbUtils.pool.query(
     'SELECT villageId FROM person WHERE id = ?', [personId]
