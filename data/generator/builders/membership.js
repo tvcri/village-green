@@ -40,8 +40,10 @@ export function buildMembership (plan, content, rng) {
         status: 'Active', // ~5% flip to Inactive/Dropped in the post-pass below
         dropReason: null,
         householdSize: rng.int(1, 2),
-        // annual dues: $40 for most, some discounted/waived, a few higher tiers
-        householdDues: rng.weighted([[40, 12], [0, 1], [20, 2], [25, 1], [30, 2], [50, 2], [60, 2]]),
+        // MONTHLY dues (the column's semantics — PR #93): $40/mo for most,
+        // some discounted/waived. The cents values mimic rows the importer
+        // produced by dividing a yearly application figure by 12.
+        householdDues: rng.weighted([[40, 12], [0, 1], [20, 2], [25, 1], [33.33, 2], [50, 2], [8.33, 2]]),
         // standing mobility/quirk notes; requests echo these as instructions
         serviceNotes: serviceNotes.length && rng.bool(0.66) ? rng.pick(serviceNotes) : null,
         // staff-only notes — the app restricts who can see these

@@ -122,8 +122,10 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   // ~40% carry a staff-only confidential note
   const confShare = m.member.filter(r => r.confidentialNotes).length / m.member.length
   assert.ok(confShare > 0.28 && confShare < 0.52, `confidentialNotes share ${confShare.toFixed(2)} not ~0.4`)
-  // every member has dues, $0–60 with $40 the common tier
-  assert.ok(m.member.every(r => typeof r.householdDues === 'number' && r.householdDues >= 0 && r.householdDues <= 60))
+  // every member has MONTHLY dues, $0–50 with $40/mo the common tier, and
+  // some cents-y yearly÷12 importer-style values
+  assert.ok(m.member.every(r => typeof r.householdDues === 'number' && r.householdDues >= 0 && r.householdDues <= 50))
+  assert.ok(m.member.some(r => !Number.isInteger(r.householdDues)), 'expect some yearly/12 cents values')
   const at40 = m.member.filter(r => r.householdDues === 40).length / m.member.length
   assert.ok(at40 > 0.4, `only ${(at40 * 100).toFixed(0)}% of members at the $40 tier`)
   // ~half of volunteers carry a staff note; disability links too (few rows, so just both-kinds)
