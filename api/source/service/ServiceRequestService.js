@@ -7,6 +7,21 @@ const SmError = require('../utils/error')
 
 const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
 
+// The five end states. A request in any of these never returns to Open or
+// Confirmed — customer-agreed policy, enforced in patchServiceRequest.
+const END_STATES = [...CANCELLED_STATUSES, 'Completed', 'Unmatched']
+
+// notification_event.eventType covers open/confirmed/cancelled (plus
+// reminder, which isn't status-driven). Completed and Unmatched have no
+// corresponding event, so a status resolving to either cannot be notified —
+// enforced in writeNotificationEvent, the sole place that maps a status to
+// an event.
+const NON_NOTIFIABLE_STATUSES = ['Completed', 'Unmatched']
+
+function isEndState(status) {
+  return END_STATES.includes(status)
+}
+
 // Escaped inline rather than bound: makeQueryString applies binds positionally
 // across the whole query, and this path is static server config, not user input.
 const NAME_CLAIM_PATH = mysql.escape(`$.${config.oauth.claims.name}`)
@@ -19,8 +34,10 @@ function deriveStatus(clientStatus, volunteerPersonId) {
 }
 
 async function writeNotificationEvent(connection, serviceRequestId, resolvedStatus) {
-  if (resolvedStatus === 'Completed') {
-    throw new SmError.UnprocessableError()
+  if (NON_NOTIFIABLE_STATUSES.includes(resolvedStatus)) {
+    throw new SmError.UnprocessableError(
+      `A ${resolvedStatus} service request has no notification to send.`
+    )
   }
   let eventType
   if (CANCELLED_STATUSES.includes(resolvedStatus)) {
@@ -339,6 +356,21 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       const current = currentRows[0]
       if (!current) return null
 
+      // Rule 2: never backward. The Patch enum already excludes Open and
+      // Confirmed, so a caller cannot request this directly today — it is
+      // stated here so the invariant does not silently depend on the enum's
+      // vocabulary, and it stays live alongside rules 1 and 3 below, which
+      // guard the same terminal-row neighborhood. Only `undefined` is exempt:
+      // absence means "leave it alone", but an explicit null would fall
+      // through to deriveStatus(null, ...) and re-derive Open/Confirmed, which
+      // is exactly the backward move this rule exists to refuse.
+      if (isEndState(current.status) && payload.status !== undefined &&
+          !isEndState(payload.status)) {
+        throw new SmError.UnprocessableError(
+          `Cannot change status from ${current.status} to ${payload.status}: a request never moves backward in its lifecycle.`
+        )
+      }
+
       const updateFields = {}
       if (payload.memberPersonId !== undefined) updateFields.memberPersonId = payload.memberPersonId || null
       if (payload.volunteerPersonId !== undefined) updateFields.volunteerPersonId = payload.volunteerPersonId || null
@@ -368,8 +400,44 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
       const newVolunteerPersonId = payload.volunteerPersonId !== undefined
         ? (payload.volunteerPersonId || null)
         : current.volunteerPersonId
-      const resolvedStatus = deriveStatus(payload.status, newVolunteerPersonId)
+
+      // Rule 1: on a cancelled or Unmatched row, CHANGING the volunteer is
+      // only meaningful as a step toward Confirmed — the backward move. Judge
+      // a change of value, not the presence of the key: the Vue form always
+      // sends volunteerPersonId, so keying on presence would refuse every
+      // ordinary save on a cancelled request. Completed is the one exempt
+      // destination: recording who performed the service is the whole point of
+      // that write, and rule 3 below in fact requires a volunteer for it. Any
+      // OTHER end state is not exempt — re-cancelling under a different reason
+      // is no license to reassign the volunteer.
+      const volunteerChanged = String(newVolunteerPersonId ?? '') !== String(current.volunteerPersonId ?? '')
+      const ruleOneApplies = isEndState(current.status) && current.status !== 'Completed'
+      if (ruleOneApplies && volunteerChanged && payload.status !== 'Completed') {
+        throw new SmError.UnprocessableError(
+          `Cannot change the volunteer on a request with status ${current.status}.`
+        )
+      }
+
+      // Absence must never imply an operation on a terminal row: omitting
+      // status means "leave it alone", not "recompute". Non-terminal rows are
+      // untouched — they still derive from volunteer presence exactly as
+      // before, which is what keeps { volunteerPersonId } on an Open row
+      // working. Only `undefined` short-circuits here; an explicit null still
+      // means recompute — which on a terminal row rule 2 above has already
+      // refused, so this ternary only ever sees null on a non-terminal row.
+      const resolvedStatus = payload.status === undefined && isEndState(current.status)
+        ? current.status
+        : deriveStatus(payload.status, newVolunteerPersonId)
       updateFields.status = resolvedStatus
+
+      // Rule 3: a Completed request must credit a volunteer. deriveStatus
+      // passes an explicit Completed through untouched, so without this a
+      // caller can record a completed service nobody performed.
+      if (resolvedStatus === 'Completed' && !newVolunteerPersonId) {
+        throw new SmError.UnprocessableError(
+          'A Completed service request must have a volunteer.'
+        )
+      }
 
       await connection.query('UPDATE service_request SET ? WHERE id = ?', [updateFields, serviceRequestId])
 

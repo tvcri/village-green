@@ -65,6 +65,12 @@ const { state: existingRequest, isLoading: isLoadingRequest } = useAsyncState(
   { immediate: true }
 )
 
+// Drives both the redirect-away watcher (below) and the template's form gate
+// — the form must not render editable while the redirect is in flight, and
+// this doubles as a defensive gate if the redirect is ever a no-op (e.g. a
+// test/harness that stubs router.push without actually navigating).
+const isUnmatched = computed(() => isEdit.value && existingRequest.value?.status === 'Unmatched')
+
 const form = ref({
   villageId: '',
   memberPersonId: '',
@@ -104,7 +110,31 @@ const cancelPopover = ref(null)
 // Starts true in create mode (no load needed); starts false in edit mode.
 const formLoaded = ref(!isEdit.value)
 
+// Editing an Unmatched request is disallowed for now — the rules around what
+// may change on one are unsettled. A direct/bookmarked/stale URL can still
+// reach this route (the list already hides the pencil, see
+// MetaServiceRequestList.vue), so the guard has to live here too. Redirect to
+// the read-only detail view rather than rendering the form. Uses router.push,
+// like every other navigation in this component (handleCancel, handleSubmit,
+// handleComplete) — this route has no back-history worth suppressing the way
+// useRequirePermission's replace() does for a forbidden page.
+//
+// Returning here matters: populating the form would fire the villageId and
+// isRideService watchers, issuing member/volunteer fetches for a component
+// that is on its way out. formLoaded and the form ref are read only by this
+// component's own watchers, so leaving them untouched is invisible to the
+// detail view we redirect to — it fetches its own copy.
 watch(existingRequest, async (val) => {
+  if (val && isEdit.value && val.status === 'Unmatched') {
+    toast.add({
+      severity: 'warn',
+      summary: 'Editing unavailable',
+      detail: 'Unmatched requests cannot be edited yet.',
+      life: 4000
+    })
+    router.push({ name: 'service-request-detail', params: { villageId: val.villageId, id: serviceRequestId.value }, query: { from: 'meta' } })
+    return
+  }
   if (val && isEdit.value) {
     formLoaded.value = false
     const extractDate = (dateStr) => {
@@ -327,9 +357,32 @@ const CLIENT_STATUSES = ['Completed', 'Member cancelled', 'Volunteer cancelled',
 
 const computedStatus = computed(() => {
   if (statusOverride.value) return statusOverride.value
+  // Terminal statuses are asserted by the user through the status droplist and
+  // held in form.status; Open/Confirmed remain derived from volunteer presence.
   if (CLIENT_STATUSES.includes(form.value.status)) return form.value.status
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
+
+// The four editable end states. Terminal rows assert their status through the
+// droplist; Open/Confirmed derive it, so they get no droplist.
+const END_STATES = ['Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
+
+const isTerminal = computed(() => END_STATES.includes(existingRequest.value?.status))
+
+// The statuses staff may assert through the droplist. Open/Confirmed are
+// derived from volunteer presence, so they are never offered.
+//
+// On an already-Completed row the cancel reasons are withheld: undoing a
+// delivered service is not a status correction, and the droplist gives it no
+// confirmation step, no notification, and no audit trail — while Completed
+// feeds the village delivery metrics. Leaving 'Completed' as the sole option
+// keeps the control visible and inert rather than making it vanish. Reversing
+// a completed request is deliberately not a thing this form can do.
+const statusOptions = computed(() =>
+  existingRequest.value?.status === 'Completed'
+    ? ['Completed']
+    : ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed']
+)
 
 const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
 const modifiedByDisplayName = computed(() => existingRequest.value?.modifiedByDisplayName || '')
@@ -574,6 +627,20 @@ watch(isRideService, (newIsRide) => {
   }
 })
 
+// The API's error handler serializes SmError as
+// `{ error, code, detail }` (api/source/bootstrap/errorHandlers.js), and
+// apiClient parses that body onto ApiError.body. For the lifecycle rules in
+// patchServiceRequest the whole user-meaningful sentence is the `detail`
+// string ("Cannot change the volunteer on a request with status Unmatched.");
+// `error` is only the generic class label ("Unprocessable Entity."), so it is
+// not worth showing. Some endpoints send a structured `detail` object instead
+// — those carry no sentence, so only a string is used and everything else
+// falls back to the generic message.
+function serverErrorDetail (err) {
+  const detail = err?.body?.detail
+  return typeof detail === 'string' && detail.trim() ? detail : null
+}
+
 const handleSubmit = async (notify = false) => {
   try {
     if (!form.value.villageId) {
@@ -629,6 +696,19 @@ const handleSubmit = async (notify = false) => {
       return
     }
 
+    // Mirrors API rule 3: a Completed request must credit a volunteer. Checked
+    // here rather than in isFormValid so it can explain itself (see the note
+    // above timesInOrder).
+    if (computedStatus.value === 'Completed' && !form.value.volunteerPersonId) {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'A completed request must have a volunteer',
+        life: 3000
+      })
+      return
+    }
+
     isSubmitting.value = true
 
     const payload = {
@@ -664,8 +744,8 @@ const handleSubmit = async (notify = false) => {
 
     if (isEdit.value) {
       // Only send status on PATCH for non-derived client values.
-      if (CLIENT_STATUSES.includes(form.value.status)) {
-        payload.status = form.value.status
+      if (CLIENT_STATUSES.includes(computedStatus.value)) {
+        payload.status = computedStatus.value
       }
     }
 
@@ -701,7 +781,8 @@ const handleSubmit = async (notify = false) => {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: isEdit.value ? 'Failed to update service request' : 'Failed to create service request',
+      detail: serverErrorDetail(err)
+        ?? (isEdit.value ? 'Failed to update service request' : 'Failed to create service request'),
       life: 5000
     })
   } finally {
@@ -709,7 +790,28 @@ const handleSubmit = async (notify = false) => {
   }
 }
 
+// Completed is the one status that can never carry a notification: the OAS
+// rejects {status: Completed, notify: true} outright. So on that path the
+// primary action must not promise one. Label, icon and the notify flag all
+// come from this single computed, so the button cannot say one thing and
+// send another.
+// Only a save that lands the request in a notifiable state offers to notify.
+// notification_event has open/confirmed/cancelled, but the cancelled event
+// belongs to the act of cancelling (doCancelRequest sends it) — saving an
+// edit to an already-terminal request announces nothing, so Completed and
+// the cancel reasons all get a plain Save. The API refuses Completed and
+// Unmatched outright; this keeps the button honest for the rest.
+const notifyOnPrimarySave = computed(() => !END_STATES.includes(computedStatus.value))
+
+const primarySaveAction = computed(() => notifyOnPrimarySave.value
+  ? { label: 'Save and Notify', icon: 'pi pi-envelope' }
+  : { label: 'Save', icon: 'pi pi-upload' }
+)
+
 const splitButtonModel = computed(() => {
+  // With no notification to suppress, "Save only" would just duplicate the
+  // primary action, so it is dropped in that state.
+  if (!notifyOnPrimarySave.value) return []
   return [{ label: 'Save only', icon: 'pi pi-upload', command: () => handleSubmit(false) }]
 })
 
@@ -719,10 +821,6 @@ const handleCancel = () => {
 }
 
 const CANCEL_REASONS = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
-
-const isCancelled = computed(() =>
-  existingRequest.value?.status?.toLowerCase().includes('cancelled') ?? false
-)
 
 const isConfirmed = computed(() =>
   existingRequest.value?.status?.toLowerCase() === 'confirmed'
@@ -830,7 +928,13 @@ const openPersonDialog = (personId) => {
       <template #content>
         <div v-if="isLoadingRequest && isEdit" class="loading">Loading...</div>
 
-        <form v-if="!isLoadingRequest || !isEdit" class="form" style="display: flex; flex-direction: column; gap: 1.5rem;" @submit.prevent="handleSubmit">
+        <div v-else-if="isUnmatched" class="loading">Unmatched requests cannot be edited yet. Redirecting…</div>
+
+        <!-- Enter-to-save must match the primary button exactly. Passing the
+             method by name would hand handleSubmit the SubmitEvent as its
+             `notify` argument, defeating the default and sending a non-boolean
+             the OAS rejects; the inline call binds the flag instead. -->
+        <form v-else-if="!isLoadingRequest || !isEdit" class="form" style="display: flex; flex-direction: column; gap: 1.5rem;" @submit.prevent="handleSubmit(notifyOnPrimarySave)">
           <!-- Persons Section -->
           <div style="border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
             <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Persons</h3>
@@ -878,7 +982,11 @@ const openPersonDialog = (personId) => {
 
             <div v-if="form.villageId">
               <label class="volunteer-label">
-                <span>Volunteer</span>
+                <span>Volunteer<span
+                  v-if="computedStatus === 'Completed'"
+                  class="req"
+                  data-testid="volunteer-required"
+                >*</span></span>
                 <span class="any-village-toggle">
                   <Checkbox v-model="anyVillageVolunteers" binary input-id="any-village-volunteers" />
                   <label for="any-village-volunteers">From any village</label>
@@ -1205,26 +1313,37 @@ const openPersonDialog = (personId) => {
           <!-- Actions -->
           <div class="form-actions">
             <template v-if="isEdit">
-              <Button
-                type="button"
-                label="Cancel Request"
-                severity="danger"
-                :disabled="isSubmitting || isCancelling || isCancelled"
-                @click="(e) => cancelPopover.toggle(e)"
+              <Select
+                v-if="isTerminal"
+                v-model="form.status"
+                :options="statusOptions"
+                placeholder="Status"
+                aria-label="Request status"
+                :disabled="isSubmitting"
+                style="min-width: 12rem;"
               />
-              <Popover ref="cancelPopover">
-                <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
-                  <Button
-                    v-for="reason in CANCEL_REASONS"
-                    :key="reason"
-                    :label="reason"
-                    text
-                    severity="danger"
-                    style="justify-content: flex-start;"
-                    @click="handleCancelRequest(reason)"
-                  />
-                </div>
-              </Popover>
+              <template v-else>
+                <Button
+                  type="button"
+                  label="Cancel Request"
+                  severity="danger"
+                  :disabled="isSubmitting || isCancelling"
+                  @click="(e) => cancelPopover.toggle(e)"
+                />
+                <Popover ref="cancelPopover">
+                  <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px;">
+                    <Button
+                      v-for="reason in CANCEL_REASONS"
+                      :key="reason"
+                      :label="reason"
+                      text
+                      severity="danger"
+                      style="justify-content: flex-start;"
+                      @click="handleCancelRequest(reason)"
+                    />
+                  </div>
+                </Popover>
+              </template>
             </template>
             <div class="form-actions-right">
               <Button
@@ -1235,12 +1354,24 @@ const openPersonDialog = (personId) => {
                 :disabled="isSubmitting"
               />
               <SplitButton
-                label="Save and Notify"
-                icon="pi pi-envelope"
+                v-if="splitButtonModel.length"
+                :label="primarySaveAction.label"
+                :icon="primarySaveAction.icon"
                 :loading="isSubmitting"
                 :disabled="!isFormValid || isSubmitting"
                 :model="splitButtonModel"
-                @click="handleSubmit(true)"
+                @click="handleSubmit(notifyOnPrimarySave)"
+              />
+              <!-- Nothing to choose between once the save cannot notify: a
+                   SplitButton would still render a chevron opening an empty menu. -->
+              <Button
+                v-else
+                type="button"
+                :label="primarySaveAction.label"
+                :icon="primarySaveAction.icon"
+                :loading="isSubmitting"
+                :disabled="!isFormValid || isSubmitting"
+                @click="handleSubmit(notifyOnPrimarySave)"
               />
             </div>
           </div>
@@ -1406,14 +1537,6 @@ const openPersonDialog = (personId) => {
   padding: 2rem;
   text-align: center;
   color: var(--color-text-dim);
-}
-
-.status-display {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border-default);
-  border-radius: 4px;
-  color: var(--color-text-primary);
-  font-size: 0.95rem;
 }
 
 @media (max-width: 768px) {
