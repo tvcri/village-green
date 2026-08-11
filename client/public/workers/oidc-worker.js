@@ -134,7 +134,7 @@ async function getStatus() {
   }
 }
 
-function logout() {
+async function logout() {
   if (!oidcConfiguration.end_session_endpoint) {
     return { success: false, error: 'Logout not available' }
   }
@@ -142,16 +142,22 @@ function logout() {
   // Capture before clearing -- ending the OP session cleanly depends on it.
   const idToken = tokens.idToken
 
-  // Cleared silently: a noToken broadcast here would reach this same tab and
-  // race its own redirect. Notifying other tabs is left to the logout-timing
-  // follow-up, which clears only after the navigation is underway.
-  clearTokens()
-  previousIdToken = null
-  clearTimeout(idleTimeoutId)
-  idleTimeoutId = null
+  // Stale authorizations must go before the broadcast: broadcastNoToken()
+  // mints a fresh one for reauthUri and ships its codeVerifier to every tab,
+  // so clearing afterwards would delete the verifier those tabs need to
+  // complete re-authentication.
   for (const key of Object.keys(authorizations)) {
     delete authorizations[key]
   }
+
+  previousIdToken = null
+  clearTimeout(idleTimeoutId)
+  idleTimeoutId = null
+
+  // Broadcasts noToken so every tab drops its token copy and stops calling the
+  // API. This tab briefly shows the re-auth modal before its own redirect
+  // lands; suppressing that flash is the logout-timing follow-up.
+  await clearTokens(true)
 
   const endSessionUrl = new URL(oidcConfiguration.end_session_endpoint)
   if (idToken) {
