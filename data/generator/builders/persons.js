@@ -4,6 +4,11 @@ const RI_TOWNS = { Arkham: 'Arkham', Quahog: 'Quahog', 'New York System': 'Provi
   Oldport: 'Newport', Innsmouth: 'Innsmouth', Kingsport: 'Kingsport', Dunwich: 'Dunwich',
   Chipwhich: 'Chepachet', Pawstuxnet: 'Warwick', Cabinet: 'Glocester' }
 
+// person.town (migration 0022) is the MUNICIPALITY — the app derives it from
+// the address via the US Census; demo rows set it directly. It usually equals
+// the mailing city, except where the city is a village inside another town.
+const RI_MUNIS = { Chipwhich: 'Glocester' }
+
 // Which figure buckets/villageHints belong to which village theme.
 function poolForVillage (vName, theme, figures, used, rng) {
   const avail = figures.filter(f => !used.has(f.name))
@@ -79,7 +84,8 @@ export function buildPersons (content, villageIdByName, rng, villagesList) {
       middleInitial: rng.bool(0.5) ? rng.pick('ABCDEFGHJLMPRSTW'.split('')) : null,
       salutation: rng.bool(0.1) ? rng.pick(['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Rev.', 'Capt.']) : null,
       street: `${rng.int(1, 400)} ${rng.pick(RI_STREETS)}`, unit: rng.bool(0.15) ? `Apt ${rng.int(1, 30)}` : null,
-      city: RI_TOWNS[vName] || vName, state: 'RI', zip: String(rng.int(2801, 2920)).padStart(5, '0'),
+      city: RI_TOWNS[vName] || vName, town: RI_MUNIS[vName] || RI_TOWNS[vName] || vName,
+      state: 'RI', zip: String(rng.int(2801, 2920)).padStart(5, '0'),
       email: emailFor(fig.name), phone: `401-555-${String(rng.int(100, 999))}`, cell: `401-555-${String(rng.int(100, 999))}`,
       computerUse: rng.bool(0.6) ? 1 : 0, smartphone: rng.bool(0.7) ? 1 : 0,
       birthDate: `19${rng.int(30, 60)}-${String(rng.int(1, 12)).padStart(2, '0')}-${String(rng.int(1, 28)).padStart(2, '0')}`,

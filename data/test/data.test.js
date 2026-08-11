@@ -40,6 +40,10 @@ test('persons: no generated-column keys, unique (village,name), themed big villa
     assert.equal(typeof nameById[p.id], 'string')
     assert.ok(p.firstName, 'firstName feeds the generated fullName')
     assert.ok(p.villageId >= 1 && p.villageId <= 10)
+    // person.town (0022) is the municipality — always set; Chepachet mail
+    // addresses live in the town of Glocester
+    assert.ok(p.town, 'town must be populated')
+    if (p.city === 'Chepachet') assert.equal(p.town, 'Glocester')
     // quirky figure names that don't survive the first/last split live in nickname
     if (nameById[p.id] !== `${p.firstName} ${p.lastName}`.trim()) assert.equal(p.nickname, nameById[p.id])
   }
