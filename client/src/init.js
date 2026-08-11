@@ -232,6 +232,10 @@ async function setupOidcWorker() {
       if (response.success) {
         this.token = null
         this.tokenParsed = null
+        // Marks the deliberate teardown so token-absence checks (e.g.
+        // reloadIfExpired) don't mistake the cleared token for staleness
+        // while the end-session navigation is pending.
+        this.isLoggingOut = true
         window.location.href = response.redirect
       }
     },
@@ -254,6 +258,7 @@ async function setupOidcWorker() {
     },
     channelName: null,
     logoutAvailable: true,
+    isLoggingOut: false,
     token: null,
     tokenParsed: null,
     worker: new SharedWorker(oidcworkerUrl, { name: 'vg-oidc-worker', type: 'module' }),
@@ -261,6 +266,17 @@ async function setupOidcWorker() {
 
   OW = VG.oidcWorker
   OW.worker.port.start()
+
+  // If this document is restored from bfcache (user pressed Back from the
+  // OP's logged-out page), the logout navigation is no longer pending here.
+  // Clear the flag so the re-auth prompt and token-absence handling behave
+  // normally again in the resurrected tab.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      OW.isLoggingOut = false
+    }
+  })
+
   const response = await initializeOidcWorker()
   if (response.error) {
     appendError(response.error)
