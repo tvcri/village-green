@@ -4,6 +4,7 @@ const logPrefix = '[OIDCWorker]:'
 const tokens = {
   accessToken: null,
   refreshToken: null,
+  idToken: null,
 }
 let ENV = null
 let oidcConfiguration = null
@@ -17,6 +18,7 @@ let idleTimeoutId = null
 let idleTimeoutM = null
 let isIdle = false
 let reauthUri = null
+let previousIdToken = null
 
 // Worker entry point
 onconnect = function (e) {
@@ -132,11 +134,44 @@ async function getStatus() {
   }
 }
 
-function logout() {
+async function logout() {
   if (!oidcConfiguration.end_session_endpoint) {
     return { success: false, error: 'Logout not available' }
   }
-  return { success: true, redirect: oidcConfiguration.end_session_endpoint }
+
+  // Capture before clearing -- ending the OP session cleanly depends on it.
+  const idToken = tokens.idToken
+
+  // Housekeeping: drop authorizations left pending for a session that is
+  // ending. Must run BEFORE the broadcast -- broadcastNoToken() mints a fresh
+  // authorization for reauthUri, and clearing afterwards would delete the very
+  // entry re-auth needs. Losing it fails silently rather than loudly:
+  // exchangeCodeForToken() guards with `if (authorizations[redirectUri] && ...)`,
+  // so a missing entry SKIPS the verifier check instead of erroring.
+  for (const key of Object.keys(authorizations)) {
+    delete authorizations[key]
+  }
+
+  previousIdToken = null
+  clearTimeout(idleTimeoutId)
+  idleTimeoutId = null
+
+  // Broadcasts noToken so every tab drops its token copy and stops calling the
+  // API. This tab briefly shows the re-auth modal before its own redirect
+  // lands; suppressing that flash is the logout-timing follow-up.
+  await clearTokens(true)
+
+  const endSessionUrl = new URL(oidcConfiguration.end_session_endpoint)
+  if (idToken) {
+    endSessionUrl.searchParams.set('id_token_hint', idToken)
+  }
+  else {
+    // Without a hint most OPs render an interactive confirmation prompt.
+    console.warn(logPrefix, 'No id_token available for id_token_hint on logout')
+    endSessionUrl.searchParams.set('client_id', ENV.clientId)
+  }
+
+  return { success: true, redirect: endSessionUrl.toString() }
 }
 
 async function onMessage(e) {
@@ -370,6 +405,7 @@ function setTokensAccessOnly(tokensResponse) {
     return
   }
   tokens.accessToken = tokensResponse.access_token
+  setIdToken(tokensResponse)
   broadcastToken()
   console.log(logPrefix, 'Access token expires: ', accessTimes.expiresDateISO, ' timeout: ', accessTimes.timeoutDateISO)
   setAccessTokenTimer(accessTimes.timeoutInMs)
@@ -388,6 +424,7 @@ function setTokensWithRefresh(tokensResponse) {
   }
   else {
     tokens.accessToken = tokensResponse.access_token
+    setIdToken(tokensResponse)
     broadcastToken()
   }
   if (refreshTimes?.timeoutInS > 0) {
@@ -501,7 +538,14 @@ function validateAudience(payload) {
   return true
 }
 
+// An id_token is returned by the code exchange, but an OP may omit it from a
+// refresh response. Carry the previous one forward so id_token_hint survives.
+function setIdToken(tokensResponse) {
+  tokens.idToken = tokensResponse.id_token ?? previousIdToken ?? null
+}
+
 function setTokens(tokensResponse) {
+  previousIdToken = tokens.idToken
   clearTokens()
   if (tokensResponse.access_token && tokensResponse.refresh_token) {
     setTokensWithRefresh(tokensResponse)
@@ -522,9 +566,10 @@ function clearAccessToken(sendBroadcast = false) {
 function clearTokens(sendBroadcast = false) {
   tokens.accessToken = null
   tokens.refreshToken = null
+  tokens.idToken = null
   clearAccessTokenTimer()
   clearRefreshTokenTimer()
-  if (sendBroadcast) { broadcastNoToken() }
+  if (sendBroadcast) { return broadcastNoToken() }
 }
 
 async function fetchTokens(params) {
