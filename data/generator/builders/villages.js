@@ -1,8 +1,6 @@
-import { VILLAGES, ROLE } from '../constants.js'
+import { ROLE } from '../constants.js'
 
 // The dev login you type into the mock OIDC form (its `preferred_username`).
-// This user is granted OWNER of every village below. Change it if you log in
-// as someone else.
 const ADMIN_LOGIN = 'admin'
 
 // Themed fill logins per village, consumed in order by the coverage pass in
@@ -76,92 +74,88 @@ const FILL_LOGINS = {
   },
 }
 
-// Build villages, demo login users, and their grants. Deterministic given rng.
-export function buildVillagesAndUsers (content, rng) {
-  const village = VILLAGES.map((v, i) => ({ id: i + 1, name: v.name }))
+// Village Leads for villages without a bespoke lead persona below.
+const LEADS = {
+  'New York System': ['ann.franklin@providence.test', 'Ann Franklin'],
+  Oldport: ['ida.lewis@lighthouse.test', 'Ida Lewis'],
+  Innsmouth: ['obed.marsh@innsmouth.test', 'Obed Marsh'],
+  Kingsport: ['richard.pickman@kingsport.test', 'Richard Pickman'],
+  Dunwich: ['wilbur.whateley@dunwich.test', 'Wilbur Whateley'],
+  Chipwhich: ['betty.bett@chepachet.test', 'Betty Bett'],
+  Pawstuxnet: ['abraham.whipple@pawtuxet.test', 'Abraham Whipple'],
+  Cabinet: ['roger.mowry@cabinet.test', 'Roger Mowry'],
+}
+
+// Build villages, demo login users, and their role grants (spec §1).
+// villagesList comes from resolveVillages() — personas referencing an
+// unselected village are skipped by grant(), not errors.
+export function buildVillagesAndUsers (content, rng, villagesList) {
+  const village = villagesList.map((v, i) => ({ id: i + 1, name: v.name }))
   const villageIdByName = Object.fromEntries(village.map(v => [v.name, v.id]))
 
   const user_data = []
-  const village_grant = []
+  const role_grant = []
   let userId = 0
-  // lastClaims carries the `name` claim: the app displays it (falling back to
-  // username) for service-request creator attribution.
   const addUser = (username, displayName, claims) => {
     userId += 1
     user_data.push({ userId, username, lastClaims: JSON.stringify({ preferred_username: username, name: displayName, ...claims }) })
     return userId
   }
-  const grant = (uid, villageName, roleId) =>
-    village_grant.push({ villageId: villageIdByName[villageName], userId: uid, roleId })
-
-  // 1) System admin — admin privilege, NO grants (sees all via elevate).
-  addUser('samuel.slater@millworks.test', 'Samuel Slater', { realm_access: { roles: ['admin'] } })
-
-  // 1b) The dev login (the "admin" user you enter in the mock OIDC form) —
-  // granted OWNER of every village so it shows up as an owner everywhere, not
-  // just via admin/elevate.
-  const adminUid = addUser(ADMIN_LOGIN, 'Demo Admin', { realm_access: { roles: ['admin'] } })
-  for (const v of village) grant(adminUid, v.name, ROLE.owner)
-
-  // 2) An owner for each of the two big villages.
-  grant(addUser('roger.williams@providence.test', 'Roger Williams'), 'Arkham', ROLE.owner)
-  grant(addUser('hp.lovecraft@miskatonic.test', 'H.P. Lovecraft'), 'Arkham', ROLE.full)
-  grant(addUser('peter.griffin@quahog.test', 'Peter Griffin'), 'Quahog', ROLE.owner)
-
-  // 3) A multi-village regional coordinator (>= 3 villages -> meta roll-up).
-  const coord = addUser('john.brown@brownbros.test', 'John Brown')
-  for (const v of ['Quahog', 'Innsmouth', 'Arkham']) grant(coord, v, ROLE.full)
-
-  // 4) One of each remaining role somewhere.
-  grant(addUser('nathanael.greene@newport.test', 'Nathanael Greene'), 'Oldport', ROLE.manage)
-  grant(addUser('gilbert.stuart@gmail.test', 'Gilbert Stuart'), 'Quahog', ROLE.restricted)
-
-  // 5) A coordinator (full) for every other village so each has a steward.
-  const stewards = {
-    'New York System': ['ann.franklin@providence.test', 'Ann Franklin'],
-    Oldport: ['ida.lewis@lighthouse.test', 'Ida Lewis'],
-    Innsmouth: ['obed.marsh@innsmouth.test', 'Obed Marsh'],
-    Kingsport: ['richard.pickman@kingsport.test', 'Richard Pickman'],
-    Dunwich: ['wilbur.whateley@dunwich.test', 'Wilbur Whateley'],
-    Chipwhich: ['betty.bett@chepachet.test', 'Betty Bett'],
-    Pawstuxnet: ['abraham.whipple@pawtuxet.test', 'Abraham Whipple'],
-    Cabinet: ['roger.mowry@cabinet.test', 'Roger Mowry'],
+  // grantId omitted — auto-increment. villageName null = federation-scoped.
+  const grant = (uid, roleId, villageName = null) => {
+    if (villageName !== null && !(villageName in villageIdByName)) return
+    role_grant.push({ userId: uid, roleId, villageId: villageName === null ? null : villageIdByName[villageName] })
   }
-  for (const [vname, [username, display]] of Object.entries(stewards)) grant(addUser(username, display), vname, ROLE.full)
 
-  // 6) A zero-grants user (valid login, sees nothing).
+  // 1) Federation personas. Admin claims are kept alongside the roleId-4 grant
+  // so the elevate escalation path still demos.
+  grant(addUser('samuel.slater@millworks.test', 'Samuel Slater', { realm_access: { roles: ['admin'] } }), ROLE.admin)
+  const adminUid = addUser(ADMIN_LOGIN, 'Demo Admin', { realm_access: { roles: ['admin'] } })
+  grant(adminUid, ROLE.admin)
+  // Staff + Service Coordinator hold sr:write — they are the SR creator pool.
+  const staffUid = addUser('samuel.gorton@hub.test', 'Samuel Gorton')
+  grant(staffUid, ROLE.staff)
+  const scUid = addUser('elizabeth.chace@hub.test', 'Elizabeth Buffum Chace')
+  grant(scUid, ROLE.serviceCoordinator)
+  grant(addUser('moses.brown@board.test', 'Moses Brown'), ROLE.board)
+
+  // 2) Bespoke village personas.
+  grant(addUser('roger.williams@providence.test', 'Roger Williams'), ROLE.lead, 'Arkham')
+  grant(addUser('hp.lovecraft@miskatonic.test', 'H.P. Lovecraft'), ROLE.steering, 'Arkham')
+  grant(addUser('peter.griffin@quahog.test', 'Peter Griffin'), ROLE.lead, 'Quahog')
+  // multi-village regional coordinator (>= 3 villages -> meta roll-up)
+  const coord = addUser('john.brown@brownbros.test', 'John Brown')
+  for (const v of ['Quahog', 'Innsmouth', 'Arkham']) grant(coord, ROLE.lead, v)
+  grant(addUser('nathanael.greene@newport.test', 'Nathanael Greene'), ROLE.lsc, 'Oldport')
+  grant(addUser('gilbert.stuart@gmail.test', 'Gilbert Stuart'), ROLE.steering, 'Quahog')
+  for (const [vname, [username, display]] of Object.entries(LEADS)) {
+    if (vname in villageIdByName) grant(addUser(username, display), ROLE.lead, vname)
+  }
+
+  // 3) Zero-grants user (valid login, sees nothing) + the loader machine account.
   addUser('mr.calimari@quahog.test', 'Mr. Calimari')
+  grant(addUser('demo-loader@villagegreen.test', 'demo-loader@villagegreen.test',
+    { scope: 'vg:op', realm_access: { roles: ['admin'] } }), ROLE.admin)
 
-  // 6b) The import/export loader's machine account (load-appdata.js mints its
-  // token as this username). Pre-seeding it matters: the API creates a row for
-  // any authenticated caller, and the privacy-ack gate blocks /op/appdata for
-  // users who haven't acknowledged the current rules — without this row (and
-  // its acknowledgement, see builders/privacy.js) the loader would 403 itself.
-  addUser('demo-loader@villagegreen.test', 'demo-loader@villagegreen.test',
-    { scope: 'vg:op', realm_access: { roles: ['admin'] } })
-
-  // 7) Coverage fill — every village offers at least one user of each grant
-  // role (big villages carry 2-3 of each), drawn from the themed pools above.
-  // The admin's blanket owner grants don't count: coverage should hold among
-  // the village's own themed users. Managers/owners double as the pool of
-  // service-request creators (see data.js).
+  // 4) Coverage fill — every selected village fields all three village roles
+  // among its own themed users (big villages 2-3 of each).
   const roleCount = {}
-  for (const g of village_grant) {
-    if (g.userId === adminUid) continue
+  for (const g of role_grant) {
+    if (g.villageId === null) continue
     const k = `${g.villageId}:${g.roleId}`
     roleCount[k] = (roleCount[k] || 0) + 1
   }
-  for (const v of VILLAGES) {
+  for (const v of villagesList) {
     const pool = Object.entries(FILL_LOGINS[v.name])
-    for (const roleId of [ROLE.owner, ROLE.manage, ROLE.full, ROLE.restricted]) {
+    for (const roleId of [ROLE.lead, ROLE.steering, ROLE.lsc]) {
       const target = v.size === 'big' ? rng.int(2, 3) : 1
       for (let have = roleCount[`${villageIdByName[v.name]}:${roleId}`] || 0; have < target; have++) {
         const next = pool.shift()
         if (!next) throw new Error(`grant fill pool exhausted for ${v.name}`)
-        grant(addUser(next[0], next[1]), v.name, roleId)
+        grant(addUser(next[0], next[1]), roleId, v.name)
       }
     }
   }
 
-  return { village, user_data, village_grant, villageIdByName, adminUserId: adminUid }
+  return { village, user_data, role_grant, villageIdByName, adminUserId: adminUid, creatorUserIds: [staffUid, scUid] }
 }

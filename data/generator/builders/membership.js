@@ -40,8 +40,10 @@ export function buildMembership (plan, content, rng) {
         status: 'Active', // ~5% flip to Inactive/Dropped in the post-pass below
         dropReason: null,
         householdSize: rng.int(1, 2),
-        // annual dues: $40 for most, some discounted/waived, a few higher tiers
-        householdDues: rng.weighted([[40, 12], [0, 1], [20, 2], [25, 1], [30, 2], [50, 2], [60, 2]]),
+        // MONTHLY dues (the column's semantics — PR #93): $40/mo for most,
+        // some discounted/waived. The cents values mimic rows the importer
+        // produced by dividing a yearly application figure by 12.
+        householdDues: rng.weighted([[40, 12], [0, 1], [20, 2], [25, 1], [33.33, 2], [50, 2], [8.33, 2]]),
         // standing mobility/quirk notes; requests echo these as instructions
         serviceNotes: serviceNotes.length && rng.bool(0.66) ? rng.pick(serviceNotes) : null,
         // staff-only notes — the app restricts who can see these
@@ -68,11 +70,11 @@ export function buildMembership (plan, content, rng) {
       // 1-3 capabilities
       const caps = rng.shuffle(CAPABILITIES).slice(0, rng.int(1, 3))
       for (const c of caps) { vcId += 1; volunteer_capability.push({ id: vcId, volunteerId: vId, capabilityId: c.id }) }
-      // ~40% have a vetting record (some expired)
+      // ~40% have a vetting record; vettings never expire in practice (spec §6)
       if (rng.bool(0.4) && vetting_type.length) {
         vvId += 1
         const entered = addDays(BASE_DATE, -rng.int(60, 1500))
-        const expired = rng.bool(0.3) ? addDays(entered, 365) : addDays(BASE_DATE, rng.int(60, 700))
+        const expired = addDays(BASE_DATE, rng.int(60, 700))
         volunteer_vetting.push({ id: vvId, volunteerId: vId, vettingTypeId: rng.pick(vetting_type).id, dateEntered: isoDate(entered), dateExpired: isoDate(expired) })
       }
     }

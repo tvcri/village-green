@@ -2,3 +2,6 @@ node_modules/
 demo-appdata.jsonl
 content/_pack-*.json
 content/_merge.mjs
+demo-guide.md
+demo-logins.json
+appdata-export.jsonl

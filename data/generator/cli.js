@@ -2,6 +2,8 @@ import { config } from './env.js'
 import { withDb } from './db.js'
 import { TABLE_ORDER } from './constants.js'
 import { buildDataset, loadContent } from './data.js'
+import { buildGuide, buildLogins } from './guide.js'
+import { wrapRoster } from './roster-file.js'
 import { seedSql } from './seed-sql.js'
 import { buildJsonl, columnMapFromDb } from './emit-appdata.js'
 import { columnMetaFromDb, analyzeDrift, loadBaseline } from './doctor.js'
@@ -28,7 +30,7 @@ async function emitJsonl (dataset) {
   return buildJsonl(dataset, columnMap, meta)
 }
 
-async function sanity () {
+async function sanity (dataset) {
   const r = await withDb(async (conn) => {
     const [[c]] = await conn.query(`SELECT
       (SELECT COUNT(*) FROM village) v,
@@ -42,7 +44,9 @@ async function sanity () {
       (SELECT COUNT(*) FROM privacy_acknowledgement) pa`)
     return c
   })
-  if (r.v !== 10) throw new Error(`expected 10 villages, got ${r.v}`)
+  if (r.v !== dataset.village.length) throw new Error(`expected ${dataset.village.length} villages, got ${r.v}`)
+  if (r.m !== dataset.member.length) throw new Error(`expected ${dataset.member.length} members, got ${r.m}`)
+  if (r.u !== dataset.user_data.length) throw new Error(`expected ${dataset.user_data.length} users, got ${r.u}`)
   if (r.bad !== 0) throw new Error(`${r.bad} Confirmed/Completed requests have no volunteer`)
   // every user must have acked the privacy rules or the API's ack gate blocks them
   if (r.pa !== r.u) throw new Error(`${r.u} users but ${r.pa} privacy acknowledgements`)
@@ -67,12 +71,18 @@ async function doctor (dataset) {
 // use the builders, so builder drift shouldn't block restoring a backup.
 const generates = args.length === 0 ||
   has('--seed-db') || has('--sql') || has('--seed-api') || has('--emit') || has('--roundtrip') || has('--doctor')
-const dataset = generates ? buildDataset(loadContent(), config.seed) : null
+const dataset = generates ? buildDataset(loadContent(), config.seed, config.sizing) : null
 if (generates) await doctor(dataset)
+if (generates) {
+  writeFileSync('demo-guide.md', buildGuide(dataset))
+  writeFileSync('demo-logins.json',
+    JSON.stringify(wrapRoster(buildLogins(dataset), { seed: config.seed, sizing: config.sizing }), null, 2) + '\n')
+  console.log('wrote demo-guide.md, demo-logins.json')
+}
 
 if (has('--seed-db') || has('--sql') || args.length === 0) {
   console.log('SQL seed:', await seedSql(dataset))
-  await sanity()
+  await sanity(dataset)
 }
 if (has('--emit')) {
   const out = val('--emit', 'demo-appdata.jsonl')
@@ -103,5 +113,5 @@ if (has('--roundtrip')) {
   const jsonl = await emitJsonl(dataset)
   const token = await mintToken()
   console.log('import result:', await importAppData(config.api.base, token, jsonl))
-  await sanity()
+  await sanity(dataset)
 }

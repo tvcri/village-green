@@ -1,19 +1,13 @@
-import { VILLAGES, RI_STREETS } from '../constants.js'
-
-// Target member/volunteer counts per village size. Members and volunteers are
-// mostly DISTINCT people (members receive services; volunteers provide them).
-// Dataset-wide the mix lands near 60/40 members:volunteers, while the big
-// villages still honor the >=50 members AND >=50 volunteers requirement.
-const SIZE = {
-  big: { members: 63, volunteers: 50 },
-  medium: { members: 13, volunteers: 7 },
-  small: { members: 6, volunteers: 3 },
-  tiny: { members: 3, volunteers: 2 },
-}
+import { RI_STREETS } from '../constants.js'
 
 const RI_TOWNS = { Arkham: 'Arkham', Quahog: 'Quahog', 'New York System': 'Providence',
   Oldport: 'Newport', Innsmouth: 'Innsmouth', Kingsport: 'Kingsport', Dunwich: 'Dunwich',
   Chipwhich: 'Chepachet', Pawstuxnet: 'Warwick', Cabinet: 'Glocester' }
+
+// person.town (migration 0022) is the MUNICIPALITY — the app derives it from
+// the address via the US Census; demo rows set it directly. It usually equals
+// the mailing city, except where the city is a village inside another town.
+const RI_MUNIS = { Chipwhich: 'Glocester' }
 
 // Which figure buckets/villageHints belong to which village theme.
 function poolForVillage (vName, theme, figures, used, rng) {
@@ -52,7 +46,7 @@ function poolForVillage (vName, theme, figures, used, rng) {
   return out
 }
 
-export function buildPersons (content, villageIdByName, rng) {
+export function buildPersons (content, villageIdByName, rng, villagesList) {
   const figures = content.people.figures
   const used = new Set()
   const person = []
@@ -90,7 +84,8 @@ export function buildPersons (content, villageIdByName, rng) {
       middleInitial: rng.bool(0.5) ? rng.pick('ABCDEFGHJLMPRSTW'.split('')) : null,
       salutation: rng.bool(0.1) ? rng.pick(['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Rev.', 'Capt.']) : null,
       street: `${rng.int(1, 400)} ${rng.pick(RI_STREETS)}`, unit: rng.bool(0.15) ? `Apt ${rng.int(1, 30)}` : null,
-      city: RI_TOWNS[vName] || vName, state: 'RI', zip: String(rng.int(2801, 2920)).padStart(5, '0'),
+      city: RI_TOWNS[vName] || vName, town: RI_MUNIS[vName] || RI_TOWNS[vName] || vName,
+      state: 'RI', zip: String(rng.int(2801, 2920)).padStart(5, '0'),
       email: emailFor(fig.name), phone: `401-555-${String(rng.int(100, 999))}`, cell: `401-555-${String(rng.int(100, 999))}`,
       computerUse: rng.bool(0.6) ? 1 : 0, smartphone: rng.bool(0.7) ? 1 : 0,
       birthDate: `19${rng.int(30, 60)}-${String(rng.int(1, 12)).padStart(2, '0')}-${String(rng.int(1, 28)).padStart(2, '0')}`,
@@ -101,9 +96,9 @@ export function buildPersons (content, villageIdByName, rng) {
     return pid
   }
 
-  for (const v of VILLAGES) {
+  for (const v of villagesList) {
     const villageId = villageIdByName[v.name]
-    const target = SIZE[v.size]
+    const target = { members: v.members, volunteers: v.volunteers }
     const pool = poolForVillage(v.name, v.theme, figures, used, rng)
     const members = []
     const volunteers = []
@@ -123,6 +118,10 @@ export function buildPersons (content, villageIdByName, rng) {
     // every village must field at least one volunteer — if the name pool ran
     // dry (the last villages get the leftovers), reuse a member
     if (!volunteers.length && members.length) volunteers.push(rng.pick(members))
+    if (members.length < v.members || volunteers.length < v.volunteers) {
+      console.warn(`notice: figure roster exhausted — ${v.name} short-filled ` +
+        `(${members.length}/${v.members} members, ${volunteers.length}/${v.volunteers} volunteers)`)
+    }
     byVillage[villageId] = { members, volunteers }
   }
   return { person, byVillage, fillerIds, nameById }

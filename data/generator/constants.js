@@ -8,7 +8,12 @@ export const CAPABILITIES = [
   { id: 18, name: 'Village Affiliation' },
 ]
 
-export const ROLE = { restricted: 1, full: 2, manage: 3, owner: 4 }
+// role ids are FIXED by the static catalog (20-vg-static.sql) — reference, never insert.
+export const ROLE = { lsc: 1, steering: 2, lead: 3, admin: 4, staff: 5, board: 6, serviceCoordinator: 7 }
+export const ROLE_NAMES = {
+  1: 'Local Service Coordinator', 2: 'Steering Committee', 3: 'Village Lead',
+  4: 'Admin', 5: 'Staff', 6: 'Board', 7: 'Service Coordinator',
+}
 
 // service_request.serviceName values are UI-enforced (serviceNameOptions in
 // ServiceRequestCreateEdit.vue) — keep this list in sync with the client.
@@ -26,26 +31,30 @@ export const RI_STREETS = ['Benefit St', 'Thayer St', 'Hope St', 'Wickenden St',
   'Westminster St', 'Spooner St', 'Water St', 'Bellevue Ave', 'Ocean Dr', 'Federal Hill',
   'Angell St', 'Power St', 'College St', 'Elmgrove Ave', 'Broadway', 'Smith St']
 
-// 10 villages; the two 'big' ones must reach 50+ members AND 50+ volunteers.
+// 10 villages. Per-village headcount = CLASS_TOTALS[size] split by mix:
+// most villages are volunteer-heavy (~40/60 members:volunteers — the real-world
+// norm); mix:'memberHeavy' flips to ~60/40 (spec §5).
 export const VILLAGES = [
   { name: 'Arkham', size: 'big', theme: 'lovecraft-health' },
-  { name: 'Quahog', size: 'big', theme: 'family-guy' },
+  { name: 'Quahog', size: 'big', theme: 'family-guy', mix: 'memberHeavy' },
   { name: 'New York System', size: 'medium', theme: 'providence' },
-  { name: 'Oldport', size: 'medium', theme: 'gilded-age' },
+  { name: 'Oldport', size: 'medium', theme: 'gilded-age', mix: 'memberHeavy' },
   { name: 'Innsmouth', size: 'small', theme: 'lovecraft' },
-  { name: 'Kingsport', size: 'small', theme: 'lovecraft' },
+  { name: 'Kingsport', size: 'small', theme: 'lovecraft', mix: 'memberHeavy' },
   { name: 'Dunwich', size: 'small', theme: 'lovecraft' },
   { name: 'Chipwhich', size: 'small', theme: 'chepachet' },
   { name: 'Pawstuxnet', size: 'small', theme: 'gaspee' },
   { name: 'Cabinet', size: 'tiny', theme: 'made-up' },
 ]
 
+export const CLASS_TOTALS = { big: 113, medium: 20, small: 9, tiny: 5 }
+
 // Parent-before-child insert order (FK checks are disabled during load, but stay tidy).
 export const TABLE_ORDER = [
-  'village', 'user_data', 'village_grant',
+  'village', 'user_data', 'role_grant',
   'privacy_rules', 'privacy_acknowledgement',
-  'capability', 'disability', 'vetting_type',
+  'capability', 'disability', 'vetting_type', 'community',
   'person', 'member', 'volunteer',
-  'volunteer_capability', 'volunteer_vetting', 'person_disability',
+  'volunteer_capability', 'volunteer_vetting', 'person_disability', 'person_community',
   'service_request', 'notification_event', 'fcv_submission',
 ]

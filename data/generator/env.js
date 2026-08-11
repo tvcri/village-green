@@ -14,6 +14,12 @@ export const config = {
   oidc: { base: e.VG_DEMO_OIDC_BASE || 'http://localhost:18080' },
   seed: Number(e.VG_DEMO_SEED || 20260630),
   token: e.VG_DEMO_TOKEN || null, // optional pre-minted bearer token for the app-data path
+  // Sizing knobs (spec §5). Unset = the full default dataset.
+  sizing: {
+    villages: e.VG_DEMO_VILLAGES || null,          // count ('3') or names ('Arkham,Quahog')
+    members: e.VG_DEMO_MEMBERS ? Number(e.VG_DEMO_MEMBERS) : null,
+    volunteers: e.VG_DEMO_VOLUNTEERS ? Number(e.VG_DEMO_VOLUNTEERS) : null,
+  },
 }
 
 // Fixed clock for deterministic data. NEVER use Date.now() in builders.
