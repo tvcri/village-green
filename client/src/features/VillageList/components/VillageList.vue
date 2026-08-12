@@ -86,11 +86,11 @@ const navigateToVillage = (villageId) => {
         <template #title>
           <div class="title-header">
             <i class="pi pi-heart vss-icon" />
-            <span class="village-name">Volunteer<br>Self Signup</span>
+            <span class="village-name">Volunteer Self Signup</span>
           </div>
         </template>
         <template #content>
-          <p class="vss-cta">Volunteer for a service request, or view your commitments<br/>and history</p>
+          <p class="vss-cta">Volunteer for a service request, or view your commitments and history</p>
         </template>
       </Card>
       <Card
