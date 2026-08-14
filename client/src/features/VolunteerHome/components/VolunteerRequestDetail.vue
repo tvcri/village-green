@@ -700,5 +700,24 @@ async function doRelease() {
   .section-half {
     grid-template-columns: 1fr;
   }
+
+  /* Side-by-side, `flex: 1` on the title resolves to flex-basis 0, so the
+     title gets only what the two tags leave over and wraps to three lines.
+     Stack instead: the title owns a full-width row on top, tags sit below. */
+  .card-header-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .card-title {
+    flex: none;
+    width: 100%;
+    font-size: 1.5rem;
+  }
+
+  .header-tags {
+    flex-wrap: wrap;
+  }
 }
 </style>

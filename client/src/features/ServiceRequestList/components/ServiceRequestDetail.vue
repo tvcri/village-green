@@ -574,5 +574,26 @@ const timeDisplay = computed(() => {
   .section-half {
     grid-template-columns: 1fr;
   }
+
+  /* Side-by-side, `flex: 1` on the title resolves to flex-basis 0, so the
+     title gets only what the status tag leaves over and wraps to four lines.
+     Stack instead: the title owns a full-width row on top, tag sits below.
+     VolunteerRequestDetail.vue carries the same block — change both. */
+  .card-header-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .card-title {
+    flex: none;
+    width: 100%;
+    font-size: 1.5rem;
+  }
+
+  :deep(.p-tag) {
+    font-size: 0.875rem;
+    padding: 0.35rem 0.75rem;
+  }
 }
 </style>
