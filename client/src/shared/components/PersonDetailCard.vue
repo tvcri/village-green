@@ -539,5 +539,19 @@ const copyEmail = async (email) => {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
+
+  /* Side-by-side, the village tag holds its width (flex-shrink: 0) and the
+     name absorbs all the shrink, wrapping to two lines at 2rem with the tag
+     centered against it. Stack instead: name owns a full-width row on top,
+     tag sits below. Same treatment as the service request detail headers. */
+  .title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  :deep(.p-card-title) {
+    font-size: 1.5rem;
+  }
 }
 </style>
