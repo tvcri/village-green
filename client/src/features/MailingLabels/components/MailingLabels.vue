@@ -3,10 +3,47 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { getMailingLabelAudiences, getMailingLabels } from '../api/mailingLabelApi.js'
+import { getMailingLabels, getVillages } from '../api/mailingLabelApi.js'
 import { generateLabelPdf } from '../lib/generateLabelPdf.js'
 
-const selectedAudience = ref(null)
+// The audience is the population definition — the kind of mailing. Values are
+// the API enum; "All labels" is the display word for roster (a one-string
+// decision — the API value stays roster regardless).
+const AUDIENCE_OPTIONS = [
+  { label: 'All labels', value: 'roster' },
+  { label: 'Printed newsletter', value: 'printed-newsletter' },
+  { label: 'Birthday month', value: 'birthday-month' },
+  { label: 'Join month', value: 'join-month' },
+]
+// printed-newsletter and join-month are member-table-backed: the role locks
+// to member. birthday-month is person-level and open to every role.
+const MEMBER_ONLY_AUDIENCES = new Set(['printed-newsletter', 'join-month'])
+const MONTH_AUDIENCES = new Set(['birthday-month', 'join-month'])
+
+const ROLE_OPTIONS = [
+  { label: 'Active members', value: 'member' },
+  { label: 'Active volunteers', value: 'volunteer' },
+  { label: 'Either', value: 'either' },
+]
+// In headings, 'either' reads as the pair; the Select option stays "Either".
+const ROLE_TITLE = {
+  member: 'Active members',
+  volunteer: 'Active volunteers',
+  either: 'Active members & volunteers',
+}
+
+const MONTH_OPTIONS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+].map((label, i) => ({ label, value: i + 1 }))
+
+// Defaults produce a complete configuration, so the first paint shows a live
+// preview immediately (matching the old preselect-and-render behavior).
+const audience = ref('roster')
+const role = ref('member')
+const villageId = ref(null)
+const month = ref(null)
+
 const startPosition = ref(1)
 const nudgeX = ref(0)
 const nudgeY = ref(0)
@@ -20,19 +57,76 @@ const sortOptions = [
   { label: 'By City', value: 'city' },
 ]
 
-const { state: audiences, execute: loadAudiences } = useAsyncState(
-  () => getMailingLabelAudiences(),
+const isMemberOnly = computed(() => MEMBER_ONLY_AUDIENCES.has(audience.value))
+const isMonthAudience = computed(() => MONTH_AUDIENCES.has(audience.value))
+// A month audience with no month chosen is an incomplete configuration: no
+// request fires and the stale preview is cleared rather than left misleading.
+const configComplete = computed(() => !isMonthAudience.value || month.value !== null)
+
+const { state: villages, execute: loadVillages } = useAsyncState(
+  () => getVillages(),
   { immediate: false, initialState: [] }
 )
+const villageOptions = computed(() => [
+  { label: 'All villages', value: null },
+  ...[...villages.value].sort((a, b) => a.name.localeCompare(b.name))
+    .map(v => ({ label: v.name, value: v.id })),
+])
+const selectedVillageName = computed(() =>
+  villages.value.find(v => v.id === villageId.value)?.name ?? null)
 
 const { state: labelData, isLoading, execute: loadLabels } = useAsyncState(
-  () => getMailingLabels(selectedAudience.value),
+  () => getMailingLabels({
+    audience: audience.value,
+    role: role.value,
+    villageId: villageId.value,
+    month: month.value,
+  }),
   { immediate: false }
 )
 
 const labels = computed(() => labelData.value?.labels ?? [])
 const summary = computed(() => labelData.value?.summary ?? null)
 const unmailable = computed(() => labelData.value?.warnings?.unmailable ?? [])
+
+// "Category - Qualifier" heading composed from the configuration, audience
+// first — the format the old hand-curated registry labels already used.
+const composedTitle = computed(() => {
+  let head = AUDIENCE_OPTIONS.find(o => o.value === audience.value).label
+  if (isMonthAudience.value && month.value !== null) {
+    head += `: ${MONTH_OPTIONS.find(m => m.value === month.value).label}`
+  }
+  const parts = [head]
+  if (!isMemberOnly.value) parts.push(ROLE_TITLE[role.value])
+  if (villageId.value !== null && selectedVillageName.value) parts.push(selectedVillageName.value)
+  return parts.join(' - ')
+})
+
+// One watcher: normalize dependent state first, then fire or clear. A
+// normalization write re-triggers this watcher (the early return prevents a
+// request with intermediate state); normalization is idempotent so it
+// settles in one extra pass. The request therefore always mirrors the
+// visible controls — hidden-but-set state can never produce a 422.
+watch([audience, role, villageId, month], () => {
+  if (isMemberOnly.value && role.value !== 'member') {
+    role.value = 'member'
+    return
+  }
+  if (!isMonthAudience.value && month.value !== null) {
+    month.value = null
+    return
+  }
+  truncated.value = []
+  if (!configComplete.value) {
+    labelData.value = null
+    if (previewUrl.value) {
+      URL.revokeObjectURL(previewUrl.value)
+      previewUrl.value = null
+    }
+    return
+  }
+  loadLabels()
+})
 
 // Order the labels by the user's chosen key. The API returns them zip-then-name,
 // so 'zip' is a stable passthrough; 'lastName' and 'city' re-key using the
@@ -62,6 +156,7 @@ async function regenerate () {
     startPosition: startPosition.value,
     nudgeX: nudgeX.value,
     nudgeY: nudgeY.value,
+    title: composedTitle.value,
   })
   if (gen !== generation) return
   truncated.value = result.truncated
@@ -75,20 +170,11 @@ onBeforeUnmount(() => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
 })
 
-onMounted(async () => {
-  const result = await loadAudiences()
-  // Single audience: preselect and load. The Select still renders — more
-  // audiences are expected and the UI should not change shape when they land.
-  if (result?.length === 1) {
-    selectedAudience.value = result[0].id
-    loadLabels()
-  }
-})
-
-function onAudienceChange () {
-  truncated.value = []
+onMounted(() => {
+  loadVillages()
+  // The defaults are a complete configuration; render labels immediately.
   loadLabels()
-}
+})
 </script>
 
 <template>
@@ -97,18 +183,55 @@ function onAudienceChange () {
 
     <div class="layout">
       <div class="controls">
+        <p class="run-title">{{ composedTitle }}</p>
+
         <div class="field">
           <label for="audience">Audience</label>
           <Select
             id="audience"
-            v-model="selectedAudience"
-            :options="audiences"
+            v-model="audience"
+            :options="AUDIENCE_OPTIONS"
             option-label="label"
-            option-value="id"
-            placeholder="Choose a list"
-            @change="onAudienceChange"
+            option-value="value"
           />
         </div>
+
+        <div class="field">
+          <label for="role">Role</label>
+          <Select
+            id="role"
+            v-model="role"
+            :options="ROLE_OPTIONS"
+            option-label="label"
+            option-value="value"
+            :disabled="isMemberOnly"
+          />
+        </div>
+
+        <div class="field">
+          <label for="village">Village</label>
+          <Select
+            id="village"
+            v-model="villageId"
+            :options="villageOptions"
+            option-label="label"
+            option-value="value"
+          />
+        </div>
+
+        <div v-if="isMonthAudience" class="field">
+          <label for="month">Month</label>
+          <Select
+            id="month"
+            v-model="month"
+            :options="MONTH_OPTIONS"
+            option-label="label"
+            option-value="value"
+            placeholder="Choose a month"
+          />
+        </div>
+
+        <p v-if="!configComplete" class="note">Choose a month to generate labels.</p>
 
         <div v-if="isLoading">Loading…</div>
 
@@ -247,6 +370,12 @@ h1 {
 .note {
   font-size: 0.875rem;
   color: var(--color-text-dim);
+}
+
+.run-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 .warning ul {

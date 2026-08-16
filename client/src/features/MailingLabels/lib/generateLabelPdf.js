@@ -46,8 +46,9 @@ function fitLine (text, font) {
 }
 
 export async function generateLabelPdf (labels, options = {}) {
-  const { startPosition = 1, nudgeX = 0, nudgeY = 0 } = options
+  const { startPosition = 1, nudgeX = 0, nudgeY = 0, title = null } = options
   const pdf = await PDFDocument.create()
+  if (title) pdf.setTitle(toWinAnsiSafe(title))
   const font = await pdf.embedFont(StandardFonts.Helvetica)
   const truncated = []
 
