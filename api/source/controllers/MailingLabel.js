@@ -2,39 +2,26 @@
 
 const SmError = require('../utils/error')
 const { hasPermission } = require('../utils/authz')
-const { getAudience, listAudiences } = require('../service/mailingLabels/audiences')
+const { queryRecipients } = require('../service/mailingLabels/buildQuery')
+const { validateLabelParams } = require('../service/mailingLabels/validateLabelParams')
 const { groupByAddress } = require('../service/mailingLabels/groupByAddress')
 
-// Each audience declares its own permission and scope. hasPermission with no
-// villageId option is the federation-wide check — passes only for a
-// federation-scoped grant or the '*' wildcard (utils/authz.js:63-71; same
-// pattern as controllers/Person.js:15). Village-scoped audiences (none
-// yet) will pass { villageId } per their params.
-function canUse (userObject, audience) {
-  return hasPermission(userObject, audience.permission)
-}
-
-module.exports.getMailingLabelAudiences = async function getMailingLabelAudiences (req, res, next) {
-  try {
-    const available = listAudiences()
-      .filter(a => canUse(req.userObject, a))
-      .map(({ id, label, description, params }) => ({ id, label, description, params }))
-    res.json(available)
-  }
-  catch (err) {
-    next(err)
-  }
-}
-
+// Mailing labels are federation-only: hasPermission with no villageId option
+// is the federation-wide check — passes only for a federation-scoped grant or
+// the '*' wildcard (utils/authz.js; same pattern as controllers/Person.js).
+// The villageId query param is a filter, not an access boundary.
 module.exports.getMailingLabels = async function getMailingLabels (req, res, next) {
   try {
-    const audience = getAudience(req.query.audience)
-    if (!audience) throw new SmError.NotFoundError('Unknown audience')
-    if (!canUse(req.userObject, audience)) throw new SmError.PrivilegeError()
+    if (!hasPermission(req.userObject, 'person:read')) throw new SmError.PrivilegeError()
 
-    const rows = await audience.query({})
+    // OAS has already enum-checked and coerced these (typed query params are
+    // always coerced by express-openapi-validator — never string-compare).
+    const { audience, role, villageId, month } = req.query
+    validateLabelParams({ audience, role, month })
+
+    const rows = await queryRecipients({ audience, role, villageId, month })
     const { labels, summary, unmailable } = groupByAddress(rows)
-    res.json({ audience: audience.id, labels, summary, warnings: { unmailable } })
+    res.json({ audience, labels, summary, warnings: { unmailable } })
   }
   catch (err) {
     next(err)
