@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
+import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getMailingLabels } from '../api/mailingLabelApi.js'
@@ -51,6 +53,12 @@ const nudgeY = ref(0)
 const sortBy = ref('zip')
 const truncated = ref([])
 const previewUrl = ref(null)
+
+// Template refs for the ribbon's print-settings popover and the two
+// warning-detail popovers (opened from the one-line summaries in the column).
+const settingsPop = ref(null)
+const unmailablePop = ref(null)
+const truncatedPop = ref(null)
 
 const sortOptions = [
   { label: 'By Zip', value: 'zip' },
@@ -192,8 +200,6 @@ onMounted(() => {
 
     <div class="layout">
       <div class="controls">
-        <p class="run-title">{{ composedTitle }}</p>
-
         <div class="field">
           <label for="audience">Audience</label>
           <Select
@@ -250,62 +256,98 @@ onMounted(() => {
             ({{ summary.recipientCount }} recipients, {{ summary.mergedCount }} merged)
           </p>
 
-          <div v-if="unmailable.length" class="warning">
-            <p>{{ unmailable.length }} recipients have no street address and are not included:</p>
-            <ul>
-              <li v-for="u in unmailable" :key="u.name">{{ u.name }} — {{ u.reason }}</li>
-            </ul>
-          </div>
+          <button
+            v-if="unmailable.length"
+            type="button"
+            class="warning-toggle"
+            @click="unmailablePop.toggle($event)"
+          >
+            {{ unmailable.length }} recipients have no street address and are not included
+          </button>
 
-          <div class="field">
-            <label for="sortBy">Sort labels</label>
-            <Select
-              id="sortBy"
-              v-model="sortBy"
-              :options="sortOptions"
-              option-label="label"
-              option-value="value"
-            />
-          </div>
-
-          <div class="field">
-            <label for="start">Start at label position</label>
-            <InputNumber id="start" v-model="startPosition" :min="1" :max="30" show-buttons />
-          </div>
-
-          <div class="field">
-            <label for="nudgeX">Nudge right (points)</label>
-            <InputNumber id="nudgeX" v-model="nudgeX" :min="-36" :max="36" show-buttons />
-          </div>
-          <div class="field">
-            <label for="nudgeY">Nudge down (points)</label>
-            <InputNumber id="nudgeY" v-model="nudgeY" :min="-36" :max="36" show-buttons />
-          </div>
-
-          <p class="note">
-            Print from the preview at 100% scale ("Actual size") with
-            "fit to page" turned off.
-          </p>
-
-          <div v-if="truncated.length" class="warning">
-            <p>{{ truncated.length }} labels had text too long to fit and were shortened:</p>
-            <ul>
-              <li v-for="(t, i) in truncated" :key="i">{{ t.name }} — "{{ t.line }}"</li>
-            </ul>
-          </div>
+          <button
+            v-if="truncated.length"
+            type="button"
+            class="warning-toggle"
+            @click="truncatedPop.toggle($event)"
+          >
+            {{ truncated.length }} labels had text too long to fit and were shortened
+          </button>
         </template>
       </div>
 
-      <iframe
-        v-if="previewUrl"
-        :src="previewUrl"
-        class="preview"
-        title="Mailing label PDF preview"
-      />
-      <div v-else class="preview preview-empty">
-        <p>The PDF preview appears here.</p>
+      <div class="preview-pane">
+        <div class="ribbon">
+          <label for="sortBy">Sort labels</label>
+          <Select
+            id="sortBy"
+            v-model="sortBy"
+            :options="sortOptions"
+            option-label="label"
+            option-value="value"
+            :disabled="!summary"
+            size="small"
+            class="sort-select"
+          />
+          <span class="note ribbon-note">
+            Print from the preview at 100% scale ("Actual size") with
+            "fit to page" turned off.
+          </span>
+          <Button
+            icon="pi pi-cog"
+            severity="secondary"
+            text
+            size="small"
+            aria-label="Print settings"
+            :disabled="!summary"
+            @click="settingsPop.toggle($event)"
+          />
+        </div>
+
+        <iframe
+          v-if="previewUrl"
+          :src="previewUrl"
+          class="preview"
+          title="Mailing label PDF preview"
+        />
+        <div v-else class="preview preview-empty">
+          <p>The PDF preview appears here.</p>
+        </div>
       </div>
     </div>
+
+    <Popover ref="settingsPop">
+      <div class="settings-fields">
+        <div class="field">
+          <label for="start">Start at label position</label>
+          <InputNumber id="start" v-model="startPosition" :min="1" :max="30" show-buttons />
+        </div>
+
+        <div class="field">
+          <label for="nudgeX">Nudge right (points)</label>
+          <InputNumber id="nudgeX" v-model="nudgeX" :min="-36" :max="36" show-buttons />
+        </div>
+        <div class="field">
+          <label for="nudgeY">Nudge down (points)</label>
+          <InputNumber id="nudgeY" v-model="nudgeY" :min="-36" :max="36" show-buttons />
+        </div>
+      </div>
+    </Popover>
+
+    <Popover ref="unmailablePop">
+      <ul class="warning-list">
+        <li v-for="u in unmailable" :key="u.name">{{ u.name }} — {{ u.reason }}</li>
+      </ul>
+    </Popover>
+
+    <Popover ref="truncatedPop">
+      <ul class="warning-list">
+        <li v-for="(t, i) in truncated" :key="i">
+          <strong>{{ t.name }}</strong><br>
+          prints as "{{ t.printed }}"<template v-if="t.line !== t.name"> (was "{{ t.line }}")</template>
+        </li>
+      </ul>
+    </Popover>
   </div>
 </template>
 
@@ -346,8 +388,8 @@ h1 {
   gap: 1rem;
   width: 18rem;
   flex-shrink: 0;
-  /* The truncated/unmailable warning lists can be long; scroll the controls
-     column internally rather than letting it grow the fixed-height layout. */
+  /* Content is bounded now (warnings collapse to one-line toggles), so this
+     never engages in normal use — it's a safety net for tiny windows. */
   overflow-y: auto;
   min-height: 0;
 }
@@ -358,15 +400,50 @@ h1 {
   gap: 0.25rem;
 }
 
-.preview {
+.preview-pane {
   flex: 1;
   min-width: 0;
-  /* min-height:0 lets the iframe fill AND shrink with the window now that the
+  /* min-height:0 lets the pane fill AND shrink with the window now that the
      parent has a definite height. A fixed min-height would reintroduce the
      non-responsive floor we just removed. */
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--color-border-default);
   border-radius: 4px;
+  /* Clip the iframe's square corners to the pane's radius. */
+  overflow: hidden;
+}
+
+.ribbon {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-default);
+  flex-shrink: 0;
+}
+
+.ribbon label {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.sort-select {
+  width: 10rem;
+  flex-shrink: 0;
+}
+
+.ribbon-note {
+  margin-left: auto;
+  text-align: right;
+}
+
+.preview {
+  flex: 1;
+  min-height: 0;
+  border: none;
 }
 
 .preview-empty {
@@ -381,15 +458,33 @@ h1 {
   color: var(--color-text-dim);
 }
 
-.run-title {
-  margin: 0;
-  font-weight: 600;
-  color: var(--color-text-primary);
+.warning-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  color: var(--color-text-error);
+  text-decoration: underline dotted;
+  cursor: pointer;
 }
 
-.warning ul {
-  margin: 0.25rem 0 0;
+.settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 15rem;
+}
+
+.warning-list {
+  margin: 0;
   padding-left: 1.25rem;
+  font-size: 0.875rem;
+  max-width: 24rem;
+  /* Long lists scroll inside the popover rather than growing past the viewport. */
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
 /* Match App.vue's 768px breakpoint: header shrinks 70px->60px and the

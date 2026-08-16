@@ -65,7 +65,7 @@ export async function generateLabelPdf (labels, options = {}) {
     labelLines(label).forEach((line, lineIndex) => {
       const safe = toWinAnsiSafe(line)
       const { text, cut } = fitLine(safe, font)
-      if (cut) truncated.push({ name: label.name, line })
+      if (cut) truncated.push({ name: label.name, line, printed: text })
       page.drawText(text, {
         x, y: y - lineIndex * LINE_HEIGHT, size: FONT_SIZE, font,
       })
