@@ -9,5 +9,3 @@ export const getMailingLabels = ({ audience, role, villageId, month }) =>
     ...(villageId != null && { villageId }),
     ...(month != null && { month }),
   })
-
-export const getVillages = () => apiCall('getVillages', {})

@@ -3,7 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
-import { getMailingLabels, getVillages } from '../api/mailingLabelApi.js'
+import { getMailingLabels } from '../api/mailingLabelApi.js'
+import { getVillages } from '../../VillageList/api/villageApi.js'
 import { generateLabelPdf } from '../lib/generateLabelPdf.js'
 
 // The audience is the population definition — the kind of mailing. Values are
@@ -70,10 +71,10 @@ const { state: villages, execute: loadVillages } = useAsyncState(
 const villageOptions = computed(() => [
   { label: 'All villages', value: null },
   ...[...villages.value].sort((a, b) => a.name.localeCompare(b.name))
-    .map(v => ({ label: v.name, value: v.id })),
+    .map(v => ({ label: v.name, value: v.villageId })),
 ])
 const selectedVillageName = computed(() =>
-  villages.value.find(v => v.id === villageId.value)?.name ?? null)
+  villages.value.find(v => v.villageId === villageId.value)?.name ?? null)
 
 const { state: labelData, isLoading, execute: loadLabels } = useAsyncState(
   () => getMailingLabels({
@@ -104,8 +105,9 @@ const composedTitle = computed(() => {
 
 // One watcher: normalize dependent state first, then fire or clear. A
 // normalization write re-triggers this watcher (the early return prevents a
-// request with intermediate state); normalization is idempotent so it
-// settles in one extra pass. The request therefore always mirrors the
+// request with intermediate state); normalization is idempotent, so it
+// settles within a bounded number of extra passes (at most one per
+// normalization branch above). The request therefore always mirrors the
 // visible controls — hidden-but-set state can never produce a 422.
 watch([audience, role, villageId, month], () => {
   if (isMemberOnly.value && role.value !== 'member') {
@@ -150,8 +152,15 @@ const sortedLabels = computed(() => {
 // a newer one; revoking the prior object URL keeps blobs from accumulating.
 let generation = 0
 async function regenerate () {
-  if (!sortedLabels.value.length) return
   const gen = ++generation
+  if (!sortedLabels.value.length) {
+    truncated.value = []
+    if (previewUrl.value) {
+      URL.revokeObjectURL(previewUrl.value)
+      previewUrl.value = null
+    }
+    return
+  }
   const result = await generateLabelPdf(sortedLabels.value, {
     startPosition: startPosition.value,
     nudgeX: nudgeX.value,
