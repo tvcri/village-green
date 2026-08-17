@@ -356,16 +356,16 @@ onMounted(() => {
       <div class="settings-fields">
         <div class="field">
           <label for="start">Start at label position</label>
-          <InputNumber id="start" v-model="startPosition" :min="1" :max="30" show-buttons />
+          <InputNumber id="start" v-model="startPosition" :min="1" :max="30" show-buttons fluid />
         </div>
 
         <div class="field">
           <label for="nudgeX">Nudge right (points)</label>
-          <InputNumber id="nudgeX" v-model="nudgeX" :min="-36" :max="36" show-buttons />
+          <InputNumber id="nudgeX" v-model="nudgeX" :min="-36" :max="36" show-buttons fluid />
         </div>
         <div class="field">
           <label for="nudgeY">Nudge down (points)</label>
-          <InputNumber id="nudgeY" v-model="nudgeY" :min="-36" :max="36" show-buttons />
+          <InputNumber id="nudgeY" v-model="nudgeY" :min="-36" :max="36" show-buttons fluid />
         </div>
       </div>
     </Popover>
