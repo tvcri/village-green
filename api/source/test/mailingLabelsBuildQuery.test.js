@@ -104,3 +104,8 @@ test('month audiences throw without a month', () => {
   assert.throws(() => buildRecipientQuery({ audience: 'birthday-month', role: 'member' }), /requires month/i)
   assert.throws(() => buildRecipientQuery({ audience: 'join-month', role: 'member' }), /requires month/i)
 })
+
+test('non-month audiences throw when month is supplied', () => {
+  assert.throws(() => buildRecipientQuery({ audience: 'roster', role: 'member', month: 5 }), /does not accept month/i)
+  assert.throws(() => buildRecipientQuery({ audience: 'printed-newsletter', role: 'member', month: 5 }), /does not accept month/i)
+})

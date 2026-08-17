@@ -1,5 +1,6 @@
 'use strict'
 const dbUtils = require('../utils')
+const { AUDIENCE_RULES } = require('./audienceRules')
 
 // Every mailing answers the same question — "who gets an envelope" — and so
 // returns the same seven columns from the same base table. Only the role
@@ -37,14 +38,13 @@ const EITHER_PREDICATE =
   '(EXISTS (SELECT 1 FROM active_member m WHERE m.personId = p.id)'
   + ' OR EXISTS (SELECT 1 FROM active_volunteer vol WHERE vol.personId = p.id))'
 
-// printed-newsletter and join-month read member columns through the m alias,
-// so they exist only for role=member. The controller 422s these combinations
-// first; the throws here are defense in depth.
-const MEMBER_ONLY_AUDIENCES = new Set(['printed-newsletter', 'join-month'])
-
 // Pure: builds SQL and binds, touching no database. Kept separate from
 // execution so it is unit-testable — this project unit-tests pure functions
 // only and does not mock dbUtils.pool.
+//
+// The controller 422s bad parameter combinations first (validateLabelParams,
+// driven by the same AUDIENCE_RULES table); the throws here are defense in
+// depth for future service-level callers that bypass the validator.
 function buildRecipientQuery ({ audience, role, villageId = null, month = null } = {}) {
   const joins = []
   const where = []
@@ -59,8 +59,21 @@ function buildRecipientQuery ({ audience, role, villageId = null, month = null }
     joins.push(roleJoin)
   }
 
-  if (MEMBER_ONLY_AUDIENCES.has(audience) && role !== 'member') {
+  const rules = AUDIENCE_RULES[audience]
+  if (!rules) {
+    throw new Error(`unknown audience: ${audience}`)
+  }
+  if (rules.memberOnly && role !== 'member') {
     throw new Error(`audience ${audience} requires role member`)
+  }
+  const hasMonth = month !== null && month !== undefined
+  if (rules.requiresMonth && !hasMonth) {
+    throw new Error(`audience ${audience} requires month`)
+  }
+  // A silently dropped month would present the full roster as a month run —
+  // wrong rows with no error — so reject it like the other mismatches.
+  if (!rules.requiresMonth && hasMonth) {
+    throw new Error(`audience ${audience} does not accept month`)
   }
 
   // Village first so its bind ordering is stable regardless of audience.
@@ -77,17 +90,13 @@ function buildRecipientQuery ({ audience, role, villageId = null, month = null }
       where.push('m.printedNewsletter = 1')
       break
     case 'birthday-month':
-      if (month === null || month === undefined) throw new Error('birthday-month requires month')
       where.push('MONTH(p.birthDate) = ?')
       binds.push(month)
       break
     case 'join-month':
-      if (month === null || month === undefined) throw new Error('join-month requires month')
       where.push('MONTH(m.joinDate) = ?')
       binds.push(month)
       break
-    default:
-      throw new Error(`unknown audience: ${audience}`)
   }
 
   // roster/member with no village has nothing to filter on, and an

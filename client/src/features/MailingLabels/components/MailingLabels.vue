@@ -10,16 +10,17 @@ import { getVillages } from '../../VillageList/api/villageApi.js'
 import { generateLabelPdf } from '../lib/generateLabelPdf.js'
 
 // The audience is the population definition — the kind of mailing. Values are
-// the API enum; "All labels" is the display word for roster (a one-string
-// decision — the API value stays roster regardless).
+// the API enum. Monthly runs are the common case, so the full-roster sweep
+// sits last; "Full roster" is its display word (the API value stays roster).
 const AUDIENCE_OPTIONS = [
-  { label: 'All labels', value: 'roster' },
   { label: 'Printed newsletter', value: 'printed-newsletter' },
   { label: 'Birthday month', value: 'birthday-month' },
   { label: 'Join month', value: 'join-month' },
+  { label: 'Full roster', value: 'roster' },
 ]
 // printed-newsletter and join-month are member-table-backed: the role locks
-// to member. birthday-month is person-level and open to every role.
+// to member and the Role select is hidden (no choice to make). birthday-month
+// is person-level and open to every role.
 const MEMBER_ONLY_AUDIENCES = new Set(['printed-newsletter', 'join-month'])
 const MONTH_AUDIENCES = new Set(['birthday-month', 'join-month'])
 
@@ -40,9 +41,11 @@ const MONTH_OPTIONS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ].map((label, i) => ({ label, value: i + 1 }))
 
-// Defaults produce a complete configuration, so the first paint shows a live
-// preview immediately (matching the old preselect-and-render behavior).
-const audience = ref('roster')
+// No default audience: the page renders nothing and fires no request until
+// the user expresses intent. The old roster default ran the heaviest query
+// (full roster + PDF build) on every visit, when the common use is a small
+// monthly run.
+const audience = ref(null)
 const role = ref('member')
 const villageId = ref(null)
 const month = ref(null)
@@ -68,28 +71,46 @@ const sortOptions = [
 
 const isMemberOnly = computed(() => MEMBER_ONLY_AUDIENCES.has(audience.value))
 const isMonthAudience = computed(() => MONTH_AUDIENCES.has(audience.value))
-// A month audience with no month chosen is an incomplete configuration: no
-// request fires and the stale preview is cleared rather than left misleading.
-const configComplete = computed(() => !isMonthAudience.value || month.value !== null)
+// What the request may send, derived from what the user selected: a hidden
+// Role/Month select never contributes its value, and the user's selection is
+// never overwritten — detour through join-month and back, and a chosen
+// "Volunteers" or month is still there.
+const effectiveRole = computed(() => (isMemberOnly.value ? 'member' : role.value))
+const effectiveMonth = computed(() => (isMonthAudience.value ? month.value : null))
+// No audience, or a month audience with no month chosen, is an incomplete
+// configuration: no request fires and the stale preview is cleared rather
+// than left misleading.
+const configComplete = computed(() =>
+  audience.value !== null && (!isMonthAudience.value || month.value !== null))
 
 const { state: villages, execute: loadVillages } = useAsyncState(
   () => getVillages(),
   { immediate: false, initialState: [] }
 )
+// PrimeVue Select renders a null model as "no selection" (empty label), so a
+// null-valued option can never display as chosen. The select binds to a
+// sentinel and maps it to villageId's semantic null (= no filter), which the
+// watcher, request, and title all key on.
+const ALL_VILLAGES = 'all'
 const villageOptions = computed(() => [
-  { label: 'All villages', value: null },
-  ...[...villages.value].sort((a, b) => a.name.localeCompare(b.name))
-    .map(v => ({ label: v.name, value: v.villageId })),
+  { label: 'All villages', value: ALL_VILLAGES },
+  // The API orders by name (VillageService hardcodes ORDER BY v.name);
+  // re-sorting here could disagree with MySQL collation.
+  ...villages.value.map(v => ({ label: v.name, value: v.villageId })),
 ])
+const villageSelection = computed({
+  get: () => villageId.value ?? ALL_VILLAGES,
+  set: (value) => { villageId.value = value === ALL_VILLAGES ? null : value },
+})
 const selectedVillageName = computed(() =>
   villages.value.find(v => v.villageId === villageId.value)?.name ?? null)
 
-const { state: labelData, isLoading, execute: loadLabels } = useAsyncState(
+const { state: labelData, isLoading, error: labelsError, execute: loadLabels } = useAsyncState(
   () => getMailingLabels({
     audience: audience.value,
-    role: role.value,
+    role: effectiveRole.value,
     villageId: villageId.value,
-    month: month.value,
+    month: effectiveMonth.value,
   }),
   { immediate: false }
 )
@@ -101,41 +122,50 @@ const unmailable = computed(() => labelData.value?.warnings?.unmailable ?? [])
 // "Category - Qualifier" heading composed from the configuration, audience
 // first — the format the old hand-curated registry labels already used.
 const composedTitle = computed(() => {
-  let head = AUDIENCE_OPTIONS.find(o => o.value === audience.value).label
-  if (isMonthAudience.value && month.value !== null) {
-    head += `: ${MONTH_OPTIONS.find(m => m.value === month.value).label}`
+  // Only evaluated once labels exist, which implies an audience — the guard
+  // is insurance against a future caller reading it in the null state.
+  const audienceOption = AUDIENCE_OPTIONS.find(o => o.value === audience.value)
+  if (!audienceOption) return ''
+  let head = audienceOption.label
+  if (effectiveMonth.value !== null) {
+    head += `: ${MONTH_OPTIONS.find(m => m.value === effectiveMonth.value).label}`
   }
   const parts = [head]
-  if (!isMemberOnly.value) parts.push(ROLE_TITLE[role.value])
+  if (!isMemberOnly.value) parts.push(ROLE_TITLE[effectiveRole.value])
   if (villageId.value !== null && selectedVillageName.value) parts.push(selectedVillageName.value)
   return parts.join(' - ')
 })
 
-// One watcher: normalize dependent state first, then fire or clear. A
-// normalization write re-triggers this watcher (the early return prevents a
-// request with intermediate state); normalization is idempotent, so it
-// settles within a bounded number of extra passes (at most one per
-// normalization branch above). The request therefore always mirrors the
-// visible controls — hidden-but-set state can never produce a 422.
-watch([audience, role, villageId, month], () => {
-  if (isMemberOnly.value && role.value !== 'member') {
-    role.value = 'member'
-    return
+// First entry into a month audience seeds Month with next month — monthly
+// mailings are prepared ahead of their month. getMonth() is 0-based, so +1
+// is the current 1-based month and the %12+1 wraps December to January. A
+// change handler rather than watcher normalization: the seed is a one-time
+// convenience on a user action, so a nulled month stays representable and
+// nothing ever overwrites a value the user can see.
+function onAudienceSelected () {
+  if (isMonthAudience.value && month.value === null) {
+    month.value = (new Date().getMonth() + 1) % 12 + 1
   }
-  if (!isMonthAudience.value && month.value !== null) {
-    month.value = null
-    return
-  }
+}
+
+// One watcher, one straight-line pass: every change either fires exactly one
+// request or clears the result. The effective* computeds make hidden-but-set
+// state unsendable, so no 422 combination can be requested. Clearing
+// labelData is sufficient cleanup — it empties sortedLabels, and the
+// regenerate watcher owns revoking the preview URL.
+watch([audience, effectiveRole, villageId, effectiveMonth], async () => {
   truncated.value = []
   if (!configComplete.value) {
     labelData.value = null
-    if (previewUrl.value) {
-      URL.revokeObjectURL(previewUrl.value)
-      previewUrl.value = null
-    }
     return
   }
-  loadLabels()
+  // useAsyncState keeps the previous state on failure. A failed reload must
+  // not leave the prior run's PDF under the new control values — the user
+  // would print the wrong labels. (Aborts and lost races also resolve null,
+  // but they leave labelsError unset and a newer pass owns the state.)
+  if (await loadLabels() === null && labelsError.value) {
+    labelData.value = null
+  }
 })
 
 // Order the labels by the user's chosen key. The API returns them zip-then-name,
@@ -184,13 +214,16 @@ async function regenerate () {
 watch([sortedLabels, startPosition, nudgeX, nudgeY], regenerate)
 
 onBeforeUnmount(() => {
+  // A PDF build still in flight must lose the generation race, or it would
+  // mint a fresh object URL after this revoke that nothing ever revokes.
+  generation++
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
 })
 
 onMounted(() => {
   loadVillages()
-  // The defaults are a complete configuration; render labels immediately.
-  loadLabels()
+  // No audience is selected yet, so there is nothing to load: the watcher
+  // fires the first request when the configuration becomes complete.
 })
 </script>
 
@@ -208,29 +241,8 @@ onMounted(() => {
             :options="AUDIENCE_OPTIONS"
             option-label="label"
             option-value="value"
-          />
-        </div>
-
-        <div class="field">
-          <label for="role">Role</label>
-          <Select
-            id="role"
-            v-model="role"
-            :options="ROLE_OPTIONS"
-            option-label="label"
-            option-value="value"
-            :disabled="isMemberOnly"
-          />
-        </div>
-
-        <div class="field">
-          <label for="village">Village</label>
-          <Select
-            id="village"
-            v-model="villageId"
-            :options="villageOptions"
-            option-label="label"
-            option-value="value"
+            placeholder="Choose an audience"
+            @change="onAudienceSelected"
           />
         </div>
 
@@ -246,7 +258,31 @@ onMounted(() => {
           />
         </div>
 
-        <p v-if="!configComplete" class="note">Choose a month to generate labels.</p>
+        <div v-if="audience !== null && !isMemberOnly" class="field">
+          <label for="role">Role</label>
+          <Select
+            id="role"
+            v-model="role"
+            :options="ROLE_OPTIONS"
+            option-label="label"
+            option-value="value"
+          />
+        </div>
+
+        <div v-if="audience !== null" class="field">
+          <label for="village">Village</label>
+          <Select
+            id="village"
+            v-model="villageSelection"
+            :options="villageOptions"
+            option-label="label"
+            option-value="value"
+          />
+        </div>
+
+        <p v-if="!configComplete" class="note">
+          {{ audience === null ? 'Choose an audience to generate labels.' : 'Choose a month to generate labels.' }}
+        </p>
 
         <div v-if="isLoading">Loading…</div>
 
@@ -336,7 +372,7 @@ onMounted(() => {
 
     <Popover ref="unmailablePop">
       <ul class="warning-list">
-        <li v-for="u in unmailable" :key="u.name">{{ u.name }} — {{ u.reason }}</li>
+        <li v-for="(u, i) in unmailable" :key="i">{{ u.name }} — {{ u.reason }}</li>
       </ul>
     </Popover>
 
