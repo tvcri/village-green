@@ -2672,9 +2672,46 @@ paths:
       - name: audience
         in: query
         required: true
-        description: Audience id from /mailing-labels/audiences
+        description: >-
+          The population definition — the kind of mailing. birthday-month and
+          join-month additionally require the month parameter;
+          printed-newsletter and join-month require role=member. Invalid
+          combinations are rejected with 422.
         schema:
           type: string
+          enum:
+          - roster
+          - printed-newsletter
+          - birthday-month
+          - join-month
+      - name: role
+        in: query
+        required: true
+        description: >-
+          Narrows the audience by who a person is. Must be member when
+          audience is printed-newsletter or join-month (422 otherwise).
+        schema:
+          type: string
+          enum:
+          - member
+          - volunteer
+          - either
+      - name: villageId
+        in: query
+        required: false
+        description: Restrict to one village (matches person.villageId). Omit for all villages.
+        schema:
+          type: integer
+      - name: month
+        in: query
+        required: false
+        description: >-
+          Calendar month 1-12. Required when audience is birthday-month or
+          join-month; rejected for other audiences (422).
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 12
       responses:
         '200':
           description: Label-ready address groups
@@ -2731,41 +2768,6 @@ paths:
                               type: string
                             reason:
                               type: string
-        default:
-          description: error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:person:read
-  /mailing-labels/audiences:
-    get:
-      summary: List mailing-label audiences available to the requesting user
-      tags:
-      - MailingLabel
-      operationId: getMailingLabelAudiences
-      responses:
-        '200':
-          description: Available audiences
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                    label:
-                      type: string
-                    description:
-                      type: string
-                    params:
-                      type: array
-                      items:
-                        type: object
         default:
           description: error
           content:
