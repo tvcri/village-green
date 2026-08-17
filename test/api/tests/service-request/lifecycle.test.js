@@ -272,6 +272,33 @@ test('rule 1: changing the volunteer alongside a cancel reason is refused', asyn
   assert.equal(after.json.status, 'Hub cancelled')
 })
 
+test('a Completed request may be moved back to a cancellation reason', async () => {
+  // Customer requirement: a request completed in error must be able to become
+  // cancelled again, with a choice of reason. No rule refuses this — rule 2
+  // sees end->end, rule 1 does not apply to a Completed row, and rule 3 only
+  // fires when the RESULT is Completed — so this pins the behaviour rather
+  // than any new guard.
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
+    serviceDate: '2026-08-01'
+  })
+  const serviceRequestId = json.serviceRequestId
+  await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+
+  for (const reason of ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']) {
+    const res = await vgCall('patchServiceRequest', { serviceRequestId },
+      { token: tokens.users.sc, body: { status: reason } })
+    assert.equal(res.status, 200, `${reason} should be accepted`)
+    assert.equal(res.json.status, reason)
+    // The volunteer stays attached: they were assigned, and that is history.
+    assert.equal(String(res.json.volunteerPersonId), volunteer)
+
+    await vgCall('patchServiceRequest', { serviceRequestId },
+      { token: tokens.users.sc, body: { status: 'Completed' } })
+  }
+})
+
 test('rule 1: Completed is exempt — the volunteer may be corrected', async () => {
   const { json } = await create({
     villageId: quahog, memberPersonId: member, volunteerPersonId: volunteer,
