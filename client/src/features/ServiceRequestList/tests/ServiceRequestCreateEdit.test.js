@@ -384,15 +384,31 @@ describe('status droplist', () => {
     expect(unref(vm.isTerminal)).toBe(false)
   })
 
-  it('withholds the cancel reasons on an already-Completed request', async () => {
-    // Reversing a delivered service is not a status correction: the droplist
-    // has no confirm step, sends no notification, and Completed is a metrics
-    // bucket. The control stays visible but offers nothing to change.
+  it('offers the cancel reasons on an already-Completed request', async () => {
+    // Staff move a request between end states in BOTH directions: a request
+    // completed in error must be able to go back to a cancellation reason.
     const vm = await mountEditAndExpose({
       ...cancelledRequest, status: 'Completed', volunteerPersonId: '9'
     })
     expect(unref(vm.isTerminal)).toBe(true)
-    expect(unref(vm.statusOptions)).toEqual(['Completed'])
+    expect(unref(vm.statusOptions)).toEqual([
+      'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed'
+    ])
+  })
+
+  it('sends the chosen cancel reason when reversing a Completed request', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose({
+      ...cancelledRequest, status: 'Completed', volunteerPersonId: '9'
+    })
+
+    vm.form.status = 'Member cancelled'
+    await vm.handleSubmit(false)
+
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.status).toBe('Member cancelled')
+    // The volunteer stays on the row — they were assigned, and that is history.
+    expect(payload.volunteerPersonId).toBe('9')
   })
 
   it('previews the pending selection in the header Tag before saving', async () => {

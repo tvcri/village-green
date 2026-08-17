@@ -369,20 +369,14 @@ const END_STATES = ['Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub
 
 const isTerminal = computed(() => END_STATES.includes(existingRequest.value?.status))
 
-// The statuses staff may assert through the droplist. Open/Confirmed are
-// derived from volunteer presence, so they are never offered.
-//
-// On an already-Completed row the cancel reasons are withheld: undoing a
-// delivered service is not a status correction, and the droplist gives it no
-// confirmation step, no notification, and no audit trail — while Completed
-// feeds the village delivery metrics. Leaving 'Completed' as the sole option
-// keeps the control visible and inert rather than making it vanish. Reversing
-// a completed request is deliberately not a thing this form can do.
-const statusOptions = computed(() =>
-  existingRequest.value?.status === 'Completed'
-    ? ['Completed']
-    : ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed']
-)
+// These four are the statuses staff may assert through the droplist.
+// Open/Confirmed are derived from volunteer presence, so they are never
+// offered. Every terminal row gets the same four: staff move a request
+// between end states in either direction, including Completed back to a
+// cancellation reason.
+const statusOptions = computed(() => [
+  'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed'
+])
 
 const createdByDisplayName = computed(() => existingRequest.value?.createdByDisplayName || '')
 const modifiedByDisplayName = computed(() => existingRequest.value?.modifiedByDisplayName || '')
