@@ -70,32 +70,37 @@ test('replaceVillageGrants swapping grantees fans out to BOTH affected users', a
   const beforeScratch = await auditRows('user', scratchUserId)
   const beforeSecond = await auditRows('user', secondUserId)
 
-  // replace wholesale: scratch user's grant is gone, second user gets one
-  const replaced = await vgCall('replaceVillageGrants', G, {
-    ...admin, body: [{ userId: secondUserId, roleId: 3 }],
-  })
-  assert.equal(replaced.status, 200)
+  // The replace grants secondUserId (users.nogrants) a temporary Village
+  // Lead grant. Wrap in try/finally so an assertion failure here still runs
+  // the cleanup replace below — other suites assert nogrants sees nothing.
+  try {
+    // replace wholesale: scratch user's grant is gone, second user gets one
+    const replaced = await vgCall('replaceVillageGrants', G, {
+      ...admin, body: [{ userId: secondUserId, roleId: 3 }],
+    })
+    assert.equal(replaced.status, 200)
 
-  const afterScratch = await auditRows('user', scratchUserId)
-  const afterSecond = await auditRows('user', secondUserId)
+    const afterScratch = await auditRows('user', scratchUserId)
+    const afterSecond = await auditRows('user', secondUserId)
 
-  assert.equal(afterScratch.length, beforeScratch.length + 1)
-  const scratchRow = afterScratch[afterScratch.length - 1]
-  assert.equal(scratchRow.action, 'update')
-  assert.equal(scratchRow.userId, ADMIN_ID)
-  assert.equal(scratchRow.changes.diff.grants.removed.length, 1)
-  assert.equal(scratchRow.changes.diff.grants.removed[0], `Local Service Coordinator@${villages.scratch.name}`)
+    assert.equal(afterScratch.length, beforeScratch.length + 1)
+    const scratchRow = afterScratch[afterScratch.length - 1]
+    assert.equal(scratchRow.action, 'update')
+    assert.equal(scratchRow.userId, ADMIN_ID)
+    assert.equal(scratchRow.changes.diff.grants.removed.length, 1)
+    assert.equal(scratchRow.changes.diff.grants.removed[0], `Local Service Coordinator@${villages.scratch.name}`)
 
-  assert.equal(afterSecond.length, beforeSecond.length + 1)
-  const secondRow = afterSecond[afterSecond.length - 1]
-  assert.equal(secondRow.action, 'update')
-  assert.equal(secondRow.userId, ADMIN_ID)
-  assert.equal(secondRow.changes.diff.grants.added.length, 1)
-  assert.equal(secondRow.changes.diff.grants.added[0], `Village Lead@${villages.scratch.name}`)
-
-  // cleanup: clear the village of grants for later tests/files
-  const cleared = await vgCall('replaceVillageGrants', G, { ...admin, body: [] })
-  assert.equal(cleared.status, 200)
+    assert.equal(afterSecond.length, beforeSecond.length + 1)
+    const secondRow = afterSecond[afterSecond.length - 1]
+    assert.equal(secondRow.action, 'update')
+    assert.equal(secondRow.userId, ADMIN_ID)
+    assert.equal(secondRow.changes.diff.grants.added.length, 1)
+    assert.equal(secondRow.changes.diff.grants.added[0], `Village Lead@${villages.scratch.name}`)
+  } finally {
+    // cleanup: clear the village of grants for later tests/files
+    const cleared = await vgCall('replaceVillageGrants', G, { ...admin, body: [] })
+    assert.equal(cleared.status, 200)
+  }
 })
 
 test('a userGroupId grantee produces NO audit rows anywhere (documented v1 gap)', async () => {

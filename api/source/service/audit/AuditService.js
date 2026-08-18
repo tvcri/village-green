@@ -18,6 +18,12 @@ function buildRowSql (shape) {
 // Read the full audited shape of one entity ON THE CALLER'S TRANSACTION
 // CONNECTION (never the pool — the read must see the transaction's own
 // uncommitted writes). row is null when the entity doesn't exist.
+//
+// This is a non-locking REPEATABLE READ snapshot: a write committed by
+// another transaction between this before-read and this transaction's
+// UPDATE gets folded into this actor's diff as if they made it. Vanishingly
+// rare at VG's write volume, accepted; a FOR UPDATE before-read would close
+// it if ever needed.
 async function readShape (connection, entityType, entityId) {
   const shape = shapeFor(entityType)
   const [rows] = await connection.query(buildRowSql(shape), [entityId])
@@ -56,6 +62,11 @@ async function validateShapes () {
     } catch (e) {
       throw new Error(`audit shape '${entityType}' failed schema validation: ${e.message}`)
     }
+  }
+  try {
+    await dbUtils.pool.query('SELECT auditId FROM audit_event WHERE auditId = ?', [0])
+  } catch (e) {
+    throw new Error(`audit_event table failed schema validation: ${e.message}`)
   }
 }
 
