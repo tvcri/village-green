@@ -3,6 +3,7 @@ const config = require('../utils/config');
 const SmError = require('../utils/error');
 const dbUtils = require('./utils')
 const KeycloakService = require('./KeycloakService')
+const AuditService = require('./audit/AuditService')
 
 const _this = this
 
@@ -207,6 +208,10 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
     async function transaction () {
       await connection.query('START TRANSACTION');
 
+      const beforeShape = writeAction === dbUtils.WRITE_ACTION.CREATE
+        ? null
+        : await AuditService.readShape(connection, 'user', userId)
+
       // Process scalar properties
       if (writeAction === dbUtils.WRITE_ACTION.CREATE) {
         // INSERT into user_data
@@ -275,6 +280,15 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
           )
         }
       }
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', userId)
+      await AuditService.record(connection, {
+        entityType: 'user', entityId: userId,
+        action: beforeShape ? 'update' : 'create',
+        userId: userObject.userId,
+        before: beforeShape?.row, beforeSets: beforeShape?.sets,
+        after, afterSets,
+      })
+
       // Commit the changes
       await connection.commit()
     }
@@ -325,8 +339,19 @@ exports.createUser = async function(body, projection, userObject, svcStatus = {}
 exports.deleteUser = async function(userId, projection, userObject) {
   try {
     let row = await _this.queryUsers(projection, { userId: userId }, userObject)
-    let sqlDelete = `DELETE FROM user_data where userId = ?`
-    await dbUtils.pool.query(sqlDelete, [userId])
+    await dbUtils.retryOnDeadlock2({
+      transactionFn: async (connection) => {
+        const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'user', userId)
+        await connection.query('DELETE FROM user_data where userId = ?', [userId])
+        if (before) {
+          await AuditService.record(connection, {
+            entityType: 'user', entityId: userId, action: 'delete',
+            userId: userObject.userId, before, beforeSets,
+          })
+        }
+        return userId
+      },
+    })
     return (row[0])
   }
   catch (err) {
@@ -718,11 +743,13 @@ exports.getUserGrants = async function (userId) {
   })
 }
 
-exports.createUserGrant = async function (userId, body) {
+exports.createUserGrant = async function (userId, body, actorUserId) {
   const grantsArray = Array.isArray(body) ? body : [body]
 
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      const beforeShape = await AuditService.readShape(connection, 'user', userId)
+
       for (const grant of grantsArray) {
         const mappedFields = {
           userId,
@@ -732,6 +759,14 @@ exports.createUserGrant = async function (userId, body) {
 
         await connection.query('INSERT INTO role_grant SET ?', mappedFields)
       }
+
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', userId)
+      await AuditService.record(connection, {
+        entityType: 'user', entityId: userId, action: 'update',
+        userId: actorUserId,
+        before: beforeShape.row, beforeSets: beforeShape.sets,
+        after, afterSets,
+      })
     },
     statusObj: undefined
   })
@@ -755,17 +790,32 @@ exports.ensureBootstrapAdmin = async function (username) {
   )
 }
 
-exports.deleteUserGrant = async function (userId, grantId) {
-  const [existing] = await dbUtils.pool.query(
-    'SELECT * FROM role_grant WHERE grantId = ? AND userId = ?',
-    [grantId, userId]
-  )
+exports.deleteUserGrant = async function (userId, grantId, actorUserId) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [existing] = await connection.query(
+        'SELECT * FROM role_grant WHERE grantId = ? AND userId = ?',
+        [grantId, userId]
+      )
 
-  if (!existing || existing.length === 0) {
-    throw new SmError.NotFoundError()
-  }
+      if (!existing || existing.length === 0) {
+        throw new SmError.NotFoundError()
+      }
 
-  await dbUtils.pool.query('DELETE FROM role_grant WHERE grantId = ? AND userId = ?', [grantId, userId])
+      const beforeShape = await AuditService.readShape(connection, 'user', userId)
+
+      await connection.query('DELETE FROM role_grant WHERE grantId = ? AND userId = ?', [grantId, userId])
+
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', userId)
+      await AuditService.record(connection, {
+        entityType: 'user', entityId: userId, action: 'update',
+        userId: actorUserId,
+        before: beforeShape.row, beforeSets: beforeShape.sets,
+        after, afterSets,
+      })
+    },
+    statusObj: undefined
+  })
 
   const grants = await exports.getUserGrants(userId)
   return grants[0] || { grantId }
