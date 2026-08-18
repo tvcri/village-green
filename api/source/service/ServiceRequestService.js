@@ -4,6 +4,7 @@ const mysql = require('mysql2/promise')
 const dbUtils = require('./utils')
 const config = require('../utils/config')
 const SmError = require('../utils/error')
+const AuditService = require('./audit/AuditService')
 
 const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
 
@@ -338,6 +339,12 @@ module.exports.createServiceRequest = async function (payload, userId) {
         await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
       }
 
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+      await AuditService.record(connection, {
+        entityType: 'serviceRequest', entityId: serviceRequestId, action: 'create',
+        userId, after, afterSets,
+      })
+
       // Return only the id. Reading the record back here would run on a
       // separate pool connection while this transaction is still uncommitted,
       // so it would return null. The caller fetches after commit.
@@ -346,9 +353,11 @@ module.exports.createServiceRequest = async function (payload, userId) {
   })
 }
 
-module.exports.patchServiceRequest = async function (serviceRequestId, payload) {
+module.exports.patchServiceRequest = async function (serviceRequestId, payload, userId) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      const { row: before } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+
       const [currentRows] = await connection.query(
         'SELECT volunteerPersonId, status FROM service_request WHERE id = ?',
         [serviceRequestId]
@@ -445,18 +454,32 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload) 
         await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
       }
 
+      const { row: after } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+      await AuditService.record(connection, {
+        entityType: 'serviceRequest', entityId: serviceRequestId, action: 'update',
+        userId, before, after,
+      })
+
       // Return only the id; the caller fetches the record after commit.
       return serviceRequestId
     }
   })
 }
 
-module.exports.deleteServiceRequest = async function (serviceRequestId) {
-  const [result] = await dbUtils.pool.query(
-    'DELETE FROM service_request WHERE id = ?',
-    [serviceRequestId]
-  )
-  return result.affectedRows > 0
+module.exports.deleteServiceRequest = async function (serviceRequestId, userId) {
+  return dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const { row: before } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+      const [result] = await connection.query('DELETE FROM service_request WHERE id = ?', [serviceRequestId])
+      if (before) {
+        await AuditService.record(connection, {
+          entityType: 'serviceRequest', entityId: serviceRequestId, action: 'delete',
+          userId, before,
+        })
+      }
+      return result.affectedRows > 0
+    },
+  })
 }
 
 module.exports.writeNotificationEvent = writeNotificationEvent

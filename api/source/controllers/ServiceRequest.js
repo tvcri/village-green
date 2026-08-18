@@ -91,7 +91,7 @@ module.exports.patchServiceRequest = async function patchServiceRequest (req, re
 
     // The service commits in a transaction and returns the id; fetch the full
     // record afterward so the read sees committed data.
-    const patched = await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body)
+    const patched = await ServiceRequestService.patchServiceRequest(serviceRequestId, req.body, req.userObject.userId)
     if (!patched) {
       throw new SmError.NotFoundError()
     }
@@ -116,7 +116,7 @@ module.exports.deleteServiceRequest = async function deleteServiceRequest (req, 
       throw new SmError.PrivilegeError()
     }
 
-    const deleted = await ServiceRequestService.deleteServiceRequest(serviceRequestId)
+    const deleted = await ServiceRequestService.deleteServiceRequest(serviceRequestId, req.userObject.userId)
     if (!deleted) {
       throw new SmError.NotFoundError()
     }
