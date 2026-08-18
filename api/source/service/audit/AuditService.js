@@ -1,7 +1,7 @@
 'use strict'
 const dbUtils = require('../utils')
 const { shapes, assertShapeInvariants } = require('./shapes')
-const { computeChanges } = require('./diff')
+const { computeChanges, columnNames } = require('./diff')
 
 function shapeFor (entityType) {
   const shape = shapes[entityType]
@@ -48,9 +48,24 @@ async function record (connection, { entityType, entityId, action, userId, befor
   )
 }
 
-// Boot-time fail-fast: execute every registry SELECT against the live schema.
-// A registry/schema mismatch (the likely failure after a refactor) stops the
-// process at startup with a named error instead of failing mutations later.
+// The omission half of boot validation: every real column on an audited
+// table must be audited (`columns`), deliberately not (`excluded`), or the
+// id column (covered structurally). Expr aliases in `columns` are not real
+// columns and simply never match. Pure; exported for unit tests.
+function undeclaredColumns (shape, actualColumnNames) {
+  const declared = new Set([...columnNames(shape), ...shape.excluded, shape.idColumn ?? 'id'])
+  return actualColumnNames.filter(c => !declared.has(c))
+}
+
+// Boot-time fail-fast, two directions per registry entry:
+//  - drift: execute every registry SELECT, so a renamed/dropped column throws;
+//  - omission: read information_schema, so a real column missing from both
+//    `columns` and `excluded` throws — otherwise a future migration could add
+//    a column the audit trail silently never covers.
+// A throw here is caught in bootstrap/dependencies.js, which logs it and sets
+// app state to 'fail': the process stays up but every /api route answers 503
+// (service-check middleware) except /op/state. Loud and immediate, though not
+// a process exit.
 async function validateShapes () {
   for (const [entityType, shape] of Object.entries(shapes)) {
     assertShapeInvariants(entityType, shape)
@@ -62,6 +77,15 @@ async function validateShapes () {
     } catch (e) {
       throw new Error(`audit shape '${entityType}' failed schema validation: ${e.message}`)
     }
+    const [cols] = await dbUtils.pool.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`, [shape.table])
+    const missing = undeclaredColumns(shape, cols.map(c => c.COLUMN_NAME))
+    if (missing.length) {
+      throw new Error(
+        `audit shape '${entityType}': undeclared columns: ${missing.join(', ')} — ` +
+        `add each to columns (audited) or excluded (deliberately not) in service/audit/shapes.js`)
+    }
   }
   try {
     await dbUtils.pool.query('SELECT auditId FROM audit_event WHERE auditId = ?', [0])
@@ -70,4 +94,4 @@ async function validateShapes () {
   }
 }
 
-module.exports = { readShape, record, validateShapes, buildRowSql }
+module.exports = { readShape, record, validateShapes, buildRowSql, undeclaredColumns }

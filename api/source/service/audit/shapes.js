@@ -6,8 +6,12 @@
 // A new column on an audited table is UNAUDITED until declared here (allowlist
 // fails safe); a refactor that moves data (e.g. address -> junction) edits the
 // entity's declaration, never the audit machinery. Boot-time validation
-// (AuditService.validateShapes) executes every SELECT below against the live
-// schema and fails startup on drift.
+// (AuditService.validateShapes) checks both directions against the live
+// schema: every declared column must exist (drift), and every existing column
+// must appear in `columns` or `excluded` (omission) — so adding a table
+// column without deciding its audit status fails the boot, not the trail.
+// `excluded` is the deliberate-omission list; the id column is covered
+// structurally and never listed.
 
 const shapes = {
   person: {
@@ -22,6 +26,9 @@ const shapes = {
       'emergencyContactPhone', 'emergencyContactEmail', 'comments',
     ],
     redacted: [],
+    // villageId feeds the 'village' lookup expr; fullName/address are
+    // DB-generated composites of audited columns.
+    excluded: ['villageId', 'fullName', 'address'],
     sets: {
       communities: {
         kind: 'values',
@@ -51,6 +58,8 @@ const shapes = {
     // householdDues + confidentialNotes are the two member fields classified
     // sensitive; diffs record {changed:true}, snapshots record '[redacted]'.
     redacted: ['confidentialNotes', 'householdDues'],
+    // createdDate is set-once creation metadata.
+    excluded: ['createdDate'],
     sets: {},
   },
 
@@ -58,6 +67,7 @@ const shapes = {
     table: 'volunteer',
     columns: ['personId', 'providerType', 'active', 'notes'],
     redacted: [],
+    excluded: [],
     sets: {
       capabilities: {
         kind: 'values',
@@ -88,10 +98,11 @@ const shapes = {
   user: {
     table: 'user_data',
     idColumn: 'userId',
-    // lastAccess/lastClaims/webPreferences/created/statusDate/statusUser are
-    // deliberately excluded: per-request noise or attribution metadata.
     columns: ['username', 'status'],
     redacted: [],
+    // Per-request noise (lastAccess/lastClaims/webPreferences) and
+    // status-change attribution metadata (created/statusDate/statusUser).
+    excluded: ['created', 'lastAccess', 'lastClaims', 'statusDate', 'statusUser', 'webPreferences'],
     sets: {
       grants: {
         kind: 'values',
@@ -123,6 +134,11 @@ const shapes = {
       'startZip', 'startPhone',
     ],
     redacted: [],
+    // villageId feeds the 'village' expr; createdAt/createdUserId are
+    // creation metadata. modifiedUserId/modifiedAt carry VSS-only semantics
+    // (read them as vssUserId/vssModifiedAt — written solely by VSS
+    // sign-up/release); their absence from the audit trail is deliberate.
+    excluded: ['villageId', 'createdAt', 'createdUserId', 'modifiedUserId', 'modifiedAt'],
     sets: {},
   },
 }
@@ -133,8 +149,15 @@ function assertShapeInvariants (entityType, shape) {
   const names = (shape.columns ?? []).map(c => (typeof c === 'string' ? c : c.name))
   if (!names.length) fail('no columns declared')
   if (new Set(names).size !== names.length) fail('duplicate column names')
-  for (const r of shape.redacted ?? []) {
+  if (!Array.isArray(shape.redacted)) fail('missing redacted (declare [] if nothing is redacted)')
+  for (const r of shape.redacted) {
     if (!names.includes(r)) fail(`redacted '${r}' is not a declared column`)
+  }
+  if (!Array.isArray(shape.excluded)) fail('missing excluded (declare [] if every column is audited)')
+  const idCol = shape.idColumn ?? 'id'
+  for (const x of shape.excluded) {
+    if (names.includes(x)) fail(`excluded '${x}' is also a declared column`)
+    if (x === idCol) fail(`excluded '${x}' is the id column (covered structurally, never listed)`)
   }
   for (const [setName, decl] of Object.entries(shape.sets ?? {})) {
     if (names.includes(setName)) fail(`set '${setName}' collides with a column name`)
