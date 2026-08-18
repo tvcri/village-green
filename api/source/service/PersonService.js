@@ -1,6 +1,7 @@
 'use strict';
 const dbUtils = require('./utils')
 const { hasPermission } = require('../utils/authz')
+const AuditService = require('./audit/AuditService')
 
 const ACTIVE_AS_COLUMN = `CASE
       WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
@@ -324,7 +325,7 @@ module.exports.getPersonsByVillage = async function (villageId) {
   return await queryPersons({ villageId })
 }
 
-module.exports.createPerson = async function (body) {
+module.exports.createPerson = async function (body, userId) {
   const { communities, disabilities, ...personFields } = body
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
@@ -338,6 +339,11 @@ module.exports.createPerson = async function (body) {
         const values = disabilities.map(d => [newPersonId, d.disabilityId, d.note ?? null])
         await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
       }
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'person', newPersonId)
+      await AuditService.record(connection, {
+        entityType: 'person', entityId: newPersonId, action: 'create',
+        userId, after, afterSets,
+      })
       return newPersonId
     },
     statusObj: undefined
@@ -345,7 +351,7 @@ module.exports.createPerson = async function (body) {
   return insertId
 }
 
-module.exports.patchPerson = async function (personId, body) {
+module.exports.patchPerson = async function (personId, body, userId) {
   const { communities, disabilities, ...personFields } = body
   // town derives from the address (the client recalculates it and sends it
   // with every address edit). A PATCH that changes address fields without
@@ -356,6 +362,7 @@ module.exports.patchPerson = async function (personId, body) {
   }
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'person', personId)
       if (Object.keys(personFields).length > 0) {
         await connection.query('UPDATE person SET ? WHERE id = ?', [personFields, personId])
       }
@@ -373,12 +380,29 @@ module.exports.patchPerson = async function (personId, body) {
           await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
         }
       }
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'person', personId)
+      await AuditService.record(connection, {
+        entityType: 'person', entityId: personId, action: 'update',
+        userId, before, after, beforeSets, afterSets,
+      })
     },
     statusObj: undefined
   })
   return personId
 }
 
-module.exports.deletePerson = async function (personId) {
-  await dbUtils.pool.query('DELETE FROM person WHERE id = ?', [personId])
+module.exports.deletePerson = async function (personId, userId) {
+  return dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'person', personId)
+      await connection.query('DELETE FROM person WHERE id = ?', [personId])
+      if (before) {
+        await AuditService.record(connection, {
+          entityType: 'person', entityId: personId, action: 'delete',
+          userId, before, beforeSets,
+        })
+      }
+      return personId
+    },
+  })
 }
