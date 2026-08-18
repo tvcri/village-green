@@ -46,7 +46,7 @@ module.exports.deletePersonMember = async function deletePersonMember (req, res,
     if (!hasPermission(req.userObject, 'member:write', { villageId: person.village?.villageId })) {
       throw new SmError.PrivilegeError()
     }
-    await MemberService.deleteMember(personId)
+    await MemberService.deleteMember(personId, req.userObject.userId)
     res.status(204).end()
   }
   catch (err) { next(err) }
