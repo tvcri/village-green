@@ -1,6 +1,7 @@
 'use strict';
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
+const AuditService = require('./audit/AuditService')
 
 // Ensure a volunteer row exists for the person; return its id.
 async function ensureVolunteer (connection, personId) {
@@ -64,6 +65,9 @@ module.exports.volunteerExists = async function (personId) {
 module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [] } = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
+      const preexisting = pre[0]?.id
+      const beforeShape = preexisting ? await AuditService.readShape(connection, 'volunteer', preexisting) : null
       const volunteerId = await ensureVolunteer(connection, personId)
       await connection.query(
         'UPDATE volunteer SET providerType = ?, active = ?, notes = ? WHERE id = ?', [providerType, active, notes, volunteerId]
@@ -71,6 +75,14 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
       await replaceCapabilities(connection, volunteerId, capabilityIds)
       await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
       await replaceVettings(connection, volunteerId, vettings)
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'volunteer', volunteerId)
+      await AuditService.record(connection, {
+        entityType: 'volunteer', entityId: volunteerId,
+        action: preexisting ? 'update' : 'create',
+        userId: userObject.userId,
+        before: beforeShape?.row, beforeSets: beforeShape?.sets,
+        after, afterSets,
+      })
     },
     statusObj: undefined
   })
@@ -81,6 +93,9 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
 module.exports.patchVolunteer = async function (personId, body = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
+      const preexisting = pre[0]?.id
+      const beforeShape = preexisting ? await AuditService.readShape(connection, 'volunteer', preexisting) : null
       const volunteerId = await ensureVolunteer(connection, personId)
       const fields = {}
       if (body.providerType !== undefined) fields.providerType = body.providerType
@@ -98,13 +113,21 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
       if (body.vettings !== undefined) {
         await replaceVettings(connection, volunteerId, body.vettings)
       }
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'volunteer', volunteerId)
+      await AuditService.record(connection, {
+        entityType: 'volunteer', entityId: volunteerId,
+        action: preexisting ? 'update' : 'create',
+        userId: userObject.userId,
+        before: beforeShape?.row, beforeSets: beforeShape?.sets,
+        after, afterSets,
+      })
     },
     statusObj: undefined
   })
   return await PersonService.getPerson(personId, ['volunteer'], userObject)
 }
 
-module.exports.deleteVolunteer = async function (personId) {
+module.exports.deleteVolunteer = async function (personId, userId) {
   // volunteer_capability and volunteer_village_associate cascade on volunteer delete
   // (associate has ON DELETE CASCADE; capability is cleared explicitly for safety).
   await dbUtils.retryOnDeadlock2({
@@ -114,10 +137,15 @@ module.exports.deleteVolunteer = async function (personId) {
       )
       if (!rows.length) return
       const volunteerId = rows[0].id
+      const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'volunteer', volunteerId)
       await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
       await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
       await connection.query('DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId])
       await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
+      await AuditService.record(connection, {
+        entityType: 'volunteer', entityId: volunteerId, action: 'delete',
+        userId, before, beforeSets,
+      })
     },
     statusObj: undefined
   })
