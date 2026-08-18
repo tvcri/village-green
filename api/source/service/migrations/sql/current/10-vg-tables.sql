@@ -84,6 +84,24 @@ CREATE TABLE `analytics_events` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `audit_event`
+--
+
+DROP TABLE IF EXISTS `audit_event`;
+CREATE TABLE `audit_event` (
+  `auditId` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `entityType` varchar(45) NOT NULL,
+  `entityId` int NOT NULL,
+  `action` varchar(45) NOT NULL,
+  `userId` int NOT NULL,
+  `changes` json NOT NULL,
+  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`auditId`),
+  KEY `idx_entity` (`entityType`,`entityId`,`createdAt`),
+  KEY `idx_actor` (`userId`,`createdAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `capability`
 --
 
@@ -676,4 +694,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-08  2:37:33
+-- Dump completed on 2026-08-18 20:07:36
