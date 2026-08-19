@@ -2,7 +2,9 @@
 // Pure diff/snapshot computation for audit_event rows. No DB access — inputs
 // are rows already read through the app pool via AuditService.readShape, so
 // both sides of a comparison share one representation (spec §5: like compares
-// with like, by construction).
+// with like, by construction). Rows are SELECT t.* plus any extras aliases;
+// the differ works over whatever keys the rows carry — there is no column
+// catalog to fall out of sync with.
 
 function normalize (v) {
   if (v === null || v === undefined) return null
@@ -29,23 +31,20 @@ function equal (a, b) {
   return false
 }
 
-function columnNames (shape) {
-  return shape.columns.map(c => (typeof c === 'string' ? c : c.name))
-}
-
 function normalizeRowObject (row) {
   const out = {}
   for (const k of Object.keys(row)) out[k] = normalize(row[k])
   return out
 }
 
-function diffColumns (shape, before, after) {
+function diffColumns (before, after) {
   const diff = {}
-  for (const col of columnNames(shape)) {
+  const keys = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])
+  for (const col of keys) {
     const a = normalize(before?.[col])
     const b = normalize(after?.[col])
     if (equal(a, b)) continue
-    diff[col] = shape.redacted.includes(col) ? { changed: true } : { old: a, new: b }
+    diff[col] = { old: a, new: b }
   }
   return diff
 }
@@ -93,9 +92,8 @@ function diffSets (shape, beforeSets, afterSets) {
 
 function buildSnapshot (shape, row, sets) {
   const snap = {}
-  for (const col of columnNames(shape)) {
-    const v = normalize(row?.[col])
-    snap[col] = shape.redacted.includes(col) ? (v === null ? null : '[redacted]') : v
+  for (const col of Object.keys(row ?? {})) {
+    snap[col] = normalize(row[col])
   }
   for (const [name, decl] of Object.entries(shape.sets ?? {})) {
     const rows = (sets?.[name] ?? []).map(normalizeRowObject)
@@ -108,8 +106,8 @@ function buildSnapshot (shape, row, sets) {
 function computeChanges (shape, { action, before, after, beforeSets, afterSets }) {
   if (action === 'create') return { snapshot: buildSnapshot(shape, after, afterSets) }
   if (action === 'delete') return { snapshot: buildSnapshot(shape, before, beforeSets) }
-  const diff = { ...diffColumns(shape, before, after), ...diffSets(shape, beforeSets, afterSets) }
+  const diff = { ...diffColumns(before, after), ...diffSets(shape, beforeSets, afterSets) }
   return Object.keys(diff).length ? { diff } : null
 }
 
-module.exports = { computeChanges, buildSnapshot, normalize, equal, diffColumns, diffSets, columnNames, requiredSetAlias }
+module.exports = { computeChanges, buildSnapshot, normalize, equal, diffColumns, diffSets, requiredSetAlias }

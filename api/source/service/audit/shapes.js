@@ -1,35 +1,36 @@
 'use strict'
-// Audited-shape registry — the single source of truth for what each
-// entityType's audit record contains. See
-// scratch/superpowers/specs/2026-08-17-audit-events-design.md §4.
+// Audited-shape registry — capture-everything model (simplified 2026-08-19;
+// see scratch/superpowers/specs/2026-08-17-audit-events-design.md §4 as-built
+// notes).
 //
-// A new column on an audited table is UNAUDITED until declared here (allowlist
-// fails safe); a refactor that moves data (e.g. address -> junction) edits the
-// entity's declaration, never the audit machinery. Boot-time validation
-// (AuditService.validateShapes) checks both directions against the live
-// schema, for entity tables AND set-source tables: every declared column
-// must exist (drift/stale), and every existing column must appear in
-// `columns`/`excluded` (entities) or `sourceColumns` (sets) — so adding a
-// column to any audited or folded table without deciding its audit status
-// fails the boot, not the trail. `excluded` is the deliberate-omission
-// list; the entity id column is covered structurally and never listed.
+// Every real column on an audited table is captured automatically:
+// AuditService.readShape SELECTs t.* — a new column is audited the moment it
+// exists, with nothing to declare and nothing that can be silently omitted.
+// Civil DATE columns are returned as 'YYYY-MM-DD' strings mechanically (per-
+// query dateStrings), never as JS Dates. Sensitivity/noise filtering is a
+// read-surface concern (none exists yet — the trail is SQL-only), not a
+// write-time one.
+//
+// What remains in this catalog is only what no machine can derive:
+// - `extras`: additive label expressions (lookup FKs resolved to names) —
+//   they ride alongside the raw columns, never instead of them, so a stale
+//   or missing extra can never hide data. Aliases must not shadow real
+//   columns (boot-checked).
+// - `sets`: junction/child collections folded into this entity, with the
+//   source table named as data (the FK scan reads it) and SQL producing the
+//   alias the differ reads ('label' for values, `key` for keyed — boot-
+//   checked via field metadata).
+// - `relatedTables`: tables that reference this entity but are deliberately
+//   NOT folded. The boot-time FK scan fails on any referencing table that is
+//   neither a set source, an audited entity, nor listed here — a future
+//   junction forces a fold-or-acknowledge decision.
 
 const shapes = {
   person: {
     table: 'person',
-    columns: [
+    extras: [
       { name: 'village', expr: '(SELECT name FROM village WHERE village.id = t.villageId)' },
-      'lastName', 'firstName', 'middleInitial', 'salutation', 'nickname',
-      'street', 'unit', 'city', 'state', 'zip', 'town',
-      'email', 'emailStatus', 'phone', 'cell', 'computerUse', 'smartphone',
-      { name: 'birthDate', expr: "DATE_FORMAT(t.birthDate, '%Y-%m-%d')" },
-      'emergencyContactName', 'emergencyContactRelationship',
-      'emergencyContactPhone', 'emergencyContactEmail', 'comments',
     ],
-    redacted: [],
-    // villageId feeds the 'village' lookup expr; fullName/address are
-    // DB-generated composites of audited columns.
-    excluded: ['villageId', 'fullName', 'address'],
     // enrollment_request/fcv_submission reference person but are their own
     // records, not attributes of the person — deliberately not folded.
     relatedTables: ['enrollment_request', 'fcv_submission'],
@@ -37,7 +38,6 @@ const shapes = {
       communities: {
         kind: 'values',
         table: 'person_community',
-        sourceColumns: ['id', 'personId', 'communityId'],
         sql: `SELECT c.name AS label
               FROM person_community pc JOIN community c ON c.id = pc.communityId
               WHERE pc.personId = ?`,
@@ -46,7 +46,6 @@ const shapes = {
         kind: 'keyed',
         key: 'k',
         table: 'person_disability',
-        sourceColumns: ['id', 'personId', 'disabilityId', 'note'],
         sql: `SELECT d.name AS k, pd.note
               FROM person_disability pd JOIN disability d ON d.id = pd.disabilityId
               WHERE pd.personId = ?`,
@@ -56,33 +55,17 @@ const shapes = {
 
   member: {
     table: 'member',
-    columns: [
-      'personId', 'memberNumber', 'memberLevel', 'memberType', 'primaryPersonId',
-      'secondaryType', 'serviceNotes',
-      { name: 'joinDate', expr: "DATE_FORMAT(t.joinDate, '%Y-%m-%d')" },
-      'status', 'dropReason', 'householdSize', 'householdDues', 'quickbooksKey',
-      'printedNewsletter', 'confidentialNotes', 'statusChangeNotes', 'miscNotes',
-    ],
-    // householdDues + confidentialNotes are the two member fields classified
-    // sensitive; diffs record {changed:true}, snapshots record '[redacted]'.
-    redacted: ['confidentialNotes', 'householdDues'],
-    // createdDate is set-once creation metadata.
-    excluded: ['createdDate'],
     relatedTables: [],
     sets: {},
   },
 
   volunteer: {
     table: 'volunteer',
-    columns: ['personId', 'providerType', 'active', 'notes'],
-    redacted: [],
-    excluded: [],
     relatedTables: [],
     sets: {
       capabilities: {
         kind: 'values',
         table: 'volunteer_capability',
-        sourceColumns: ['id', 'volunteerId', 'capabilityId'],
         sql: `SELECT c.name AS label
               FROM volunteer_capability vc JOIN capability c ON c.id = vc.capabilityId
               WHERE vc.volunteerId = ?`,
@@ -90,7 +73,6 @@ const shapes = {
       villageAssociations: {
         kind: 'values',
         table: 'volunteer_village_associate',
-        sourceColumns: ['id', 'volunteerId', 'villageId'],
         sql: `SELECT v.name AS label
               FROM volunteer_village_associate a JOIN village v ON v.id = a.villageId
               WHERE a.volunteerId = ?`,
@@ -99,10 +81,9 @@ const shapes = {
         kind: 'keyed',
         key: 'k',
         table: 'volunteer_vetting',
-        // additionalData/notes exist but are not rendered into diffs (they
-        // are also dropped by replaceVettings — pre-existing, see plan).
-        sourceColumns: ['id', 'volunteerId', 'vettingTypeId', 'dateEntered', 'dateExpired', 'additionalData', 'notes'],
-        // Natural key mirrors UNIQUE(volunteerId, vettingTypeId, dateEntered)
+        // Natural key mirrors UNIQUE(volunteerId, vettingTypeId, dateEntered).
+        // additionalData/notes are not rendered into diffs (they are also
+        // dropped by replaceVettings — pre-existing, see plan).
         sql: `SELECT CONCAT(vt.name, ' ', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d')) AS k,
                      vt.name AS vettingType,
                      DATE_FORMAT(vv.dateEntered, '%Y-%m-%d') AS dateEntered,
@@ -116,11 +97,6 @@ const shapes = {
   user: {
     table: 'user_data',
     idColumn: 'userId',
-    columns: ['username', 'status'],
-    redacted: [],
-    // Per-request noise (lastAccess/lastClaims/webPreferences) and
-    // status-change attribution metadata (created/statusDate/statusUser).
-    excluded: ['created', 'lastAccess', 'lastClaims', 'statusDate', 'statusUser', 'webPreferences'],
     // privacy_acknowledgement/privacy_rules are their own records; user_group's
     // FKs are creation/modification attribution, not user attributes.
     relatedTables: ['privacy_acknowledgement', 'privacy_rules', 'user_group'],
@@ -128,9 +104,6 @@ const shapes = {
       grants: {
         kind: 'values',
         table: 'role_grant',
-        // villageKey is a generated dedup column; userGroupId rows belong to
-        // groups (not folded in v1) but the column itself is accounted here.
-        sourceColumns: ['grantId', 'userId', 'userGroupId', 'roleId', 'villageId', 'villageKey'],
         sql: `SELECT CONCAT(r.name, '@', COALESCE(v.name, 'federation')) AS label
               FROM role_grant rg
               JOIN role r ON r.roleId = rg.roleId
@@ -140,7 +113,6 @@ const shapes = {
       userGroups: {
         kind: 'values',
         table: 'user_group_user_map',
-        sourceColumns: ['ugumId', 'userGroupId', 'userId'],
         sql: `SELECT ug.name AS label
               FROM user_group_user_map m JOIN user_group ug ON ug.userGroupId = m.userGroupId
               WHERE m.userId = ?`,
@@ -150,23 +122,13 @@ const shapes = {
 
   serviceRequest: {
     table: 'service_request',
-    columns: [
-      'requestNumber',
+    extras: [
       { name: 'village', expr: '(SELECT name FROM village WHERE village.id = t.villageId)' },
-      'memberPersonId', 'volunteerPersonId', 'status', 'serviceName', 'transportationType',
-      { name: 'serviceDate', expr: "DATE_FORMAT(t.serviceDate, '%Y-%m-%d')" },
-      'timesFlexible', 'startTime', 'finishTime', 'apptTime', 'returnTime',
-      'instructions', 'description', 'destination', 'address', 'city', 'phone',
-      'state', 'zip', 'start', 'startAddress', 'startCity', 'startState',
-      'startZip', 'startPhone',
     ],
-    redacted: [],
-    // villageId feeds the 'village' expr; createdAt/createdUserId are
-    // creation metadata. modifiedUserId/modifiedAt carry VSS-only semantics
-    // (read them as vssUserId/vssModifiedAt — written solely by VSS
-    // sign-up/release); their absence from the audit trail is deliberate.
-    excluded: ['villageId', 'createdAt', 'createdUserId', 'modifiedUserId', 'modifiedAt'],
     // notification_event is its own append-only log by design, not folded.
+    // NOTE: modifiedUserId/modifiedAt (VSS-only semantics, read as
+    // vssUserId/vssModifiedAt) are captured like every other column now;
+    // their VSS meaning is documented where they are written.
     relatedTables: ['notification_event'],
     sets: {},
   },
@@ -175,27 +137,19 @@ const shapes = {
 function assertShapeInvariants (entityType, shape) {
   const fail = (msg) => { throw new Error(`audit shape '${entityType}': ${msg}`) }
   if (!shape.table) fail('missing table')
-  const names = (shape.columns ?? []).map(c => (typeof c === 'string' ? c : c.name))
-  if (!names.length) fail('no columns declared')
-  if (new Set(names).size !== names.length) fail('duplicate column names')
-  if (!Array.isArray(shape.redacted)) fail('missing redacted (declare [] if nothing is redacted)')
-  for (const r of shape.redacted) {
-    if (!names.includes(r)) fail(`redacted '${r}' is not a declared column`)
+  const extraNames = (shape.extras ?? []).map(e => e?.name)
+  for (const e of shape.extras ?? []) {
+    if (typeof e?.name !== 'string' || !e.name) fail('extras entries need a name')
+    if (typeof e?.expr !== 'string' || !e.expr) fail(`extra '${e.name}' needs an expr`)
   }
-  if (!Array.isArray(shape.excluded)) fail('missing excluded (declare [] if every column is audited)')
-  const idCol = shape.idColumn ?? 'id'
-  for (const x of shape.excluded) {
-    if (names.includes(x)) fail(`excluded '${x}' is also a declared column`)
-    if (x === idCol) fail(`excluded '${x}' is the id column (covered structurally, never listed)`)
-  }
+  if (new Set(extraNames).size !== extraNames.length) fail('duplicate extras names')
   const setTables = []
   for (const [setName, decl] of Object.entries(shape.sets ?? {})) {
-    if (names.includes(setName)) fail(`set '${setName}' collides with a column name`)
+    if (extraNames.includes(setName)) fail(`set '${setName}' collides with an extras name`)
     if (decl.kind !== 'values' && decl.kind !== 'keyed') fail(`set '${setName}' has unknown kind '${decl.kind}'`)
     if (decl.kind === 'keyed' && (typeof decl.key !== 'string' || !decl.key)) fail(`keyed set '${setName}' must declare its key alias`)
     if (typeof decl.sql !== 'string' || !decl.sql.includes('?')) fail(`set '${setName}' sql must take one placeholder`)
     if (typeof decl.table !== 'string' || !decl.table) fail(`set '${setName}' must declare its source table (the FK scan reads it)`)
-    if (!Array.isArray(decl.sourceColumns) || !decl.sourceColumns.length) fail(`set '${setName}' must declare sourceColumns (the set-level omission check reads them)`)
     setTables.push(decl.table)
   }
   if (!Array.isArray(shape.relatedTables)) fail('missing relatedTables (declare [] if no unfolded tables reference this entity)')

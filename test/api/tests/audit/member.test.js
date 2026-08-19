@@ -38,10 +38,11 @@ test('member put(create)/patch/delete audit lifecycle with redaction', async () 
   assert.equal(rows[0].action, 'create')
   assert.equal(rows[0].userId, STAFF_ID)
   assert.equal(rows[0].changes.snapshot.status, 'Active')
-  assert.equal(rows[0].changes.snapshot.confidentialNotes, '[redacted]')
-  assert.ok(!JSON.stringify(rows[0].changes).includes('the-secret-text'), 'redacted value never appears')
+  // Capture-everything model (2026-08-19): sensitive fields are recorded
+  // verbatim; sensitivity is a read-surface concern (the trail is SQL-only).
+  assert.equal(rows[0].changes.snapshot.confidentialNotes, 'the-secret-text')
 
-  // PATCH a redacted field -> {changed: true}, value still absent
+  // PATCH a sensitive field -> ordinary old/new diff (recorded verbatim)
   const patch = await vgCall('patchPersonMember', { personId }, {
     token: tokens.users.staff, body: { confidentialNotes: 'the-second-secret' },
   })
@@ -49,8 +50,7 @@ test('member put(create)/patch/delete audit lifecycle with redaction', async () 
   rows = await auditRows('member', memberId)
   assert.equal(rows.length, 2)
   assert.equal(rows[1].action, 'update')
-  assert.deepEqual(rows[1].changes.diff.confidentialNotes, { changed: true })
-  assert.ok(!JSON.stringify(rows[1].changes).includes('secret'))
+  assert.deepEqual(rows[1].changes.diff.confidentialNotes, { old: 'the-secret-text', new: 'the-second-secret' })
 
   // DELETE -> snapshot survives
   const del = await vgCall('deletePersonMember', { personId }, { token: tokens.users.staff })
