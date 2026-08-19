@@ -180,6 +180,7 @@ function assertShapeInvariants (entityType, shape) {
   for (const [setName, decl] of Object.entries(shape.sets ?? {})) {
     if (names.includes(setName)) fail(`set '${setName}' collides with a column name`)
     if (decl.kind !== 'values' && decl.kind !== 'keyed') fail(`set '${setName}' has unknown kind '${decl.kind}'`)
+    if (decl.kind === 'keyed' && (typeof decl.key !== 'string' || !decl.key)) fail(`keyed set '${setName}' must declare its key alias`)
     if (typeof decl.sql !== 'string' || !decl.sql.includes('?')) fail(`set '${setName}' sql must take one placeholder`)
     if (typeof decl.table !== 'string' || !decl.table) fail(`set '${setName}' must declare its source table (the FK scan reads it)`)
     setTables.push(decl.table)

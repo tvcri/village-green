@@ -81,6 +81,14 @@ function unaccountedReferencingTables (registry, fkRows) {
   return [...out.values()]
 }
 
+// The alias a set's SQL must produce for the differ to see anything:
+// 'values' sets are diffed on r.label, 'keyed' sets are indexed on r[key].
+// A renamed alias is valid SQL, so only this check stands between a typo
+// and every diff silently comparing undefined to undefined.
+function requiredSetAlias (decl) {
+  return decl.kind === 'values' ? 'label' : decl.key
+}
+
 // Boot-time fail-fast, two directions per registry entry:
 //  - drift: execute every registry SELECT, so a renamed/dropped column throws;
 //  - omission: read information_schema, so a real column missing from both
@@ -96,13 +104,23 @@ function unaccountedReferencingTables (registry, fkRows) {
 async function validateShapes () {
   for (const [entityType, shape] of Object.entries(shapes)) {
     assertShapeInvariants(entityType, shape)
+    const setFields = new Map()
     try {
       await dbUtils.pool.query(buildRowSql(shape), [0])
-      for (const decl of Object.values(shape.sets ?? {})) {
-        await dbUtils.pool.query(decl.sql, [0])
+      for (const [setName, decl] of Object.entries(shape.sets ?? {})) {
+        const [, fields] = await dbUtils.pool.query(decl.sql, [0])
+        setFields.set(setName, fields.map(f => f.name))
       }
     } catch (e) {
       throw new Error(`audit shape '${entityType}' failed schema validation: ${e.message}`)
+    }
+    for (const [setName, decl] of Object.entries(shape.sets ?? {})) {
+      const alias = requiredSetAlias(decl)
+      if (!setFields.get(setName).includes(alias)) {
+        throw new Error(
+          `audit shape '${entityType}': set '${setName}' sql does not produce required alias ` +
+          `'${alias}' — the differ reads it; check the SELECT's AS clauses`)
+      }
     }
     const [cols] = await dbUtils.pool.query(
       `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -133,4 +151,4 @@ async function validateShapes () {
   }
 }
 
-module.exports = { readShape, record, validateShapes, buildRowSql, undeclaredColumns, unaccountedReferencingTables }
+module.exports = { readShape, record, validateShapes, buildRowSql, undeclaredColumns, unaccountedReferencingTables, requiredSetAlias }

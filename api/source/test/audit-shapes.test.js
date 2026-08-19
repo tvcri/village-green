@@ -1,7 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { shapes, assertShapeInvariants } = require('../service/audit/shapes')
-const { buildRowSql, undeclaredColumns, unaccountedReferencingTables } = require('../service/audit/AuditService')
+const { buildRowSql, undeclaredColumns, unaccountedReferencingTables, requiredSetAlias } = require('../service/audit/AuditService')
 
 test('registry declares exactly the five v1 entity types', () => {
   assert.deepEqual(Object.keys(shapes).sort(), ['member', 'person', 'serviceRequest', 'user', 'volunteer'])
@@ -32,6 +32,23 @@ test('invariants require set source tables and an explicit relatedTables array',
   assert.throws(() => assertShapeInvariants('x', { table: 't', columns: ['a'], redacted: [], excluded: [], sets: {} }), /relatedTables/)
   // a table cannot be both a folded set source and related-not-folded
   assert.throws(() => assertShapeInvariants('x', { table: 't', columns: ['a'], redacted: [], excluded: [], relatedTables: ['j'], sets: { s: { kind: 'values', sql: 's?', table: 'j' } } }), /relatedTables 'j'/)
+})
+
+test('keyed sets must declare a non-empty key; values sets need none', () => {
+  assert.throws(() => assertShapeInvariants('x', {
+    table: 't', columns: ['a'], redacted: [], excluded: [], relatedTables: [],
+    sets: { s: { kind: 'keyed', sql: 's?', table: 'j' } },
+  }), /key/)
+  // values kind without a key is fine
+  assertShapeInvariants('x', {
+    table: 't', columns: ['a'], redacted: [], excluded: [], relatedTables: [],
+    sets: { s: { kind: 'values', sql: 's?', table: 'j' } },
+  })
+})
+
+test('requiredSetAlias names exactly the alias the differ reads', () => {
+  assert.equal(requiredSetAlias({ kind: 'values' }), 'label')
+  assert.equal(requiredSetAlias({ kind: 'keyed', key: 'k' }), 'k')
 })
 
 test('unaccountedReferencingTables buckets FK-referencing tables correctly', () => {
