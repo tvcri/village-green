@@ -29,9 +29,13 @@ const shapes = {
     // villageId feeds the 'village' lookup expr; fullName/address are
     // DB-generated composites of audited columns.
     excluded: ['villageId', 'fullName', 'address'],
+    // enrollment_request/fcv_submission reference person but are their own
+    // records, not attributes of the person — deliberately not folded.
+    relatedTables: ['enrollment_request', 'fcv_submission'],
     sets: {
       communities: {
         kind: 'values',
+        table: 'person_community',
         sql: `SELECT c.name AS label
               FROM person_community pc JOIN community c ON c.id = pc.communityId
               WHERE pc.personId = ?`,
@@ -39,6 +43,7 @@ const shapes = {
       disabilities: {
         kind: 'keyed',
         key: 'k',
+        table: 'person_disability',
         sql: `SELECT d.name AS k, pd.note
               FROM person_disability pd JOIN disability d ON d.id = pd.disabilityId
               WHERE pd.personId = ?`,
@@ -60,6 +65,7 @@ const shapes = {
     redacted: ['confidentialNotes', 'householdDues'],
     // createdDate is set-once creation metadata.
     excluded: ['createdDate'],
+    relatedTables: [],
     sets: {},
   },
 
@@ -68,15 +74,18 @@ const shapes = {
     columns: ['personId', 'providerType', 'active', 'notes'],
     redacted: [],
     excluded: [],
+    relatedTables: [],
     sets: {
       capabilities: {
         kind: 'values',
+        table: 'volunteer_capability',
         sql: `SELECT c.name AS label
               FROM volunteer_capability vc JOIN capability c ON c.id = vc.capabilityId
               WHERE vc.volunteerId = ?`,
       },
       villageAssociations: {
         kind: 'values',
+        table: 'volunteer_village_associate',
         sql: `SELECT v.name AS label
               FROM volunteer_village_associate a JOIN village v ON v.id = a.villageId
               WHERE a.volunteerId = ?`,
@@ -84,6 +93,7 @@ const shapes = {
       vettings: {
         kind: 'keyed',
         key: 'k',
+        table: 'volunteer_vetting',
         // Natural key mirrors UNIQUE(volunteerId, vettingTypeId, dateEntered)
         sql: `SELECT CONCAT(vt.name, ' ', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d')) AS k,
                      vt.name AS vettingType,
@@ -103,9 +113,13 @@ const shapes = {
     // Per-request noise (lastAccess/lastClaims/webPreferences) and
     // status-change attribution metadata (created/statusDate/statusUser).
     excluded: ['created', 'lastAccess', 'lastClaims', 'statusDate', 'statusUser', 'webPreferences'],
+    // privacy_acknowledgement/privacy_rules are their own records; user_group's
+    // FKs are creation/modification attribution, not user attributes.
+    relatedTables: ['privacy_acknowledgement', 'privacy_rules', 'user_group'],
     sets: {
       grants: {
         kind: 'values',
+        table: 'role_grant',
         sql: `SELECT CONCAT(r.name, '@', COALESCE(v.name, 'federation')) AS label
               FROM role_grant rg
               JOIN role r ON r.roleId = rg.roleId
@@ -114,6 +128,7 @@ const shapes = {
       },
       userGroups: {
         kind: 'values',
+        table: 'user_group_user_map',
         sql: `SELECT ug.name AS label
               FROM user_group_user_map m JOIN user_group ug ON ug.userGroupId = m.userGroupId
               WHERE m.userId = ?`,
@@ -139,6 +154,8 @@ const shapes = {
     // (read them as vssUserId/vssModifiedAt — written solely by VSS
     // sign-up/release); their absence from the audit trail is deliberate.
     excluded: ['villageId', 'createdAt', 'createdUserId', 'modifiedUserId', 'modifiedAt'],
+    // notification_event is its own append-only log by design, not folded.
+    relatedTables: ['notification_event'],
     sets: {},
   },
 }
@@ -159,10 +176,17 @@ function assertShapeInvariants (entityType, shape) {
     if (names.includes(x)) fail(`excluded '${x}' is also a declared column`)
     if (x === idCol) fail(`excluded '${x}' is the id column (covered structurally, never listed)`)
   }
+  const setTables = []
   for (const [setName, decl] of Object.entries(shape.sets ?? {})) {
     if (names.includes(setName)) fail(`set '${setName}' collides with a column name`)
     if (decl.kind !== 'values' && decl.kind !== 'keyed') fail(`set '${setName}' has unknown kind '${decl.kind}'`)
     if (typeof decl.sql !== 'string' || !decl.sql.includes('?')) fail(`set '${setName}' sql must take one placeholder`)
+    if (typeof decl.table !== 'string' || !decl.table) fail(`set '${setName}' must declare its source table (the FK scan reads it)`)
+    setTables.push(decl.table)
+  }
+  if (!Array.isArray(shape.relatedTables)) fail('missing relatedTables (declare [] if no unfolded tables reference this entity)')
+  for (const t of shape.relatedTables) {
+    if (setTables.includes(t)) fail(`relatedTables '${t}' is already a declared set source`)
   }
 }
 

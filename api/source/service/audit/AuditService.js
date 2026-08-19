@@ -57,11 +57,38 @@ function undeclaredColumns (shape, actualColumnNames) {
   return actualColumnNames.filter(c => !declared.has(c))
 }
 
+// The junction half of boot validation: every table holding an FK into an
+// audited table must be a declared set source (folded), itself an audited
+// entity, or listed in that entity's relatedTables (deliberately not
+// folded) — otherwise a future junction/child table could carry entity
+// data the trail silently never covers. fkRows are
+// {TABLE_NAME, REFERENCED_TABLE_NAME} pairs; returns deduped
+// [{table, entityType}] for everything unaccounted. Pure; exported for
+// unit tests.
+function unaccountedReferencingTables (registry, fkRows) {
+  const auditedTables = new Map(Object.entries(registry).map(([type, s]) => [s.table, type]))
+  const out = new Map()
+  for (const { TABLE_NAME: t, REFERENCED_TABLE_NAME: ref } of fkRows) {
+    const entityType = auditedTables.get(ref)
+    if (!entityType) continue
+    if (auditedTables.has(t)) continue
+    const shape = registry[entityType]
+    const setTables = Object.values(shape.sets ?? {}).map(d => d.table)
+    if (setTables.includes(t)) continue
+    if (shape.relatedTables.includes(t)) continue
+    out.set(`${t}->${entityType}`, { table: t, entityType })
+  }
+  return [...out.values()]
+}
+
 // Boot-time fail-fast, two directions per registry entry:
 //  - drift: execute every registry SELECT, so a renamed/dropped column throws;
 //  - omission: read information_schema, so a real column missing from both
 //    `columns` and `excluded` throws — otherwise a future migration could add
 //    a column the audit trail silently never covers.
+// Plus one cross-entity check: an FK scan (unaccountedReferencingTables), so
+// a future junction table referencing an audited entity forces a fold-or-
+// acknowledge decision the same way a new column does.
 // A throw here is caught in bootstrap/dependencies.js, which logs it and sets
 // app state to 'fail': the process stays up but every /api route answers 503
 // (service-check middleware) except /op/state. Loud and immediate, though not
@@ -87,6 +114,18 @@ async function validateShapes () {
         `add each to columns (audited) or excluded (deliberately not) in service/audit/shapes.js`)
     }
   }
+  const [fkRows] = await dbUtils.pool.query(
+    `SELECT DISTINCT TABLE_NAME, REFERENCED_TABLE_NAME
+     FROM information_schema.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL`)
+  const unaccounted = unaccountedReferencingTables(shapes, fkRows)
+  if (unaccounted.length) {
+    throw new Error(
+      'audit: tables reference audited entities but are neither declared set sources, ' +
+      'audited entities, nor relatedTables: ' +
+      unaccounted.map(u => `${u.table} -> ${u.entityType}`).join(', ') +
+      ' — fold each as a set or add it to relatedTables in service/audit/shapes.js')
+  }
   try {
     await dbUtils.pool.query('SELECT auditId FROM audit_event WHERE auditId = ?', [0])
   } catch (e) {
@@ -94,4 +133,4 @@ async function validateShapes () {
   }
 }
 
-module.exports = { readShape, record, validateShapes, buildRowSql, undeclaredColumns }
+module.exports = { readShape, record, validateShapes, buildRowSql, undeclaredColumns, unaccountedReferencingTables }
