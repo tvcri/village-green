@@ -440,6 +440,16 @@ exports.addOrUpdateUserGroup = async function ({userGroupId, userGroupFields, us
   const sqlDeleteUserGroupUserMap = `DELETE from user_group_user_map WHERE userGroupId = ?`
 
   async function transactionFn (connection) {
+    // Group writes mutate each member's audited userGroups set (membership
+    // rewrites directly; a rename changes every member's labels), so audit
+    // fans out per affected user. Before-shapes are read before any write.
+    const [prevMembers] = await connection.query(
+      'SELECT userId FROM user_group_user_map WHERE userGroupId = ?', [userGroupId ?? 0])
+    const affected = new Set(prevMembers.map(r => r.userId))
+    for (const uid of userIds ?? []) affected.add(Number(uid))
+    const befores = new Map()
+    for (const uid of affected) befores.set(uid, await AuditService.readShape(connection, 'user', uid))
+
     if (Object.keys(userGroupFields).length) {
       const sql = isUpdate ? sqlUpdateUserGroup : sqlInsertUserGroup
       const binds = isUpdate ? [userGroupFields, userGroupId] : [userGroupFields.name, userGroupFields.description, createdUserId, modifiedUserId]
@@ -487,11 +497,23 @@ exports.addOrUpdateUserGroup = async function ({userGroupId, userGroupFields, us
         await connection.query(sqlInsertRoleGrant, [binds] )
       }
     }
+    // Fan out per affected user; no-op members (membership and labels
+    // unchanged) produce null diffs and write nothing. Group grants don't
+    // appear here — the per-user grants set selects userId grantees only.
+    const actorUserId = modifiedUserId ?? createdUserId
+    for (const uid of affected) {
+      const b = befores.get(uid)
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', uid)
+      await AuditService.record(connection, {
+        entityType: 'user', entityId: uid, action: 'update',
+        userId: actorUserId, before: b.row, beforeSets: b.sets, after, afterSets,
+      })
+    }
     return userGroupId
   }
 
   return dbUtils.retryOnDeadlock2({
-    transactionFn, 
+    transactionFn,
     statusObj: svcStatus
   })
 }
@@ -570,10 +592,29 @@ exports.queryUserGroups = async function ({projections = [], filters = {}, eleva
   return rows
 }
 
-exports.deleteUserGroup = async function({userGroupId}) {
-    const sqlDeleteUserGroup = `DELETE from user_group WHERE userGroupId = ?`
-    await dbUtils.pool.query(sqlDeleteUserGroup, [userGroupId])
-    return userGroupId
+exports.deleteUserGroup = async function({userGroupId, actorUserId}) {
+  // The DELETE's FK cascade strips every member's user_group_user_map row —
+  // a mutation of each member's audited userGroups set — so audit fans out
+  // per member, with before-shapes read ahead of the cascade.
+  return dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [members] = await connection.query(
+        'SELECT userId FROM user_group_user_map WHERE userGroupId = ?', [userGroupId])
+      const befores = new Map()
+      for (const { userId } of members) {
+        befores.set(userId, await AuditService.readShape(connection, 'user', userId))
+      }
+      await connection.query('DELETE from user_group WHERE userGroupId = ?', [userGroupId])
+      for (const [uid, b] of befores) {
+        const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', uid)
+        await AuditService.record(connection, {
+          entityType: 'user', entityId: uid, action: 'update',
+          userId: actorUserId, before: b.row, beforeSets: b.sets, after, afterSets,
+        })
+      }
+      return userGroupId
+    },
+  })
 }
 
 exports.getUserRoleData = async function (userId) {

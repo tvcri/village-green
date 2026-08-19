@@ -408,6 +408,7 @@ module.exports.deleteUserGroup = async (req, res, next) => {
     })
     await UserService.deleteUserGroup({
       userGroupId: req.params.userGroupId,
+      actorUserId: req.userObject.userId,
     })
     res.json(response[0])
   }
