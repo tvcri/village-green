@@ -97,7 +97,11 @@ test('replaceVillageGrants swapping grantees fans out to BOTH affected users', a
     assert.equal(secondRow.changes.diff.grants.added.length, 1)
     assert.equal(secondRow.changes.diff.grants.added[0], `Village Lead@${villages.scratch.name}`)
   } finally {
-    // cleanup: clear the village of grants for later tests/files
+    // cleanup: clear the village of grants for later tests/files. Known
+    // tradeoff: if BOTH the try's assertions and this cleanup fail, the
+    // cleanup's error replaces the informative original — acceptable, since
+    // a failing cleanup means the shared DB is polluted and later files
+    // would fail confusingly anyway; better to hear about it here.
     const cleared = await vgCall('replaceVillageGrants', G, { ...admin, body: [] })
     assert.equal(cleared.status, 200)
   }

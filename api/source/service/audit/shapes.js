@@ -7,11 +7,12 @@
 // fails safe); a refactor that moves data (e.g. address -> junction) edits the
 // entity's declaration, never the audit machinery. Boot-time validation
 // (AuditService.validateShapes) checks both directions against the live
-// schema: every declared column must exist (drift), and every existing column
-// must appear in `columns` or `excluded` (omission) — so adding a table
-// column without deciding its audit status fails the boot, not the trail.
-// `excluded` is the deliberate-omission list; the id column is covered
-// structurally and never listed.
+// schema, for entity tables AND set-source tables: every declared column
+// must exist (drift/stale), and every existing column must appear in
+// `columns`/`excluded` (entities) or `sourceColumns` (sets) — so adding a
+// column to any audited or folded table without deciding its audit status
+// fails the boot, not the trail. `excluded` is the deliberate-omission
+// list; the entity id column is covered structurally and never listed.
 
 const shapes = {
   person: {
@@ -36,6 +37,7 @@ const shapes = {
       communities: {
         kind: 'values',
         table: 'person_community',
+        sourceColumns: ['id', 'personId', 'communityId'],
         sql: `SELECT c.name AS label
               FROM person_community pc JOIN community c ON c.id = pc.communityId
               WHERE pc.personId = ?`,
@@ -44,6 +46,7 @@ const shapes = {
         kind: 'keyed',
         key: 'k',
         table: 'person_disability',
+        sourceColumns: ['id', 'personId', 'disabilityId', 'note'],
         sql: `SELECT d.name AS k, pd.note
               FROM person_disability pd JOIN disability d ON d.id = pd.disabilityId
               WHERE pd.personId = ?`,
@@ -79,6 +82,7 @@ const shapes = {
       capabilities: {
         kind: 'values',
         table: 'volunteer_capability',
+        sourceColumns: ['id', 'volunteerId', 'capabilityId'],
         sql: `SELECT c.name AS label
               FROM volunteer_capability vc JOIN capability c ON c.id = vc.capabilityId
               WHERE vc.volunteerId = ?`,
@@ -86,6 +90,7 @@ const shapes = {
       villageAssociations: {
         kind: 'values',
         table: 'volunteer_village_associate',
+        sourceColumns: ['id', 'volunteerId', 'villageId'],
         sql: `SELECT v.name AS label
               FROM volunteer_village_associate a JOIN village v ON v.id = a.villageId
               WHERE a.volunteerId = ?`,
@@ -94,6 +99,9 @@ const shapes = {
         kind: 'keyed',
         key: 'k',
         table: 'volunteer_vetting',
+        // additionalData/notes exist but are not rendered into diffs (they
+        // are also dropped by replaceVettings — pre-existing, see plan).
+        sourceColumns: ['id', 'volunteerId', 'vettingTypeId', 'dateEntered', 'dateExpired', 'additionalData', 'notes'],
         // Natural key mirrors UNIQUE(volunteerId, vettingTypeId, dateEntered)
         sql: `SELECT CONCAT(vt.name, ' ', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d')) AS k,
                      vt.name AS vettingType,
@@ -120,6 +128,9 @@ const shapes = {
       grants: {
         kind: 'values',
         table: 'role_grant',
+        // villageKey is a generated dedup column; userGroupId rows belong to
+        // groups (not folded in v1) but the column itself is accounted here.
+        sourceColumns: ['grantId', 'userId', 'userGroupId', 'roleId', 'villageId', 'villageKey'],
         sql: `SELECT CONCAT(r.name, '@', COALESCE(v.name, 'federation')) AS label
               FROM role_grant rg
               JOIN role r ON r.roleId = rg.roleId
@@ -129,6 +140,7 @@ const shapes = {
       userGroups: {
         kind: 'values',
         table: 'user_group_user_map',
+        sourceColumns: ['ugumId', 'userGroupId', 'userId'],
         sql: `SELECT ug.name AS label
               FROM user_group_user_map m JOIN user_group ug ON ug.userGroupId = m.userGroupId
               WHERE m.userId = ?`,
@@ -183,6 +195,7 @@ function assertShapeInvariants (entityType, shape) {
     if (decl.kind === 'keyed' && (typeof decl.key !== 'string' || !decl.key)) fail(`keyed set '${setName}' must declare its key alias`)
     if (typeof decl.sql !== 'string' || !decl.sql.includes('?')) fail(`set '${setName}' sql must take one placeholder`)
     if (typeof decl.table !== 'string' || !decl.table) fail(`set '${setName}' must declare its source table (the FK scan reads it)`)
+    if (!Array.isArray(decl.sourceColumns) || !decl.sourceColumns.length) fail(`set '${setName}' must declare sourceColumns (the set-level omission check reads them)`)
     setTables.push(decl.table)
   }
   if (!Array.isArray(shape.relatedTables)) fail('missing relatedTables (declare [] if no unfolded tables reference this entity)')

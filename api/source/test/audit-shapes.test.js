@@ -1,7 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { shapes, assertShapeInvariants } = require('../service/audit/shapes')
-const { buildRowSql, undeclaredColumns, unaccountedReferencingTables, requiredSetAlias } = require('../service/audit/AuditService')
+const { buildRowSql, undeclaredColumns, unaccountedReferencingTables, requiredSetAlias, staleExcluded, setColumnGaps } = require('../service/audit/AuditService')
 
 test('registry declares exactly the five v1 entity types', () => {
   assert.deepEqual(Object.keys(shapes).sort(), ['member', 'person', 'serviceRequest', 'user', 'volunteer'])
@@ -31,7 +31,7 @@ test('invariants require set source tables and an explicit relatedTables array',
   // omitting relatedTables must fail loudly — the FK scan depends on it
   assert.throws(() => assertShapeInvariants('x', { table: 't', columns: ['a'], redacted: [], excluded: [], sets: {} }), /relatedTables/)
   // a table cannot be both a folded set source and related-not-folded
-  assert.throws(() => assertShapeInvariants('x', { table: 't', columns: ['a'], redacted: [], excluded: [], relatedTables: ['j'], sets: { s: { kind: 'values', sql: 's?', table: 'j' } } }), /relatedTables 'j'/)
+  assert.throws(() => assertShapeInvariants('x', { table: 't', columns: ['a'], redacted: [], excluded: [], relatedTables: ['j'], sets: { s: { kind: 'values', sql: 's?', table: 'j', sourceColumns: ['x'] } } }), /relatedTables 'j'/)
 })
 
 test('keyed sets must declare a non-empty key; values sets need none', () => {
@@ -42,8 +42,28 @@ test('keyed sets must declare a non-empty key; values sets need none', () => {
   // values kind without a key is fine
   assertShapeInvariants('x', {
     table: 't', columns: ['a'], redacted: [], excluded: [], relatedTables: [],
-    sets: { s: { kind: 'values', sql: 's?', table: 'j' } },
+    sets: { s: { kind: 'values', sql: 's?', table: 'j', sourceColumns: ['x'] } },
   })
+})
+
+test('sets must declare their source columns for the set-level omission check', () => {
+  assert.throws(() => assertShapeInvariants('x', {
+    table: 't', columns: ['a'], redacted: [], excluded: [], relatedTables: [],
+    sets: { s: { kind: 'values', sql: 's?', table: 'j' } },
+  }), /sourceColumns/)
+})
+
+test('setColumnGaps reports both directions: undeclared real columns and stale declared ones', () => {
+  const decl = { kind: 'values', sql: 's?', table: 'j', sourceColumns: ['id', 'personId', 'communityId'] }
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId', 'communityId']), { undeclared: [], stale: [] })
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId', 'communityId', 'grantedBy']), { undeclared: ['grantedBy'], stale: [] })
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId']), { undeclared: [], stale: ['communityId'] })
+})
+
+test('staleExcluded reports excluded entries whose column no longer exists', () => {
+  const shape = { table: 't', columns: ['a'], redacted: [], excluded: ['gone', 'real'], relatedTables: [], sets: {} }
+  assert.deepEqual(staleExcluded(shape, ['id', 'a', 'real']), ['gone'])
+  assert.deepEqual(staleExcluded(shape, ['id', 'a', 'real', 'gone']), [])
 })
 
 test('requiredSetAlias names exactly the alias the differ reads', () => {
@@ -78,10 +98,11 @@ test('relatedTables carry the deliberate non-folds as data', () => {
     assert.ok(shapes.user.relatedTables.includes(t), `user relatedTables misses ${t}`)
   }
   assert.ok(shapes.serviceRequest.relatedTables.includes('notification_event'))
-  // every set names its source table
+  // every set names its source table and declares its source columns
   for (const [entityType, shape] of Object.entries(shapes)) {
     for (const [name, decl] of Object.entries(shape.sets)) {
       assert.equal(typeof decl.table, 'string', `${entityType}.${name} missing source table`)
+      assert.ok(Array.isArray(decl.sourceColumns) && decl.sourceColumns.length, `${entityType}.${name} missing sourceColumns`)
     }
   }
 })

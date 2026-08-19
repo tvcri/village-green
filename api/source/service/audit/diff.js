@@ -50,21 +50,30 @@ function diffColumns (shape, before, after) {
   return diff
 }
 
+// The alias a set's SQL must produce for this differ to see anything:
+// 'values' sets are diffed on that alias's value, 'keyed' sets are indexed
+// on it. Defined here — next to the reads — so boot validation
+// (AuditService.validateShapes) checks exactly what this file consumes.
+function requiredSetAlias (decl) {
+  return decl.kind === 'values' ? 'label' : decl.key
+}
+
 function diffSets (shape, beforeSets, afterSets) {
   const out = {}
   for (const [name, decl] of Object.entries(shape.sets ?? {})) {
     const before = (beforeSets?.[name] ?? []).map(normalizeRowObject)
     const after = (afterSets?.[name] ?? []).map(normalizeRowObject)
+    const alias = requiredSetAlias(decl)
     if (decl.kind === 'values') {
-      const b = new Set(before.map(r => r.label))
-      const a = new Set(after.map(r => r.label))
+      const b = new Set(before.map(r => r[alias]))
+      const a = new Set(after.map(r => r[alias]))
       const added = [...a].filter(x => !b.has(x))
       const removed = [...b].filter(x => !a.has(x))
       if (added.length || removed.length) {
         out[name] = { ...(added.length && { added }), ...(removed.length && { removed }) }
       }
     } else { // 'keyed'
-      const key = decl.key ?? 'k'
+      const key = alias
       const bIdx = new Map(before.map(r => [r[key], r]))
       const aIdx = new Map(after.map(r => [r[key], r]))
       const added = [...aIdx.values()].filter(r => !bIdx.has(r[key]))
@@ -90,7 +99,7 @@ function buildSnapshot (shape, row, sets) {
   }
   for (const [name, decl] of Object.entries(shape.sets ?? {})) {
     const rows = (sets?.[name] ?? []).map(normalizeRowObject)
-    snap[name] = decl.kind === 'values' ? rows.map(r => r.label) : rows
+    snap[name] = decl.kind === 'values' ? rows.map(r => r[requiredSetAlias(decl)]) : rows
   }
   return snap
 }
@@ -103,4 +112,4 @@ function computeChanges (shape, { action, before, after, beforeSets, afterSets }
   return Object.keys(diff).length ? { diff } : null
 }
 
-module.exports = { computeChanges, buildSnapshot, normalize, equal, diffColumns, diffSets, columnNames }
+module.exports = { computeChanges, buildSnapshot, normalize, equal, diffColumns, diffSets, columnNames, requiredSetAlias }
