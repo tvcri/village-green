@@ -41,6 +41,7 @@ test('member put(create)/patch/delete audit lifecycle with redaction', async () 
   // Capture-everything model (2026-08-19): sensitive fields are recorded
   // verbatim; sensitivity is a read-surface concern (the trail is SQL-only).
   assert.equal(rows[0].changes.snapshot.confidentialNotes, 'the-secret-text')
+  assert.equal(rows[0].changes.snapshot.joinDate, '2026-01-15', 'civil DATE recorded as the plain date string sent')
 
   // PATCH a sensitive field -> ordinary old/new diff (recorded verbatim)
   const patch = await vgCall('patchPersonMember', { personId }, {

@@ -3,9 +3,13 @@
 // see scratch/superpowers/specs/2026-08-17-audit-events-design.md §4 as-built
 // notes).
 //
-// Every real column on an audited table is captured automatically:
+// Every real column on an audited ENTITY table is captured automatically:
 // AuditService.readShape SELECTs t.* — a new column is audited the moment it
 // exists, with nothing to declare and nothing that can be silently omitted.
+// Set-source tables are the one place hand-projection remains (their SQL
+// joins catalogs for labels), so each set declares `sourceColumns` and boot
+// validation checks its source table both directions — a new junction
+// column forces a decision the way an entity column can't need one.
 // Civil DATE columns are returned as 'YYYY-MM-DD' strings mechanically (per-
 // query dateStrings), never as JS Dates. Sensitivity/noise filtering is a
 // read-surface concern (none exists yet — the trail is SQL-only), not a
@@ -17,9 +21,10 @@
 //   or missing extra can never hide data. Aliases must not shadow real
 //   columns (boot-checked).
 // - `sets`: junction/child collections folded into this entity, with the
-//   source table named as data (the FK scan reads it) and SQL producing the
-//   alias the differ reads ('label' for values, `key` for keyed — boot-
-//   checked via field metadata).
+//   source table named as data (the FK scan reads it), `sourceColumns`
+//   accounting for every column on it (boot-checked both directions), and
+//   SQL producing the alias the differ reads ('label' for values, `key`
+//   for keyed — boot-checked via field metadata).
 // - `relatedTables`: tables that reference this entity but are deliberately
 //   NOT folded. The boot-time FK scan fails on any referencing table that is
 //   neither a set source, an audited entity, nor listed here — a future
@@ -38,6 +43,7 @@ const shapes = {
       communities: {
         kind: 'values',
         table: 'person_community',
+        sourceColumns: ['id', 'personId', 'communityId'],
         sql: `SELECT c.name AS label
               FROM person_community pc JOIN community c ON c.id = pc.communityId
               WHERE pc.personId = ?`,
@@ -46,6 +52,7 @@ const shapes = {
         kind: 'keyed',
         key: 'k',
         table: 'person_disability',
+        sourceColumns: ['id', 'personId', 'disabilityId', 'note'],
         sql: `SELECT d.name AS k, pd.note
               FROM person_disability pd JOIN disability d ON d.id = pd.disabilityId
               WHERE pd.personId = ?`,
@@ -66,6 +73,7 @@ const shapes = {
       capabilities: {
         kind: 'values',
         table: 'volunteer_capability',
+        sourceColumns: ['id', 'volunteerId', 'capabilityId'],
         sql: `SELECT c.name AS label
               FROM volunteer_capability vc JOIN capability c ON c.id = vc.capabilityId
               WHERE vc.volunteerId = ?`,
@@ -73,6 +81,7 @@ const shapes = {
       villageAssociations: {
         kind: 'values',
         table: 'volunteer_village_associate',
+        sourceColumns: ['id', 'volunteerId', 'villageId'],
         sql: `SELECT v.name AS label
               FROM volunteer_village_associate a JOIN village v ON v.id = a.villageId
               WHERE a.volunteerId = ?`,
@@ -81,6 +90,7 @@ const shapes = {
         kind: 'keyed',
         key: 'k',
         table: 'volunteer_vetting',
+        sourceColumns: ['id', 'volunteerId', 'vettingTypeId', 'dateEntered', 'dateExpired', 'additionalData', 'notes'],
         // Natural key mirrors UNIQUE(volunteerId, vettingTypeId, dateEntered).
         // additionalData/notes are not rendered into diffs (they are also
         // dropped by replaceVettings — pre-existing, see plan).
@@ -104,6 +114,7 @@ const shapes = {
       grants: {
         kind: 'values',
         table: 'role_grant',
+        sourceColumns: ['grantId', 'userId', 'userGroupId', 'roleId', 'villageId', 'villageKey'],
         sql: `SELECT CONCAT(r.name, '@', COALESCE(v.name, 'federation')) AS label
               FROM role_grant rg
               JOIN role r ON r.roleId = rg.roleId
@@ -113,6 +124,7 @@ const shapes = {
       userGroups: {
         kind: 'values',
         table: 'user_group_user_map',
+        sourceColumns: ['ugumId', 'userGroupId', 'userId'],
         sql: `SELECT ug.name AS label
               FROM user_group_user_map m JOIN user_group ug ON ug.userGroupId = m.userGroupId
               WHERE m.userId = ?`,
@@ -150,6 +162,7 @@ function assertShapeInvariants (entityType, shape) {
     if (decl.kind === 'keyed' && (typeof decl.key !== 'string' || !decl.key)) fail(`keyed set '${setName}' must declare its key alias`)
     if (typeof decl.sql !== 'string' || !decl.sql.includes('?')) fail(`set '${setName}' sql must take one placeholder`)
     if (typeof decl.table !== 'string' || !decl.table) fail(`set '${setName}' must declare its source table (the FK scan reads it)`)
+    if (!Array.isArray(decl.sourceColumns) || !decl.sourceColumns.length) fail(`set '${setName}' must declare sourceColumns (the set-level omission check reads them)`)
     setTables.push(decl.table)
   }
   if (!Array.isArray(shape.relatedTables)) fail('missing relatedTables (declare [] if no unfolded tables reference this entity)')

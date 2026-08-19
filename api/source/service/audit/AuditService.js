@@ -34,7 +34,7 @@ async function readShape (connection, entityType, entityId) {
   const row = rows[0] ?? null
   const sets = {}
   for (const [name, decl] of Object.entries(shape.sets ?? {})) {
-    const [setRows] = await connection.query(decl.sql, [entityId])
+    const [setRows] = await connection.query({ sql: decl.sql, dateStrings: ['DATE'] }, [entityId])
     sets[name] = setRows
   }
   return { row, sets }
@@ -50,6 +50,18 @@ async function record (connection, { entityType, entityId, action, userId, befor
     'INSERT INTO audit_event (entityType, entityId, action, userId, changes) VALUES (?, ?, ?, ?, ?)',
     [entityType, entityId, action, userId, JSON.stringify(changes)]
   )
+}
+
+// Set-level omission/stale check: entity tables capture everything via
+// SELECT t.*, but set SQL is a hand projection — so every real column on a
+// set's source table must appear in its sourceColumns (a new junction
+// column forces a decision), and every declared sourceColumn must still
+// exist. Pure; exported for unit tests.
+function setColumnGaps (decl, actualColumnNames) {
+  return {
+    undeclared: actualColumnNames.filter(c => !decl.sourceColumns.includes(c)),
+    stale: decl.sourceColumns.filter(c => !actualColumnNames.includes(c)),
+  }
 }
 
 // Aliases that would shadow a real column in the SELECT t.* result row —
@@ -106,7 +118,7 @@ async function validateShapes () {
     try {
       await dbUtils.pool.query({ sql: buildRowSql(shape), dateStrings: ['DATE'] }, [0])
       for (const [setName, decl] of Object.entries(shape.sets ?? {})) {
-        const [, fields] = await dbUtils.pool.query(decl.sql, [0])
+        const [, fields] = await dbUtils.pool.query({ sql: decl.sql, dateStrings: ['DATE'] }, [0])
         setFields.set(setName, fields.map(f => f.name))
       }
     } catch (e) {
@@ -128,6 +140,23 @@ async function validateShapes () {
       throw new Error(
         `audit shape '${entityType}': aliases shadow real columns: ${shadowed.join(', ')} — ` +
         `rename the extras/set in service/audit/shapes.js`)
+    }
+    for (const [setName, decl] of Object.entries(shape.sets ?? {})) {
+      const [setCols] = await dbUtils.pool.query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`, [decl.table])
+      const gaps = setColumnGaps(decl, setCols.map(c => c.COLUMN_NAME))
+      if (gaps.undeclared.length) {
+        throw new Error(
+          `audit shape '${entityType}': set '${setName}' source table '${decl.table}' has ` +
+          `undeclared columns: ${gaps.undeclared.join(', ')} — add each to the set's sourceColumns ` +
+          `(and decide whether its sql should expose it) in service/audit/shapes.js`)
+      }
+      if (gaps.stale.length) {
+        throw new Error(
+          `audit shape '${entityType}': set '${setName}' has stale sourceColumns: ` +
+          `${gaps.stale.join(', ')} — the columns no longer exist on '${decl.table}'`)
+      }
     }
   }
   const [fkRows] = await dbUtils.pool.query(
@@ -152,4 +181,4 @@ async function validateShapes () {
   }
 }
 
-module.exports = { readShape, record, validateShapes, buildRowSql, shadowedAliases, unaccountedReferencingTables, requiredSetAlias }
+module.exports = { readShape, record, validateShapes, buildRowSql, shadowedAliases, setColumnGaps, unaccountedReferencingTables, requiredSetAlias }

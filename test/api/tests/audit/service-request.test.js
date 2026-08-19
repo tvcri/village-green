@@ -40,6 +40,7 @@ test('SR create/patch/delete audit lifecycle', async () => {
   assert.equal(rows[0].userId, SC_ID)
   assert.equal(typeof rows[0].changes.snapshot.status, 'string')
   assert.match(rows[0].changes.snapshot.serviceDate ?? '', /^\d{4}-\d{2}-\d{2}$/, 'civil date stays a plain date string')
+  assert.match(rows[0].changes.snapshot.createdAt ?? '', /^\d{4}-\d{2}-\d{2}T.*Z$/, 'DATETIME stays a UTC instant (dateStrings must scope to DATE only)')
 
   // THE distinctive VG test: patch a non-status field on an Open SR.
   // patchServiceRequest writes status unconditionally (service line 428-431),

@@ -1,7 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { shapes, assertShapeInvariants } = require('../service/audit/shapes')
-const { buildRowSql, shadowedAliases, unaccountedReferencingTables, requiredSetAlias } = require('../service/audit/AuditService')
+const { buildRowSql, shadowedAliases, unaccountedReferencingTables, requiredSetAlias, setColumnGaps } = require('../service/audit/AuditService')
 
 test('registry declares exactly the five v1 entity types', () => {
   assert.deepEqual(Object.keys(shapes).sort(), ['member', 'person', 'serviceRequest', 'user', 'volunteer'])
@@ -21,21 +21,30 @@ test('invariants: extras need name+expr with unique names, not colliding with se
   assert.throws(() => assertShapeInvariants('x', {
     ...base,
     extras: [{ name: 's', expr: 'e' }],
-    sets: { s: { kind: 'values', sql: 's?', table: 'j' } },
+    sets: { s: { kind: 'values', sql: 's?', table: 'j', sourceColumns: ['id'] } },
   }), /collides/)
 })
 
-test('invariants: set declarations carry kind/key/sql/table; relatedTables required and disjoint', () => {
+test('invariants: set declarations carry kind/key/sql/table/sourceColumns; relatedTables required and disjoint', () => {
   const base = { table: 't', relatedTables: [], sets: {} }
-  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'bogus', sql: 's?', table: 'j' } } }), /kind/)
-  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'keyed', sql: 's?', table: 'j' } } }), /key/)
-  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'values', sql: 's', table: 'j' } } }), /placeholder/)
-  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'values', sql: 's?' } } }), /source table/)
+  const SC = ['id']
+  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'bogus', sql: 's?', table: 'j', sourceColumns: SC } } }), /kind/)
+  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'keyed', sql: 's?', table: 'j', sourceColumns: SC } } }), /key/)
+  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'values', sql: 's', table: 'j', sourceColumns: SC } } }), /placeholder/)
+  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'values', sql: 's?', sourceColumns: SC } } }), /source table/)
+  assert.throws(() => assertShapeInvariants('x', { ...base, sets: { s: { kind: 'values', sql: 's?', table: 'j' } } }), /sourceColumns/)
   assert.throws(() => assertShapeInvariants('x', { table: 't', sets: {} }), /relatedTables/)
   assert.throws(() => assertShapeInvariants('x', {
     table: 't', relatedTables: ['j'],
-    sets: { s: { kind: 'values', sql: 's?', table: 'j' } },
+    sets: { s: { kind: 'values', sql: 's?', table: 'j', sourceColumns: SC } },
   }), /relatedTables 'j'/)
+})
+
+test('setColumnGaps reports both directions: undeclared real columns and stale declared ones', () => {
+  const decl = { kind: 'values', sql: 's?', table: 'j', sourceColumns: ['id', 'personId', 'communityId'] }
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId', 'communityId']), { undeclared: [], stale: [] })
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId', 'communityId', 'grantedBy']), { undeclared: ['grantedBy'], stale: [] })
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId']), { undeclared: [], stale: ['communityId'] })
 })
 
 test('buildRowSql selects the whole row plus extras, keyed by idColumn', () => {
@@ -89,10 +98,11 @@ test('relatedTables carry the deliberate non-folds as data', () => {
     assert.ok(shapes.user.relatedTables.includes(t), `user relatedTables misses ${t}`)
   }
   assert.ok(shapes.serviceRequest.relatedTables.includes('notification_event'))
-  // every set names its source table
+  // every set names its source table and accounts for its columns
   for (const [entityType, shape] of Object.entries(shapes)) {
     for (const [name, decl] of Object.entries(shape.sets)) {
       assert.equal(typeof decl.table, 'string', `${entityType}.${name} missing source table`)
+      assert.ok(Array.isArray(decl.sourceColumns) && decl.sourceColumns.length, `${entityType}.${name} missing sourceColumns`)
     }
   }
 })
