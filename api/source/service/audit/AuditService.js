@@ -23,6 +23,12 @@ function buildRowSql (shape) {
 // CONNECTION (never the pool — the read must see the transaction's own
 // uncommitted writes). row is null when the entity doesn't exist.
 //
+// A null/undefined entityId is the "doesn't exist yet" case (the before-read
+// of a create) and returns the empty shape without querying — total rather
+// than partial, so callers never guard the call with a ternary. It is the
+// same answer the query would give (WHERE id = NULL matches nothing), minus
+// the round-trips.
+//
 // This is a non-locking REPEATABLE READ snapshot: a write committed by
 // another transaction between this before-read and this transaction's
 // UPDATE gets folded into this actor's diff as if they made it. Vanishingly
@@ -30,6 +36,7 @@ function buildRowSql (shape) {
 // it if ever needed.
 async function readShape (connection, entityType, entityId) {
   const shape = shapeFor(entityType)
+  if (entityId === null || entityId === undefined) return { row: null, sets: {} }
   const [rows] = await connection.query({ sql: buildRowSql(shape), dateStrings: ['DATE'] }, [entityId])
   const row = rows[0] ?? null
   const sets = {}
@@ -50,6 +57,75 @@ async function record (connection, { entityType, entityId, action, userId, befor
     'INSERT INTO audit_event (entityType, entityId, action, userId, changes) VALUES (?, ?, ?, ?, ?)',
     [entityType, entityId, action, userId, JSON.stringify(changes)]
   )
+}
+
+// Wrap a mutation in its before/after reads and record the result. Owns the
+// whole ceremony: both reads, the create-vs-update derivation, and the
+// record call. Runs on the caller's open transaction connection.
+//
+// entityId may be null when the mutation CREATES the entity — in that case
+// mutateFn must return the new id (the after-read has nothing else to key
+// on). That obligation is enforced below rather than left implicit: a
+// mutateFn that returns nothing throws here instead of silently recording an
+// empty snapshot. When entityId is supplied, mutateFn's return value is
+// ignored.
+//
+// action defaults to 'create' or 'update' by whether the entity existed
+// before, which is the same test every call site used to hand-write.
+async function auditUpdate (connection, { entityType, entityId = null, userId, action }, mutateFn) {
+  const before = await readShape(connection, entityType, entityId)
+  const created = await mutateFn()
+  const id = entityId ?? created
+  if (id === null || id === undefined) {
+    throw new Error(
+      `audit: ${entityType} mutateFn must return the new entity id when entityId is null`)
+  }
+  const after = await readShape(connection, entityType, id)
+  await record(connection, {
+    entityType, entityId: id, userId,
+    action: action ?? (before.row ? 'update' : 'create'),
+    before: before.row, beforeSets: before.sets,
+    after: after.row, afterSets: after.sets,
+  })
+  return id
+}
+
+// Wrap a delete in its before-read and record the snapshot. Deleting an
+// entity that doesn't exist records nothing — the guard is structural here
+// so no call site has to remember it. Returns mutateFn's value.
+async function auditDelete (connection, { entityType, entityId, userId }, mutateFn) {
+  const before = await readShape(connection, entityType, entityId)
+  const result = await mutateFn()
+  if (before.row) {
+    await record(connection, {
+      entityType, entityId, action: 'delete', userId,
+      before: before.row, beforeSets: before.sets,
+    })
+  }
+  return result
+}
+
+// Wrap a mutation that changes the audited shape of SEVERAL entities at once
+// (group membership rewrites, village grant replacement) — before-shapes for
+// every affected id are read ahead of the mutation, afters after it, and one
+// row is recorded per id. Unchanged entities diff to null and write nothing,
+// so over-broad id sets are safe. Keeping both loops here is the point: they
+// have to stay symmetric, and that is easy to get wrong once per call site.
+async function auditFanOut (connection, { entityType, entityIds, userId, action = 'update' }, mutateFn) {
+  const ids = [...new Set(entityIds)]
+  const befores = new Map()
+  for (const id of ids) befores.set(id, await readShape(connection, entityType, id))
+  const result = await mutateFn()
+  for (const id of ids) {
+    const before = befores.get(id)
+    const after = await readShape(connection, entityType, id)
+    await record(connection, {
+      entityType, entityId: id, action, userId,
+      before: before.row, beforeSets: before.sets,
+      after: after.row, afterSets: after.sets,
+    })
+  }
+  return result
 }
 
 // Set-level omission/stale check: entity tables capture everything via
@@ -181,4 +257,4 @@ async function validateShapes () {
   }
 }
 
-module.exports = { readShape, record, validateShapes, buildRowSql, shadowedAliases, setColumnGaps, unaccountedReferencingTables, requiredSetAlias }
+module.exports = { readShape, record, auditUpdate, auditDelete, auditFanOut, validateShapes, buildRowSql, shadowedAliases, setColumnGaps, unaccountedReferencingTables, requiredSetAlias }

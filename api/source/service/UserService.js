@@ -208,85 +208,84 @@ exports.addOrUpdateUser = async function (writeAction, userId, body, projection,
     async function transaction () {
       await connection.query('START TRANSACTION');
 
-      const beforeShape = writeAction === dbUtils.WRITE_ACTION.CREATE
-        ? null
-        : await AuditService.readShape(connection, 'user', userId)
-
-      // Process scalar properties
-      if (writeAction === dbUtils.WRITE_ACTION.CREATE) {
-        // INSERT into user_data
-        let sqlInsert =
-          `INSERT INTO
-              user_data
-              ( username, status )
-            VALUES
-              ( ?, ? )`
-        let [result] = await connection.query(sqlInsert, [userFields.username, userFields.status])
-        userId = result.insertId
-      }
-      else if (writeAction === dbUtils.WRITE_ACTION.UPDATE || writeAction === dbUtils.WRITE_ACTION.REPLACE) {
-        if (Object.keys(userFields).length > 0) {
-          let sqlUpdate =
-            `UPDATE
-                user_data
-              SET
-                ?
-              WHERE
-                userid = ?`
-          await connection.query(sqlUpdate, [userFields, userId])
-        }
-      }
-      else {
-        throw new Error('Invalid writeAction')
-      }
-  
-      // Process grants if present. role_grant's unique key is
-      // (userId, roleId, villageKey) where villageKey collapses NULL
-      // villageId (federation scope) to 0, so a grant is identified by the
-      // (roleId, villageId) pair, not villageId alone.
-      if (roleGrants) {
-        if ( writeAction !== dbUtils.WRITE_ACTION.CREATE ) {
-          // DELETE from role_grant
-          const deleteBinds = [userId]
-          let sqlDeleteRoleGrant = 'DELETE FROM role_grant where userId = ?'
-          if (roleGrants.length > 0) {
-            const pairs = roleGrants.map(grant => [grant.roleId, grant.villageId ?? null])
-            sqlDeleteRoleGrant += ' and (roleId, IFNULL(villageId, 0)) NOT IN (?)'
-            deleteBinds.push(pairs.map(([roleId, villageId]) => [roleId, villageId ?? 0]))
-          }
-          await connection.query(sqlDeleteRoleGrant, deleteBinds)
-        }
-        if (roleGrants.length > 0) {
-          let sqlInsertRoleGrant = `
-            INSERT INTO
-              role_grant (userId, villageId, roleId)
-            VALUES
-              ? as new
-            ON DUPLICATE KEY UPDATE
-              roleId = new.roleId`
-          const insertBinds = roleGrants.map( grant => [userId, grant.villageId ?? null, grant.roleId])
-          // INSERT into role_grant
-          await connection.query(sqlInsertRoleGrant, [insertBinds] )
-        }
-      }
-      if (userGroups) {
-        if ( writeAction !== dbUtils.WRITE_ACTION.CREATE ) {
-          await connection.query('DELETE FROM user_group_user_map where userId = ?', [userId])
-        }
-        if (userGroups.length > 0) {
-          await connection.query(
-            `INSERT INTO user_group_user_map (userGroupId, userId) VALUES ?`, 
-            [userGroups.map( userGroup => [userGroup, userId])]
-          )
-        }
-      }
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', userId)
-      await AuditService.record(connection, {
-        entityType: 'user', entityId: userId,
-        action: beforeShape ? 'update' : 'create',
+      // auditUpdate owns both shape reads and the create/update derivation.
+      // On CREATE the id does not exist yet: entityId is null and the closure
+      // returns the new insertId (it also assigns the outer `userId`, which
+      // the rest of this function still reads).
+      await AuditService.auditUpdate(connection, {
+        entityType: 'user',
+        entityId: writeAction === dbUtils.WRITE_ACTION.CREATE ? null : userId,
         userId: userObject.userId,
-        before: beforeShape?.row, beforeSets: beforeShape?.sets,
-        after, afterSets,
+      }, async () => {
+        // Process scalar properties
+        if (writeAction === dbUtils.WRITE_ACTION.CREATE) {
+          // INSERT into user_data
+          let sqlInsert =
+            `INSERT INTO
+                user_data
+                ( username, status )
+              VALUES
+                ( ?, ? )`
+          let [result] = await connection.query(sqlInsert, [userFields.username, userFields.status])
+          userId = result.insertId
+        }
+        else if (writeAction === dbUtils.WRITE_ACTION.UPDATE || writeAction === dbUtils.WRITE_ACTION.REPLACE) {
+          if (Object.keys(userFields).length > 0) {
+            let sqlUpdate =
+              `UPDATE
+                  user_data
+                SET
+                  ?
+                WHERE
+                  userid = ?`
+            await connection.query(sqlUpdate, [userFields, userId])
+          }
+        }
+        else {
+          throw new Error('Invalid writeAction')
+        }
+  
+        // Process grants if present. role_grant's unique key is
+        // (userId, roleId, villageKey) where villageKey collapses NULL
+        // villageId (federation scope) to 0, so a grant is identified by the
+        // (roleId, villageId) pair, not villageId alone.
+        if (roleGrants) {
+          if ( writeAction !== dbUtils.WRITE_ACTION.CREATE ) {
+            // DELETE from role_grant
+            const deleteBinds = [userId]
+            let sqlDeleteRoleGrant = 'DELETE FROM role_grant where userId = ?'
+            if (roleGrants.length > 0) {
+              const pairs = roleGrants.map(grant => [grant.roleId, grant.villageId ?? null])
+              sqlDeleteRoleGrant += ' and (roleId, IFNULL(villageId, 0)) NOT IN (?)'
+              deleteBinds.push(pairs.map(([roleId, villageId]) => [roleId, villageId ?? 0]))
+            }
+            await connection.query(sqlDeleteRoleGrant, deleteBinds)
+          }
+          if (roleGrants.length > 0) {
+            let sqlInsertRoleGrant = `
+              INSERT INTO
+                role_grant (userId, villageId, roleId)
+              VALUES
+                ? as new
+              ON DUPLICATE KEY UPDATE
+                roleId = new.roleId`
+            const insertBinds = roleGrants.map( grant => [userId, grant.villageId ?? null, grant.roleId])
+            // INSERT into role_grant
+            await connection.query(sqlInsertRoleGrant, [insertBinds] )
+          }
+        }
+        if (userGroups) {
+          if ( writeAction !== dbUtils.WRITE_ACTION.CREATE ) {
+            await connection.query('DELETE FROM user_group_user_map where userId = ?', [userId])
+          }
+          if (userGroups.length > 0) {
+            await connection.query(
+              `INSERT INTO user_group_user_map (userGroupId, userId) VALUES ?`, 
+              [userGroups.map( userGroup => [userGroup, userId])]
+            )
+          }
+        }
+        return userId
       })
 
       // Commit the changes
@@ -341,14 +340,9 @@ exports.deleteUser = async function(userId, projection, userObject) {
     let row = await _this.queryUsers(projection, { userId: userId }, userObject)
     await dbUtils.retryOnDeadlock2({
       transactionFn: async (connection) => {
-        const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'user', userId)
-        await connection.query('DELETE FROM user_data where userId = ?', [userId])
-        if (before) {
-          await AuditService.record(connection, {
-            entityType: 'user', entityId: userId, action: 'delete',
-            userId: userObject.userId, before, beforeSets,
-          })
-        }
+        await AuditService.auditDelete(connection,
+          { entityType: 'user', entityId: userId, userId: userObject.userId },
+          () => connection.query('DELETE FROM user_data where userId = ?', [userId]))
         return userId
       },
     })
@@ -442,73 +436,67 @@ exports.addOrUpdateUserGroup = async function ({userGroupId, userGroupFields, us
   async function transactionFn (connection) {
     // Group writes mutate each member's audited userGroups set (membership
     // rewrites directly; a rename changes every member's labels), so audit
-    // fans out per affected user. Before-shapes are read before any write.
+    // fans out per affected user — auditFanOut reads every before-shape
+    // ahead of the mutation and records one row per affected user after.
     const [prevMembers] = await connection.query(
       'SELECT userId FROM user_group_user_map WHERE userGroupId = ?', [userGroupId ?? 0])
     const affected = new Set(prevMembers.map(r => r.userId))
     for (const uid of userIds ?? []) affected.add(Number(uid))
-    const befores = new Map()
-    for (const uid of affected) befores.set(uid, await AuditService.readShape(connection, 'user', uid))
 
-    if (Object.keys(userGroupFields).length) {
-      const sql = isUpdate ? sqlUpdateUserGroup : sqlInsertUserGroup
-      const binds = isUpdate ? [userGroupFields, userGroupId] : [userGroupFields.name, userGroupFields.description, createdUserId, modifiedUserId]
-      const [resultUserGroup] = await connection.query(sql, binds)
-      userGroupId = isUpdate ? userGroupId : resultUserGroup.insertId
-    }
-    if (userIds) {
-      if (isUpdate) {
-        await connection.query(sqlDeleteUserGroupUserMap, [userGroupId])
+    // No-op members (membership and labels unchanged) produce null diffs and
+    // write nothing. Group grants don't appear here — the per-user grants set
+    // selects userId grantees only.
+    await AuditService.auditFanOut(connection, {
+      entityType: 'user', entityIds: affected, userId: modifiedUserId ?? createdUserId,
+    }, async () => {
+      if (Object.keys(userGroupFields).length) {
+        const sql = isUpdate ? sqlUpdateUserGroup : sqlInsertUserGroup
+        const binds = isUpdate ? [userGroupFields, userGroupId] : [userGroupFields.name, userGroupFields.description, createdUserId, modifiedUserId]
+        const [resultUserGroup] = await connection.query(sql, binds)
+        userGroupId = isUpdate ? userGroupId : resultUserGroup.insertId
       }
-      if (userIds.length) {
-        const binds = userIds.map( userId => [userGroupId, userId])
-        await connection.query(
-          sqlInsertUserGroupUserMap,
-          [binds]
-        ) 
-      }
-    }
-    // Process grants if present. role_grant's unique key is
-    // (userGroupId, roleId, villageKey) where villageKey collapses NULL
-    // villageId (federation scope) to 0, so a grant is identified by the
-    // (roleId, villageId) pair, not villageId alone.
-    if (villageGrants) {
-      if (isUpdate) {
-        // DELETE from role_grant
-        const binds = [userGroupId]
-        let sqlDeleteRoleGrant = 'DELETE FROM role_grant where userGroupId = ?'
-        if (villageGrants.length > 0) {
-          const pairs = villageGrants.map(grant => [grant.roleId, grant.villageId ?? 0])
-          sqlDeleteRoleGrant += ' and (roleId, IFNULL(villageId, 0)) NOT IN (?)'
-          binds.push(pairs)
+      if (userIds) {
+        if (isUpdate) {
+          await connection.query(sqlDeleteUserGroupUserMap, [userGroupId])
         }
-        await connection.query(sqlDeleteRoleGrant, binds)
+        if (userIds.length) {
+          const binds = userIds.map( userId => [userGroupId, userId])
+          await connection.query(
+            sqlInsertUserGroupUserMap,
+            [binds]
+          ) 
+        }
       }
-      if (villageGrants.length > 0) {
-        let sqlInsertRoleGrant = `
-          INSERT INTO
-            role_grant (userGroupId, villageId, roleId)
-          VALUES
-            ? as new
-          ON DUPLICATE KEY UPDATE
-            roleId = new.roleId`
-        const binds = villageGrants.map( grant => [userGroupId, grant.villageId ?? null, grant.roleId])
-        // INSERT into role_grant
-        await connection.query(sqlInsertRoleGrant, [binds] )
+      // Process grants if present. role_grant's unique key is
+      // (userGroupId, roleId, villageKey) where villageKey collapses NULL
+      // villageId (federation scope) to 0, so a grant is identified by the
+      // (roleId, villageId) pair, not villageId alone.
+      if (villageGrants) {
+        if (isUpdate) {
+          // DELETE from role_grant
+          const binds = [userGroupId]
+          let sqlDeleteRoleGrant = 'DELETE FROM role_grant where userGroupId = ?'
+          if (villageGrants.length > 0) {
+            const pairs = villageGrants.map(grant => [grant.roleId, grant.villageId ?? 0])
+            sqlDeleteRoleGrant += ' and (roleId, IFNULL(villageId, 0)) NOT IN (?)'
+            binds.push(pairs)
+          }
+          await connection.query(sqlDeleteRoleGrant, binds)
+        }
+        if (villageGrants.length > 0) {
+          let sqlInsertRoleGrant = `
+            INSERT INTO
+              role_grant (userGroupId, villageId, roleId)
+            VALUES
+              ? as new
+            ON DUPLICATE KEY UPDATE
+              roleId = new.roleId`
+          const binds = villageGrants.map( grant => [userGroupId, grant.villageId ?? null, grant.roleId])
+          // INSERT into role_grant
+          await connection.query(sqlInsertRoleGrant, [binds] )
+        }
       }
-    }
-    // Fan out per affected user; no-op members (membership and labels
-    // unchanged) produce null diffs and write nothing. Group grants don't
-    // appear here — the per-user grants set selects userId grantees only.
-    const actorUserId = modifiedUserId ?? createdUserId
-    for (const uid of affected) {
-      const b = befores.get(uid)
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', uid)
-      await AuditService.record(connection, {
-        entityType: 'user', entityId: uid, action: 'update',
-        userId: actorUserId, before: b.row, beforeSets: b.sets, after, afterSets,
-      })
-    }
+    })
     return userGroupId
   }
 
@@ -600,18 +588,9 @@ exports.deleteUserGroup = async function({userGroupId, actorUserId}) {
     transactionFn: async (connection) => {
       const [members] = await connection.query(
         'SELECT userId FROM user_group_user_map WHERE userGroupId = ?', [userGroupId])
-      const befores = new Map()
-      for (const { userId } of members) {
-        befores.set(userId, await AuditService.readShape(connection, 'user', userId))
-      }
-      await connection.query('DELETE from user_group WHERE userGroupId = ?', [userGroupId])
-      for (const [uid, b] of befores) {
-        const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', uid)
-        await AuditService.record(connection, {
-          entityType: 'user', entityId: uid, action: 'update',
-          userId: actorUserId, before: b.row, beforeSets: b.sets, after, afterSets,
-        })
-      }
+      await AuditService.auditFanOut(connection,
+        { entityType: 'user', entityIds: members.map(m => m.userId), userId: actorUserId },
+        () => connection.query('DELETE from user_group WHERE userGroupId = ?', [userGroupId]))
       return userGroupId
     },
   })
@@ -789,25 +768,18 @@ exports.createUserGrant = async function (userId, body, actorUserId) {
 
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const beforeShape = await AuditService.readShape(connection, 'user', userId)
+      await AuditService.auditUpdate(connection,
+        { entityType: 'user', entityId: userId, userId: actorUserId, action: 'update' }, async () => {
+          for (const grant of grantsArray) {
+            const mappedFields = {
+              userId,
+              villageId: grant.villageId ?? null,
+              roleId: grant.roleId
+            }
 
-      for (const grant of grantsArray) {
-        const mappedFields = {
-          userId,
-          villageId: grant.villageId ?? null,
-          roleId: grant.roleId
-        }
-
-        await connection.query('INSERT INTO role_grant SET ?', mappedFields)
-      }
-
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', userId)
-      await AuditService.record(connection, {
-        entityType: 'user', entityId: userId, action: 'update',
-        userId: actorUserId,
-        before: beforeShape.row, beforeSets: beforeShape.sets,
-        after, afterSets,
-      })
+            await connection.query('INSERT INTO role_grant SET ?', mappedFields)
+          }
+        })
     },
     statusObj: undefined
   })
@@ -843,17 +815,11 @@ exports.deleteUserGrant = async function (userId, grantId, actorUserId) {
         throw new SmError.NotFoundError()
       }
 
-      const beforeShape = await AuditService.readShape(connection, 'user', userId)
-
-      await connection.query('DELETE FROM role_grant WHERE grantId = ? AND userId = ?', [grantId, userId])
-
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', userId)
-      await AuditService.record(connection, {
-        entityType: 'user', entityId: userId, action: 'update',
-        userId: actorUserId,
-        before: beforeShape.row, beforeSets: beforeShape.sets,
-        after, afterSets,
-      })
+      // The grant row is a member of the user's audited grants set, so this
+      // is an 'update' to the user — not a 'delete' of an audited entity.
+      await AuditService.auditUpdate(connection,
+        { entityType: 'user', entityId: userId, userId: actorUserId, action: 'update' },
+        () => connection.query('DELETE FROM role_grant WHERE grantId = ? AND userId = ?', [grantId, userId]))
     },
     statusObj: undefined
   })

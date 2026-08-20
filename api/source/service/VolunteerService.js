@@ -67,22 +67,18 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
     transactionFn: async (connection) => {
       const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
       const preexisting = pre[0]?.id
-      const beforeShape = preexisting ? await AuditService.readShape(connection, 'volunteer', preexisting) : null
-      const volunteerId = await ensureVolunteer(connection, personId)
-      await connection.query(
-        'UPDATE volunteer SET providerType = ?, active = ?, notes = ? WHERE id = ?', [providerType, active, notes, volunteerId]
-      )
-      await replaceCapabilities(connection, volunteerId, capabilityIds)
-      await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
-      await replaceVettings(connection, volunteerId, vettings)
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'volunteer', volunteerId)
-      await AuditService.record(connection, {
-        entityType: 'volunteer', entityId: volunteerId,
-        action: preexisting ? 'update' : 'create',
-        userId: userObject.userId,
-        before: beforeShape?.row, beforeSets: beforeShape?.sets,
-        after, afterSets,
-      })
+      await AuditService.auditUpdate(connection,
+        { entityType: 'volunteer', entityId: preexisting ?? null, userId: userObject.userId },
+        async () => {
+          const volunteerId = await ensureVolunteer(connection, personId)
+          await connection.query(
+            'UPDATE volunteer SET providerType = ?, active = ?, notes = ? WHERE id = ?', [providerType, active, notes, volunteerId]
+          )
+          await replaceCapabilities(connection, volunteerId, capabilityIds)
+          await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
+          await replaceVettings(connection, volunteerId, vettings)
+          return volunteerId
+        })
     },
     statusObj: undefined
   })
@@ -95,32 +91,28 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
     transactionFn: async (connection) => {
       const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
       const preexisting = pre[0]?.id
-      const beforeShape = preexisting ? await AuditService.readShape(connection, 'volunteer', preexisting) : null
-      const volunteerId = await ensureVolunteer(connection, personId)
-      const fields = {}
-      if (body.providerType !== undefined) fields.providerType = body.providerType
-      if (body.active !== undefined) fields.active = body.active
-      if (body.notes !== undefined) fields.notes = body.notes
-      if (Object.keys(fields).length) {
-        await connection.query('UPDATE volunteer SET ? WHERE id = ?', [fields, volunteerId])
-      }
-      if (body.capabilityIds !== undefined) {
-        await replaceCapabilities(connection, volunteerId, body.capabilityIds)
-      }
-      if (body.associateVillageIds !== undefined) {
-        await replaceAssociateVillages(connection, volunteerId, body.associateVillageIds)
-      }
-      if (body.vettings !== undefined) {
-        await replaceVettings(connection, volunteerId, body.vettings)
-      }
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'volunteer', volunteerId)
-      await AuditService.record(connection, {
-        entityType: 'volunteer', entityId: volunteerId,
-        action: preexisting ? 'update' : 'create',
-        userId: userObject.userId,
-        before: beforeShape?.row, beforeSets: beforeShape?.sets,
-        after, afterSets,
-      })
+      await AuditService.auditUpdate(connection,
+        { entityType: 'volunteer', entityId: preexisting ?? null, userId: userObject.userId },
+        async () => {
+          const volunteerId = await ensureVolunteer(connection, personId)
+          const fields = {}
+          if (body.providerType !== undefined) fields.providerType = body.providerType
+          if (body.active !== undefined) fields.active = body.active
+          if (body.notes !== undefined) fields.notes = body.notes
+          if (Object.keys(fields).length) {
+            await connection.query('UPDATE volunteer SET ? WHERE id = ?', [fields, volunteerId])
+          }
+          if (body.capabilityIds !== undefined) {
+            await replaceCapabilities(connection, volunteerId, body.capabilityIds)
+          }
+          if (body.associateVillageIds !== undefined) {
+            await replaceAssociateVillages(connection, volunteerId, body.associateVillageIds)
+          }
+          if (body.vettings !== undefined) {
+            await replaceVettings(connection, volunteerId, body.vettings)
+          }
+          return volunteerId
+        })
     },
     statusObj: undefined
   })
@@ -137,15 +129,13 @@ module.exports.deleteVolunteer = async function (personId, userId) {
       )
       if (!rows.length) return
       const volunteerId = rows[0].id
-      const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'volunteer', volunteerId)
-      await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
-      await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
-      await connection.query('DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId])
-      await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
-      await AuditService.record(connection, {
-        entityType: 'volunteer', entityId: volunteerId, action: 'delete',
-        userId, before, beforeSets,
-      })
+      await AuditService.auditDelete(connection, { entityType: 'volunteer', entityId: volunteerId, userId },
+        async () => {
+          await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
+          await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
+          await connection.query('DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId])
+          await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
+        })
     },
     statusObj: undefined
   })

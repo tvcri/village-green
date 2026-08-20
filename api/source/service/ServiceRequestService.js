@@ -469,14 +469,12 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
 module.exports.deleteServiceRequest = async function (serviceRequestId, userId) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const { row: before } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
-      const [result] = await connection.query('DELETE FROM service_request WHERE id = ?', [serviceRequestId])
-      if (before) {
-        await AuditService.record(connection, {
-          entityType: 'serviceRequest', entityId: serviceRequestId, action: 'delete',
-          userId, before,
+      const result = await AuditService.auditDelete(connection,
+        { entityType: 'serviceRequest', entityId: serviceRequestId, userId },
+        async () => {
+          const [res] = await connection.query('DELETE FROM service_request WHERE id = ?', [serviceRequestId])
+          return res
         })
-      }
       return result.affectedRows > 0
     },
   })

@@ -45,32 +45,30 @@ module.exports.putMember = async function (personId, body, userObject) {
       const [existing] = await connection.query(
         'SELECT id, status FROM member WHERE personId = ?', [personId]
       )
-      const memberId0 = existing[0]?.id
-      const beforeShape = memberId0 ? await AuditService.readShape(connection, 'member', memberId0) : null
-      let result
-      if (existing.length) {
-        if (Object.keys(body).length) {
-          await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
-        }
-      }
-      else {
-        const [[{ nextNumber }]] = await connection.query(
-          'SELECT COALESCE(MAX(CAST(memberNumber AS SIGNED)), 0) + 1 AS nextNumber FROM member FOR UPDATE'
-        )
-        ;[result] = await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...body })
-      }
-      if (isActivation(existing[0]?.status, body.status)) {
-        await writeMemberWelcomeEvent(connection, personId)
-      }
-      const memberId = memberId0 ?? result.insertId
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'member', memberId)
-      await AuditService.record(connection, {
-        entityType: 'member', entityId: memberId,
-        action: memberId0 ? 'update' : 'create',
-        userId: userObject.userId,
-        before: beforeShape?.row, beforeSets: beforeShape?.sets,
-        after, afterSets,
-      })
+      await AuditService.auditUpdate(connection,
+        { entityType: 'member', entityId: existing[0]?.id ?? null, userId: userObject.userId },
+        async () => {
+          // createdId, not an early return: the welcome-event check below must
+          // run on the insert branch too — a member created directly in Active
+          // is the primary welcome path.
+          let createdId
+          if (existing.length) {
+            if (Object.keys(body).length) {
+              await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+            }
+          }
+          else {
+            const [[{ nextNumber }]] = await connection.query(
+              'SELECT COALESCE(MAX(CAST(memberNumber AS SIGNED)), 0) + 1 AS nextNumber FROM member FOR UPDATE'
+            )
+            const [result] = await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...body })
+            createdId = result.insertId
+          }
+          if (isActivation(existing[0]?.status, body.status)) {
+            await writeMemberWelcomeEvent(connection, personId)
+          }
+          return createdId
+        })
     },
     statusObj: undefined
   })
@@ -87,21 +85,21 @@ module.exports.patchMember = async function (personId, body, userObject) {
         'SELECT id, status FROM member WHERE personId = ?', [personId]
       )
       const memberId = existing[0]?.id
-      const beforeShape = memberId ? await AuditService.readShape(connection, 'member', memberId) : null
-      if (Object.keys(body).length) {
-        await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
-      }
-      if (isActivation(existing[0]?.status, body.status)) {
-        await writeMemberWelcomeEvent(connection, personId)
+      // No member row: the mutation is a no-op UPDATE and there is no entity
+      // to audit, so it runs unwrapped (auditUpdate would demand a new id).
+      const mutate = async () => {
+        if (Object.keys(body).length) {
+          await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+        }
+        if (isActivation(existing[0]?.status, body.status)) {
+          await writeMemberWelcomeEvent(connection, personId)
+        }
       }
       if (memberId) {
-        const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'member', memberId)
-        await AuditService.record(connection, {
-          entityType: 'member', entityId: memberId, action: 'update',
-          userId: userObject.userId,
-          before: beforeShape?.row, beforeSets: beforeShape?.sets,
-          after, afterSets,
-        })
+        await AuditService.auditUpdate(connection,
+          { entityType: 'member', entityId: memberId, userId: userObject.userId, action: 'update' }, mutate)
+      } else {
+        await mutate()
       }
     },
     statusObj: undefined
@@ -115,12 +113,8 @@ module.exports.deleteMember = async function (personId, userId) {
       const [rows] = await connection.query('SELECT id FROM member WHERE personId = ?', [personId])
       const memberId = rows[0]?.id
       if (!memberId) return personId
-      const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'member', memberId)
-      await connection.query('DELETE FROM member WHERE personId = ?', [personId])
-      await AuditService.record(connection, {
-        entityType: 'member', entityId: memberId, action: 'delete',
-        userId, before, beforeSets,
-      })
+      await AuditService.auditDelete(connection, { entityType: 'member', entityId: memberId, userId },
+        () => connection.query('DELETE FROM member WHERE personId = ?', [personId]))
       return personId
     },
   })

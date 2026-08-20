@@ -329,22 +329,19 @@ module.exports.createPerson = async function (body, userId) {
   const { communities, disabilities, ...personFields } = body
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const [personInsertResult] = await connection.query('INSERT INTO person SET ?', personFields)
-      const newPersonId = personInsertResult.insertId
-      if (communities?.length) {
-        const values = communities.map(communityId => [newPersonId, communityId])
-        await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
-      }
-      if (disabilities?.length) {
-        const values = disabilities.map(d => [newPersonId, d.disabilityId, d.note ?? null])
-        await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
-      }
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'person', newPersonId)
-      await AuditService.record(connection, {
-        entityType: 'person', entityId: newPersonId, action: 'create',
-        userId, after, afterSets,
+      return AuditService.auditUpdate(connection, { entityType: 'person', userId }, async () => {
+        const [personInsertResult] = await connection.query('INSERT INTO person SET ?', personFields)
+        const newPersonId = personInsertResult.insertId
+        if (communities?.length) {
+          const values = communities.map(communityId => [newPersonId, communityId])
+          await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
+        }
+        if (disabilities?.length) {
+          const values = disabilities.map(d => [newPersonId, d.disabilityId, d.note ?? null])
+          await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
+        }
+        return newPersonId
       })
-      return newPersonId
     },
     statusObj: undefined
   })
@@ -362,29 +359,26 @@ module.exports.patchPerson = async function (personId, body, userId) {
   }
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'person', personId)
-      if (Object.keys(personFields).length > 0) {
-        await connection.query('UPDATE person SET ? WHERE id = ?', [personFields, personId])
-      }
-      if (communities !== undefined) {
-        await connection.query('DELETE FROM person_community WHERE personId = ?', [personId])
-        if (communities.length) {
-          const values = communities.map(communityId => [personId, communityId])
-          await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
-        }
-      }
-      if (disabilities !== undefined) {
-        await connection.query('DELETE FROM person_disability WHERE personId = ?', [personId])
-        if (disabilities.length) {
-          const values = disabilities.map(d => [personId, d.disabilityId, d.note ?? null])
-          await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
-        }
-      }
-      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'person', personId)
-      await AuditService.record(connection, {
-        entityType: 'person', entityId: personId, action: 'update',
-        userId, before, after, beforeSets, afterSets,
-      })
+      await AuditService.auditUpdate(connection,
+        { entityType: 'person', entityId: personId, userId, action: 'update' }, async () => {
+          if (Object.keys(personFields).length > 0) {
+            await connection.query('UPDATE person SET ? WHERE id = ?', [personFields, personId])
+          }
+          if (communities !== undefined) {
+            await connection.query('DELETE FROM person_community WHERE personId = ?', [personId])
+            if (communities.length) {
+              const values = communities.map(communityId => [personId, communityId])
+              await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
+            }
+          }
+          if (disabilities !== undefined) {
+            await connection.query('DELETE FROM person_disability WHERE personId = ?', [personId])
+            if (disabilities.length) {
+              const values = disabilities.map(d => [personId, d.disabilityId, d.note ?? null])
+              await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
+            }
+          }
+        })
     },
     statusObj: undefined
   })
@@ -394,14 +388,8 @@ module.exports.patchPerson = async function (personId, body, userId) {
 module.exports.deletePerson = async function (personId, userId) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'person', personId)
-      await connection.query('DELETE FROM person WHERE id = ?', [personId])
-      if (before) {
-        await AuditService.record(connection, {
-          entityType: 'person', entityId: personId, action: 'delete',
-          userId, before, beforeSets,
-        })
-      }
+      await AuditService.auditDelete(connection, { entityType: 'person', entityId: personId, userId },
+        () => connection.query('DELETE FROM person WHERE id = ?', [personId]))
       return personId
     },
   })

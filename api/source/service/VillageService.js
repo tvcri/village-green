@@ -453,20 +453,15 @@ module.exports.createVillageGrant = async function (villageId, body, actorUserId
           mappedFields.userGroupId = grant.userGroupId
         }
 
-        if (grant.userId !== undefined) {
-          const beforeShape = await AuditService.readShape(connection, 'user', grant.userId)
-          await connection.query('INSERT INTO role_grant SET ?', mappedFields)
-          const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', grant.userId)
-          await AuditService.record(connection, {
-            entityType: 'user', entityId: grant.userId, action: 'update',
-            userId: actorUserId,
-            before: beforeShape.row, beforeSets: beforeShape.sets,
-            after, afterSets,
-          })
-        } else {
-          // group grantees are not audited in v1 — user_group is not an entityType
-          await connection.query('INSERT INTO role_grant SET ?', mappedFields)
-        }
+        // A user grantee's grants set changes, so it audits under that user;
+        // group grantees are not audited in v1 (user_group is not an
+        // entityType) and pass an empty id list, leaving the INSERT itself
+        // written once either way.
+        await AuditService.auditFanOut(connection, {
+          entityType: 'user',
+          entityIds: grant.userId !== undefined ? [grant.userId] : [],
+          userId: actorUserId,
+        }, () => connection.query('INSERT INTO role_grant SET ?', mappedFields))
       }
     },
     statusObj: undefined
@@ -483,36 +478,28 @@ module.exports.replaceVillageGrants = async function (villageId, body, actorUser
         'SELECT DISTINCT userId FROM role_grant WHERE villageId = ? AND userId IS NOT NULL', [villageId])
       const affected = new Set(prevUsers.map(r => r.userId))
       for (const g of (body ?? [])) if (g.userId) affected.add(Number(g.userId))
-      const befores = new Map()
-      for (const uid of affected) befores.set(uid, await AuditService.readShape(connection, 'user', uid))
 
-      await connection.query('DELETE FROM role_grant WHERE villageId = ?', [villageId])
+      await AuditService.auditFanOut(connection,
+        { entityType: 'user', entityIds: affected, userId: actorUserId }, async () => {
+          await connection.query('DELETE FROM role_grant WHERE villageId = ?', [villageId])
 
-      if (body && body.length > 0) {
-        for (const grant of body) {
-          const mappedFields = {
-            villageId,
-            roleId: grant.roleId
+          if (body && body.length > 0) {
+            for (const grant of body) {
+              const mappedFields = {
+                villageId,
+                roleId: grant.roleId
+              }
+
+              if (grant.userId !== undefined) {
+                mappedFields.userId = grant.userId
+              } else if (grant.userGroupId !== undefined) {
+                mappedFields.userGroupId = grant.userGroupId
+              }
+
+              await connection.query('INSERT INTO role_grant SET ?', mappedFields)
+            }
           }
-
-          if (grant.userId !== undefined) {
-            mappedFields.userId = grant.userId
-          } else if (grant.userGroupId !== undefined) {
-            mappedFields.userGroupId = grant.userGroupId
-          }
-
-          await connection.query('INSERT INTO role_grant SET ?', mappedFields)
-        }
-      }
-
-      for (const uid of affected) {
-        const b = befores.get(uid)
-        const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', uid)
-        await AuditService.record(connection, {
-          entityType: 'user', entityId: uid, action: 'update',
-          userId: actorUserId, before: b.row, beforeSets: b.sets, after, afterSets,
         })
-      }
     },
     statusObj: undefined
   })
@@ -534,20 +521,16 @@ module.exports.deleteVillageGrant = async function (villageId, grantId, actorUse
       }
       existing = rows[0]
 
-      if (existing.userId !== null && existing.userId !== undefined) {
-        const beforeShape = await AuditService.readShape(connection, 'user', existing.userId)
-        await connection.query('DELETE FROM role_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId])
-        const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'user', existing.userId)
-        await AuditService.record(connection, {
-          entityType: 'user', entityId: existing.userId, action: 'update',
-          userId: actorUserId,
-          before: beforeShape.row, beforeSets: beforeShape.sets,
-          after, afterSets,
-        })
-      } else {
-        // group grantees are not audited in v1 — user_group is not an entityType
-        await connection.query('DELETE FROM role_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId])
-      }
+      // A user grantee audits under that user (their grants set changes);
+      // group grantees are not audited in v1 (user_group is not an
+      // entityType) and pass an empty id list, so the DELETE is written once
+      // either way.
+      const granteeUserId = existing.userId ?? null
+      await AuditService.auditFanOut(connection, {
+        entityType: 'user',
+        entityIds: granteeUserId !== null ? [granteeUserId] : [],
+        userId: actorUserId,
+      }, () => connection.query('DELETE FROM role_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId]))
     },
     statusObj: undefined
   })
