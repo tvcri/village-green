@@ -64,7 +64,7 @@ module.exports.deletePersonVolunteer = async function deletePersonVolunteer (req
     if (!hasPermission(req.userObject, 'volunteer:write', { villageId: person.village?.villageId })) {
       throw new SmError.PrivilegeError()
     }
-    await VolunteerService.deleteVolunteer(personId)
+    await VolunteerService.deleteVolunteer(personId, req.userObject.userId)
     res.status(204).end()
   }
   catch (err) { next(err) }

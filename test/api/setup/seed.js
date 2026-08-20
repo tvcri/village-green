@@ -7,6 +7,7 @@ import { villages, users, persons, members, volunteers, volunteerCapabilities, s
 
 // Tables we own, child-before-parent for clean truncation.
 const TABLES = [
+  'audit_event',
   'enrollment_request',
   'notification_event', 'service_request', 'fcv_submission', 'volunteer_vetting',
   'volunteer_capability', 'volunteer_village_associate', 'volunteer', 'member',

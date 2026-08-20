@@ -3,6 +3,7 @@ const auth = require('../utils/auth')
 const config = require('../utils/config')
 const db = require('../service/utils')
 const UserService = require('../service/UserService')
+const AuditService = require('../service/audit/AuditService')
 const { serializeError } = require('../utils/serializeError')
 const state = require('../utils/state')
 
@@ -12,6 +13,9 @@ async function initializeDependencies() {
           auth.initializeAuth(),
           db.initializeDatabase()
       ])
+
+      await AuditService.validateShapes()
+      logger.writeInfo('bootstrap', 'auditShapes', { status: 'validated' })
 
       if (config.settings.bootstrapAdmin) {
         await UserService.ensureBootstrapAdmin(config.settings.bootstrapAdmin)

@@ -288,7 +288,7 @@ module.exports.createVillageGrant = async function createVillageGrant (req, res,
     // field; it's implied by the URL).
     await validateRoleGrants(body.map(grant => ({ roleId: grant.roleId, villageId })))
 
-    const response = await VillageService.createVillageGrant(villageId, body)
+    const response = await VillageService.createVillageGrant(villageId, body, req.userObject.userId)
     res.status(201).json(response)
   }
   catch (err) {
@@ -312,7 +312,7 @@ module.exports.replaceVillageGrants = async function replaceVillageGrants (req, 
     // See createVillageGrant: villageId comes from the path, not the body.
     await validateRoleGrants(body.map(grant => ({ roleId: grant.roleId, villageId })))
 
-    const response = await VillageService.replaceVillageGrants(villageId, body)
+    const response = await VillageService.replaceVillageGrants(villageId, body, req.userObject.userId)
     res.json(response)
   }
   catch (err) {
@@ -333,7 +333,7 @@ module.exports.deleteVillageGrant = async function deleteVillageGrant (req, res,
       throw new SmError.NotFoundError()
     }
 
-    const response = await VillageService.deleteVillageGrant(villageId, grantId)
+    const response = await VillageService.deleteVillageGrant(villageId, grantId, req.userObject.userId)
     res.json(response)
   }
   catch (err) {

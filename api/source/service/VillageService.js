@@ -2,6 +2,8 @@
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
 const config = require('../utils/config')
+const SmError = require('../utils/error')
+const AuditService = require('./audit/AuditService')
 
 const _this = this
 
@@ -434,7 +436,7 @@ module.exports.getVillageGrants = async function (villageId) {
   })
 }
 
-module.exports.createVillageGrant = async function (villageId, body) {
+module.exports.createVillageGrant = async function (villageId, body, actorUserId) {
   const grantsArray = Array.isArray(body) ? body : [body]
 
   await dbUtils.retryOnDeadlock2({
@@ -451,7 +453,15 @@ module.exports.createVillageGrant = async function (villageId, body) {
           mappedFields.userGroupId = grant.userGroupId
         }
 
-        await connection.query('INSERT INTO role_grant SET ?', mappedFields)
+        // A user grantee's grants set changes, so it audits under that user;
+        // group grantees are not audited in v1 (user_group is not an
+        // entityType) and pass an empty id list, leaving the INSERT itself
+        // written once either way.
+        await AuditService.auditFanOut(connection, {
+          entityType: 'user',
+          entityIds: grant.userId !== undefined ? [grant.userId] : [],
+          userId: actorUserId,
+        }, () => connection.query('INSERT INTO role_grant SET ?', mappedFields))
       }
     },
     statusObj: undefined
@@ -461,27 +471,35 @@ module.exports.createVillageGrant = async function (villageId, body) {
   return grants
 }
 
-module.exports.replaceVillageGrants = async function (villageId, body) {
+module.exports.replaceVillageGrants = async function (villageId, body, actorUserId) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      await connection.query('DELETE FROM role_grant WHERE villageId = ?', [villageId])
+      const [prevUsers] = await connection.query(
+        'SELECT DISTINCT userId FROM role_grant WHERE villageId = ? AND userId IS NOT NULL', [villageId])
+      const affected = new Set(prevUsers.map(r => r.userId))
+      for (const g of (body ?? [])) if (g.userId) affected.add(Number(g.userId))
 
-      if (body && body.length > 0) {
-        for (const grant of body) {
-          const mappedFields = {
-            villageId,
-            roleId: grant.roleId
+      await AuditService.auditFanOut(connection,
+        { entityType: 'user', entityIds: affected, userId: actorUserId }, async () => {
+          await connection.query('DELETE FROM role_grant WHERE villageId = ?', [villageId])
+
+          if (body && body.length > 0) {
+            for (const grant of body) {
+              const mappedFields = {
+                villageId,
+                roleId: grant.roleId
+              }
+
+              if (grant.userId !== undefined) {
+                mappedFields.userId = grant.userId
+              } else if (grant.userGroupId !== undefined) {
+                mappedFields.userGroupId = grant.userGroupId
+              }
+
+              await connection.query('INSERT INTO role_grant SET ?', mappedFields)
+            }
           }
-
-          if (grant.userId !== undefined) {
-            mappedFields.userId = grant.userId
-          } else if (grant.userGroupId !== undefined) {
-            mappedFields.userGroupId = grant.userGroupId
-          }
-
-          await connection.query('INSERT INTO role_grant SET ?', mappedFields)
-        }
-      }
+        })
     },
     statusObj: undefined
   })
@@ -489,18 +507,33 @@ module.exports.replaceVillageGrants = async function (villageId, body) {
   return await module.exports.getVillageGrants(villageId)
 }
 
-module.exports.deleteVillageGrant = async function (villageId, grantId) {
-  const [existing] = await dbUtils.pool.query(
-    'SELECT * FROM role_grant WHERE grantId = ? AND villageId = ?',
-    [grantId, villageId]
-  )
+module.exports.deleteVillageGrant = async function (villageId, grantId, actorUserId) {
+  let existing
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [rows] = await connection.query(
+        'SELECT * FROM role_grant WHERE grantId = ? AND villageId = ?',
+        [grantId, villageId]
+      )
 
-  if (!existing || existing.length === 0) {
-    const SmError = require('../utils/error')
-    throw new SmError.NotFoundError()
-  }
+      if (!rows || rows.length === 0) {
+        throw new SmError.NotFoundError()
+      }
+      existing = rows[0]
 
-  await dbUtils.pool.query('DELETE FROM role_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId])
+      // A user grantee audits under that user (their grants set changes);
+      // group grantees are not audited in v1 (user_group is not an
+      // entityType) and pass an empty id list, so the DELETE is written once
+      // either way.
+      const granteeUserId = existing.userId ?? null
+      await AuditService.auditFanOut(connection, {
+        entityType: 'user',
+        entityIds: granteeUserId !== null ? [granteeUserId] : [],
+        userId: actorUserId,
+      }, () => connection.query('DELETE FROM role_grant WHERE grantId = ? AND villageId = ?', [grantId, villageId]))
+    },
+    statusObj: undefined
+  })
 
   const sql = `
     SELECT
@@ -525,11 +558,11 @@ module.exports.deleteVillageGrant = async function (villageId, grantId) {
   `
   const [rows] = await dbUtils.pool.query(sql, [
     grantId,
-    existing[0].roleId,
-    existing[0].userId,
-    existing[0].userGroupId,
-    existing[0].userId,
-    existing[0].userGroupId
+    existing.roleId,
+    existing.userId,
+    existing.userGroupId,
+    existing.userId,
+    existing.userGroupId
   ])
 
   const row = rows[0]

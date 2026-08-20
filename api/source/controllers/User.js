@@ -408,6 +408,7 @@ module.exports.deleteUserGroup = async (req, res, next) => {
     })
     await UserService.deleteUserGroup({
       userGroupId: req.params.userGroupId,
+      actorUserId: req.userObject.userId,
     })
     res.json(response[0])
   }
@@ -475,7 +476,7 @@ module.exports.createUserGrant = async function createUserGrant (req, res, next)
 
     await validateRoleGrants(body)
 
-    const response = await UserService.createUserGrant(userId, body)
+    const response = await UserService.createUserGrant(userId, body, req.userObject.userId)
     res.status(201).json(response)
   }
   catch (err) {
@@ -497,7 +498,7 @@ module.exports.deleteUserGrant = async function deleteUserGrant (req, res, next)
       throw new SmError.NotFoundError()
     }
 
-    const response = await UserService.deleteUserGrant(userId, grantId)
+    const response = await UserService.deleteUserGrant(userId, grantId, req.userObject.userId)
     res.json(response)
   }
   catch (err) {

@@ -16,7 +16,7 @@ users see the right data) as the throughline.
 > multi-village statistics 500, and the fresh scaffold shipping an empty 0013
 > role catalog) are **fixed by #69** — see `SECURITY-FINDINGS.md` for the
 > register.
-> Landscape: **205 tests — 203 pass, 0 fail, 2 todo** (~45 s wall clock, ~20 s
+> Landscape: **303 tests — 300 pass, 0 fail, 3 todo** (~45 s wall clock, ~20 s
 > test phase). There are currently **no deliberate REDs**: every documented
 > finding has been fixed upstream, and each red flipped green with no edit,
 > which is what the red-until-fixed convention is for. **Any** failure is now
@@ -167,7 +167,9 @@ specced as todos. Gaps, in priority order:
   (via `KeycloakService.updateUsername`) call Keycloak unconditionally, so they 500 in
   the harness and their happy paths are untestable; and `PUT /users/{userId}` is
   unusable because `UserPut` both requires and forbids `villageGrants` (spec bug,
-  characterized as 400).
+  characterized as 400). The same gap blocks `tests/audit/user.test.js`'s
+  `deleteUser` audit-row assertion (todo) — the audit code is implemented and
+  reviewed statically but can't be driven over HTTP in this harness.
 - **Volunteer vettings:** the `vettings` arrays on the volunteer role are unexercised —
   `vetting_type` ships no static rows and has no write endpoint, so any `vettingTypeId`
   would violate the FK.
@@ -211,6 +213,10 @@ lib/
                      the hook for importing special-purpose datasets in tests
 tests/               the endpoint tests, one directory per topic; each topic's
                      projections.test.js covers its `?projection=` expansions
+  audit/             audit_event rows for person/member/volunteer/service-request/
+                     user/village-grant writes; runs against the same shared seeded
+                     DB as everything else and filters assertions by the entityIds
+                     each test creates
   auth/              authentication + scope, elevation
   members/           authz/scope gating + /persons/{id}/member lifecycle,
                      active_member view filtering (+ finding #5 probe)

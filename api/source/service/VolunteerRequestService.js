@@ -3,6 +3,7 @@
 const mysql = require('mysql2/promise')
 const dbUtils = require('./utils')
 const ServiceRequestService = require('./ServiceRequestService')
+const AuditService = require('./audit/AuditService')
 
 // Capability -> serviceName prefix map derived from the shared SERVICE_CATEGORIES
 // vocabulary in dbUtils (see utils.js). A request is pickable under a capability
@@ -301,6 +302,8 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
       }
       else chosen = qualifying[0]
 
+      const { row: before } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+
       // Atomic first-wins: any unassigned Open request, any village.
       const [result] = await connection.query(
         `UPDATE service_request
@@ -310,6 +313,11 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
       )
       if (result.affectedRows === 1) {
         await ServiceRequestService.writeNotificationEvent(connection, serviceRequestId, 'Confirmed')
+        const { row: after } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+        await AuditService.record(connection, {
+          entityType: 'serviceRequest', entityId: serviceRequestId, action: 'update',
+          userId, before, after,
+        })
         return { outcome: 'confirmed' }
       }
       const [rows] = await connection.query(
@@ -330,6 +338,8 @@ module.exports.signUpVolunteerRequest = async function ({ serviceRequestId, pers
 module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, personIds, userId }) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      const { row: before } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+
       // Account-level release (spec, conscious decision): any of the caller's
       // volunteers' commitments can be released from the shared account.
       const [result] = await connection.query(
@@ -342,6 +352,11 @@ module.exports.releaseVolunteerRequest = async function ({ serviceRequestId, per
         // Re-broadcast to the volunteer list. The member is deliberately NOT
         // notified: the service is back to seeking, not cancelled (spec §3).
         await ServiceRequestService.writeNotificationEvent(connection, serviceRequestId, 'Open')
+        const { row: after } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+        await AuditService.record(connection, {
+          entityType: 'serviceRequest', entityId: serviceRequestId, action: 'update',
+          userId, before, after,
+        })
         return { outcome: 'released' }
       }
       const [rows] = await connection.query(

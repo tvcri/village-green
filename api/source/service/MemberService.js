@@ -1,6 +1,7 @@
 'use strict';
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
+const AuditService = require('./audit/AuditService')
 
 // A member is welcomed when they genuinely become Active. Prior 'Active' is the
 // hazard this guard exists for: ~712 existing Active members with email would
@@ -44,20 +45,30 @@ module.exports.putMember = async function (personId, body, userObject) {
       const [existing] = await connection.query(
         'SELECT id, status FROM member WHERE personId = ?', [personId]
       )
-      if (existing.length) {
-        if (Object.keys(body).length) {
-          await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
-        }
-      }
-      else {
-        const [[{ nextNumber }]] = await connection.query(
-          'SELECT COALESCE(MAX(CAST(memberNumber AS SIGNED)), 0) + 1 AS nextNumber FROM member FOR UPDATE'
-        )
-        await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...body })
-      }
-      if (isActivation(existing[0]?.status, body.status)) {
-        await writeMemberWelcomeEvent(connection, personId)
-      }
+      await AuditService.auditUpdate(connection,
+        { entityType: 'member', entityId: existing[0]?.id ?? null, userId: userObject.userId },
+        async () => {
+          // createdId, not an early return: the welcome-event check below must
+          // run on the insert branch too — a member created directly in Active
+          // is the primary welcome path.
+          let createdId
+          if (existing.length) {
+            if (Object.keys(body).length) {
+              await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+            }
+          }
+          else {
+            const [[{ nextNumber }]] = await connection.query(
+              'SELECT COALESCE(MAX(CAST(memberNumber AS SIGNED)), 0) + 1 AS nextNumber FROM member FOR UPDATE'
+            )
+            const [result] = await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...body })
+            createdId = result.insertId
+          }
+          if (isActivation(existing[0]?.status, body.status)) {
+            await writeMemberWelcomeEvent(connection, personId)
+          }
+          return createdId
+        })
     },
     statusObj: undefined
   })
@@ -71,13 +82,24 @@ module.exports.patchMember = async function (personId, body, userObject) {
       // Read the before-state inside the transaction: this is the path a
       // Pending -> Active activation actually takes from the client.
       const [existing] = await connection.query(
-        'SELECT status FROM member WHERE personId = ?', [personId]
+        'SELECT id, status FROM member WHERE personId = ?', [personId]
       )
-      if (Object.keys(body).length) {
-        await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+      const memberId = existing[0]?.id
+      // No member row: the mutation is a no-op UPDATE and there is no entity
+      // to audit, so it runs unwrapped (auditUpdate would demand a new id).
+      const mutate = async () => {
+        if (Object.keys(body).length) {
+          await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+        }
+        if (isActivation(existing[0]?.status, body.status)) {
+          await writeMemberWelcomeEvent(connection, personId)
+        }
       }
-      if (isActivation(existing[0]?.status, body.status)) {
-        await writeMemberWelcomeEvent(connection, personId)
+      if (memberId) {
+        await AuditService.auditUpdate(connection,
+          { entityType: 'member', entityId: memberId, userId: userObject.userId, action: 'update' }, mutate)
+      } else {
+        await mutate()
       }
     },
     statusObj: undefined
@@ -85,6 +107,15 @@ module.exports.patchMember = async function (personId, body, userObject) {
   return await PersonService.getPerson(personId, ['member'], userObject)
 }
 
-module.exports.deleteMember = async function (personId) {
-  await dbUtils.pool.query('DELETE FROM member WHERE personId = ?', [personId])
+module.exports.deleteMember = async function (personId, userId) {
+  return dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [rows] = await connection.query('SELECT id FROM member WHERE personId = ?', [personId])
+      const memberId = rows[0]?.id
+      if (!memberId) return personId
+      await AuditService.auditDelete(connection, { entityType: 'member', entityId: memberId, userId },
+        () => connection.query('DELETE FROM member WHERE personId = ?', [personId]))
+      return personId
+    },
+  })
 }

@@ -40,7 +40,7 @@ module.exports.createPerson = async function createPerson (req, res, next) {
     if (!hasPermission(req.userObject, 'person:write', { villageId: body.villageId })) {
       throw new SmError.PrivilegeError()
     }
-    const personId = await PersonService.createPerson(body)
+    const personId = await PersonService.createPerson(body, req.userObject.userId)
     const response = await PersonService.getPerson(personId, [], req.userObject)
     res.status(201).json(response)
   }
@@ -89,7 +89,7 @@ module.exports.patchPerson = async function patchPerson (req, res, next) {
       throw new SmError.PrivilegeError()
     }
 
-    await PersonService.patchPerson(personId, body)
+    await PersonService.patchPerson(personId, body, req.userObject.userId)
     const response = await PersonService.getPerson(personId, [], req.userObject)
     res.json(response)
   }
@@ -110,7 +110,7 @@ module.exports.deletePerson = async function deletePerson (req, res, next) {
       throw new SmError.PrivilegeError()
     }
 
-    await PersonService.deletePerson(personId)
+    await PersonService.deletePerson(personId, req.userObject.userId)
     res.json(existing)
   }
   catch (err) {
