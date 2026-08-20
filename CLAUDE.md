@@ -58,6 +58,50 @@ went missing until PR #69 (every `role_grant` insert hit
 `role_grant` / `village_grant` backfill) stay out of the list: dumping them
 would ship one deployment's rows to every other.
 
+## Service request statuses — the seven
+
+`service_request.status` is **`varchar(50)`, not a MySQL enum**, and no
+single file lists all seven values. Do not infer the vocabulary from any
+list you happen to find — several deliberately-narrowed subsets exist and
+each one looks authoritative on its own. The complete set is:
+
+| Status | Written by | Notes |
+|---|---|---|
+| `Open` | derived | no volunteer assigned |
+| `Confirmed` | derived | volunteer assigned |
+| `Completed` | client | end state |
+| `Unmatched` | scheduled event | end state |
+| `Member cancelled` | client | end state |
+| `Volunteer cancelled` | client | end state |
+| `Hub cancelled` | client | end state |
+
+**Seven values.** Some views roll the three cancels into a single
+"Cancelled" bucket — that is a presentation choice, never the vocabulary.
+`Open` and `Confirmed` are **never posted** —
+`deriveStatus()` in `ServiceRequestService.js` computes them from
+`volunteerPersonId`, which is why the OAS `status` enum lists only the four
+client-writable values. `evt_auto_complete_service_requests` rewrites
+in-flight rows to `Completed`/`Unmatched` the day after `serviceDate`.
+
+**The narrowed subsets, and why each is narrow.** Reading one of these as
+the vocabulary is a real mistake that has been made:
+
+- `dbUtils.TERMINAL_SR_STATUSES` (`utils.js`) — **four**: excludes
+  `Open`/`Confirmed` because they are still in flight and the auto-complete
+  event rewrites them, making a report irreproducible; excludes
+  `Hub cancelled` because those are treated as if the request never existed.
+  This is a *metrics reporting* rule, **not** the status vocabulary.
+- OAS `status` enum — **four**: the client-*writable* subset only.
+- `CANCELLED_STATUSES` / `END_STATES` / `NON_NOTIFIABLE_STATUSES`
+  (`ServiceRequestService.js`) — behavioral groupings, not vocabularies.
+- `metricsView.js` `STATUS_ORDER` — the four terminal keys in camelCase;
+  a `byStatus` payload structurally cannot carry `open`/`confirmed`.
+
+**Consequence for dashboards:** any view that wants in-flight counts
+(`Open`, `Confirmed`) cannot be built on `/village/metrics`. That endpoint
+excludes them by design, and the exclusion is a considered reproducibility
+rule — widening it is a decision to raise with the user, not a bug to fix.
+
 ## Service request dates & times
 
 `service_request.serviceDate` (DATE) and the four TIME columns
