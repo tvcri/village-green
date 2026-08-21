@@ -11,6 +11,7 @@ const router = useRouter()
     <div class="actions">
       <Button label="Persons" @click="router.push({ name: 'meta-persons' })" />
       <Button label="Service Requests" @click="router.push({ name: 'meta-service-requests' })" />
+      <Button label="Metrics" @click="router.push({ name: 'meta-metrics' })" />
       <Button label="Friends" @click="router.push({ name: 'meta-friends' })" />
       <Button label="Mailing Labels" @click="router.push({ name: 'meta-mailing-labels' })" />
     </div>
