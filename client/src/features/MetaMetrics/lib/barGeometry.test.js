@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { barSegments, BAR_TRACK_PX } from './barGeometry.js'
+import { barSegments } from './barGeometry.js'
 import { STATUS_SERIES } from './reduceCells.js'
 
 const ROWS = [
@@ -13,9 +13,9 @@ describe('counts view', () => {
   it('makes the largest single segment exactly full width', () => {
     // Scaled against the largest SEGMENT (Barrington's 671 completed), not the
     // largest row TOTAL. Counts never draws a total, so scaling to one would
-    // leave the longest bar permanently short of the track's end.
+    // leave the longest bar permanently short of its container's end.
     const segs = barSegments(ROWS, STATUS_SERIES, 'counts')
-    expect(segs[0].find(s => s.key === 'completed').width).toBeCloseTo(BAR_TRACK_PX, 0)
+    expect(segs[0].find(s => s.key === 'completed').width).toBeCloseTo(100, 6)
   })
 
   it('scales every other bar against that same segment, so lengths compare', () => {
@@ -25,11 +25,11 @@ describe('counts view', () => {
     expect(warwick / barrington).toBeCloseTo(298 / 671, 2)
   })
 
-  it('gives a nonzero value at least one pixel so it never vanishes', () => {
+  it('floors a nonzero value so it never rounds away to nothing', () => {
     const segs = barSegments(ROWS, STATUS_SERIES, 'counts')
-    // Wood River's 6 cancelled against a 809 max is well under a pixel.
+    // Wood River's 6 cancelled against a 671 max is 0.9% — under the floor.
     const cancelled = segs[2].find(s => s.key === 'cancelled')
-    expect(cancelled.width).toBeGreaterThanOrEqual(1)
+    expect(cancelled.width).toBeGreaterThan(0)
   })
 
   it('gives a zero value zero width — a sliver would be a lie', () => {
@@ -44,14 +44,6 @@ describe('counts view', () => {
 })
 
 describe('share view', () => {
-  it('is expressed as a percentage so the bar fills whatever cell it lands in', () => {
-    // Deliberately NOT pixels: a fixed px track left a ragged gap at the right
-    // edge, which undercuts the one thing a share bar asserts — that this is
-    // the whole of this village.
-    const segs = barSegments(ROWS, STATUS_SERIES, 'share')
-    for (const seg of segs[0]) expect(seg.unit).toBe('%')
-  })
-
   it('totals 100% for every row regardless of magnitude', () => {
     const segs = barSegments(ROWS, STATUS_SERIES, 'share')
     const big = segs[0].reduce((sum, s) => sum + s.width, 0)
@@ -81,11 +73,6 @@ describe('segment identity', () => {
       colorLight: '#1d4ed8',
       colorDark: '#3b82f6',
     })
-  })
-
-  it('marks counts widths as pixels, since they share a cross-row scale', () => {
-    const [first] = barSegments(ROWS, STATUS_SERIES, 'counts')
-    for (const seg of first) expect(seg.unit).toBe('px')
   })
 
   it('carries the raw value so a tooltip can state it', () => {

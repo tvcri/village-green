@@ -1,4 +1,4 @@
-// Pixel geometry for the in-row bars of the Outcomes table.
+// Bar widths for the in-row bars of the Outcomes table.
 //
 // This page draws no chart. A Chart.js canvas was built first and rejected on
 // sight against real data: it forced constant scrolling between a chart and the
@@ -10,43 +10,42 @@
 // Pure and DOM-free, like every other lib here: the deferred PDF export draws
 // its own table and needs these widths as plain numbers.
 
-// A fixed track, NOT a stretch-to-fill cell. Share bars are all 100% of
-// something, so a percentage width would let them run to the page edge and make
-// the two views occupy visibly different amounts of page. Pinning the track
-// means a full Share bar is exactly as long as the largest Counts bar.
-export const BAR_TRACK_PX = 260
+// BOTH views are expressed as percentages so the bars fill whatever width the
+// column ends up with. An earlier fixed-pixel track left a widening gap at the
+// right-hand end as the numeric columns were tightened — the bars stopped short
+// of their container for no reason a reader could see.
+//
+// The two views differ in their DENOMINATOR, not their unit:
+//   share  — each row against its OWN total, so every bar fills the track and
+//            the segments read as parts of 100%.
+//   counts — every row against the largest single SEGMENT on the page, so the
+//            longest bar is exactly full width and all lengths stay comparable
+//            across rows.
+//
+// COUNTS ONLY: a floor keeps a nonzero value visible. A 1-request outcome
+// against a 135 maximum is 0.7% of the track, which rounds away to nothing, and
+// a village that did something must not render as though it did nothing.
+//
+// Share deliberately does NOT floor. Its segments are the parts of one whole,
+// so inflating a small one both overstates it and pushes the row past 100% —
+// the bar would overflow its own container. Share needs no floor anyway: a
+// percentage of a row's own total is far larger than the same value measured
+// against the page's maximum.
+const MIN_VISIBLE_PCT = 0.6
 
-// Sub-pixel values would disappear entirely at this scale — Wood River's 6
-// cancelled against a hub max of 809 is 1.9px. A village that did something
-// must not render as though it did nothing.
-const MIN_VISIBLE_PX = 1
-
-function pxWidth (value, denominator) {
+function widthPct (value, denominator, floor) {
   if (!denominator || value <= 0) return 0
-  return Math.max(MIN_VISIBLE_PX, (value / denominator) * BAR_TRACK_PX)
-}
-
-// Share is expressed as a PERCENTAGE rather than pixels so the bar fills its
-// cell whatever width the column ends up with. A fixed px track left a ragged
-// gap at the right edge, which undercuts the one thing a share bar asserts —
-// that this is the whole of this village. Counts keeps pixels because its
-// lengths must be comparable ACROSS rows against a shared maximum, which a
-// per-row percentage cannot express.
-function pctWidth (value, total) {
-  if (!total || value <= 0) return 0
-  return (value / total) * 100
+  const pct = (value / denominator) * 100
+  return floor ? Math.max(MIN_VISIBLE_PCT, pct) : pct
 }
 
 /**
- * One array of drawable segments per row, in series order.
+ * One array of drawable segments per row, in series order. `width` is a
+ * PERCENTAGE in both views — see the denominator note above.
  *
- * `counts` scales every row against the LARGEST row total, so bar lengths are
- * comparable between villages — that shared scale is the whole point, and it is
- * why a small village renders as a sliver. That is the finding, not a
- * rendering failure; the number in the adjacent column carries the precision.
- *
- * `share` scales each row against its OWN total, so every bar fills the track
- * and the segments read as proportions.
+ * A small village still renders as a sliver under `counts`, and that is the
+ * finding rather than a rendering failure: the number in the adjacent column
+ * carries the precision the bar cannot.
  *
  * @returns {Array<Array<{key,label,value,width,colorLight,colorDark}>>}
  */
@@ -69,12 +68,7 @@ export function barSegments (rows, series, view) {
     key: s.key,
     label: s.label,
     value: row[s.key],
-    width: isShare
-      ? pctWidth(row[s.key], row.total)
-      : pxWidth(row[s.key], maxSegment),
-    // The consumer cannot infer this from the number alone, and getting it
-    // wrong silently renders a 57 as 57px instead of 57%.
-    unit: isShare ? '%' : 'px',
+    width: widthPct(row[s.key], isShare ? row.total : maxSegment, !isShare),
     colorLight: s.colorLight,
     colorDark: s.colorDark,
   })))

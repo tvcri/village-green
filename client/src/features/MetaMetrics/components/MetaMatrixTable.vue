@@ -7,7 +7,7 @@ import Row from 'primevue/row'
 import Button from 'primevue/button'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { matrixColumns, matrixCells, matrixFooter } from '../lib/matrixTable.js'
-import { barSegments, BAR_TRACK_PX } from '../lib/barGeometry.js'
+import { barSegments } from '../lib/barGeometry.js'
 
 const props = defineProps({
   rows: { type: Array, required: true },      // ALREADY ordered by the parent
@@ -75,8 +75,6 @@ function segTitle (seg) {
   return `${seg.label}: ${seg.value}`
 }
 
-const trackWidth = `${BAR_TRACK_PX}px`
-
 function onDownloadCsv () {
   downloadCsv(toCsv(cells.value, columns.value), props.csvFilename)
 }
@@ -128,13 +126,12 @@ function onDownloadCsv () {
                the segments genuinely are parts of 100%. -->
           <div
             :class="['bar-track', view === 'share' ? 'is-stacked' : 'is-grouped']"
-            :style="view === 'share' ? null : { width: trackWidth }"
           >
             <span
               v-for="seg in segmentsFor(data.villageId)"
               :key="seg.key"
               class="bar-seg"
-              :style="{ width: `${seg.width}${seg.unit}`, backgroundColor: segColor(seg) }"
+              :style="{ width: `${seg.width}%`, backgroundColor: segColor(seg) }"
               :title="segTitle(seg)"
             />
           </div>
@@ -229,10 +226,12 @@ function onDownloadCsv () {
 
 /* Counts: one thin bar per outcome, stacked vertically and left-aligned so all
    three start from a common zero. Modelled on the two-bar rows in the
-   ri-senate district report (page 4). */
+   ri-senate district report (page 4). Full width, like the stacked view — the
+   segments are percentages of the cell, so the bars grow with the column. */
 .bar-track.is-grouped {
   flex-direction: column;
   align-items: flex-start;
+  width: 100%;
   /* NO gap. Colour and the shared left edge already separate the three bars, so
      whitespace between them is redundant — and spending it on thickness is what
      makes them read as bars rather than rules. Abutting is how the paired bars
