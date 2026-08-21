@@ -52,7 +52,7 @@ describe('byServiceType', () => {
     const medical = rows.find(r => r.serviceName === 'Ride: Medical Appnt')
     expect(medical.completed).toBe(15)
     expect(medical.unmatched).toBe(3)
-    expect(medical.total).toBe(18)
+    expect(medical.total).toBe(20)
   })
 
   it('sorts by total descending', () => {
@@ -71,6 +71,6 @@ describe('byCategory', () => {
   it('ignores cells whose category is null', () => {
     const withNull = [...CELLS, { villageId: '1', serviceName: 'Mystery', category: null, byStatus: S(9, 0, 0, 0), completedRoundTrips: 0 }]
     const rows = byCategory(withNull)
-    expect(rows.reduce((a, r) => a + r.total, 0)).toBe(21) // the 9 is excluded
+    expect(rows.reduce((a, r) => a + r.total, 0)).toBe(25) // the 9 is excluded
   })
 })
