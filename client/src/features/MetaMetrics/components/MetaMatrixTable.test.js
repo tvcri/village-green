@@ -137,7 +137,7 @@ describe('MetaMatrixTable in-row bars', () => {
     expect(firstRow.querySelectorAll('.bar-seg')).toHaveLength(STATUS_SERIES.length)
   })
 
-  it('scales counts against the widest row so bars compare across villages', () => {
+  it('scales counts against one shared denominator so bars compare across villages', () => {
     const { container } = mountTable({ view: 'counts' })
     const rows = container.querySelectorAll('.meta-matrix-table tbody tr')
     const widthOf = (tr, i) => parseFloat(tr.querySelectorAll('.bar-seg')[i].style.width)

@@ -52,7 +52,18 @@ function pctWidth (value, total) {
  */
 export function barSegments (rows, series, view) {
   const isShare = view === 'share'
-  const maxTotal = rows.reduce((max, r) => Math.max(max, r.total), 0)
+
+  // Scaled against the largest single SEGMENT, not the largest row total.
+  // Counts draws the three outcomes as separate bars and never draws the total,
+  // so scaling to a total nothing renders just wastes the right-hand end of the
+  // track — the longest bar could only ever reach completed/total of it
+  // (Barrington's 135 of 151). Against the max segment the longest bar is
+  // exactly full width, and every comparison stays valid because it is still
+  // one shared denominator.
+  const maxSegment = rows.reduce(
+    (max, row) => series.reduce((m, s) => Math.max(m, row[s.key]), max),
+    0,
+  )
 
   return rows.map(row => series.map(s => ({
     key: s.key,
@@ -60,7 +71,7 @@ export function barSegments (rows, series, view) {
     value: row[s.key],
     width: isShare
       ? pctWidth(row[s.key], row.total)
-      : pxWidth(row[s.key], maxTotal),
+      : pxWidth(row[s.key], maxSegment),
     // The consumer cannot infer this from the number alone, and getting it
     // wrong silently renders a 57 as 57px instead of 57%.
     unit: isShare ? '%' : 'px',

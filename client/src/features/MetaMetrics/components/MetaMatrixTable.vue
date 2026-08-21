@@ -39,8 +39,8 @@ function swatchColor (colKey) {
 }
 
 // DataTable never sorts for itself: it reports the click and the parent
-// recomputes the one ordered list this table renders. `:sortField`/`:sortOrder` are bound so the header
-// arrows reflect the parent's state. `lazy` is the load-bearing prop here —
+// recomputes the one ordered list this table renders. `:sortField`/`:sortOrder`
+// are bound so the header arrows reflect the parent's state. `lazy` is the load-bearing prop here —
 // PrimeVue's `processedData` unconditionally re-sorts `value` by `sortField`
 // whenever `lazy` is false (verified in primevue/datatable/index.mjs); `lazy`
 // is the only switch that makes it render `value` as given.
@@ -214,6 +214,15 @@ function onDownloadCsv () {
   padding-left: 1.15rem;
 }
 
+/* PrimeVue's bodyCell padding is 0.75rem top and bottom — 24px of the row's
+   height spent on whitespace, which is what kept the three grouped bars thin.
+   Trimming it in THIS cell only lets the bars grow without changing the
+   vertical rhythm of the text columns beside them. */
+.meta-matrix-table :deep(td.bar-cell) {
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+}
+
 .bar-track {
   display: flex;
 }
@@ -231,10 +240,10 @@ function onDownloadCsv () {
   gap: 0;
 }
 
-.bar-track.is-grouped .bar-seg { height: 6px; }
+.bar-track.is-grouped .bar-seg { height: 9px; }
 
-/* Share: a single composed bar, so it can afford real weight. Thicker than the
-   grouped bars because it is one mark rather than three. */
+/* Share: a single composed bar matching the grouped stack's total height
+   (3 x 9px), so switching views does not change the table's vertical rhythm. */
 /* Fills the cell rather than a fixed track: a share bar asserts "this is the
    whole of this village", and one that visibly stops short of its container
    undercuts exactly that. Counts keeps the fixed px track because ITS lengths
@@ -243,13 +252,13 @@ function onDownloadCsv () {
   flex-direction: row;
   align-items: center;
   width: 100%;
-  height: 18px;
+  height: 27px;
   /* A 1px gap keeps adjacent segments distinguishable where one is a sliver;
      without it a 1px orange against a 1px purple reads as a single 2px mark. */
   gap: 1px;
 }
 
-.bar-track.is-stacked .bar-seg { height: 18px; }
+.bar-track.is-stacked .bar-seg { height: 27px; }
 
 /* NO border-radius. Rounding every segment was wrong in stacked bars: it landed
    on whichever segment happened to be last, so the rounding moved between rows

@@ -10,14 +10,19 @@ const ROWS = [
 ]
 
 describe('counts view', () => {
-  it('scales every row against the largest row total, not its own', () => {
+  it('makes the largest single segment exactly full width', () => {
+    // Scaled against the largest SEGMENT (Barrington's 671 completed), not the
+    // largest row TOTAL. Counts never draws a total, so scaling to one would
+    // leave the longest bar permanently short of the track's end.
     const segs = barSegments(ROWS, STATUS_SERIES, 'counts')
-    // Barrington is the max, so its three widths fill the whole track.
-    const barrington = segs[0].reduce((sum, s) => sum + s.width, 0)
-    expect(barrington).toBeCloseTo(BAR_TRACK_PX, 0)
-    // Warwick's total is 475/809 of the max, so its bar is that fraction.
-    const warwick = segs[1].reduce((sum, s) => sum + s.width, 0)
-    expect(warwick / barrington).toBeCloseTo(475 / 809, 2)
+    expect(segs[0].find(s => s.key === 'completed').width).toBeCloseTo(BAR_TRACK_PX, 0)
+  })
+
+  it('scales every other bar against that same segment, so lengths compare', () => {
+    const segs = barSegments(ROWS, STATUS_SERIES, 'counts')
+    const barrington = segs[0].find(s => s.key === 'completed').width
+    const warwick = segs[1].find(s => s.key === 'completed').width
+    expect(warwick / barrington).toBeCloseTo(298 / 671, 2)
   })
 
   it('gives a nonzero value at least one pixel so it never vanishes', () => {
