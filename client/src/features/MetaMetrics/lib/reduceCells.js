@@ -26,10 +26,6 @@ export const STATUS_SERIES = [
   { key: 'unmatched', label: 'Unmatched', colorLight: '#9333ea', colorDark: '#a855f7' },
 ]
 
-// `byServiceType`, `byCategory`, `CATEGORY_ORDER`, and `cellTotal` below have
-// no caller in this stage — Stage 1 ships the Outcomes tab only. They are for
-// the Categories and Services tabs of Stage 2, which reduce the same `cells`
-// payload by a different key. Do not delete them as dead code.
 export function cellTotal (byStatus) {
   return byStatus.completed + byStatus.unmatched +
     byStatus.memberCancelled + byStatus.volunteerCancelled
@@ -67,23 +63,3 @@ export function byVillage (cells, villages, { legs = false } = {}) {
   return [...rows.values()].sort(byTotalDesc)
 }
 
-export function byServiceType (cells) {
-  const rows = new Map()
-  for (const c of cells) {
-    if (!rows.has(c.serviceName)) rows.set(c.serviceName, blank({ serviceName: c.serviceName }))
-    accumulate(rows.get(c.serviceName), c.byStatus, c.completedRoundTrips, false)
-  }
-  return [...rows.values()].sort(byTotalDesc)
-}
-
-export function byCategory (cells) {
-  // Fixed order, zero-filled: chart colors and shapes stay stable regardless of
-  // which categories have data. Cells with a null category (a serviceName
-  // matching no prefix) are excluded rather than bucketed.
-  const rows = new Map(CATEGORY_ORDER.map(c => [c, blank({ category: c })]))
-  for (const c of cells) {
-    const row = c.category === null ? undefined : rows.get(c.category)
-    if (row) accumulate(row, c.byStatus, c.completedRoundTrips, false)
-  }
-  return [...rows.values()]
-}

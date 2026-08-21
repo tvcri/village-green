@@ -32,7 +32,21 @@ describe('drilldownCategories', () => {
       { villageId: '1', serviceName: 'Friends: Visit', category: 'Friends', byStatus: S(4, 0, 0, 0), completedRoundTrips: 0 },
       { villageId: '1', serviceName: 'Friends: Call', category: 'Friends', byStatus: S(6, 0, 0, 0), completedRoundTrips: 0 },
     ]
-    expect(drilldownCategories(withFriends)).toEqual(['Friends', 'Rides'])
+    expect(drilldownCategories(withFriends)).toContain('Friends')
+    expect(drilldownCategories(withFriends)).toContain('Rides')
+  })
+
+  it('orders by volume so the busiest category is the default selection', () => {
+    // Alphabetical order would put Errands first, but Rides is ~74% of all
+    // requests and Errands ~5% — opening on Errands shows the reader the least
+    // interesting slice of their data.
+    const cells = [
+      { villageId: '1', serviceName: 'Errand: Shopping', category: 'Errands', byStatus: S(3, 0, 0, 0), completedRoundTrips: 0 },
+      { villageId: '1', serviceName: 'Errand: Other', category: 'Errands', byStatus: S(2, 0, 0, 0), completedRoundTrips: 0 },
+      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(80, 0, 0, 0), completedRoundTrips: 0 },
+      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(40, 0, 0, 0), completedRoundTrips: 0 },
+    ]
+    expect(drilldownCategories(cells)).toEqual(['Rides', 'Errands'])
   })
 
   it('returns nothing when no category has a second service', () => {

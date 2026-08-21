@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { byVillage, byServiceType, byCategory, cellTotal } from './reduceCells.js'
+import { byVillage, cellTotal } from './reduceCells.js'
 
 const S = (completed, unmatched, memberCancelled, volunteerCancelled) =>
   ({ completed, unmatched, memberCancelled, volunteerCancelled })
@@ -46,34 +46,6 @@ describe('byVillage', () => {
   })
 })
 
-describe('byServiceType', () => {
-  it('sums the same serviceName across villages', () => {
-    const rows = byServiceType(CELLS)
-    const medical = rows.find(r => r.serviceName === 'Ride: Medical Appnt')
-    expect(medical.completed).toBe(15)
-    expect(medical.unmatched).toBe(3)
-    expect(medical.total).toBe(20)
-  })
-
-  it('sorts by total descending', () => {
-    expect(byServiceType(CELLS).map(r => r.serviceName))
-      .toEqual(['Ride: Medical Appnt', 'Errand: Shopping'])
-  })
-})
-
-describe('byCategory', () => {
-  it('returns all four categories in fixed order, zero-filled', () => {
-    const rows = byCategory(CELLS)
-    expect(rows.map(r => r.category)).toEqual(['Rides', 'Errands', 'Home Help', 'Tech Support'])
-    expect(rows.find(r => r.category === 'Tech Support').total).toBe(0)
-  })
-
-  it('ignores cells whose category is null', () => {
-    const withNull = [...CELLS, { villageId: '1', serviceName: 'Mystery', category: null, byStatus: S(9, 0, 0, 0), completedRoundTrips: 0 }]
-    const rows = byCategory(withNull)
-    expect(rows.reduce((a, r) => a + r.total, 0)).toBe(25) // the 9 is excluded
-  })
-})
 
 describe('byVillage with legs', () => {
   it('adds completedRoundTrips to completed when legs is true', () => {

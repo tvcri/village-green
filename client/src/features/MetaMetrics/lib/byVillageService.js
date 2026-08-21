@@ -42,18 +42,28 @@ function shortServiceName (serviceName, category) {
  *
  * Home Help and Tech Support have exactly one service each today, so drilling
  * into them would show a single column identical to the row total.
+ *
+ * BUSIEST FIRST, because the caller takes [0] as the default selection.
+ * Alphabetical order opened the tab on Errands (~5% of requests) rather than
+ * Rides (~74%) — the least interesting slice of the data, chosen by accident of
+ * spelling. Ordering by volume keeps the default honest as the mix changes,
+ * including when Friends arrives and possibly rivals Rides.
  */
 export function drilldownCategories (cells) {
   const byCategory = new Map()
   for (const cell of cells) {
     if (cell.category === null) continue
-    if (!byCategory.has(cell.category)) byCategory.set(cell.category, new Set())
-    byCategory.get(cell.category).add(cell.serviceName)
+    if (!byCategory.has(cell.category)) {
+      byCategory.set(cell.category, { names: new Set(), completed: 0 })
+    }
+    const entry = byCategory.get(cell.category)
+    entry.names.add(cell.serviceName)
+    entry.completed += cell.byStatus.completed
   }
   return [...byCategory.entries()]
-    .filter(([, names]) => names.size > 1)
+    .filter(([, { names }]) => names.size > 1)
+    .sort((a, b) => b[1].completed - a[1].completed || a[0].localeCompare(b[0]))
     .map(([category]) => category)
-    .sort((a, b) => a.localeCompare(b))
 }
 
 // Header-only abbreviations, keyed by full service name. Without them
