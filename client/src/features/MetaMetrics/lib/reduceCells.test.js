@@ -74,3 +74,39 @@ describe('byCategory', () => {
     expect(rows.reduce((a, r) => a + r.total, 0)).toBe(25) // the 9 is excluded
   })
 })
+
+describe('byVillage with legs', () => {
+  it('adds completedRoundTrips to completed when legs is true', () => {
+    const rows = byVillage(CELLS, VILLAGES, { legs: true })
+    const quahog = rows.find(r => r.villageId === '1')
+    // completed 10+3 = 13, roundTrips 4+0 = 4
+    expect(quahog.completed).toBe(17)
+  })
+
+  it('bumps total by the same amount so percentages stay coherent', () => {
+    const rows = byVillage(CELLS, VILLAGES, { legs: true })
+    const quahog = rows.find(r => r.villageId === '1')
+    // base total 13+1+3+1 = 18, plus 4 legs
+    expect(quahog.total).toBe(22)
+    expect(quahog.completed + quahog.cancelled + quahog.unmatched).toBe(quahog.total)
+  })
+
+  it('leaves counts untouched when legs is false', () => {
+    const rows = byVillage(CELLS, VILLAGES, { legs: false })
+    const quahog = rows.find(r => r.villageId === '1')
+    expect(quahog.completed).toBe(13)
+    expect(quahog.total).toBe(18)
+  })
+
+  it('defaults legs to false when no options are passed', () => {
+    const rows = byVillage(CELLS, VILLAGES)
+    expect(rows.find(r => r.villageId === '1').completed).toBe(13)
+  })
+
+  it('still seeds granted villages that have no cells', () => {
+    const rows = byVillage(CELLS, VILLAGES, { legs: true })
+    const empty = rows.find(r => r.villageId === '3')
+    expect(empty.total).toBe(0)
+    expect(empty.completed).toBe(0)
+  })
+})

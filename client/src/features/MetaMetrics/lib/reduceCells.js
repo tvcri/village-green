@@ -28,16 +28,22 @@ function blank (extra) {
   return { ...extra, completed: 0, cancelled: 0, unmatched: 0, total: 0 }
 }
 
-function accumulate (row, byStatus) {
-  row.completed += byStatus.completed
+// `legs` is a parameter with exactly ONE caller pinning it to true, on purpose.
+// The federation counts a completed round trip as two services and will not
+// count differently, so Meta Metrics ships no toggle. Keeping the arithmetic
+// parameterised means restoring a toggle for a future multi-village-grant user
+// is wiring a ref to an existing parameter, not a rework. Do not inline it.
+function accumulate (row, byStatus, completedRoundTrips, legs) {
+  const bump = legs ? completedRoundTrips : 0
+  row.completed += byStatus.completed + bump
   row.cancelled += byStatus.memberCancelled + byStatus.volunteerCancelled
   row.unmatched += byStatus.unmatched
-  row.total += cellTotal(byStatus)
+  row.total += cellTotal(byStatus) + bump
 }
 
 const byTotalDesc = (a, b) => b.total - a.total
 
-export function byVillage (cells, villages) {
+export function byVillage (cells, villages, { legs = false } = {}) {
   // Seeded from `villages`, not from `cells`: a granted village with no
   // requests in range must still appear, at zero.
   const rows = new Map(
@@ -45,7 +51,7 @@ export function byVillage (cells, villages) {
   )
   for (const c of cells) {
     const row = rows.get(c.villageId)
-    if (row) accumulate(row, c.byStatus)
+    if (row) accumulate(row, c.byStatus, c.completedRoundTrips, legs)
   }
   return [...rows.values()].sort(byTotalDesc)
 }
@@ -54,7 +60,7 @@ export function byServiceType (cells) {
   const rows = new Map()
   for (const c of cells) {
     if (!rows.has(c.serviceName)) rows.set(c.serviceName, blank({ serviceName: c.serviceName }))
-    accumulate(rows.get(c.serviceName), c.byStatus)
+    accumulate(rows.get(c.serviceName), c.byStatus, c.completedRoundTrips, false)
   }
   return [...rows.values()].sort(byTotalDesc)
 }
@@ -66,7 +72,7 @@ export function byCategory (cells) {
   const rows = new Map(CATEGORY_ORDER.map(c => [c, blank({ category: c })]))
   for (const c of cells) {
     const row = c.category === null ? undefined : rows.get(c.category)
-    if (row) accumulate(row, c.byStatus)
+    if (row) accumulate(row, c.byStatus, c.completedRoundTrips, false)
   }
   return [...rows.values()]
 }
