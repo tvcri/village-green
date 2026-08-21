@@ -7,6 +7,7 @@ import { getMetaMetrics } from '../api/metaMetricsApi.js'
 import { byVillage, byServiceType, byCategory } from '../lib/reduceCells.js'
 import { buildBarData, buildProportionalData, barOptions } from '../lib/chartConfig.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
+import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
 
 const payload = ref(null)
 const isLoading = ref(true)
@@ -17,8 +18,7 @@ function defaultRange () {
   const end = new Date()
   const start = new Date(end)
   start.setDate(start.getDate() - 29)
-  const iso = d => d.toISOString().slice(0, 10)
-  return { start: iso(start), end: iso(end) }
+  return { start: dateToServiceDate(start), end: dateToServiceDate(end) }
 }
 
 const range = ref(defaultRange())

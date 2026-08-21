@@ -3,10 +3,13 @@
 const SmError = require('../utils/error')
 const MetricsService = require('../service/MetricsService')
 const { hasPermission } = require('../utils/authz')
+const { resolveMetricsRange, todayCivil } = require('../utils/metricsRange')
+const config = require('../utils/config')
 
 module.exports.getMetaMetrics = async function getMetaMetrics (req, res, next) {
   try {
-    const { start, end } = req.query
+    const today = todayCivil(config.settings.civilTimeZone)
+    const { start, end } = resolveMetricsRange(req.query.start, req.query.end, today)
     // Scope derives from grants rather than a query param. This diverges from
     // GET /service-requests, which demands an explicit villageId list from a
     // non-federation caller — that strictness suits an endpoint returning rows,
