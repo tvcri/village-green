@@ -103,11 +103,17 @@ function onDownloadCsv () {
         :field="col.key"
         :header="col.header"
         sortable
-        :bodyClass="i === 0 ? '' : 'num-cell'"
-        :headerClass="i === 0 ? '' : 'num-cell'"
+        :bodyClass="i === 0 ? 'name-cell' : 'num-cell'"
+        :headerClass="i === 0 ? 'name-cell' : 'num-cell'"
       >
         <template v-if="swatchColor(col.key)" #header>
           <span class="swatch" :style="{ backgroundColor: swatchColor(col.key) }" />
+        </template>
+        <!-- Only the name column needs a body template: the title attribute is
+             what keeps an ellipsis-truncated village name readable. Every other
+             column renders its field value as usual. -->
+        <template v-if="i === 0" #body="{ data }">
+          <span :title="data.villageName">{{ data.villageName }}</span>
         </template>
       </Column>
 
@@ -133,7 +139,7 @@ function onDownloadCsv () {
             v-for="(col, i) in columns"
             :key="col.key"
             :footer="String(footer[col.key])"
-            :footerClass="i === 0 ? '' : 'num-cell'"
+            :footerClass="i === 0 ? 'name-cell' : 'num-cell'"
           />
           <!-- Matches the bar column so the footer's cells stay aligned with
                the body's. Deliberately empty: a hub-wide bar would invite
@@ -155,8 +161,28 @@ function onDownloadCsv () {
   margin-bottom: 0.25rem;
 }
 
-/* Numbers right-align so magnitudes line up column-wise; the village name does not. */
-.meta-matrix-table :deep(.num-cell) { text-align: right; }
+/* Without explicit widths these columns are auto-sized from their content and
+   header text, and the village name loses that negotiation — "Aquidneck Island"
+   and "Bristol-Warren" wrapped to two lines while the percentage columns sat on
+   ~100px of surplus. Sizing the numeric columns to what they actually hold
+   returns that width to the names.
+   Numbers right-align so magnitudes line up column-wise; the name does not. */
+.meta-matrix-table :deep(.num-cell) {
+  width: 6.5rem;
+  text-align: right;
+}
+
+/* 11rem clears the longest name in the roster ("Aquidneck Island", 16 chars)
+   with room to spare. Names are hand-entered into a varchar(200), so an
+   unusually long one ellipsis-truncates rather than wrapping or widening the
+   table — the full name stays available via the title attribute. */
+.meta-matrix-table :deep(.name-cell) {
+  width: 11rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 11rem;
+}
 
 /* text-align alone does NOT right-align a sortable header. PrimeVue wraps the
    header's label + sort icon in a flex container, and its justify-content wins

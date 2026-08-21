@@ -160,6 +160,15 @@ describe('MetaMatrixTable in-row bars', () => {
     expect(container.querySelector('.bar-seg').style.backgroundColor).toBe(probe.style.backgroundColor)
   })
 
+  it('titles the village name so an ellipsis-truncated one stays readable', () => {
+    // The name column is a fixed width with nowrap + text-overflow, so a name
+    // longer than the track truncates rather than wrapping or widening the
+    // table. The title attribute is what keeps it recoverable.
+    const { container } = mountTable()
+    const nameCell = container.querySelector('.meta-matrix-table tbody td')
+    expect(nameCell.querySelector('[title]').getAttribute('title')).toBe('Barrington')
+  })
+
   it('titles each segment so its value is reachable on hover', () => {
     const { container } = mountTable()
     expect(container.querySelector('.bar-seg').getAttribute('title')).toBe('Completed: 624')
