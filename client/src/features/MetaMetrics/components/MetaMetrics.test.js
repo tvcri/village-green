@@ -225,9 +225,10 @@ describe('MetaMetrics page shell', () => {
     mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'detail' }
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
-    // Rides is the only drillable category here, so it is the default, and its
-    // labels lose the prefix the selector already states.
-    expect(screen.getByText('Medical Appnt')).toBeInTheDocument()
+    // Rides is the only drillable category here, so it is the default. Column
+    // headers lose the prefix the selector already states, and the long ones
+    // are abbreviated further so they do not wrap.
+    expect(screen.getByText('Medical')).toBeInTheDocument()
     expect(screen.getByText('Shopping')).toBeInTheDocument()
     // Stacked like Categories, since services partition their category's work.
     expect(container.querySelector('.bar-track')).toHaveClass('is-stacked')
@@ -249,14 +250,14 @@ describe('MetaMetrics page shell', () => {
     mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'detail', category: 'Rides' }
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
-    expect(screen.getByText('Medical Appnt')).toBeInTheDocument()
+    expect(screen.getByText('Medical')).toBeInTheDocument()
   })
 
   it('falls back to the first drillable category for an unknown one', async () => {
     mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'detail', category: 'Banana' }
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
-    expect(screen.getByText('Medical Appnt')).toBeInTheDocument()
+    expect(screen.getByText('Medical')).toBeInTheDocument()
     // Read-and-fall-back, never a written correction.
     expect(mockRoute.query.category).toBe('Banana')
   })

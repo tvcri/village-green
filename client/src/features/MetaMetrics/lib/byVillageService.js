@@ -56,9 +56,25 @@ export function drilldownCategories (cells) {
     .sort((a, b) => a.localeCompare(b))
 }
 
+// Header-only abbreviations, keyed by full service name. Without them
+// "Medical Appnt" and "Personal Care" wrap their column headers onto two lines
+// while "Shopping" and "Other" sit on one, making the header row taller than
+// any of them needs. These are the customer's own shorthand for the services;
+// the full prefix-stripped label still names the bar segment and the CSV column.
+//
+// Keyed by the FULL name rather than the stripped one so a future
+// "Friends: Personal Care" could not accidentally inherit a ride's shorthand.
+const SERVICE_SHORT_LABELS = {
+  'Ride: Medical Appnt': 'Medical',
+  'Ride: Activity/Event': 'Activity',
+  'Ride: Personal Care': 'Personal',
+  'Errand: Pick up/delivery': 'Pickup',
+}
+
 /**
  * The drawable series for one category: its service names, busiest first, each
- * carrying a ramp colour and a prefix-stripped label.
+ * carrying a ramp colour, a prefix-stripped label, and — where the label is
+ * long enough to wrap a header — a shortLabel.
  */
 export function serviceSeries (cells, category) {
   const totals = new Map()
@@ -72,11 +88,15 @@ export function serviceSeries (cells, category) {
     // Busiest first so the ramp's strongest hue lands on the dominant service
     // and the column order matches the bar's segment order.
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([serviceName], i) => ({
-      key: serviceName,
-      label: shortServiceName(serviceName, category),
-      ...SERVICE_RAMP[i % SERVICE_RAMP.length],
-    }))
+    .map(([serviceName], i) => {
+      const short = SERVICE_SHORT_LABELS[serviceName]
+      return {
+        key: serviceName,
+        label: shortServiceName(serviceName, category),
+        ...(short ? { shortLabel: short } : {}),
+        ...SERVICE_RAMP[i % SERVICE_RAMP.length],
+      }
+    })
 }
 
 /**

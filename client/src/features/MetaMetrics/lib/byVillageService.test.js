@@ -109,3 +109,38 @@ describe('byVillageService', () => {
     expect(rows.find(r => r.villageId === '2')['Ride: Shopping']).toBe(0)
   })
 })
+
+// Long service labels wrap their column headers onto two lines while the
+// single-word ones sit on one, leaving the header row taller than any of them
+// needs — the same problem the category headers had. Header-only, as there:
+// the full name still labels the bar segment and the CSV column.
+describe('service header abbreviations', () => {
+  const ride = name => ({
+    villageId: '1', serviceName: name, category: 'Rides',
+    byStatus: { completed: 1, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
+    completedRoundTrips: 0,
+  })
+
+  it('shortens the multi-word ride services', () => {
+    const cells = ['Ride: Medical Appnt', 'Ride: Activity/Event', 'Ride: Personal Care'].map(ride)
+    const byKey = Object.fromEntries(serviceSeries(cells, 'Rides').map(s => [s.key, s.shortLabel]))
+    expect(byKey['Ride: Medical Appnt']).toBe('Medical')
+    expect(byKey['Ride: Activity/Event']).toBe('Activity')
+    expect(byKey['Ride: Personal Care']).toBe('Personal')
+  })
+
+  it('shortens the one multi-word errand service', () => {
+    const cells = [{ ...ride('Errand: Pick up/delivery'), category: 'Errands' }]
+    expect(serviceSeries(cells, 'Errands')[0].shortLabel).toBe('Pickup')
+  })
+
+  it('leaves an already-short label alone', () => {
+    const cells = ['Ride: Shopping', 'Ride: Other'].map(ride)
+    for (const s of serviceSeries(cells, 'Rides')) expect(s.shortLabel).toBeUndefined()
+  })
+
+  it('keeps the full prefix-stripped label for the bar and the CSV', () => {
+    const [s] = serviceSeries([ride('Ride: Medical Appnt')], 'Rides')
+    expect(s.label).toBe('Medical Appnt')
+  })
+})
