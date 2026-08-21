@@ -2136,6 +2136,36 @@ paths:
       security:
       - oauth:
         - vg:friends:read
+  /metrics:
+    get:
+      summary: Cross-village service metrics over a serviceDate range, scoped to the caller's grants
+      description: >-
+        Returns one cell per village x serviceName. A caller with a
+        federation-scope sr:read sees every village; otherwise the response
+        covers exactly the villages the caller holds sr:read on, and 403s when
+        that set is empty. Terminal statuses only.
+      tags:
+      - Metrics
+      operationId: getMetaMetrics
+      parameters:
+      - $ref: '#/components/parameters/MetricsStartQuery'
+      - $ref: '#/components/parameters/MetricsEndQuery'
+      responses:
+        '200':
+          description: Cross-village metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetaMetrics'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
   /villages:
     get:
       summary: List villages
@@ -5007,6 +5037,67 @@ components:
           type: integer
         volunteerCancelled:
           type: integer
+    MetaMetrics:
+      type: object
+      additionalProperties: false
+      required:
+      - range
+      - villages
+      - cells
+      properties:
+        range:
+          type: object
+          additionalProperties: false
+          required:
+          - start
+          - end
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+        villages:
+          type: array
+          description: Every village in the caller's scope, including those with no requests in range.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - villageId
+            - villageName
+            properties:
+              villageId:
+                $ref: '#/components/schemas/VillageId'
+              villageName:
+                $ref: '#/components/schemas/VillageName'
+        cells:
+          type: array
+          description: One entry per village x serviceName having at least one terminal request in range.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - villageId
+            - serviceName
+            - category
+            - byStatus
+            - completedRoundTrips
+            properties:
+              villageId:
+                $ref: '#/components/schemas/VillageId'
+              serviceName:
+                type: string
+                maxLength: 200
+              category:
+                type: string
+                maxLength: 40
+                nullable: true
+              byStatus:
+                $ref: '#/components/schemas/MetricsStatusCounts'
+              completedRoundTrips:
+                type: integer
     VillageMetrics:
       type: object
       additionalProperties: false
