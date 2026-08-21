@@ -69,6 +69,15 @@ const mountPage = () => render(MetaMetrics, {
   global: { plugins: [PrimeVue], stubs: { MetricsRangePicker: true } },
 })
 
+// Mount and wait for the payload to land. 'Villages' is the first summary-strip
+// card and only renders once `payload` is set, so it is the loaded-state signal
+// the other tests already key on.
+async function mountLoaded () {
+  const utils = mountPage()
+  await waitFor(() => expect(screen.getByText('Villages')).toBeInTheDocument())
+  return utils
+}
+
 beforeEach(() => {
   window.matchMedia = window.matchMedia || (q => ({
     matches: false, media: q, addEventListener () {}, removeEventListener () {},
@@ -173,5 +182,65 @@ describe('MetaMetrics page shell', () => {
     getMetaMetrics.mockRejectedValue(Object.assign(new Error('Forbidden'), { status: 403 }))
     mountPage()
     await waitFor(() => expect(screen.getByText(/no villages in scope/i)).toBeInTheDocument())
+  })
+
+  // ---- fetch-lifecycle guards ----
+  // These four cover the three traps the page comments call load-bearing: the
+  // primitive `rangeKey` watch source, `normalizeRange()` returning false so the
+  // router.replace re-triggers the watcher, and onMounted's single trigger.
+  // Without them a regression that double-fetches — or that refetches on every
+  // sort click — leaves the rest of the suite green.
+
+  it('fetches once on entry with a valid range', async () => {
+    await mountLoaded()
+    expect(getMetaMetrics).toHaveBeenCalledTimes(1)
+    expect(getMetaMetrics).toHaveBeenCalledWith('2026-01-01', '2026-12-31')
+    // a valid range must not provoke a normalizing replace
+    expect(mockRouter.replace).not.toHaveBeenCalled()
+  })
+
+  it('normalizes a missing range to this-year without dropping other query keys', async () => {
+    mockRoute.query = { foo: 'bar' }
+    mountPage()
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalled())
+    const { query } = mockRouter.replace.mock.calls[0][0]
+    expect(query.foo).toBe('bar')
+    expect(query.start).toBeTruthy()
+    expect(query.end).toBeTruthy()
+    // The write-back makes the range valid, so exactly one real fetch follows the
+    // normalize — never two (no double-fetch, no replace loop).
+    await waitFor(() => expect(getMetaMetrics).toHaveBeenCalledTimes(1))
+    expect(getMetaMetrics).toHaveBeenCalledWith(query.start, query.end)
+    expect(mockRouter.replace).toHaveBeenCalledTimes(1)
+  })
+
+  it('refetches when the range actually changes', async () => {
+    await mountLoaded()
+    expect(getMetaMetrics).toHaveBeenCalledTimes(1)
+
+    // simulate the range picker emitting a new range through the same router path
+    mockRoute.query = { ...mockRoute.query, start: '2025-01-01', end: '2025-12-31' }
+    await waitFor(() => expect(getMetaMetrics).toHaveBeenCalledTimes(2))
+    expect(getMetaMetrics).toHaveBeenLastCalledWith('2025-01-01', '2025-12-31')
+  })
+
+  // The view toggle and the table sort are pure client-side reductions of the
+  // already-fetched payload; only a range change should ever trigger a network
+  // call. Both navigate — they write `view`/`sort` into the query — so this is
+  // what guards the primitive `rangeKey` watch source: watching the `range`
+  // OBJECT instead would refetch here, because vue-router hands back a brand-new
+  // query object on every navigation.
+  it('does not refetch when the view toggle or the sort changes', async () => {
+    await mountLoaded()
+    expect(getMetaMetrics).toHaveBeenCalledTimes(1)
+
+    await fireEvent.click(screen.getByText('Share'))
+    await waitFor(() => expect(mockRoute.query.view).toBe('share'))
+    expect(getMetaMetrics).toHaveBeenCalledTimes(1)
+
+    // Drive the real table header, not an internal setter.
+    await fireEvent.click(screen.getByText('Unmatched', { selector: '.p-datatable-column-title' }))
+    await waitFor(() => expect(mockRoute.query.sort).toBe('unmatched'))
+    expect(getMetaMetrics).toHaveBeenCalledTimes(1)
   })
 })
