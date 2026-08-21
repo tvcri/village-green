@@ -23,16 +23,35 @@ import { CATEGORY_ORDER } from './reduceCells.js'
 // the header row is taller than any of them needs. The audience for this page
 // is federation staff, for whom "Home" and "Tech" are unambiguous; the full
 // label still names the bar segment and the CSV column.
-export const CATEGORY_SERIES = CATEGORY_ORDER.map(key => ({
-  key,
-  label: key,
-  ...{
-    Rides: { colorLight: '#22c55e', colorDark: '#4ade80' },
-    Errands: { colorLight: '#f59e0b', colorDark: '#fbbf24' },
-    'Home Help': { colorLight: '#3b82f6', colorDark: '#60a5fa', shortLabel: 'Home' },
-    'Tech Support': { colorLight: '#8b5cf6', colorDark: '#a78bfa', shortLabel: 'Tech' },
-  }[key],
-}))
+const CATEGORY_STYLES = {
+  Rides: { colorLight: '#22c55e', colorDark: '#4ade80' },
+  Errands: { colorLight: '#f59e0b', colorDark: '#fbbf24' },
+  'Home Help': { colorLight: '#3b82f6', colorDark: '#60a5fa', shortLabel: 'Home' },
+  'Tech Support': { colorLight: '#8b5cf6', colorDark: '#a78bfa', shortLabel: 'Tech' },
+}
+
+// The vocabulary is expected to GROW: friendly calls and visits are a likely
+// fifth category, and the customer expects them to rival Rides by volume once
+// they are willing to record them. A category added to CATEGORY_ORDER without
+// a style here would otherwise spread to `undefined` colors and render as an
+// INVISIBLE bar segment — a silent failure. This gives it a visible neutral
+// grey and says so, loudly, in the console.
+const FALLBACK_STYLE = { colorLight: '#64748b', colorDark: '#94a3b8' }
+
+export function buildCategorySeries (order) {
+  return order.map(key => {
+    const style = CATEGORY_STYLES[key]
+    if (!style && typeof console !== 'undefined') {
+      console.warn(
+        `[MetaMetrics] No color defined for service category "${key}". ` +
+        'Add one to CATEGORY_STYLES in byVillageCategory.js — it is rendering grey.',
+      )
+    }
+    return { key, label: key, ...(style ?? FALLBACK_STYLE) }
+  })
+}
+
+export const CATEGORY_SERIES = buildCategorySeries(CATEGORY_ORDER)
 
 /**
  * One row per village in `villages`, carrying a completed-request count for

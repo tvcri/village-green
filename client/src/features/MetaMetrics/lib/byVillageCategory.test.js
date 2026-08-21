@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { byVillageCategory, CATEGORY_SERIES } from './byVillageCategory.js'
+import { byVillageCategory, CATEGORY_SERIES, buildCategorySeries } from './byVillageCategory.js'
 
 const S = (completed, unmatched, memberCancelled, volunteerCancelled) =>
   ({ completed, unmatched, memberCancelled, volunteerCancelled })
@@ -79,5 +79,28 @@ describe('byVillageCategory', () => {
     const rows = byVillageCategory(CELLS, VILLAGES, { legs: false })
     const quahog = rows.find(r => r.villageId === '1')
     expect(quahog.total).toBe(18)
+  })
+})
+
+// The category vocabulary is expected to GROW — friendly calls/visits are a
+// likely fifth, and the customer expects them to rival Rides by volume. A new
+// entry in CATEGORY_ORDER with no color mapping must not render as an invisible
+// segment; it gets a visible fallback and a warning instead.
+describe('an unmapped category', () => {
+  it('still gets both theme colors', () => {
+    const series = buildCategorySeries(['Rides', 'Friendly Calls'])
+    const added = series.find(s => s.key === 'Friendly Calls')
+    expect(added.colorLight).toMatch(/^#[0-9a-f]{6}$/i)
+    expect(added.colorDark).toMatch(/^#[0-9a-f]{6}$/i)
+  })
+
+  it('keeps its own label rather than borrowing another category’s', () => {
+    const series = buildCategorySeries(['Rides', 'Friendly Calls'])
+    expect(series.find(s => s.key === 'Friendly Calls').label).toBe('Friendly Calls')
+  })
+
+  it('preserves the given order', () => {
+    expect(buildCategorySeries(['Errands', 'Rides']).map(s => s.key))
+      .toEqual(['Errands', 'Rides'])
   })
 })

@@ -8,6 +8,13 @@
 
 // Must stay in step with SERVICE_CATEGORIES in api/source/service/utils.js,
 // which is the vocabulary's source of truth.
+//
+// ADDING ONE: also add a colour to CATEGORY_STYLES in byVillageCategory.js.
+// Without it the new category renders grey with a console warning rather than
+// silently invisible, but grey is a placeholder, not a choice. A fifth category
+// for friendly calls/visits is expected eventually — the customer is holding it
+// back over reconciliation issues in their manually entered data, not because
+// the work is small; they expect it to rival Rides by volume.
 export const CATEGORY_ORDER = ['Rides', 'Errands', 'Home Help', 'Tech Support']
 
 // The three drawn series. 'cancelled' merges the two client cancel statuses;
