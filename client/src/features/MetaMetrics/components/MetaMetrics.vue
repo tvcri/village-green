@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Chart from 'primevue/chart'
 import SelectButton from 'primevue/selectbutton'
 import MetaChartCard from './MetaChartCard.vue'
@@ -8,20 +9,68 @@ import { byVillage, byServiceType, byCategory } from '../lib/reduceCells.js'
 import { buildBarData, buildProportionalData, barOptions } from '../lib/chartConfig.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
+import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
+import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
+import { presetRange, isValidRange } from '../../VillageMetrics/lib/rangePresets.js'
+import MetricsRangePicker from '../../VillageMetrics/components/MetricsRangePicker.vue'
 
-const payload = ref(null)
-const isLoading = ref(true)
-const isDenied = ref(false)
+const route = useRoute()
+const router = useRouter()
 
-// Default window: the trailing 30 days, matching the sheet this replaces.
-function defaultRange () {
-  const end = new Date()
-  const start = new Date(end)
-  start.setDate(start.getDate() - 29)
-  return { start: dateToServiceDate(start), end: dateToServiceDate(end) }
+// "today" as a civil string — reading the clock is allowed; parsing a stored value is not.
+const todayCivil = dateToServiceDate(new Date())
+
+const range = computed(() => ({ start: route.query.start, end: route.query.end }))
+
+// Identity-stable watch source. `range` returns a NEW object literal each evaluation, and
+// watch compares non-deep sources with Object.is — so watching `range` refetches on ANY
+// navigation, including one that leaves start/end untouched (vue-router builds a fresh
+// query object per navigation, which invalidates the computed even when unchanged).
+// A primitive string collapses that to a real value comparison.
+const rangeKey = computed(() => `${route.query.start}|${route.query.end}`)
+
+// Normalize the URL to a valid range (default = this-year, matching VillageMetrics)
+// whenever it is missing/invalid. Spreads the existing query so a normalize doesn't
+// drop any other query params.
+function normalizeRange () {
+  if (!isValidRange(range.value)) {
+    const def = presetRange('thisYear', todayCivil)
+    router.replace({ query: { ...route.query, start: def.start, end: def.end } })
+    return false // a replace will re-trigger the watcher with a valid range
+  }
+  return true
 }
 
-const range = ref(defaultRange())
+const { state: payload, isLoading, error, execute } = useAsyncState(
+  () => getMetaMetrics(range.value.start, range.value.end),
+  // A 403 here means the caller has no granted villages at all — an expected
+  // outcome, not a bug. Show it inline instead of the global crash-style error modal.
+  { immediate: false, onError: null },
+)
+
+const isDenied = computed(() => getHttpStatus(error.value) === 403)
+
+// Fetch only when the range is valid; normalize otherwise.
+function fetchIfValid () {
+  if (normalizeRange()) execute()
+}
+
+// Refetch on range change. Watches `rangeKey` (a primitive) rather than `range`
+// (an object literal), so this fires exactly when start/end actually change.
+// It does not fire on initial mount (watch is lazy by default).
+useRefetchOnChange([rangeKey], fetchIfValid)
+
+// The single mount trigger. onMounted fires once; fetchIfValid either executes
+// (valid query) or router.replaces the default — and that replace changes route.query,
+// which the useRefetchOnChange watcher above then picks up to run the one real fetch.
+// Net: exactly one fetch on entry (no double-fetch, no replace loop, because a valid
+// range makes normalizeRange a no-op that returns true).
+onMounted(() => fetchIfValid())
+
+// Spread the existing query so changing the range preserves any other query params.
+function onRangeUpdate ({ start, end }) {
+  router.replace({ query: { ...route.query, start, end } })
+}
 
 // Per-chart view selection, mirroring VillageMetrics' per-chart status
 // selectors rather than one page-level control.
@@ -67,24 +116,19 @@ const serviceOptions = computed(() => barOptions({ stacked: false, percent: fals
 
 // 44px per row keeps 13 villages readable and grows with a 14th.
 const rowHeight = rows => Math.max(240, rows.length * 44 + 80)
-
-onMounted(async () => {
-  try {
-    payload.value = await getMetaMetrics(range.value.start, range.value.end)
-  }
-  catch (err) {
-    if (getHttpStatus(err) === 403) isDenied.value = true
-    else throw err
-  }
-  finally {
-    isLoading.value = false
-  }
-})
 </script>
 
 <template>
   <div class="meta-metrics">
     <h1>Metrics</h1>
+
+    <MetricsRangePicker
+      v-if="isValidRange(range)"
+      :start="range.start"
+      :end="range.end"
+      :today="todayCivil"
+      @update:range="onRangeUpdate"
+    />
 
     <p v-if="isDenied" class="notice">
       You have no villages in scope, so there are no metrics to show.
@@ -131,6 +175,7 @@ h1 {
 
 .notice {
   color: var(--color-text-secondary);
+  margin-top: 1.5rem;
 }
 
 @media (max-width: 640px) {
