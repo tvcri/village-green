@@ -7,6 +7,7 @@ import Row from 'primevue/row'
 import Button from 'primevue/button'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { matrixColumns, matrixCells, matrixFooter } from '../lib/matrixTable.js'
+import { barSegments, BAR_TRACK_PX } from '../lib/barGeometry.js'
 
 const props = defineProps({
   rows: { type: Array, required: true },      // ALREADY ordered by the parent
@@ -26,9 +27,10 @@ const columns = computed(() => matrixColumns(props.series, props.view))
 const cells = computed(() => matrixCells(props.rows, props.series, props.view))
 const footer = computed(() => matrixFooter(props.rows, props.series, props.view))
 
-// This table IS the chart's legend (Chart.js's own legend is off — see
-// chartConfig.js), so each series column header carries the same swatch as
-// its bars. Village and Total/Requests are not series, so they get none.
+// Each series column header carries the same swatch color as the bar segments
+// drawn in that column's rows — there is no chart and no separate legend, so
+// this pairing is what names the colors. Village and Total/Requests are not
+// series, so they get none.
 // Keyed off `series[].key` rather than column index — index math (skip first
 // and last) would silently mis-swatch if a column were ever reordered.
 function swatchColor (colKey) {
@@ -51,6 +53,30 @@ function onSort (event) {
 }
 
 const sortOrder = computed(() => (props.dir === 'desc' ? -1 : 1))
+
+// The bar lives in the same ROW as its numbers, which is the whole reason this
+// page has no chart. Keyed by villageId rather than row index so the bar cannot
+// drift from its row if PrimeVue ever renders out of order.
+const segmentsById = computed(() => {
+  const all = barSegments(props.rows, props.series, props.view)
+  return new Map(props.rows.map((row, i) => [row.villageId, all[i]]))
+})
+
+function segmentsFor (villageId) {
+  return segmentsById.value.get(villageId) ?? []
+}
+
+function segColor (seg) {
+  return props.dark ? seg.colorDark : seg.colorLight
+}
+
+// Native title attribute rather than a tooltip library: the numbers are already
+// on screen in the same row, so this is a convenience, not the primary reading.
+function segTitle (seg) {
+  return `${seg.label}: ${seg.value}`
+}
+
+const trackWidth = `${BAR_TRACK_PX}px`
 
 function onDownloadCsv () {
   downloadCsv(toCsv(cells.value, columns.value), props.csvFilename)
@@ -84,6 +110,23 @@ function onDownloadCsv () {
           <span class="swatch" :style="{ backgroundColor: swatchColor(col.key) }" />
         </template>
       </Column>
+
+      <!-- The bar column. Not sortable and not exported: it is a rendering of
+           the numbers in the same row, not a value of its own. -->
+      <Column headerClass="bar-head" bodyClass="bar-cell">
+        <template #body="{ data }">
+          <div class="bar-track" :style="{ width: trackWidth }">
+            <span
+              v-for="seg in segmentsFor(data.villageId)"
+              :key="seg.key"
+              class="bar-seg"
+              :style="{ width: `${seg.width}px`, backgroundColor: segColor(seg) }"
+              :title="segTitle(seg)"
+            />
+          </div>
+        </template>
+      </Column>
+
       <ColumnGroup type="footer">
         <Row>
           <Column
@@ -92,6 +135,11 @@ function onDownloadCsv () {
             :footer="String(footer[col.key])"
             :footerClass="i === 0 ? '' : 'num-cell'"
           />
+          <!-- Matches the bar column so the footer's cells stay aligned with
+               the body's. Deliberately empty: a hub-wide bar would invite
+               reading it against the per-village bars, which are on a
+               different scale. -->
+          <Column />
         </Row>
       </ColumnGroup>
     </DataTable>
@@ -110,9 +158,43 @@ function onDownloadCsv () {
 /* Numbers right-align so magnitudes line up column-wise; the village name does not. */
 .meta-matrix-table :deep(.num-cell) { text-align: right; }
 
+/* text-align alone does NOT right-align a sortable header. PrimeVue wraps the
+   header's label + sort icon in a flex container, and its justify-content wins
+   over the th's text-align — so the body cells right-aligned while the headers
+   stayed left, putting each header visually above the PREVIOUS column's
+   numbers. Justify the flex container instead. */
+.meta-matrix-table :deep(th.num-cell .p-datatable-column-header-content) {
+  justify-content: flex-end;
+}
+
 .meta-matrix-table :deep(tfoot td) {
   font-weight: 700;
   border-top: 2px solid var(--color-border-default, #e5e7eb);
+}
+
+/* The bar column takes the leftover width so the numeric columns keep their
+   natural size. Extra left padding separates the bar from the Total figure. */
+.meta-matrix-table :deep(td.bar-cell),
+.meta-matrix-table :deep(th.bar-head) {
+  width: 100%;
+  padding-left: 1.15rem;
+}
+
+.bar-track {
+  display: flex;
+  align-items: center;
+  height: 11px;
+  /* A 1px gap keeps adjacent segments distinguishable where one is a sliver;
+     without it a 1px orange against a 1px purple reads as a single 2px mark. */
+  gap: 1px;
+}
+
+/* NO border-radius. Rounding every segment was wrong in stacked bars: it landed
+   on whichever segment happened to be last, so the rounding moved between rows
+   as the data changed — visible when a village had zero Unmatched. */
+.bar-seg {
+  display: inline-block;
+  height: 11px;
 }
 
 .swatch {

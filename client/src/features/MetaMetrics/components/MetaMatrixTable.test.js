@@ -90,8 +90,10 @@ describe('MetaMatrixTable', () => {
     const { container } = mountTable()
     const headers = container.querySelectorAll('.meta-matrix-table th')
     const swatchCounts = [...headers].map(h => h.querySelectorAll('.swatch').length)
-    // columns are [Village, Completed, Cancelled, Unmatched, Total]
-    expect(swatchCounts).toEqual([0, 1, 1, 1, 0])
+    // columns are [Village, Completed, Cancelled, Unmatched, Total, bar]
+    // The bar column's header is deliberately blank — the swatches above name
+    // the colors it draws.
+    expect(swatchCounts).toEqual([0, 1, 1, 1, 0, 0])
   })
 
   it('picks the light swatch color by default and the dark one when dark is true', () => {
@@ -109,5 +111,57 @@ describe('MetaMatrixTable', () => {
     const { container: darkContainer } = mountTable({ dark: true })
     probe.style.backgroundColor = dark
     expect(darkContainer.querySelector('.swatch').style.backgroundColor).toBe(probe.style.backgroundColor)
+  })
+})
+
+// The bar is a column of this table rather than a separate chart, so that a
+// village's bar and its numbers are structurally on the same line and cannot
+// drift apart. These assert that pairing, not the pixel math (barGeometry.test.js
+// owns that).
+describe('MetaMatrixTable in-row bars', () => {
+  it('draws one bar per row, each with one segment per series', () => {
+    const { container } = mountTable()
+    const tracks = container.querySelectorAll('.bar-track')
+    expect(tracks).toHaveLength(ROWS.length)
+    for (const track of tracks) {
+      expect(track.querySelectorAll('.bar-seg')).toHaveLength(STATUS_SERIES.length)
+    }
+  })
+
+  it('puts each row’s bar in that row, beside its own numbers', () => {
+    const { container } = mountTable()
+    const firstRow = container.querySelectorAll('.meta-matrix-table tbody tr')[0]
+    expect(firstRow.textContent).toContain('Barrington')
+    // Barrington's completed count and its bar are in the SAME <tr>.
+    expect(firstRow.textContent).toContain('624')
+    expect(firstRow.querySelectorAll('.bar-seg')).toHaveLength(STATUS_SERIES.length)
+  })
+
+  it('scales counts against the widest row so bars compare across villages', () => {
+    const { container } = mountTable({ view: 'counts' })
+    const rows = container.querySelectorAll('.meta-matrix-table tbody tr')
+    const widthOf = (tr, i) => parseFloat(tr.querySelectorAll('.bar-seg')[i].style.width)
+    // Barrington completed 624, East Greenwich 88 — the ratio must survive.
+    expect(widthOf(rows[0], 0) / widthOf(rows[1], 0)).toBeCloseTo(624 / 88, 1)
+  })
+
+  it('fills the same track for every row in share view', () => {
+    const { container } = mountTable({ view: 'share' })
+    const total = tr => [...tr.querySelectorAll('.bar-seg')]
+      .reduce((sum, s) => sum + parseFloat(s.style.width), 0)
+    const rows = container.querySelectorAll('.meta-matrix-table tbody tr')
+    expect(total(rows[0])).toBeCloseTo(total(rows[1]), 0)
+  })
+
+  it('colors the bar segments for the active theme', () => {
+    const probe = document.createElement('span')
+    probe.style.backgroundColor = STATUS_SERIES[0].colorDark
+    const { container } = mountTable({ dark: true })
+    expect(container.querySelector('.bar-seg').style.backgroundColor).toBe(probe.style.backgroundColor)
+  })
+
+  it('titles each segment so its value is reachable on hover', () => {
+    const { container } = mountTable()
+    expect(container.querySelector('.bar-seg').getAttribute('title')).toBe('Completed: 624')
   })
 })

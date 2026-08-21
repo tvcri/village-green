@@ -9,12 +9,11 @@ import TabPanel from 'primevue/tabpanel'
 import SelectButton from 'primevue/selectbutton'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import MetaChartCard from './MetaChartCard.vue'
+import MetaOutcomesCard from './MetaOutcomesCard.vue'
 import MetaSummaryStrip from './MetaSummaryStrip.vue'
 import { getMetaMetrics } from '../api/metaMetricsApi.js'
 import { byVillage, STATUS_SERIES } from '../lib/reduceCells.js'
 import { orderRows, DEFAULT_SORT } from '../lib/orderRows.js'
-import { buildBarData, buildProportionalData, barOptions } from '../lib/chartConfig.js'
 import { metaStripStats } from '../lib/stripStats.js'
 import { metaCsvFilename } from '../lib/matrixTable.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
@@ -137,19 +136,13 @@ const villageRows = computed(() =>
   payload.value ? byVillage(payload.value.cells, payload.value.villages, { legs: true }) : []
 )
 
-// ONE ordered list, consumed by both the chart and the table.
+// ONE ordered list. The bars live inside the table's rows, so ordering the
+// rows orders the bars — there is no second thing to keep in step.
 const orderedRows = computed(() =>
   orderRows(villageRows.value, { sort: sort.value, dir: dir.value, view: view.value })
 )
 
 const strip = computed(() => metaStripStats(villageRows.value))
-
-const chartData = computed(() => (view.value === 'share'
-  ? buildProportionalData(orderedRows.value, 'villageName', { dark: dark.value, series: STATUS_SERIES })
-  : buildBarData(orderedRows.value, 'villageName', { dark: dark.value, series: STATUS_SERIES })))
-
-const chartOptions = computed(() =>
-  barOptions({ stacked: view.value === 'share', percent: view.value === 'share' }))
 
 const csvName = computed(() => metaCsvFilename({
   tab: tab.value,
@@ -210,18 +203,16 @@ const showCountingInfo = ref(false)
                 optionLabel="label"
                 optionValue="value"
                 :allowEmpty="false"
-                aria-label="Chart view"
+                aria-label="Bar view"
               />
             </div>
-            <MetaChartCard
+            <MetaOutcomesCard
               :rows="orderedRows"
               :series="STATUS_SERIES"
               :view="view"
               :sort="sort"
               :dir="dir"
               :csvFilename="csvName"
-              :chartData="chartData"
-              :chartOptions="chartOptions"
               :dark="dark"
               @update:sort="onSortUpdate"
             />

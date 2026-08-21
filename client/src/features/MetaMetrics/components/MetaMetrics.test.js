@@ -27,27 +27,19 @@ vi.mock('../api/metaMetricsApi.js', () => ({
   getMetaMetrics: vi.fn(),
 }))
 
-// Chart.js needs a real canvas; stub the PrimeVue wrapper and assert on the
-// data we hand it instead. The stub records `data` on every render (in
-// `setup`'s returned render fn, not `setup` itself, which only runs once) so a
-// reactive prop change from clicking the toggle is observable — matching the
-// ChartStub pattern in VillageMetrics.test.js.
-let chartRenders = []
-vi.mock('primevue/chart', () => ({
-  default: {
-    name: 'Chart',
-    props: ['type', 'data', 'options'],
-    setup (props) {
-      return () => {
-        chartRenders.push(props.data)
-        return null
-      }
-    },
-  },
-}))
-
 import { getMetaMetrics } from '../api/metaMetricsApi.js'
 import MetaMetrics from './MetaMetrics.vue'
+
+// The bars live IN the table rows, so there is no chart to stub and no chart
+// props to inspect. These read the rendered DOM instead, which is a stronger
+// assertion: it exercises the real PrimeVue DataTable rather than a stand-in.
+const villageOrder = (container) =>
+  [...container.querySelectorAll('.meta-matrix-table tbody tr')]
+    .map(tr => tr.querySelector('td')?.textContent.trim())
+
+const barWidths = (container, rowIndex) =>
+  [...container.querySelectorAll('.meta-matrix-table tbody tr')[rowIndex]
+    .querySelectorAll('.bar-seg')].map(s => parseFloat(s.style.width))
 
 const PAYLOAD = {
   range: { start: '2026-01-01', end: '2026-12-31' },
@@ -91,7 +83,6 @@ beforeEach(() => {
   mockRouter.push.mockClear()
   getMetaMetrics.mockReset()
   getMetaMetrics.mockResolvedValue(PAYLOAD)
-  chartRenders = []
 })
 
 afterEach(() => cleanup())
@@ -135,18 +126,19 @@ describe('MetaMetrics page shell', () => {
 
   it('orders rows by village name ascending on first render', async () => {
     getMetaMetrics.mockResolvedValue(PAYLOAD)
-    mountPage()
-    await waitFor(() => expect(chartRenders.length).toBeGreaterThan(0))
-    expect(chartRenders.at(-1).labels).toEqual(['Barrington', 'Warwick'])
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    expect(villageOrder(container)).toEqual(['Barrington', 'Warwick'])
   })
 
   it('doubles completed counts for round trips', async () => {
     getMetaMetrics.mockResolvedValue(PAYLOAD)
-    mountPage()
-    await waitFor(() => expect(chartRenders.length).toBeGreaterThan(0))
-    const completed = chartRenders.at(-1).datasets[0]
-    // Barrington: completed 10 + roundTrips 3 = 13
-    expect(completed.data[0]).toBe(13)
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    // Barrington: completed 10 + roundTrips 3 = 13, in its own row.
+    const firstRow = container.querySelectorAll('.meta-matrix-table tbody tr')[0]
+    expect(firstRow.textContent).toContain('Barrington')
+    expect(firstRow.textContent).toContain('13')
   })
 
   it('writes the view to the URL when Share is chosen', async () => {
@@ -160,17 +152,17 @@ describe('MetaMetrics page shell', () => {
   it('reads the sort from the URL and applies it to the chart', async () => {
     mockRoute.query = { start: '2026-01-01', end: '2026-12-31', sort: 'unmatched', dir: 'desc' }
     getMetaMetrics.mockResolvedValue(PAYLOAD)
-    mountPage()
-    await waitFor(() => expect(chartRenders.length).toBeGreaterThan(0))
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
     // Warwick has more unmatched than Barrington
-    expect(chartRenders.at(-1).labels).toEqual(['Warwick', 'Barrington'])
+    expect(villageOrder(container)).toEqual(['Warwick', 'Barrington'])
   })
 
   it('falls back to defaults for unknown URL values without writing a correction', async () => {
     mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'banana', view: 'banana' }
     getMetaMetrics.mockResolvedValue(PAYLOAD)
-    mountPage()
-    await waitFor(() => expect(chartRenders.length).toBeGreaterThan(0))
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
     expect(mockRoute.query.tab).toBe('banana')  // not corrected
     expect(screen.getByRole('tab', { name: 'Outcomes' })).toHaveAttribute('aria-selected', 'true')
   })
@@ -244,16 +236,15 @@ describe('MetaMetrics page shell', () => {
     expect(getMetaMetrics).toHaveBeenCalledTimes(1)
   })
 
-  // The headline claim: one ordered list drives BOTH children off a single
-  // header click, so they can never disagree. Barrington has 1 unmatched,
-  // Warwick has 5. The first click on Unmatched sorts ascending (Barrington,
-  // Warwick — same as the villageName default, so it alone wouldn't catch a
-  // child that silently ignored the new sort); the second click flips to
-  // descending (Warwick, Barrington), which only a regression would miss in
-  // exactly one of the two children.
-  it('reorders the chart and the table together when a header is clicked', async () => {
-    await mountLoaded()
-    expect(chartRenders.at(-1).labels).toEqual(['Barrington', 'Warwick'])
+  // The headline claim, restated for the bar-in-table: a header click reorders
+  // the rows, and each row's BAR travels with its own numbers because they are
+  // the same <tr>. Barrington has 1 unmatched, Warwick 5. The first click sorts
+  // ascending (Barrington, Warwick — identical to the villageName default, so
+  // it alone would not catch a child ignoring the new sort); the second flips
+  // to descending, which a regression cannot fake.
+  it('reorders rows on a header click, carrying each bar with its own row', async () => {
+    const { container } = await mountLoaded()
+    expect(villageOrder(container)).toEqual(['Barrington', 'Warwick'])
 
     const unmatchedHeader = () => screen.getByText('Unmatched', { selector: '.p-datatable-column-title' })
 
@@ -264,12 +255,13 @@ describe('MetaMetrics page shell', () => {
     await waitFor(() => expect(mockRoute.query.dir).toBe('desc'))
 
     const expectedOrder = ['Warwick', 'Barrington']
-    expect(chartRenders.at(-1).labels).toEqual(expectedOrder)
+    expect(villageOrder(container)).toEqual(expectedOrder)
 
-    // Scoped to tbody: PrimeVue's footer <td> also carries an implicit cell
-    // role, and its "Total" label would otherwise leak into this list.
-    const firstColumnCells = [...document.querySelectorAll('[data-pc-section="tbody"] td:first-child')]
-      .map(c => c.textContent.trim())
-    expect(firstColumnCells).toEqual(expectedOrder)
+    // And the bars moved WITH the rows: Warwick is now first, and its unmatched
+    // segment (5) must now be the wider of the two villages' — the reverse of
+    // the default order. A bar left behind by its row fails here.
+    const warwickUnmatched = barWidths(container, 0)[2]
+    const barringtonUnmatched = barWidths(container, 1)[2]
+    expect(warwickUnmatched).toBeGreaterThan(barringtonUnmatched)
   })
 })
