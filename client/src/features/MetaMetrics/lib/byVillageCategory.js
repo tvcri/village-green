@@ -17,14 +17,20 @@ import { CATEGORY_ORDER } from './reduceCells.js'
 // charts encode and it had to survive protanopia. Category identity is a weaker
 // requirement — the numbers sit in labelled columns beside the bar — and
 // matching the rest of the product matters more here.
+//
+// `shortLabel` is the on-screen column header only. Without it "Home Help" and
+// "Tech Support" wrap to two lines while "Rides" and "Errands" sit on one, so
+// the header row is taller than any of them needs. The audience for this page
+// is federation staff, for whom "Home" and "Tech" are unambiguous; the full
+// label still names the bar segment and the CSV column.
 export const CATEGORY_SERIES = CATEGORY_ORDER.map(key => ({
   key,
   label: key,
   ...{
     Rides: { colorLight: '#22c55e', colorDark: '#4ade80' },
     Errands: { colorLight: '#f59e0b', colorDark: '#fbbf24' },
-    'Home Help': { colorLight: '#3b82f6', colorDark: '#60a5fa' },
-    'Tech Support': { colorLight: '#8b5cf6', colorDark: '#a78bfa' },
+    'Home Help': { colorLight: '#3b82f6', colorDark: '#60a5fa', shortLabel: 'Home' },
+    'Tech Support': { colorLight: '#8b5cf6', colorDark: '#a78bfa', shortLabel: 'Tech' },
   }[key],
 }))
 

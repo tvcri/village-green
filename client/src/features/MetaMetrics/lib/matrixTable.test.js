@@ -61,3 +61,28 @@ describe('metaCsvFilename', () => {
       .toBe('meta-outcomes-share-2026-01-01-2026-08-21.csv')
   })
 })
+
+// The Categories columns are wide enough to wrap their headers onto two lines,
+// which makes the header row taller than the others need. A series may carry a
+// shortLabel for the header only — the full label still names the bar segment
+// and the CSV column, where there is room for it.
+describe('shortLabel', () => {
+  const SERIES = [
+    { key: 'Rides', label: 'Rides' },
+    { key: 'Home Help', label: 'Home Help', shortLabel: 'Home' },
+  ]
+
+  it('uses the short label for a column header when one is given', () => {
+    expect(matrixColumns(SERIES, 'counts').map(c => c.header))
+      .toEqual(['Village', 'Rides', 'Home', 'Total'])
+  })
+
+  it('falls back to the full label when there is no short one', () => {
+    expect(matrixColumns([{ key: 'Rides', label: 'Rides' }], 'counts')[1].header).toBe('Rides')
+  })
+
+  it('keeps the full label as the CSV header, where width is not a constraint', () => {
+    expect(matrixColumns(SERIES, 'counts', { full: true }).map(c => c.header))
+      .toEqual(['Village', 'Rides', 'Home Help', 'Total'])
+  })
+})

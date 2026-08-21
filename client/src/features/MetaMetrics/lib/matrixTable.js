@@ -15,10 +15,15 @@ function pct (value, total) {
 // The last column changes meaning with the view. In share view it stays an
 // ABSOLUTE count — it is the answer to "share hides magnitude", letting a
 // reader see that a 45.6% completion rate is out of only 193 requests.
-export function matrixColumns (series, view) {
+// `full: true` keeps the long labels — used for the CSV, where a header has no
+// column width to fit into. On screen a series may supply a `shortLabel`
+// ("Home Help" -> "Home") so the header row does not wrap to two lines while
+// its neighbours sit on one. The full label still names the bar segment in its
+// tooltip and the column in the export.
+export function matrixColumns (series, view, { full = false } = {}) {
   return [
     { header: 'Village', key: 'villageName' },
-    ...series.map(s => ({ header: s.label, key: s.key })),
+    ...series.map(s => ({ header: full ? s.label : (s.shortLabel ?? s.label), key: s.key })),
     { header: view === 'share' ? 'Requests' : 'Total', key: 'total' },
   ]
 }

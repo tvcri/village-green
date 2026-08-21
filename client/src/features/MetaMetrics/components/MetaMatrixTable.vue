@@ -99,7 +99,10 @@ function segTitle (seg) {
 }
 
 function onDownloadCsv () {
-  downloadCsv(toCsv(cells.value, columns.value), props.csvFilename)
+  // Full labels in the export: a CSV header has no width to fit into, and
+  // "Home Help" is what a reader opening the file expects to see.
+  const csvColumns = matrixColumns(props.series, props.view, { full: true })
+  downloadCsv(toCsv(cells.value, csvColumns), props.csvFilename)
 }
 </script>
 
