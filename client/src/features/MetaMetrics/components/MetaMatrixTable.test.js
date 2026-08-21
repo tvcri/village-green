@@ -83,8 +83,8 @@ describe('MetaMatrixTable', () => {
     expect(screen.getByRole('button', { name: /download csv/i })).toBeInTheDocument()
   })
 
-  // The table IS the chart's legend (Chart.js's own legend is off), so each
-  // series header needs the swatch that maps it to its bars. Village and
+  // There is no chart and no separate legend: each series header's swatch is
+  // what maps that column's name to the bars drawn in its rows. Village and
   // Total are not series and must get none.
   it('renders a color swatch on each series header, and none on Village or Total', () => {
     const { container } = mountTable()
