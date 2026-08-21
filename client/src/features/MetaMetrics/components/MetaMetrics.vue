@@ -296,6 +296,11 @@ const showCountingInfo = ref(false)
           :allowEmpty="false"
           aria-label="Bar view"
         />
+        <!-- Beside the toggle rather than inside the card, because it describes
+             what the toggle DOES. Inside the card it explained a control that
+             lives outside it, and read as stray helper text while costing the
+             table a line of vertical space. -->
+        <p class="scale-note">{{ scaleNote }}</p>
       </div>
 
       <Tabs v-model:value="tab" lazy>
@@ -338,7 +343,6 @@ const showCountingInfo = ref(false)
               :csvFilename="csvName"
               :dark="dark"
               :layout="isOutcomes ? 'grouped' : 'stacked'"
-              :scaleNote="scaleNote"
               :emptyMessage="emptyMessage"
               @update:sort="onSortUpdate"
             />
@@ -383,7 +387,15 @@ const showCountingInfo = ref(false)
 .notice { color: var(--color-text-muted, #6b7280); margin-top: 1.5rem; }
 .view-bar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
   margin-bottom: 1rem;
+}
+.scale-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #6b7280);
 }
 .panel-filters {
   display: flex;

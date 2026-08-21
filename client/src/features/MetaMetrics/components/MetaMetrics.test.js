@@ -177,6 +177,35 @@ describe('MetaMetrics page shell', () => {
     expect(screen.getByRole('tab', { name: 'Outcomes' })).toHaveAttribute('aria-selected', 'true')
   })
 
+  it('puts the view toggle and its explanation above the tabs, not inside a tab', async () => {
+    // One ?view= param drives every tab, so the control belongs above them —
+    // inside a filter row it implied a per-table choice it never was. The note
+    // travels with it because it describes what the toggle does.
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    const bar = container.querySelector('.view-bar')
+    expect(bar).toBeTruthy()
+    expect(bar.querySelector('.scale-note').textContent).toMatch(/bars share one scale/i)
+    // And it is a sibling of the tab strip, not a descendant of a panel.
+    expect(bar.querySelector('[role="tabpanel"]')).toBeNull()
+  })
+
+  it('changes the explanation with the view', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', view: 'share' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    expect(container.querySelector('.scale-note').textContent)
+      .toMatch(/own total, split by outcome/i)
+  })
+
+  it('changes the explanation with the tab', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'categories' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    expect(container.querySelector('.scale-note').textContent)
+      .toMatch(/completed work only/i)
+  })
+
   it('offers a Categories tab alongside Outcomes', async () => {
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))

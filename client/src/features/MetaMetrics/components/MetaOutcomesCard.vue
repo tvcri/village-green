@@ -22,9 +22,6 @@ const props = defineProps({
   emptyMessage: { type: String, default: 'No requests in this range' },
   // 'grouped' (Outcomes) or 'stacked' (Categories) — see MetaMatrixTable.
   layout: { type: String, default: 'grouped' },
-  // Owned by the page, not derived here: the sentence depends on which tab is
-  // showing as well as which view, and the card knows only the latter.
-  scaleNote: { type: String, default: '' },
 })
 
 defineEmits(['update:sort'])
@@ -41,8 +38,6 @@ const hasRows = computed(() => props.rows.length > 0)
       <!-- No legend row here: the table's own column headers carry a swatch
            beside each outcome name, so a second key above the table would
            repeat itself. -->
-      <p v-if="scaleNote" class="scale-note">{{ scaleNote }}</p>
-
       <MetaMatrixTable
         :rows="rows"
         :series="series"
@@ -67,12 +62,6 @@ const hasRows = computed(() => props.rows.length > 0)
   border-radius: 6px;
   padding: 1.25rem 1.5rem 1.5rem;
   min-width: 0;
-}
-
-.scale-note {
-  margin: 0 0 0.75rem;
-  font-size: 0.78rem;
-  color: var(--color-text-muted, #6b7280);
 }
 
 .empty-msg {
