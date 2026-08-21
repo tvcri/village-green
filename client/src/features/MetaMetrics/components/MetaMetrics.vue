@@ -1,18 +1,30 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Chart from 'primevue/chart'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import TabPanels from 'primevue/tabpanels'
+import TabPanel from 'primevue/tabpanel'
 import SelectButton from 'primevue/selectbutton'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import MetaChartCard from './MetaChartCard.vue'
+import MetaSummaryStrip from './MetaSummaryStrip.vue'
 import { getMetaMetrics } from '../api/metaMetricsApi.js'
-import { byVillage, byServiceType, byCategory } from '../lib/reduceCells.js'
+import { byVillage, STATUS_SERIES } from '../lib/reduceCells.js'
+import { orderRows, DEFAULT_SORT } from '../lib/orderRows.js'
 import { buildBarData, buildProportionalData, barOptions } from '../lib/chartConfig.js'
+import { metaStripStats } from '../lib/stripStats.js'
+import { metaCsvFilename } from '../lib/matrixTable.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { presetRange, isValidRange } from '../../VillageMetrics/lib/rangePresets.js'
 import MetricsRangePicker from '../../VillageMetrics/components/MetricsRangePicker.vue'
+
+defineOptions({ name: 'MetaMetrics' })
 
 const route = useRoute()
 const router = useRouter()
@@ -24,14 +36,12 @@ const range = computed(() => ({ start: route.query.start, end: route.query.end }
 
 // Identity-stable watch source. `range` returns a NEW object literal each evaluation, and
 // watch compares non-deep sources with Object.is — so watching `range` refetches on ANY
-// navigation, including one that leaves start/end untouched (vue-router builds a fresh
-// query object per navigation, which invalidates the computed even when unchanged).
-// A primitive string collapses that to a real value comparison.
+// navigation, including a tab-only one. A primitive string collapses that to a real
+// value comparison.
 const rangeKey = computed(() => `${route.query.start}|${route.query.end}`)
 
-// Normalize the URL to a valid range (default = this-year, matching VillageMetrics)
-// whenever it is missing/invalid. Spreads the existing query so a normalize doesn't
-// drop any other query params.
+// Normalize the URL to a valid range (default = this-year) whenever it is missing/invalid.
+// Spreads the existing query so a normalize doesn't drop tab/view/sort.
 function normalizeRange () {
   if (!isValidRange(range.value)) {
     const def = presetRange('thisYear', todayCivil)
@@ -44,141 +54,226 @@ function normalizeRange () {
 const { state: payload, isLoading, error, execute } = useAsyncState(
   () => getMetaMetrics(range.value.start, range.value.end),
   // A 403 here means the caller has no granted villages at all — an expected
-  // outcome, not a bug. Show it inline instead of the global crash-style error modal.
+  // outcome, not a bug. Show it inline instead of the global error modal.
   { immediate: false, onError: null },
 )
 
 const isDenied = computed(() => getHttpStatus(error.value) === 403)
 
-// Fetch only when the range is valid; normalize otherwise.
 function fetchIfValid () {
   if (normalizeRange()) execute()
 }
 
-// Refetch on range change. Watches `rangeKey` (a primitive) rather than `range`
-// (an object literal), so this fires exactly when start/end actually change.
-// It does not fire on initial mount (watch is lazy by default).
 useRefetchOnChange([rangeKey], fetchIfValid)
 
-// The single mount trigger. onMounted fires once; fetchIfValid either executes
-// (valid query) or router.replaces the default — and that replace changes route.query,
-// which the useRefetchOnChange watcher above then picks up to run the one real fetch.
-// Net: exactly one fetch on entry (no double-fetch, no replace loop, because a valid
-// range makes normalizeRange a no-op that returns true).
+// The single mount trigger — see VillageMetrics.vue for the full note. Net:
+// exactly one fetch on entry, no double-fetch and no replace loop.
 onMounted(() => fetchIfValid())
 
-// Spread the existing query so changing the range preserves any other query params.
 function onRangeUpdate ({ start, end }) {
   router.replace({ query: { ...route.query, start, end } })
 }
 
-// Per-chart view selection, mirroring VillageMetrics' per-chart status
-// selectors rather than one page-level control.
+// ---- URL-backed selections ----
+// All follow the same shape: read when present and valid, otherwise fall back
+// WITHOUT writing a correction, so a hand-typed bad value renders sanely with no
+// extra history entry. Every setter spreads route.query so params don't clobber
+// each other.
+function urlState (param, values, fallback) {
+  return computed({
+    get: () => (values.includes(route.query[param]) ? route.query[param] : fallback),
+    set: (value) => {
+      if (!values.includes(value)) return
+      router.replace({ query: { ...route.query, [param]: value } })
+    },
+  })
+}
+
+// Stage 1 ships Outcomes only; categories/services are stage 2.
+const TAB_VALUES = ['outcomes']
+const tab = urlState('tab', TAB_VALUES, 'outcomes')
+
 const VIEW_OPTIONS = [
   { label: 'Counts', value: 'counts' },
   { label: 'Share', value: 'share' },
 ]
-const villageView = ref('counts')
+const view = urlState('view', ['counts', 'share'], 'counts')
 
-// Chart 2 switches resolution: 10 serviceName values, or the 4 category
-// rollups. Both are legitimate — service names say what people ask for,
-// categories say what kind of work a village does.
-const GRAIN_OPTIONS = [
-  { label: 'Detail', value: 'detail' },
-  { label: 'Category', value: 'category' },
-]
-const serviceGrain = ref('detail')
+const SORT_KEYS = ['villageName', 'completed', 'cancelled', 'unmatched', 'total']
+const sort = urlState('sort', SORT_KEYS, DEFAULT_SORT.sort)
+const dir = urlState('dir', ['asc', 'desc'], DEFAULT_SORT.dir)
 
-// Dark mode is signalled by `.app-dark` on <html> (client/src/style.css).
-const dark = computed(() => document.documentElement.classList.contains('app-dark'))
+function onSortUpdate (next) {
+  router.replace({ query: { ...route.query, sort: next.sort, dir: next.dir } })
+}
 
-const villageRows = computed(() =>
-  payload.value ? byVillage(payload.value.cells, payload.value.villages) : []
-)
-const serviceRows = computed(() => {
-  if (!payload.value) return []
-  return serviceGrain.value === 'category'
-    ? byCategory(payload.value.cells)
-    : byServiceType(payload.value.cells)
+// ---- theme ----
+// The theme toggle swaps `app-dark` on <html>, which is invisible to Vue, so a
+// computed reading it would never re-evaluate. The observer is what makes it react.
+const themeTick = ref(0)
+let themeObserver = null
+
+onMounted(() => {
+  if (typeof MutationObserver === 'undefined') return
+  themeObserver = new MutationObserver(() => { themeTick.value++ })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 })
-const serviceLabelKey = computed(() =>
-  serviceGrain.value === 'category' ? 'category' : 'serviceName')
 
-const villageData = computed(() => villageView.value === 'share'
-  ? buildProportionalData(villageRows.value, 'villageName', { dark: dark.value })
-  : buildBarData(villageRows.value, 'villageName', { dark: dark.value }))
+onBeforeUnmount(() => {
+  themeObserver?.disconnect()
+  themeObserver = null
+})
 
-const villageOptions = computed(() =>
-  barOptions({ stacked: villageView.value === 'share', percent: villageView.value === 'share' }))
+const dark = computed(() => {
+  void themeTick.value
+  return document.documentElement.classList.contains('app-dark')
+})
 
-const serviceData = computed(() => buildBarData(serviceRows.value, serviceLabelKey.value, { dark: dark.value }))
-const serviceOptions = computed(() => barOptions({ stacked: false, percent: false }))
+// ---- derived views ----
+// legs is pinned TRUE: the federation counts a completed round trip as two
+// services and will not count differently, so this page ships no toggle. The
+// parameter stays for a future multi-village-grant user.
+const villageRows = computed(() =>
+  payload.value ? byVillage(payload.value.cells, payload.value.villages, { legs: true }) : []
+)
 
-// 44px per row keeps 13 villages readable and grows with a 14th.
-const rowHeight = rows => Math.max(240, rows.length * 44 + 80)
+// ONE ordered list, consumed by both the chart and the table.
+const orderedRows = computed(() =>
+  orderRows(villageRows.value, { sort: sort.value, dir: dir.value, view: view.value })
+)
+
+const strip = computed(() => metaStripStats(villageRows.value))
+
+const chartData = computed(() => (view.value === 'share'
+  ? buildProportionalData(orderedRows.value, 'villageName', { dark: dark.value, series: STATUS_SERIES })
+  : buildBarData(orderedRows.value, 'villageName', { dark: dark.value, series: STATUS_SERIES })))
+
+const chartOptions = computed(() =>
+  barOptions({ stacked: view.value === 'share', percent: view.value === 'share' }))
+
+const csvName = computed(() => metaCsvFilename({
+  tab: tab.value,
+  view: view.value,
+  start: range.value.start,
+  end: range.value.end,
+}))
+
+const showCountingInfo = ref(false)
 </script>
 
 <template>
   <div class="meta-metrics">
-    <h1>Metrics</h1>
-
-    <MetricsRangePicker
-      v-if="isValidRange(range)"
-      :start="range.start"
-      :end="range.end"
-      :today="todayCivil"
-      @update:range="onRangeUpdate"
-    />
+    <header class="metrics-header">
+      <div class="header-row">
+        <h1>Hub — Metrics</h1>
+      </div>
+      <p class="exclusion-note">
+        Hub-cancelled requests are excluded from all counts.
+        Completed round-trip rides count as two services.
+        <Button
+          icon="pi pi-info-circle"
+          text
+          rounded
+          severity="secondary"
+          aria-label="About round-trip ride counting"
+          @click="showCountingInfo = true"
+        />
+      </p>
+      <MetricsRangePicker
+        v-if="isValidRange(range)"
+        :start="range.start"
+        :end="range.end"
+        :today="todayCivil"
+        @update:range="onRangeUpdate"
+      />
+    </header>
 
     <p v-if="isDenied" class="notice">
       You have no villages in scope, so there are no metrics to show.
     </p>
 
-    <p v-else-if="isLoading" class="notice">Loading…</p>
+    <p v-else-if="isLoading" class="notice">Loading metrics…</p>
 
     <template v-else-if="payload">
-      <MetaChartCard
-        title="Requests by village"
-        :subtitle="`${range.start} to ${range.end}`"
-        :height="rowHeight(villageRows)"
-      >
-        <template #controls>
-          <SelectButton v-model="villageView" :options="VIEW_OPTIONS" optionLabel="label" optionValue="value" />
-        </template>
-        <Chart type="bar" :data="villageData" :options="villageOptions" />
-      </MetaChartCard>
+      <MetaSummaryStrip :stats="strip" />
 
-      <MetaChartCard
-        title="Requests by service type"
-        :subtitle="`${range.start} to ${range.end}`"
-        :height="rowHeight(serviceRows)"
-      >
-        <template #controls>
-          <SelectButton v-model="serviceGrain" :options="GRAIN_OPTIONS" optionLabel="label" optionValue="value" />
-        </template>
-        <Chart type="bar" :data="serviceData" :options="serviceOptions" />
-      </MetaChartCard>
+      <Tabs v-model:value="tab" lazy>
+        <TabList>
+          <Tab value="outcomes">Outcomes</Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel value="outcomes">
+            <div class="panel-filters">
+              <SelectButton
+                v-model="view"
+                :options="VIEW_OPTIONS"
+                optionLabel="label"
+                optionValue="value"
+                :allowEmpty="false"
+                aria-label="Chart view"
+              />
+            </div>
+            <MetaChartCard
+              :rows="orderedRows"
+              :series="STATUS_SERIES"
+              :view="view"
+              :sort="sort"
+              :dir="dir"
+              :csvFilename="csvName"
+              :chartData="chartData"
+              :chartOptions="chartOptions"
+              @update:sort="onSortUpdate"
+            />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </template>
+
+    <Dialog
+      v-model:visible="showCountingInfo"
+      modal
+      header="Round-trip Rides"
+      :style="{ width: '28rem' }"
+      :breakpoints="{ '640px': '90vw' }"
+    >
+      <p class="info-body">
+        Many health insurers count round-trip rides to medical appointments as
+        TWO services even if the driver waited for the insured and provided the
+        return trip home. The Hub follows this practice, so every completed
+        round-trip ride counts as two services throughout this dashboard.
+      </p>
+    </Dialog>
   </div>
 </template>
 
 <style scoped>
-.meta-metrics {
-  padding: 2rem;
-  min-width: 0;
+.meta-metrics { padding: 1rem 1.5rem; min-width: 0; }
+.metrics-header { margin-bottom: 1.5rem; }
+.header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
 }
-
-h1 {
-  margin: 0 0 1.5rem;
-  color: var(--color-text-primary);
+.header-row h1 { margin: 0; color: var(--color-text-primary); }
+.exclusion-note {
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 1rem;
 }
-
-.notice {
-  color: var(--color-text-secondary);
-  margin-top: 1.5rem;
+.notice { color: var(--color-text-muted, #6b7280); margin-top: 1.5rem; }
+.panel-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
 }
+.info-body { margin: 0; line-height: 1.5; }
 
 @media (max-width: 640px) {
-  .meta-metrics { padding: 1rem; }
+  .meta-metrics { padding: 1rem 0.75rem; }
+  .panel-filters { flex-direction: column; align-items: stretch; }
 }
 </style>
