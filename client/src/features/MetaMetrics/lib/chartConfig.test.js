@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildBarData, buildProportionalData, barOptions } from './chartConfig.js'
+import { buildBarData, buildProportionalData, barOptions, chartHeight, BAR_THICKNESS, CHART_PADDING } from './chartConfig.js'
 
 const ROWS = [
   { villageId: '1', villageName: 'Quahog',    completed: 60, cancelled: 28, unmatched: 0,  total: 88 },
@@ -51,5 +51,42 @@ describe('barOptions', () => {
 
   it('leaves the x axis unbounded in count mode', () => {
     expect(barOptions({ stacked: false, percent: false }).scales.x.max).toBeUndefined()
+  })
+})
+
+describe('chartHeight', () => {
+  it('scales with rows times series', () => {
+    expect(chartHeight(13, 3)).toBe(13 * 3 * BAR_THICKNESS + CHART_PADDING)
+  })
+
+  it('gives a 4-series chart more height than a 3-series one at equal rows', () => {
+    expect(chartHeight(13, 4)).toBeGreaterThan(chartHeight(13, 3))
+  })
+
+  it('floors at a usable height when there are no rows', () => {
+    expect(chartHeight(0, 3)).toBeGreaterThanOrEqual(240)
+  })
+})
+
+describe('buildBarData series parameter', () => {
+  const ROWS = [{ villageName: 'Quahog', completed: 5, cancelled: 2, unmatched: 1, total: 8 }]
+
+  it('defaults to the three status series', () => {
+    const data = buildBarData(ROWS, 'villageName', { dark: false })
+    expect(data.datasets.map(d => d.label)).toEqual(['Completed', 'Cancelled', 'Unmatched'])
+  })
+
+  it('accepts an explicit series set', () => {
+    const series = [{ key: 'completed', label: 'Done', colorLight: '#111', colorDark: '#eee' }]
+    const data = buildBarData(ROWS, 'villageName', { dark: false, series })
+    expect(data.datasets).toHaveLength(1)
+    expect(data.datasets[0].label).toBe('Done')
+    expect(data.datasets[0].backgroundColor).toBe('#111')
+  })
+
+  it('picks the dark hue when dark is true', () => {
+    const series = [{ key: 'completed', label: 'Done', colorLight: '#111', colorDark: '#eee' }]
+    const data = buildBarData(ROWS, 'villageName', { dark: true, series })
+    expect(data.datasets[0].backgroundColor).toBe('#eee')
   })
 })
