@@ -68,10 +68,6 @@ const serviceOptions = computed(() => barOptions({ stacked: false, percent: fals
 // 44px per row keeps 13 villages readable and grows with a 14th.
 const rowHeight = rows => Math.max(240, rows.length * 44 + 80)
 
-// Exposed for component tests: the toggles drive pure reductions, and asserting
-// on them is far more legible than parsing a stubbed chart's props.
-defineExpose({ serviceGrain, serviceRows, serviceLabelKey, villageView, villageRows })
-
 onMounted(async () => {
   try {
     payload.value = await getMetaMetrics(range.value.start, range.value.end)
