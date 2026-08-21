@@ -24,7 +24,7 @@ defineProps({
 
 <style scoped>
 .meta-chart-card {
-  background: var(--color-bg-secondary, #fff);
+  background: var(--color-background-light);
   border: 1px solid var(--color-border-light);
   border-radius: 6px;
   padding: 1.25rem 1.5rem 1.5rem;
