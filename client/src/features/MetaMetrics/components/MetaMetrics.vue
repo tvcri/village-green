@@ -281,6 +281,23 @@ const showCountingInfo = ref(false)
     <template v-else-if="payload">
       <MetaSummaryStrip :stats="strip" />
 
+      <!-- PAGE level, not per tab. It is one `?view=` param shared by every
+           tab, so rendering it inside each filter row implied a per-table
+           choice it never was: picking Share on one tab and Counts on another
+           silently changed both. It sat there only because an earlier Services
+           tab could not honour it and a disabled control reads as broken —
+           that tab no longer exists, and all three now support both views. -->
+      <div class="view-bar">
+        <SelectButton
+          v-model="view"
+          :options="VIEW_OPTIONS"
+          optionLabel="label"
+          optionValue="value"
+          :allowEmpty="false"
+          aria-label="Bar view"
+        />
+      </div>
+
       <Tabs v-model:value="tab" lazy>
         <TabList>
           <Tab v-for="value in TAB_VALUES" :key="value" :value="value">{{ TAB_LABELS[value] }}</Tab>
@@ -290,27 +307,18 @@ const showCountingInfo = ref(false)
                the scale note differ, so the markup is shared rather than
                duplicated. `lazy` on Tabs means only the active one mounts. -->
           <TabPanel v-for="value in TAB_VALUES" :key="value" :value="value">
-            <div class="panel-filters">
-              <SelectButton
-                v-model="view"
-                :options="VIEW_OPTIONS"
-                optionLabel="label"
-                optionValue="value"
-                :allowEmpty="false"
-                aria-label="Bar view"
+            <!-- Only genuinely per-tab controls live here. Outcomes and
+                 Categories have none; Detail has its category selector, which
+                 is deliberately offered with no "all" option — every service at
+                 once is the 130-cell table this tab exists to avoid. -->
+            <div v-if="isDetail && detailOptions.length" class="panel-filters">
+              <label for="detailCategory">Category</label>
+              <Select
+                inputId="detailCategory"
+                v-model="detailCategory"
+                :options="detailOptions"
+                aria-label="Service category"
               />
-              <!-- Detail only, and deliberately with no "all" option: every
-                   service at once is the 130-cell table this tab exists to
-                   avoid. Scoped to a category it is at most seven columns. -->
-              <template v-if="isDetail && detailOptions.length">
-                <label for="detailCategory">Category</label>
-                <Select
-                  inputId="detailCategory"
-                  v-model="detailCategory"
-                  :options="detailOptions"
-                  aria-label="Service category"
-                />
-              </template>
             </div>
             <!-- Nothing to drill into: every category has a single service, so
                  a detail table would repeat the Categories tab column for
@@ -373,6 +381,10 @@ const showCountingInfo = ref(false)
   margin: 0.25rem 0 1rem;
 }
 .notice { color: var(--color-text-muted, #6b7280); margin-top: 1.5rem; }
+.view-bar {
+  display: flex;
+  margin-bottom: 1rem;
+}
 .panel-filters {
   display: flex;
   flex-wrap: wrap;
