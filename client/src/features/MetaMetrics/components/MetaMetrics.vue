@@ -18,7 +18,8 @@ import { byVillageCategory, CATEGORY_SERIES } from '../lib/byVillageCategory.js'
 import { byVillageService, serviceSeries, drilldownCategories } from '../lib/byVillageService.js'
 import { orderRows, DEFAULT_SORT } from '../lib/orderRows.js'
 import { metaStripStats } from '../lib/stripStats.js'
-import { metaCsvFilename } from '../lib/matrixTable.js'
+import { metaCsvFilename, matrixColumns, matrixCells } from '../lib/matrixTable.js'
+import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -242,6 +243,15 @@ const emptyMessage = computed(() => (isCategories.value || isDetail.value
   ? 'No completed requests in this range'
   : 'No requests in this range'))
 
+// The export lives here rather than in the table because the button sits on the
+// tab strip, above the card — and the page already holds everything the file
+// needs. Full labels, not the abbreviated headers: a CSV column has no width to
+// fit into and a reader opening the file expects the real name.
+function onDownloadCsv () {
+  const columns = matrixColumns(series.value, view.value, { full: true })
+  downloadCsv(toCsv(matrixCells(orderedRows.value, series.value, view.value), columns), csvName.value)
+}
+
 const showCountingInfo = ref(false)
 </script>
 
@@ -303,10 +313,28 @@ const showCountingInfo = ref(false)
         <p class="scale-note">{{ scaleNote }}</p>
       </div>
 
+      <!-- The CSV button is absolutely positioned over the right of the tab
+           strip: it costs no vertical space there, and PrimeVue's TabList
+           offers only one slot, INSIDE role="tablist", where a button would be
+           announced as a tab. Outside it, over it. -->
+      <div class="tabs-wrap">
       <Tabs v-model:value="tab" lazy>
         <TabList>
           <Tab v-for="value in TAB_VALUES" :key="value" :value="value">{{ TAB_LABELS[value] }}</Tab>
         </TabList>
+        <!-- On the strip's own line, right-aligned, so it costs no vertical
+             space. A SIBLING of the tablist, not a child: PrimeVue's only
+             TabList slot is inside role="tablist", where a button would be
+             announced as a tab. -->
+        <div class="tabs-csv">
+          <Button
+            icon="pi pi-download"
+            label="Download CSV"
+            text
+            size="small"
+            @click="onDownloadCsv"
+          />
+        </div>
         <TabPanels>
           <!-- Both panels render the same card; only the series, the layout and
                the scale note differ, so the markup is shared rather than
@@ -349,6 +377,7 @@ const showCountingInfo = ref(false)
           </TabPanel>
         </TabPanels>
       </Tabs>
+      </div>
     </template>
 
     <Dialog
@@ -385,6 +414,15 @@ const showCountingInfo = ref(false)
   margin: 0.25rem 0 1rem;
 }
 .notice { color: var(--color-text-muted, #6b7280); margin-top: 1.5rem; }
+.tabs-wrap { position: relative; }
+/* Sits on the tab strip's own line, right-aligned. The strip's height is set by
+   the tabs, so this costs nothing. */
+.tabs-csv {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+}
 .view-bar {
   display: flex;
   flex-wrap: wrap;

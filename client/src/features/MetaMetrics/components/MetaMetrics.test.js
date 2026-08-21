@@ -206,6 +206,22 @@ describe('MetaMetrics page shell', () => {
       .toMatch(/completed work only/i)
   })
 
+  it('puts the CSV button on the tab strip rather than above the table', async () => {
+    // It costs no vertical space there. The page owns the export because the
+    // button sits above the card, and the target is a SIBLING of the tablist —
+    // PrimeVue's only TabList slot is inside role="tablist", where a button
+    // would be announced as a tab.
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    const slot = container.querySelector('.tabs-csv')
+    expect(slot).toBeTruthy()
+    expect(slot.textContent).toMatch(/download csv/i)
+    expect(slot.closest('[role="tablist"]')).toBeNull()
+    // And there is exactly one, not a leftover above the table too.
+    expect([...container.querySelectorAll('button')]
+      .filter(b => /download csv/i.test(b.textContent))).toHaveLength(1)
+  })
+
   it('offers a Categories tab alongside Outcomes', async () => {
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))

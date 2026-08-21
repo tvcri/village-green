@@ -78,11 +78,6 @@ describe('MetaMatrixTable', () => {
     expect(screen.getByText('Hub')).toBeInTheDocument()
   })
 
-  it('offers a CSV download', () => {
-    mountTable()
-    expect(screen.getByRole('button', { name: /download csv/i })).toBeInTheDocument()
-  })
-
   // There is no chart and no separate legend: each series header's swatch is
   // what maps that column's name to the bars drawn in its rows. Village and
   // Total are not series and must get none.

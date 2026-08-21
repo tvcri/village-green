@@ -4,8 +4,6 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ColumnGroup from 'primevue/columngroup'
 import Row from 'primevue/row'
-import Button from 'primevue/button'
-import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { matrixColumns, matrixCells, matrixFooter } from '../lib/matrixTable.js'
 import { barSegments } from '../lib/barGeometry.js'
 
@@ -98,19 +96,10 @@ function segTitle (seg) {
   return `${seg.label}: ${seg.value}`
 }
 
-function onDownloadCsv () {
-  // Full labels in the export: a CSV header has no width to fit into, and
-  // "Home Help" is what a reader opening the file expects to see.
-  const csvColumns = matrixColumns(props.series, props.view, { full: true })
-  downloadCsv(toCsv(cells.value, csvColumns), props.csvFilename)
-}
 </script>
 
 <template>
   <div class="matrix-wrap">
-    <div class="table-actions">
-      <Button icon="pi pi-download" label="Download CSV" text size="small" @click="onDownloadCsv" />
-    </div>
     <DataTable
       :value="cells"
       lazy
@@ -186,12 +175,6 @@ function onDownloadCsv () {
 
 <style scoped>
 .matrix-wrap { min-width: 0; overflow-x: auto; }
-
-.table-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0.25rem;
-}
 
 /* Without explicit widths these columns are auto-sized from their content and
    header text, and the village name loses that negotiation — "Aquidneck Island"
