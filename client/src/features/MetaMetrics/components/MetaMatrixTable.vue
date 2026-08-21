@@ -15,6 +15,7 @@ const props = defineProps({
   sort: { type: String, required: true },
   dir: { type: String, required: true },      // 'asc' | 'desc'
   csvFilename: { type: String, required: true },
+  dark: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:sort'])
@@ -24,6 +25,16 @@ defineOptions({ name: 'MetaMatrixTable' })
 const columns = computed(() => matrixColumns(props.series, props.view))
 const cells = computed(() => matrixCells(props.rows, props.series, props.view))
 const footer = computed(() => matrixFooter(props.rows, props.series, props.view))
+
+// This table IS the chart's legend (Chart.js's own legend is off — see
+// chartConfig.js), so each series column header carries the same swatch as
+// its bars. Village and Total/Requests are not series, so they get none.
+// Keyed off `series[].key` rather than column index — index math (skip first
+// and last) would silently mis-swatch if a column were ever reordered.
+function swatchColor (colKey) {
+  const s = props.series.find(s => s.key === colKey)
+  return s ? (props.dark ? s.colorDark : s.colorLight) : null
+}
 
 // The chart above must render the SAME order, so DataTable never sorts for
 // itself: it reports the click and the parent recomputes one ordered list that
@@ -68,7 +79,11 @@ function onDownloadCsv () {
         sortable
         :bodyClass="i === 0 ? '' : 'num-cell'"
         :headerClass="i === 0 ? '' : 'num-cell'"
-      />
+      >
+        <template v-if="swatchColor(col.key)" #header>
+          <span class="swatch" :style="{ backgroundColor: swatchColor(col.key) }" />
+        </template>
+      </Column>
       <ColumnGroup type="footer">
         <Row>
           <Column
@@ -98,5 +113,14 @@ function onDownloadCsv () {
 .meta-matrix-table :deep(tfoot td) {
   font-weight: 700;
   border-top: 2px solid var(--color-border-default, #e5e7eb);
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  vertical-align: middle;
 }
 </style>

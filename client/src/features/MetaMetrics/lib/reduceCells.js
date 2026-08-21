@@ -19,6 +19,10 @@ export const STATUS_SERIES = [
   { key: 'unmatched', label: 'Unmatched', colorLight: '#9333ea', colorDark: '#a855f7' },
 ]
 
+// `byServiceType`, `byCategory`, `CATEGORY_ORDER`, and `cellTotal` below have
+// no caller in this stage — Stage 1 ships the Outcomes tab only. They are for
+// the Categories and Services tabs of Stage 2, which reduce the same `cells`
+// payload by a different key. Do not delete them as dead code.
 export function cellTotal (byStatus) {
   return byStatus.completed + byStatus.unmatched +
     byStatus.memberCancelled + byStatus.volunteerCancelled

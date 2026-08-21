@@ -53,7 +53,10 @@ export function barOptions ({ stacked, percent }) {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'top' },
+      // The matrix table below the chart IS the legend (its column headers
+      // carry the same swatch + label pairing) — see MetaMatrixTable.vue.
+      // Do not turn this back on.
+      legend: { display: false },
       tooltip: {
         callbacks: {
           label: (ctx) => percent

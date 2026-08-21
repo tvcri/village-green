@@ -52,6 +52,13 @@ describe('barOptions', () => {
   it('leaves the x axis unbounded in count mode', () => {
     expect(barOptions({ stacked: false, percent: false }).scales.x.max).toBeUndefined()
   })
+
+  // The matrix table below the chart is the legend (see MetaMatrixTable.vue's
+  // swatch headers). A built-in Chart.js legend would duplicate it and, with
+  // maintainAspectRatio: false, eat into the fixed-height box's bar thickness.
+  it('hides the built-in chart legend', () => {
+    expect(barOptions({ stacked: false, percent: false }).plugins.legend.display).toBe(false)
+  })
 })
 
 describe('chartHeight', () => {

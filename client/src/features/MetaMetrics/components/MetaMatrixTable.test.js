@@ -82,4 +82,32 @@ describe('MetaMatrixTable', () => {
     mountTable()
     expect(screen.getByRole('button', { name: /download csv/i })).toBeInTheDocument()
   })
+
+  // The table IS the chart's legend (Chart.js's own legend is off), so each
+  // series header needs the swatch that maps it to its bars. Village and
+  // Total are not series and must get none.
+  it('renders a color swatch on each series header, and none on Village or Total', () => {
+    const { container } = mountTable()
+    const headers = container.querySelectorAll('.meta-matrix-table th')
+    const swatchCounts = [...headers].map(h => h.querySelectorAll('.swatch').length)
+    // columns are [Village, Completed, Cancelled, Unmatched, Total]
+    expect(swatchCounts).toEqual([0, 1, 1, 1, 0])
+  })
+
+  it('picks the light swatch color by default and the dark one when dark is true', () => {
+    // jsdom normalizes an inline hex to rgb(), so compare via the DOM's own
+    // parsed value rather than string-matching the source hex.
+    const light = STATUS_SERIES.find(s => s.key === 'completed').colorLight
+    const dark = STATUS_SERIES.find(s => s.key === 'completed').colorDark
+    const probe = document.createElement('span')
+
+    const { container: lightContainer } = mountTable({ dark: false })
+    probe.style.backgroundColor = light
+    expect(lightContainer.querySelector('.swatch').style.backgroundColor).toBe(probe.style.backgroundColor)
+    cleanup()
+
+    const { container: darkContainer } = mountTable({ dark: true })
+    probe.style.backgroundColor = dark
+    expect(darkContainer.querySelector('.swatch').style.backgroundColor).toBe(probe.style.backgroundColor)
+  })
 })

@@ -243,4 +243,33 @@ describe('MetaMetrics page shell', () => {
     await waitFor(() => expect(mockRoute.query.sort).toBe('unmatched'))
     expect(getMetaMetrics).toHaveBeenCalledTimes(1)
   })
+
+  // The headline claim: one ordered list drives BOTH children off a single
+  // header click, so they can never disagree. Barrington has 1 unmatched,
+  // Warwick has 5. The first click on Unmatched sorts ascending (Barrington,
+  // Warwick — same as the villageName default, so it alone wouldn't catch a
+  // child that silently ignored the new sort); the second click flips to
+  // descending (Warwick, Barrington), which only a regression would miss in
+  // exactly one of the two children.
+  it('reorders the chart and the table together when a header is clicked', async () => {
+    await mountLoaded()
+    expect(chartRenders.at(-1).labels).toEqual(['Barrington', 'Warwick'])
+
+    const unmatchedHeader = () => screen.getByText('Unmatched', { selector: '.p-datatable-column-title' })
+
+    await fireEvent.click(unmatchedHeader())
+    await waitFor(() => expect(mockRoute.query.sort).toBe('unmatched'))
+
+    await fireEvent.click(unmatchedHeader())
+    await waitFor(() => expect(mockRoute.query.dir).toBe('desc'))
+
+    const expectedOrder = ['Warwick', 'Barrington']
+    expect(chartRenders.at(-1).labels).toEqual(expectedOrder)
+
+    // Scoped to tbody: PrimeVue's footer <td> also carries an implicit cell
+    // role, and its "Total" label would otherwise leak into this list.
+    const firstColumnCells = [...document.querySelectorAll('[data-pc-section="tbody"] td:first-child')]
+      .map(c => c.textContent.trim())
+    expect(firstColumnCells).toEqual(expectedOrder)
+  })
 })

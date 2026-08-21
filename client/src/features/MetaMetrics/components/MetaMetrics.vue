@@ -222,6 +222,7 @@ const showCountingInfo = ref(false)
               :csvFilename="csvName"
               :chartData="chartData"
               :chartOptions="chartOptions"
+              :dark="dark"
               @update:sort="onSortUpdate"
             />
           </TabPanel>

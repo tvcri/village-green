@@ -14,6 +14,7 @@ const props = defineProps({
   chartData: { type: Object, required: true },
   chartOptions: { type: Object, required: true },
   emptyMessage: { type: String, default: 'No requests in this range' },
+  dark: { type: Boolean, default: false },
 })
 
 defineEmits(['update:sort'])
@@ -78,6 +79,7 @@ onBeforeUnmount(() => {
       :sort="sort"
       :dir="dir"
       :csvFilename="csvFilename"
+      :dark="dark"
       @update:sort="$emit('update:sort', $event)"
     />
   </section>
