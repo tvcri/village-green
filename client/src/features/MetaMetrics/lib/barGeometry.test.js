@@ -39,18 +39,26 @@ describe('counts view', () => {
 })
 
 describe('share view', () => {
-  it('fills the same track for every row regardless of magnitude', () => {
+  it('is expressed as a percentage so the bar fills whatever cell it lands in', () => {
+    // Deliberately NOT pixels: a fixed px track left a ragged gap at the right
+    // edge, which undercuts the one thing a share bar asserts — that this is
+    // the whole of this village.
+    const segs = barSegments(ROWS, STATUS_SERIES, 'share')
+    for (const seg of segs[0]) expect(seg.unit).toBe('%')
+  })
+
+  it('totals 100% for every row regardless of magnitude', () => {
     const segs = barSegments(ROWS, STATUS_SERIES, 'share')
     const big = segs[0].reduce((sum, s) => sum + s.width, 0)
     const small = segs[2].reduce((sum, s) => sum + s.width, 0)
-    expect(big).toBeCloseTo(BAR_TRACK_PX, 0)
-    expect(small).toBeCloseTo(BAR_TRACK_PX, 0)
+    expect(big).toBeCloseTo(100, 6)
+    expect(small).toBeCloseTo(100, 6)
   })
 
   it('sizes each segment by its share of that row', () => {
     const segs = barSegments(ROWS, STATUS_SERIES, 'share')
     const warwickUnmatched = segs[1].find(s => s.key === 'unmatched')
-    expect(warwickUnmatched.width / BAR_TRACK_PX).toBeCloseTo(87 / 475, 2)
+    expect(warwickUnmatched.width).toBeCloseTo(87 / 475 * 100, 2)
   })
 
   it('leaves an all-zero row empty rather than dividing by zero', () => {
@@ -68,6 +76,11 @@ describe('segment identity', () => {
       colorLight: '#1d4ed8',
       colorDark: '#3b82f6',
     })
+  })
+
+  it('marks counts widths as pixels, since they share a cross-row scale', () => {
+    const [first] = barSegments(ROWS, STATUS_SERIES, 'counts')
+    for (const seg of first) expect(seg.unit).toBe('px')
   })
 
   it('carries the raw value so a tooltip can state it', () => {

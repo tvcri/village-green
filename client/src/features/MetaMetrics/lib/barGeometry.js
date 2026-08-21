@@ -21,9 +21,20 @@ export const BAR_TRACK_PX = 260
 // must not render as though it did nothing.
 const MIN_VISIBLE_PX = 1
 
-function widthFor (value, denominator) {
+function pxWidth (value, denominator) {
   if (!denominator || value <= 0) return 0
   return Math.max(MIN_VISIBLE_PX, (value / denominator) * BAR_TRACK_PX)
+}
+
+// Share is expressed as a PERCENTAGE rather than pixels so the bar fills its
+// cell whatever width the column ends up with. A fixed px track left a ragged
+// gap at the right edge, which undercuts the one thing a share bar asserts —
+// that this is the whole of this village. Counts keeps pixels because its
+// lengths must be comparable ACROSS rows against a shared maximum, which a
+// per-row percentage cannot express.
+function pctWidth (value, total) {
+  if (!total || value <= 0) return 0
+  return (value / total) * 100
 }
 
 /**
@@ -40,17 +51,20 @@ function widthFor (value, denominator) {
  * @returns {Array<Array<{key,label,value,width,colorLight,colorDark}>>}
  */
 export function barSegments (rows, series, view) {
+  const isShare = view === 'share'
   const maxTotal = rows.reduce((max, r) => Math.max(max, r.total), 0)
 
-  return rows.map(row => {
-    const denominator = view === 'share' ? row.total : maxTotal
-    return series.map(s => ({
-      key: s.key,
-      label: s.label,
-      value: row[s.key],
-      width: widthFor(row[s.key], denominator),
-      colorLight: s.colorLight,
-      colorDark: s.colorDark,
-    }))
-  })
+  return rows.map(row => series.map(s => ({
+    key: s.key,
+    label: s.label,
+    value: row[s.key],
+    width: isShare
+      ? pctWidth(row[s.key], row.total)
+      : pxWidth(row[s.key], maxTotal),
+    // The consumer cannot infer this from the number alone, and getting it
+    // wrong silently renders a 57 as 57px instead of 57%.
+    unit: isShare ? '%' : 'px',
+    colorLight: s.colorLight,
+    colorDark: s.colorDark,
+  })))
 }

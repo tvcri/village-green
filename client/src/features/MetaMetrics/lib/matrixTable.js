@@ -1,7 +1,7 @@
-// The table beside/below the chart IS the legend — Chart.js's own legend is
-// disabled, exactly as in VillageMetrics' MetricsChartCard.vue. But where that
-// table is one row per slice (its chart is single-series), Meta's chart is
-// villages x series, so this table is a MATRIX: villages down, series across.
+// The columns of the Outcomes table. There is no chart on this page — the bars
+// are drawn IN these rows (see barGeometry.js), so this is not a legend beside
+// a chart but the whole visualisation: a MATRIX of villages down, series
+// across, with each row's bar rendered alongside its own figures.
 //
 // Pure and DOM-free: the deferred PDF export draws its own table from these
 // same values.

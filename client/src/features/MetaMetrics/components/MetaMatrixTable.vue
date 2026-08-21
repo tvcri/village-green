@@ -38,9 +38,8 @@ function swatchColor (colKey) {
   return s ? (props.dark ? s.colorDark : s.colorLight) : null
 }
 
-// The chart above must render the SAME order, so DataTable never sorts for
-// itself: it reports the click and the parent recomputes one ordered list that
-// both children consume. `:sortField`/`:sortOrder` are bound so the header
+// DataTable never sorts for itself: it reports the click and the parent
+// recomputes the one ordered list this table renders. `:sortField`/`:sortOrder` are bound so the header
 // arrows reflect the parent's state. `lazy` is the load-bearing prop here —
 // PrimeVue's `processedData` unconditionally re-sorts `value` by `sortField`
 // whenever `lazy` is false (verified in primevue/datatable/index.mjs); `lazy`
@@ -129,13 +128,13 @@ function onDownloadCsv () {
                the segments genuinely are parts of 100%. -->
           <div
             :class="['bar-track', view === 'share' ? 'is-stacked' : 'is-grouped']"
-            :style="{ width: trackWidth }"
+            :style="view === 'share' ? null : { width: trackWidth }"
           >
             <span
               v-for="seg in segmentsFor(data.villageId)"
               :key="seg.key"
               class="bar-seg"
-              :style="{ width: `${seg.width}px`, backgroundColor: segColor(seg) }"
+              :style="{ width: `${seg.width}${seg.unit}`, backgroundColor: segColor(seg) }"
               :title="segTitle(seg)"
             />
           </div>
@@ -225,16 +224,25 @@ function onDownloadCsv () {
 .bar-track.is-grouped {
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  /* NO gap. Colour and the shared left edge already separate the three bars, so
+     whitespace between them is redundant — and spending it on thickness is what
+     makes them read as bars rather than rules. Abutting is how the paired bars
+     in the ri-senate report carry their weight at this row height. */
+  gap: 0;
 }
 
-.bar-track.is-grouped .bar-seg { height: 5px; }
+.bar-track.is-grouped .bar-seg { height: 6px; }
 
 /* Share: a single composed bar, so it can afford real weight. Thicker than the
    grouped bars because it is one mark rather than three. */
+/* Fills the cell rather than a fixed track: a share bar asserts "this is the
+   whole of this village", and one that visibly stops short of its container
+   undercuts exactly that. Counts keeps the fixed px track because ITS lengths
+   must be comparable across rows against a shared maximum. */
 .bar-track.is-stacked {
   flex-direction: row;
   align-items: center;
+  width: 100%;
   height: 18px;
   /* A 1px gap keeps adjacent segments distinguishable where one is a sliver;
      without it a 1px orange against a 1px purple reads as a single 2px mark. */

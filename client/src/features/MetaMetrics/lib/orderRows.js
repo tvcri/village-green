@@ -1,7 +1,6 @@
-// The single ordering consumed by BOTH the chart and the table. The table
-// header is the sort control and the chart follows it, so computing two
-// orderings anywhere would let them drift apart — which is the whole point of
-// putting them one above the other.
+// The single ordering of the Outcomes rows. The table header is the sort
+// control, and because each row carries its own bar, ordering the rows orders
+// the bars — there is no second sequence to keep in step.
 //
 // Pure and component-free on purpose: the deferred PDF export draws its own
 // table and cannot scrape the DOM, so it needs this list as plain data.
