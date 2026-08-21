@@ -7,6 +7,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import SelectButton from 'primevue/selectbutton'
+import Select from 'primevue/select'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import MetaOutcomesCard from './MetaOutcomesCard.vue'
@@ -14,6 +15,7 @@ import MetaSummaryStrip from './MetaSummaryStrip.vue'
 import { getMetaMetrics } from '../api/metaMetricsApi.js'
 import { byVillage, STATUS_SERIES } from '../lib/reduceCells.js'
 import { byVillageCategory, CATEGORY_SERIES } from '../lib/byVillageCategory.js'
+import { byVillageService, serviceSeries, drilldownCategories } from '../lib/byVillageService.js'
 import { orderRows, DEFAULT_SORT } from '../lib/orderRows.js'
 import { metaStripStats } from '../lib/stripStats.js'
 import { metaCsvFilename } from '../lib/matrixTable.js'
@@ -89,18 +91,45 @@ function urlState (param, values, fallback) {
   })
 }
 
-// Services remains unbuilt: ten service names is too fine a grain for a
-// cross-village table, and its shape is an open question rather than a
-// straight extension of these two.
-const TAB_VALUES = ['outcomes', 'categories']
+const TAB_VALUES = ['outcomes', 'categories', 'detail']
 const tab = urlState('tab', TAB_VALUES, 'outcomes')
 
-const isCategories = computed(() => tab.value === 'categories')
+const TAB_LABELS = { outcomes: 'Outcomes', categories: 'Categories', detail: 'Detail' }
 
-// Each tab supplies its own series, and with them its own valid sort columns:
-// Outcomes sorts by completed/cancelled/unmatched, Categories by the four
-// category names.
-const series = computed(() => (isCategories.value ? CATEGORY_SERIES : STATUS_SERIES))
+// Outcomes GROUPS because its three series do not compose into a whole.
+// Categories and Detail both STACK: categories partition a village's work, and
+// a category's services partition that category.
+const isOutcomes = computed(() => tab.value === 'outcomes')
+const isCategories = computed(() => tab.value === 'categories')
+const isDetail = computed(() => tab.value === 'detail')
+
+// Only categories with more than one service are worth drilling into — Home
+// Help and Tech Support have exactly one each today, so their detail table
+// would be a single column identical to the total. Derived from the payload so
+// a category appears the moment it gains a second service.
+const detailOptions = computed(() =>
+  payload.value ? drilldownCategories(payload.value.cells) : [])
+
+// REQUIRED, with no "all": a table of every service across every category is
+// the 130-cell explosion this tab exists to avoid. Defaults to the first
+// available option (Rides in practice, at ~74% of all requests).
+const detailCategory = computed({
+  get: () => (detailOptions.value.includes(route.query.category)
+    ? route.query.category
+    : detailOptions.value[0] ?? ''),
+  set: (value) => {
+    if (!detailOptions.value.includes(value)) return
+    router.replace({ query: { ...route.query, category: value } })
+  },
+})
+
+// Each tab supplies its own series, and with them its own valid sort columns.
+const series = computed(() => {
+  if (isDetail.value) {
+    return payload.value ? serviceSeries(payload.value.cells, detailCategory.value) : []
+  }
+  return isCategories.value ? CATEGORY_SERIES : STATUS_SERIES
+})
 const seriesKeys = computed(() => series.value.map(s => s.key))
 
 const VIEW_OPTIONS = [
@@ -155,6 +184,9 @@ const dark = computed(() => {
 const villageRows = computed(() => {
   if (!payload.value) return []
   const { cells, villages } = payload.value
+  if (isDetail.value) {
+    return byVillageService(cells, villages, detailCategory.value, { legs: true })
+  }
   return isCategories.value
     ? byVillageCategory(cells, villages, { legs: true })
     : byVillage(cells, villages, { legs: true })
@@ -177,7 +209,11 @@ const strip = computed(() => metaStripStats(
 ))
 
 const csvName = computed(() => metaCsvFilename({
-  tab: tab.value,
+  // The category rides along in the tab slug, so a Rides download and an
+  // Errands download do not land as the same filename.
+  tab: isDetail.value && detailCategory.value
+    ? `detail-${detailCategory.value.toLowerCase().replace(/\s+/g, '-')}`
+    : tab.value,
   view: view.value,
   start: range.value.start,
   end: range.value.end,
@@ -187,6 +223,11 @@ const csvName = computed(() => metaCsvFilename({
 // which. Categories counts COMPLETED work only — its bar is work done, not
 // requests received — and that is not inferable from the chart itself.
 const scaleNote = computed(() => {
+  if (isDetail.value) {
+    return view.value === 'share'
+      ? `Completed ${detailCategory.value.toLowerCase()} only. Each bar is that village’s own mix.`
+      : `Completed ${detailCategory.value.toLowerCase()} only. Bar length is the village’s total; segments are its mix.`
+  }
   if (isCategories.value) {
     return view.value === 'share'
       ? 'Completed work only. Each bar is that village’s own mix of categories.'
@@ -197,7 +238,7 @@ const scaleNote = computed(() => {
     : 'Bars share one scale, so lengths compare directly between villages.'
 })
 
-const emptyMessage = computed(() => (isCategories.value
+const emptyMessage = computed(() => (isCategories.value || isDetail.value
   ? 'No completed requests in this range'
   : 'No requests in this range'))
 
@@ -242,8 +283,7 @@ const showCountingInfo = ref(false)
 
       <Tabs v-model:value="tab" lazy>
         <TabList>
-          <Tab value="outcomes">Outcomes</Tab>
-          <Tab value="categories">Categories</Tab>
+          <Tab v-for="value in TAB_VALUES" :key="value" :value="value">{{ TAB_LABELS[value] }}</Tab>
         </TabList>
         <TabPanels>
           <!-- Both panels render the same card; only the series, the layout and
@@ -259,8 +299,29 @@ const showCountingInfo = ref(false)
                 :allowEmpty="false"
                 aria-label="Bar view"
               />
+              <!-- Detail only, and deliberately with no "all" option: every
+                   service at once is the 130-cell table this tab exists to
+                   avoid. Scoped to a category it is at most seven columns. -->
+              <template v-if="isDetail && detailOptions.length">
+                <label for="detailCategory">Category</label>
+                <Select
+                  inputId="detailCategory"
+                  v-model="detailCategory"
+                  :options="detailOptions"
+                  aria-label="Service category"
+                />
+              </template>
             </div>
+            <!-- Nothing to drill into: every category has a single service, so
+                 a detail table would repeat the Categories tab column for
+                 column. Says so rather than rendering an empty card. -->
+            <p v-if="isDetail && !detailOptions.length" class="notice">
+              No category has more than one service in this range, so there is
+              nothing to break down here.
+            </p>
+
             <MetaOutcomesCard
+              v-else
               :rows="orderedRows"
               :series="series"
               :view="view"
@@ -268,7 +329,7 @@ const showCountingInfo = ref(false)
               :dir="dir"
               :csvFilename="csvName"
               :dark="dark"
-              :layout="isCategories ? 'stacked' : 'grouped'"
+              :layout="isOutcomes ? 'grouped' : 'stacked'"
               :scaleNote="scaleNote"
               :emptyMessage="emptyMessage"
               @update:sort="onSortUpdate"

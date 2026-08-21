@@ -59,6 +59,11 @@ const PAYLOAD = {
     { villageId: '1', serviceName: 'Errand: Pharmacy', category: 'Errands',
       byStatus: { completed: 4, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
       completedRoundTrips: 0 },
+    // A second Ride service, so Rides is drillable on the Detail tab. Errands
+    // has only one service here and so must NOT be offered.
+    { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides',
+      byStatus: { completed: 6, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
+      completedRoundTrips: 0 },
   ],
 }
 
@@ -193,11 +198,11 @@ describe('MetaMetrics page shell', () => {
     mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'categories' }
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
-    // Warwick: rides completed 8 + 2 round trips = 10, errands 4. Its 5
-    // unmatched and 3 cancelled are NOT work done and must not appear.
+    // Warwick rides: medical 8 + 2 round trips, plus shopping 6 = 16.
+    // Errands 4. Its 5 unmatched and 3 cancelled are NOT work done.
     const warwick = [...container.querySelectorAll('.meta-matrix-table tbody tr')]
       .find(tr => tr.textContent.includes('Warwick'))
-    expect(warwick.textContent).toContain('10')
+    expect(warwick.textContent).toContain('16')
     expect(warwick.textContent).toContain('4')
   })
 
@@ -208,6 +213,52 @@ describe('MetaMetrics page shell', () => {
     // The strip must not change meaning under the reader on a tab switch.
     const strip = container.querySelector('.summary-strip')
     expect(strip.textContent).toContain('Unmatched')
+  })
+
+  it('offers a Detail tab beside Outcomes and Categories', async () => {
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    expect(screen.getByRole('tab', { name: 'Detail' })).toBeInTheDocument()
+  })
+
+  it('drills into one category, showing its services as columns', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'detail' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    // Rides is the only drillable category here, so it is the default, and its
+    // labels lose the prefix the selector already states.
+    expect(screen.getByText('Medical Appnt')).toBeInTheDocument()
+    expect(screen.getByText('Shopping')).toBeInTheDocument()
+    // Stacked like Categories, since services partition their category's work.
+    expect(container.querySelector('.bar-track')).toHaveClass('is-stacked')
+  })
+
+  it('offers no category with only one service, and no all-categories option', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'detail' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    // Errands has a single service in the fixture; a droplist entry for it
+    // would show one column identical to the total.
+    const select = container.querySelector('#detailCategory')
+    expect(select.textContent).toContain('Rides')
+    expect(select.textContent).not.toContain('Errands')
+    expect(select.textContent).not.toMatch(/all/i)
+  })
+
+  it('carries the chosen category in the URL', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'detail', category: 'Rides' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    expect(screen.getByText('Medical Appnt')).toBeInTheDocument()
+  })
+
+  it('falls back to the first drillable category for an unknown one', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'detail', category: 'Banana' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    expect(screen.getByText('Medical Appnt')).toBeInTheDocument()
+    // Read-and-fall-back, never a written correction.
+    expect(mockRoute.query.category).toBe('Banana')
   })
 
   it('shows an inline notice rather than crashing on 403', async () => {
