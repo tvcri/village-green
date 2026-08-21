@@ -17,6 +17,9 @@ const props = defineProps({
   dir: { type: String, required: true },      // 'asc' | 'desc'
   csvFilename: { type: String, required: true },
   dark: { type: Boolean, default: false },
+  // 'grouped' (Outcomes) draws one bar per series; 'stacked' (Categories) draws
+  // one composed bar whose length carries the row total in counts view.
+  layout: { type: String, default: 'grouped' },
 })
 
 const emit = defineEmits(['update:sort'])
@@ -56,13 +59,33 @@ const sortOrder = computed(() => (props.dir === 'desc' ? -1 : 1))
 // The bar lives in the same ROW as its numbers, which is the whole reason this
 // page has no chart. Keyed by villageId rather than row index so the bar cannot
 // drift from its row if PrimeVue ever renders out of order.
-const segmentsById = computed(() => {
-  const all = barSegments(props.rows, props.series, props.view)
-  return new Map(props.rows.map((row, i) => [row.villageId, all[i]]))
+// Outcomes groups its bars in counts and stacks them in share, because the
+// three outcomes do not compose into a whole. Categories stacks in BOTH views,
+// because the four categories genuinely partition a village's work — so the
+// tab passes layout="stacked" and the view only changes the track's length.
+const isStacked = computed(() =>
+  props.layout === 'stacked' || props.view === 'share')
+
+const barsById = computed(() => {
+  const { segments, trackPct } = barSegments(
+    props.rows, props.series, props.view, { layout: props.layout },
+  )
+  return new Map(props.rows.map((row, i) => [
+    row.villageId,
+    { segments: segments[i], trackPct: trackPct[i] },
+  ]))
 })
 
-function segmentsFor (villageId) {
-  return segmentsById.value.get(villageId) ?? []
+function barFor (villageId) {
+  return barsById.value.get(villageId) ?? { segments: [], trackPct: 0 }
+}
+
+// Grouped bars own their widths per segment and always fill the cell; a stacked
+// counts bar is shortened to carry its village's share of the busiest total.
+function trackStyle (villageId) {
+  return props.layout === 'stacked'
+    ? { width: `${barFor(villageId).trackPct}%` }
+    : null
 }
 
 function segColor (seg) {
@@ -125,10 +148,11 @@ function onDownloadCsv () {
                assert a total that means nothing. Share STACKS, because there
                the segments genuinely are parts of 100%. -->
           <div
-            :class="['bar-track', view === 'share' ? 'is-stacked' : 'is-grouped']"
+            :class="['bar-track', isStacked ? 'is-stacked' : 'is-grouped']"
+            :style="trackStyle(data.villageId)"
           >
             <span
-              v-for="seg in segmentsFor(data.villageId)"
+              v-for="seg in barFor(data.villageId).segments"
               :key="seg.key"
               class="bar-seg"
               :style="{ width: `${seg.width}%`, backgroundColor: segColor(seg) }"

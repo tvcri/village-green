@@ -13,6 +13,7 @@ import MetaOutcomesCard from './MetaOutcomesCard.vue'
 import MetaSummaryStrip from './MetaSummaryStrip.vue'
 import { getMetaMetrics } from '../api/metaMetricsApi.js'
 import { byVillage, STATUS_SERIES } from '../lib/reduceCells.js'
+import { byVillageCategory, CATEGORY_SERIES } from '../lib/byVillageCategory.js'
 import { orderRows, DEFAULT_SORT } from '../lib/orderRows.js'
 import { metaStripStats } from '../lib/stripStats.js'
 import { metaCsvFilename } from '../lib/matrixTable.js'
@@ -88,9 +89,19 @@ function urlState (param, values, fallback) {
   })
 }
 
-// Stage 1 ships Outcomes only; categories/services are stage 2.
-const TAB_VALUES = ['outcomes']
+// Services remains unbuilt: ten service names is too fine a grain for a
+// cross-village table, and its shape is an open question rather than a
+// straight extension of these two.
+const TAB_VALUES = ['outcomes', 'categories']
 const tab = urlState('tab', TAB_VALUES, 'outcomes')
+
+const isCategories = computed(() => tab.value === 'categories')
+
+// Each tab supplies its own series, and with them its own valid sort columns:
+// Outcomes sorts by completed/cancelled/unmatched, Categories by the four
+// category names.
+const series = computed(() => (isCategories.value ? CATEGORY_SERIES : STATUS_SERIES))
+const seriesKeys = computed(() => series.value.map(s => s.key))
 
 const VIEW_OPTIONS = [
   { label: 'Counts', value: 'counts' },
@@ -98,8 +109,17 @@ const VIEW_OPTIONS = [
 ]
 const view = urlState('view', ['counts', 'share'], 'counts')
 
-const SORT_KEYS = ['villageName', 'completed', 'cancelled', 'unmatched', 'total']
-const sort = urlState('sort', SORT_KEYS, DEFAULT_SORT.sort)
+const sortKeys = computed(() => ['villageName', 'total', ...seriesKeys.value])
+// urlState needs the valid set at call time, and it changes with the tab — so
+// this one is written out rather than using the helper. Same contract: read
+// when valid, fall back silently otherwise, never write a correction.
+const sort = computed({
+  get: () => (sortKeys.value.includes(route.query.sort) ? route.query.sort : DEFAULT_SORT.sort),
+  set: (value) => {
+    if (!sortKeys.value.includes(value)) return
+    router.replace({ query: { ...route.query, sort: value } })
+  },
+})
 const dir = urlState('dir', ['asc', 'desc'], DEFAULT_SORT.dir)
 
 function onSortUpdate (next) {
@@ -132,17 +152,29 @@ const dark = computed(() => {
 // legs is pinned TRUE: the federation counts a completed round trip as two
 // services and will not count differently, so this page ships no toggle. The
 // parameter stays for a future multi-village-grant user.
-const villageRows = computed(() =>
-  payload.value ? byVillage(payload.value.cells, payload.value.villages, { legs: true }) : []
-)
+const villageRows = computed(() => {
+  if (!payload.value) return []
+  const { cells, villages } = payload.value
+  return isCategories.value
+    ? byVillageCategory(cells, villages, { legs: true })
+    : byVillage(cells, villages, { legs: true })
+})
 
 // ONE ordered list. The bars live inside the table's rows, so ordering the
 // rows orders the bars — there is no second thing to keep in step.
 const orderedRows = computed(() =>
-  orderRows(villageRows.value, { sort: sort.value, dir: dir.value, view: view.value })
+  orderRows(villageRows.value, {
+    sort: sort.value, dir: dir.value, view: view.value, seriesKeys: seriesKeys.value,
+  })
 )
 
-const strip = computed(() => metaStripStats(villageRows.value))
+// Always the OUTCOME totals, whichever tab is showing. The strip answers "how
+// is the hub doing" and must not change meaning under the reader when they
+// switch tabs — and a Categories row carries no completed/cancelled fields to
+// sum anyway.
+const strip = computed(() => metaStripStats(
+  payload.value ? byVillage(payload.value.cells, payload.value.villages, { legs: true }) : [],
+))
 
 const csvName = computed(() => metaCsvFilename({
   tab: tab.value,
@@ -150,6 +182,24 @@ const csvName = computed(() => metaCsvFilename({
   start: range.value.start,
   end: range.value.end,
 }))
+
+// The bar means something different on each tab, so the caption has to say
+// which. Categories counts COMPLETED work only — its bar is work done, not
+// requests received — and that is not inferable from the chart itself.
+const scaleNote = computed(() => {
+  if (isCategories.value) {
+    return view.value === 'share'
+      ? 'Completed work only. Each bar is that village’s own mix of categories.'
+      : 'Completed work only. Bar length is the village’s total work; segments are its mix.'
+  }
+  return view.value === 'share'
+    ? 'Each bar is that village’s own total, split by outcome.'
+    : 'Bars share one scale, so lengths compare directly between villages.'
+})
+
+const emptyMessage = computed(() => (isCategories.value
+  ? 'No completed requests in this range'
+  : 'No requests in this range'))
 
 const showCountingInfo = ref(false)
 </script>
@@ -193,9 +243,13 @@ const showCountingInfo = ref(false)
       <Tabs v-model:value="tab" lazy>
         <TabList>
           <Tab value="outcomes">Outcomes</Tab>
+          <Tab value="categories">Categories</Tab>
         </TabList>
         <TabPanels>
-          <TabPanel value="outcomes">
+          <!-- Both panels render the same card; only the series, the layout and
+               the scale note differ, so the markup is shared rather than
+               duplicated. `lazy` on Tabs means only the active one mounts. -->
+          <TabPanel v-for="value in TAB_VALUES" :key="value" :value="value">
             <div class="panel-filters">
               <SelectButton
                 v-model="view"
@@ -208,12 +262,15 @@ const showCountingInfo = ref(false)
             </div>
             <MetaOutcomesCard
               :rows="orderedRows"
-              :series="STATUS_SERIES"
+              :series="series"
               :view="view"
               :sort="sort"
               :dir="dir"
               :csvFilename="csvName"
               :dark="dark"
+              :layout="isCategories ? 'stacked' : 'grouped'"
+              :scaleNote="scaleNote"
+              :emptyMessage="emptyMessage"
               @update:sort="onSortUpdate"
             />
           </TabPanel>

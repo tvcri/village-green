@@ -15,16 +15,20 @@ export const DEFAULT_SORT = { sort: 'villageName', dir: 'asc' }
 // In share view a series column ranks by its FRACTION of the row, so a village
 // with a bad rate but small absolute numbers rises. That is the intent; the
 // Requests column beside it is what keeps the reader honest about magnitude.
-function valueFor (row, sort, view) {
+function valueFor (row, sort, view, seriesKeys) {
   if (sort === 'total') return row.total
-  if (view === 'share' && SERIES_KEYS.includes(sort)) {
+  if (view === 'share' && seriesKeys.includes(sort)) {
     return row.total === 0 ? 0 : row[sort] / row.total
   }
   return row[sort]
 }
 
-export function orderRows (rows, { sort, dir, view }) {
-  const key = (sort === 'villageName' || sort === 'total' || SERIES_KEYS.includes(sort))
+// `seriesKeys` defaults to the outcome keys but is supplied by the Categories
+// tab, whose columns are the four category names. Hardcoding them would make a
+// click on "Rides" fall back to village name while the header arrow still
+// pointed at Rides — a sort that silently never happened.
+export function orderRows (rows, { sort, dir, view, seriesKeys = SERIES_KEYS }) {
+  const key = (sort === 'villageName' || sort === 'total' || seriesKeys.includes(sort))
     ? sort
     : DEFAULT_SORT.sort
   const sign = dir === 'desc' ? -1 : 1
@@ -34,6 +38,6 @@ export function orderRows (rows, { sort, dir, view }) {
     if (key === 'villageName') {
       return sign * a.villageName.localeCompare(b.villageName)
     }
-    return sign * (valueFor(a, key, view) - valueFor(b, key, view))
+    return sign * (valueFor(a, key, view, seriesKeys) - valueFor(b, key, view, seriesKeys))
   })
 }

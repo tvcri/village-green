@@ -20,6 +20,11 @@ const props = defineProps({
   csvFilename: { type: String, required: true },
   dark: { type: Boolean, default: false },
   emptyMessage: { type: String, default: 'No requests in this range' },
+  // 'grouped' (Outcomes) or 'stacked' (Categories) — see MetaMatrixTable.
+  layout: { type: String, default: 'grouped' },
+  // Owned by the page, not derived here: the sentence depends on which tab is
+  // showing as well as which view, and the card knows only the latter.
+  scaleNote: { type: String, default: '' },
 })
 
 defineEmits(['update:sort'])
@@ -28,9 +33,6 @@ defineOptions({ name: 'MetaOutcomesCard' })
 
 const hasRows = computed(() => props.rows.length > 0)
 
-const scaleNote = computed(() => (props.view === 'share'
-  ? 'Each bar is that village’s own total, split by outcome.'
-  : 'Bars share one scale, so lengths compare directly between villages.'))
 </script>
 
 <template>
@@ -39,7 +41,7 @@ const scaleNote = computed(() => (props.view === 'share'
       <!-- No legend row here: the table's own column headers carry a swatch
            beside each outcome name, so a second key above the table would
            repeat itself. -->
-      <p class="scale-note">{{ scaleNote }}</p>
+      <p v-if="scaleNote" class="scale-note">{{ scaleNote }}</p>
 
       <MetaMatrixTable
         :rows="rows"
@@ -49,6 +51,7 @@ const scaleNote = computed(() => (props.view === 'share'
         :dir="dir"
         :csvFilename="csvFilename"
         :dark="dark"
+        :layout="layout"
         @update:sort="$emit('update:sort', $event)"
       />
     </template>

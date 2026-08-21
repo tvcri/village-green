@@ -49,27 +49,47 @@ function widthPct (value, denominator, floor) {
  *
  * @returns {Array<Array<{key,label,value,width,colorLight,colorDark}>>}
  */
-export function barSegments (rows, series, view) {
+export function barSegments (rows, series, view, { layout = 'grouped' } = {}) {
   const isShare = view === 'share'
+  const isStacked = layout === 'stacked'
 
-  // Scaled against the largest single SEGMENT, not the largest row total.
-  // Counts draws the three outcomes as separate bars and never draws the total,
-  // so scaling to a total nothing renders just wastes the right-hand end of the
-  // track — the longest bar could only ever reach completed/total of it
+  // GROUPED (Outcomes): scaled against the largest single SEGMENT, not the
+  // largest row total. Counts draws the outcomes as separate bars and never
+  // draws a total, so scaling to a total nothing renders would just waste the
+  // right-hand end — the longest bar could only reach completed/total of it
   // (Barrington's 135 of 151). Against the max segment the longest bar is
-  // exactly full width, and every comparison stays valid because it is still
+  // exactly full width and every comparison stays valid, because it is still
   // one shared denominator.
   const maxSegment = rows.reduce(
     (max, row) => series.reduce((m, s) => Math.max(m, row[s.key]), max),
     0,
   )
 
-  return rows.map(row => series.map(s => ({
+  // STACKED (Categories): the segments are always proportions of their own row,
+  // and it is the TRACK that carries magnitude — full width in share, scaled to
+  // the busiest village in counts. That split is what lets one mark show both
+  // how much work a village does and what kind.
+  const maxTotal = rows.reduce((max, row) => Math.max(max, row.total), 0)
+
+  const segments = rows.map(row => series.map(s => ({
     key: s.key,
     label: s.label,
     value: row[s.key],
-    width: widthPct(row[s.key], isShare ? row.total : maxSegment, !isShare),
+    width: isStacked
+      // No floor when stacked: the segments must sum to exactly 100% of their
+      // track, and inflating a small one would push the row past its own end.
+      ? widthPct(row[s.key], row.total, false)
+      : widthPct(row[s.key], isShare ? row.total : maxSegment, !isShare),
     colorLight: s.colorLight,
     colorDark: s.colorDark,
   })))
+
+  // How wide the whole bar is, as a percentage of the cell. Grouped bars own
+  // their own widths per segment, so their track is always the full cell.
+  const trackPct = rows.map(row => {
+    if (!isStacked || isShare) return 100
+    return widthPct(row.total, maxTotal, true)
+  })
+
+  return { segments, trackPct }
 }

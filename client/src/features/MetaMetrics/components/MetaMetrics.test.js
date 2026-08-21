@@ -54,6 +54,11 @@ const PAYLOAD = {
     { villageId: '2', serviceName: 'Ride: Medical Appnt', category: 'Rides',
       byStatus: { completed: 10, unmatched: 1, memberCancelled: 3, volunteerCancelled: 0 },
       completedRoundTrips: 3 },
+    // A second category, so the Categories tab has a real mix to render rather
+    // than one full-width Rides bar per village.
+    { villageId: '1', serviceName: 'Errand: Pharmacy', category: 'Errands',
+      byStatus: { completed: 4, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
+      completedRoundTrips: 0 },
   ],
 }
 
@@ -165,6 +170,44 @@ describe('MetaMetrics page shell', () => {
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
     expect(mockRoute.query.tab).toBe('banana')  // not corrected
     expect(screen.getByRole('tab', { name: 'Outcomes' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('offers a Categories tab alongside Outcomes', async () => {
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    expect(screen.getByRole('tab', { name: 'Outcomes' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Categories' })).toBeInTheDocument()
+  })
+
+  it('renders category columns and stacked bars on the Categories tab', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'categories' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    expect(screen.getByText('Rides')).toBeInTheDocument()
+    expect(screen.getByText('Errands')).toBeInTheDocument()
+    // Categories stacks in BOTH views; Outcomes would group here.
+    expect(container.querySelector('.bar-track')).toHaveClass('is-stacked')
+  })
+
+  it('counts completed work only on the Categories tab', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'categories' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    // Warwick: rides completed 8 + 2 round trips = 10, errands 4. Its 5
+    // unmatched and 3 cancelled are NOT work done and must not appear.
+    const warwick = [...container.querySelectorAll('.meta-matrix-table tbody tr')]
+      .find(tr => tr.textContent.includes('Warwick'))
+    expect(warwick.textContent).toContain('10')
+    expect(warwick.textContent).toContain('4')
+  })
+
+  it('keeps the summary strip on outcome totals when the Categories tab is active', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'categories' }
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+    // The strip must not change meaning under the reader on a tab switch.
+    const strip = container.querySelector('.summary-strip')
+    expect(strip.textContent).toContain('Unmatched')
   })
 
   it('shows an inline notice rather than crashing on 403', async () => {
