@@ -160,6 +160,18 @@ describe('MetaMatrixTable in-row bars', () => {
     expect(container.querySelector('.bar-seg').style.backgroundColor).toBe(probe.style.backgroundColor)
   })
 
+  it('groups the bars in counts view and stacks them in share view', () => {
+    // Not cosmetic. The three outcomes are independent quantities that do not
+    // compose into a whole, so counts draws them as three separate bars sharing
+    // a scale; share's segments genuinely are parts of 100%, so they stack.
+    const { container: counts } = mountTable({ view: 'counts' })
+    expect(counts.querySelector('.bar-track')).toHaveClass('is-grouped')
+    cleanup()
+
+    const { container: share } = mountTable({ view: 'share' })
+    expect(share.querySelector('.bar-track')).toHaveClass('is-stacked')
+  })
+
   it('titles the village name so an ellipsis-truncated one stays readable', () => {
     // The name column is a fixed width with nowrap + text-overflow, so a name
     // longer than the track truncates rather than wrapping or widening the

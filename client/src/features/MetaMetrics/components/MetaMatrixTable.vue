@@ -121,7 +121,16 @@ function onDownloadCsv () {
            the numbers in the same row, not a value of its own. -->
       <Column headerClass="bar-head" bodyClass="bar-cell">
         <template #body="{ data }">
-          <div class="bar-track" :style="{ width: trackWidth }">
+          <!-- Counts GROUPS: three thin bars stacked vertically, sharing one
+               scale. The three outcomes are independent quantities that do not
+               compose into a whole — an unmatched request is not part of the
+               same pile as a completed one — so butting them end to end would
+               assert a total that means nothing. Share STACKS, because there
+               the segments genuinely are parts of 100%. -->
+          <div
+            :class="['bar-track', view === 'share' ? 'is-stacked' : 'is-grouped']"
+            :style="{ width: trackWidth }"
+          >
             <span
               v-for="seg in segmentsFor(data.villageId)"
               :key="seg.key"
@@ -208,20 +217,36 @@ function onDownloadCsv () {
 
 .bar-track {
   display: flex;
+}
+
+/* Counts: one thin bar per outcome, stacked vertically and left-aligned so all
+   three start from a common zero. Modelled on the two-bar rows in the
+   ri-senate district report (page 4). */
+.bar-track.is-grouped {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.bar-track.is-grouped .bar-seg { height: 5px; }
+
+/* Share: a single composed bar, so it can afford real weight. Thicker than the
+   grouped bars because it is one mark rather than three. */
+.bar-track.is-stacked {
+  flex-direction: row;
   align-items: center;
-  height: 11px;
+  height: 18px;
   /* A 1px gap keeps adjacent segments distinguishable where one is a sliver;
      without it a 1px orange against a 1px purple reads as a single 2px mark. */
   gap: 1px;
 }
 
+.bar-track.is-stacked .bar-seg { height: 18px; }
+
 /* NO border-radius. Rounding every segment was wrong in stacked bars: it landed
    on whichever segment happened to be last, so the rounding moved between rows
    as the data changed — visible when a village had zero Unmatched. */
-.bar-seg {
-  display: inline-block;
-  height: 11px;
-}
+.bar-seg { display: inline-block; }
 
 .swatch {
   display: inline-block;

@@ -28,16 +28,6 @@ defineOptions({ name: 'MetaOutcomesCard' })
 
 const hasRows = computed(() => props.rows.length > 0)
 
-// The legend sits above the table rather than inside a chart. It names the same
-// colors the column-header swatches and the in-row bars use.
-const legend = computed(() =>
-  props.series.map(s => ({
-    key: s.key,
-    label: s.label,
-    color: props.dark ? s.colorDark : s.colorLight,
-  })),
-)
-
 const scaleNote = computed(() => (props.view === 'share'
   ? 'Each bar is that village’s own total, split by outcome.'
   : 'Bars share one scale, so lengths compare directly between villages.'))
@@ -46,15 +36,10 @@ const scaleNote = computed(() => (props.view === 'share'
 <template>
   <section class="meta-outcomes-card">
     <template v-if="hasRows">
-      <div class="card-head">
-        <ul class="legend">
-          <li v-for="item in legend" :key="item.key">
-            <span class="key" :style="{ backgroundColor: item.color }" aria-hidden="true" />
-            {{ item.label }}
-          </li>
-        </ul>
-        <p class="scale-note">{{ scaleNote }}</p>
-      </div>
+      <!-- No legend row here: the table's own column headers carry a swatch
+           beside each outcome name, so a second key above the table would
+           repeat itself. -->
+      <p class="scale-note">{{ scaleNote }}</p>
 
       <MetaMatrixTable
         :rows="rows"
@@ -81,40 +66,8 @@ const scaleNote = computed(() => (props.view === 'share'
   min-width: 0;
 }
 
-.card-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.35rem 1.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.8rem;
-}
-
-.legend li {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.key {
-  display: inline-block;
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 2px;
-}
-
 .scale-note {
-  margin: 0;
+  margin: 0 0 0.75rem;
   font-size: 0.78rem;
   color: var(--color-text-muted, #6b7280);
 }
