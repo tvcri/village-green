@@ -23,6 +23,7 @@ import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { buildMetaMetricsPdf } from '../lib/metaMetricsPdf.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
+import { useToast } from 'primevue/usetoast'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useRefetchOnChange } from '../../../shared/composables/useRefetchOnChange.js'
 import { presetRange, isValidRange } from '../../VillageMetrics/lib/rangePresets.js'
@@ -55,11 +56,31 @@ function normalizeRange () {
   return true
 }
 
+// Resolved in onMounted: useToast() needs the ToastService provider, which is
+// not present when a component is mounted bare in a test.
+let toast = null
+onMounted(() => { toast = useToast() })
+
+// A 403 means the caller has no granted villages at all — an expected outcome,
+// not a bug, and it renders inline (see `isDenied`). EVERY OTHER failure is a
+// real one and must say so: `onError: null` alone silenced all of them, so a
+// 500 on a range change left the previous range's numbers on screen under the
+// newly-chosen dates with nothing to indicate the fetch had failed.
+// The stale payload is deliberately left in place — see the note on the range
+// picker: reverting the user's chosen range is a separate decision.
+function onFetchError (e) {
+  if (getHttpStatus(e) === 403) return
+  toast?.add({
+    severity: 'error',
+    summary: 'Could not load metrics',
+    detail: 'The figures shown are from the previous range. Try again, or pick a different range.',
+    life: 6000,
+  })
+}
+
 const { state: payload, isLoading, error, execute } = useAsyncState(
   () => getMetaMetrics(range.value.start, range.value.end),
-  // A 403 here means the caller has no granted villages at all — an expected
-  // outcome, not a bug. Show it inline instead of the global error modal.
-  { immediate: false, onError: null },
+  { immediate: false, onError: onFetchError },
 )
 
 const isDenied = computed(() => getHttpStatus(error.value) === 403)

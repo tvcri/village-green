@@ -27,6 +27,9 @@ vi.mock('../api/metaMetricsApi.js', () => ({
   getMetaMetrics: vi.fn(),
 }))
 
+const toastAdd = vi.fn()
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
+
 import { getMetaMetrics } from '../api/metaMetricsApi.js'
 import MetaMetrics from './MetaMetrics.vue'
 
@@ -91,6 +94,7 @@ beforeEach(() => {
   mockRoute.query = { start: '2026-01-01', end: '2026-12-31' }
   mockRouter.replace.mockClear()
   mockRouter.push.mockClear()
+  toastAdd.mockClear()
   getMetaMetrics.mockReset()
   getMetaMetrics.mockResolvedValue(PAYLOAD)
 })
@@ -421,5 +425,31 @@ describe('MetaMetrics page shell', () => {
     const warwickUnmatched = barWidths(container, 0)[2]
     const barringtonUnmatched = barWidths(container, 1)[2]
     expect(warwickUnmatched).toBeGreaterThan(barringtonUnmatched)
+  })
+
+  // `onError: null` used to silence EVERY failure, not just the 403 it was
+  // written for. A 500 on a range change then left the previous range's numbers
+  // on screen under the newly-chosen dates, with nothing to say the fetch had
+  // failed. The 403 stays inline; everything else is loud.
+  describe('fetch failures', () => {
+    const httpError = (status) => Object.assign(new Error(`HTTP ${status}`), {
+      status, response: { status },
+    })
+
+    it('toasts a server error rather than failing silently', async () => {
+      getMetaMetrics.mockRejectedValueOnce(httpError(500))
+      mountPage()
+      await waitFor(() => expect(toastAdd).toHaveBeenCalledTimes(1))
+      expect(toastAdd.mock.calls[0][0]).toMatchObject({ severity: 'error' })
+    })
+
+    it('leaves a 403 to the inline denial notice, with no toast', async () => {
+      // No granted villages is an expected state, not a failure to report.
+      getMetaMetrics.mockRejectedValueOnce(httpError(403))
+      mountPage()
+      await waitFor(() => expect(getMetaMetrics).toHaveBeenCalled())
+      await Promise.resolve()
+      expect(toastAdd).not.toHaveBeenCalled()
+    })
   })
 })
