@@ -45,7 +45,7 @@ describe('counts view', () => {
 
 describe('share view', () => {
   it('totals 100% for every row regardless of magnitude', () => {
-    const { segments: segs } = barSegments(ROWS, STATUS_SERIES, 'share')
+    const { segments: segs } = barSegments(ROWS, STATUS_SERIES, 'percent')
     const big = segs[0].reduce((sum, s) => sum + s.width, 0)
     const small = segs[2].reduce((sum, s) => sum + s.width, 0)
     expect(big).toBeCloseTo(100, 6)
@@ -53,13 +53,13 @@ describe('share view', () => {
   })
 
   it('sizes each segment by its share of that row', () => {
-    const { segments: segs } = barSegments(ROWS, STATUS_SERIES, 'share')
+    const { segments: segs } = barSegments(ROWS, STATUS_SERIES, 'percent')
     const warwickUnmatched = segs[1].find(s => s.key === 'unmatched')
     expect(warwickUnmatched.width).toBeCloseTo(87 / 475 * 100, 2)
   })
 
   it('leaves an all-zero row empty rather than dividing by zero', () => {
-    const { segments: segs } = barSegments(ROWS, STATUS_SERIES, 'share')
+    const { segments: segs } = barSegments(ROWS, STATUS_SERIES, 'percent')
     for (const s of segs[3]) expect(s.width).toBe(0)
   })
 })
@@ -109,7 +109,7 @@ describe('stacked layout (the Categories tab)', () => {
   })
 
   it('gives every village a full-width bar in share', () => {
-    const { trackPct } = barSegments(CROWS, CAT, 'share', { layout: 'stacked' })
+    const { trackPct } = barSegments(CROWS, CAT, 'percent', { layout: 'stacked' })
     expect(trackPct[0]).toBeCloseTo(100, 6)
     expect(trackPct[1]).toBeCloseTo(100, 6)
   })
@@ -126,8 +126,8 @@ describe('stacked layout (the Categories tab)', () => {
 // while the screen stacked them.
 describe('isStackedLayout', () => {
   it('stacks whenever the view is share, whatever the tab asked for', () => {
-    expect(isStackedLayout('grouped', 'share')).toBe(true)
-    expect(isStackedLayout('stacked', 'share')).toBe(true)
+    expect(isStackedLayout('grouped', 'percent')).toBe(true)
+    expect(isStackedLayout('stacked', 'percent')).toBe(true)
   })
 
   it('honours the tab in counts view', () => {

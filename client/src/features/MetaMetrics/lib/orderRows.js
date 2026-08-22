@@ -17,7 +17,7 @@ export const DEFAULT_SORT = { sort: 'villageName', dir: 'asc' }
 // Requests column beside it is what keeps the reader honest about magnitude.
 function valueFor (row, sort, view, seriesKeys) {
   if (sort === 'total') return row.total
-  if (view === 'share' && seriesKeys.includes(sort)) {
+  if (view === 'percent' && seriesKeys.includes(sort)) {
     return row.total === 0 ? 0 : row[sort] / row.total
   }
   return row[sort]

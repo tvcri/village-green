@@ -92,7 +92,7 @@ describe('buildMetaMetricsPdf', () => {
   })
 
   it('renders share view without throwing on percentage cells', async () => {
-    const bytes = await buildMetaMetricsPdf(report({ view: 'share' }))
+    const bytes = await buildMetaMetricsPdf(report({ view: 'percent' }))
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-')
   })
 

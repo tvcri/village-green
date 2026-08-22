@@ -14,7 +14,7 @@ import MetaMatrixTable from './MetaMatrixTable.vue'
 const props = defineProps({
   rows: { type: Array, required: true },       // ALREADY ordered by the parent
   series: { type: Array, required: true },
-  view: { type: String, required: true },      // 'counts' | 'share'
+  view: { type: String, required: true },      // 'counts' | 'percent'
   sort: { type: String, required: true },
   dir: { type: String, required: true },       // 'asc' | 'desc'
   csvFilename: { type: String, required: true },

@@ -15,7 +15,7 @@ describe('matrixColumns', () => {
   })
 
   it('names the last column Requests in share view', () => {
-    expect(matrixColumns(STATUS_SERIES, 'share').map(c => c.header))
+    expect(matrixColumns(STATUS_SERIES, 'percent').map(c => c.header))
       .toEqual(['Village', 'Completed', 'Cancelled', 'Unmatched', 'Requests'])
   })
 })
@@ -27,17 +27,17 @@ describe('matrixCells', () => {
   })
 
   it('emits one-decimal percentages in share view', () => {
-    const cells = matrixCells(ROWS, STATUS_SERIES, 'share')
+    const cells = matrixCells(ROWS, STATUS_SERIES, 'percent')
     expect(cells[1]).toMatchObject({ villageName: 'East Greenwich', unmatched: '22.8%' })
   })
 
   it('keeps the absolute request count as the last column in share view', () => {
-    const cells = matrixCells(ROWS, STATUS_SERIES, 'share')
+    const cells = matrixCells(ROWS, STATUS_SERIES, 'percent')
     expect(cells[1].total).toBe(193)
   })
 
   it('renders a zero-total village as 0.0% rather than NaN', () => {
-    const cells = matrixCells(ROWS, STATUS_SERIES, 'share')
+    const cells = matrixCells(ROWS, STATUS_SERIES, 'percent')
     expect(cells[2].completed).toBe('0.0%')
   })
 })
@@ -49,7 +49,7 @@ describe('matrixFooter', () => {
   })
 
   it('is a hub-wide rate labelled Hub in share view', () => {
-    const foot = matrixFooter(ROWS, STATUS_SERIES, 'share')
+    const foot = matrixFooter(ROWS, STATUS_SERIES, 'percent')
     // 712 / 1112 = 64.0%
     expect(foot).toMatchObject({ villageName: 'Hub', completed: '64.0%', total: 1112 })
   })
@@ -57,8 +57,8 @@ describe('matrixFooter', () => {
 
 describe('metaCsvFilename', () => {
   it('carries tab, view and range', () => {
-    expect(metaCsvFilename({ tab: 'outcomes', view: 'share', start: '2026-01-01', end: '2026-08-21' }))
-      .toBe('meta-outcomes-share-2026-01-01-2026-08-21.csv')
+    expect(metaCsvFilename({ tab: 'outcomes', view: 'percent', start: '2026-01-01', end: '2026-08-21' }))
+      .toBe('meta-outcomes-percent-2026-01-01-2026-08-21.csv')
   })
 })
 

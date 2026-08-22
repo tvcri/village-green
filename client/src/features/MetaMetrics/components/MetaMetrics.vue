@@ -134,23 +134,20 @@ const series = computed(() => {
 })
 const seriesKeys = computed(() => series.value.map(s => s.key))
 
-// The LABEL is 'Percent', the value stays 'share'. Two different jobs: the
-// label has to land on a reader who sees it twice a month, and 'Share' did not
-// — it is analytics vocabulary that assumes "share of a whole". 'Percent' names
-// what the cells literally contain, and pairs with 'Counts' because both name a
-// FORMAT rather than a meaning; the note beside the toggle carries the meaning,
-// which differs per tab anyway.
+// 'Percent' rather than 'Share'. The label has to land on a reader who sees it
+// twice a month, and 'Share' did not — it is analytics vocabulary assuming
+// "share of a whole". 'Percent' names what the cells literally contain, and
+// pairs with 'Counts' because both name a FORMAT rather than a meaning; the
+// note beside the toggle carries the meaning, which differs per tab anyway.
 //
 // Rejected: 'Ratio' (conventionally 3:1 or 1.5x, not a part of a whole), 'Mix'
 // (right for Categories, wrong for a completion rate) and 'Rate' (the inverse).
 // Only a format word works across all three tabs.
-//
-// The value is untouched on purpose: ?view=share is in shared links.
 const VIEW_OPTIONS = [
   { label: 'Counts', value: 'counts' },
-  { label: 'Percent', value: 'share' },
+  { label: 'Percent', value: 'percent' },
 ]
-const view = urlState('view', ['counts', 'share'], 'counts')
+const view = urlState('view', ['counts', 'percent'], 'counts')
 
 const sortKeys = computed(() => ['villageName', 'total', ...seriesKeys.value])
 // urlState needs the valid set at call time, and it changes with the tab — so
@@ -241,16 +238,16 @@ const csvName = computed(() => metaCsvFilename({
 function noteFor (tabValue, viewValue) {
   if (tabValue === 'detail') {
     const cat = detailCategory.value.toLowerCase()
-    return viewValue === 'share'
+    return viewValue === 'percent'
       ? `Completed ${cat} only. Each bar is that village’s own mix.`
       : `Completed ${cat} only. Bar length is the village’s total; segments are its mix.`
   }
   if (tabValue === 'categories') {
-    return viewValue === 'share'
+    return viewValue === 'percent'
       ? 'Completed work only. Each bar is that village’s own mix of categories.'
       : 'Completed work only. Bar length is the village’s total work; segments are its mix.'
   }
-  return viewValue === 'share'
+  return viewValue === 'percent'
     ? 'Each bar is that village’s own total, split by outcome.'
     : 'Bars share one scale, so lengths compare directly between villages.'
 }

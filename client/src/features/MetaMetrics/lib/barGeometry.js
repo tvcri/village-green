@@ -49,7 +49,7 @@ function widthPct (value, denominator, floor) {
  * once hardcoded its own version of this rule and rendered share as grouped.
  */
 export function isStackedLayout (layout, view) {
-  return layout === 'stacked' || view === 'share'
+  return layout === 'stacked' || view === 'percent'
 }
 
 /**
@@ -63,7 +63,7 @@ export function isStackedLayout (layout, view) {
  * @returns {{segments: Array<Array<object>>, trackPct: number[]}}
  */
 export function barSegments (rows, series, view, { layout = 'grouped' } = {}) {
-  const isShare = view === 'share'
+  const isShare = view === 'percent'
   const isStacked = isStackedLayout(layout, view)
 
   // GROUPED (Outcomes): scaled against the largest single SEGMENT, not the

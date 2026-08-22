@@ -44,7 +44,7 @@ describe('MetaMatrixTable', () => {
   })
 
   it('names the last column Requests in share view', () => {
-    mountTable({ view: 'share' })
+    mountTable({ view: 'percent' })
     expect(screen.getByText('Requests')).toBeInTheDocument()
   })
 
@@ -57,7 +57,7 @@ describe('MetaMatrixTable', () => {
   })
 
   it('shows percentages in share view', () => {
-    mountTable({ view: 'share' })
+    mountTable({ view: 'percent' })
     expect(screen.getByText('22.8%')).toBeInTheDocument()
   })
 
@@ -74,7 +74,7 @@ describe('MetaMatrixTable', () => {
   })
 
   it('labels the footer Hub in share view', () => {
-    mountTable({ view: 'share' })
+    mountTable({ view: 'percent' })
     expect(screen.getByText('Hub')).toBeInTheDocument()
   })
 
@@ -141,7 +141,7 @@ describe('MetaMatrixTable in-row bars', () => {
   })
 
   it('fills the same track for every row in share view', () => {
-    const { container } = mountTable({ view: 'share' })
+    const { container } = mountTable({ view: 'percent' })
     const total = tr => [...tr.querySelectorAll('.bar-seg')]
       .reduce((sum, s) => sum + parseFloat(s.style.width), 0)
     const rows = container.querySelectorAll('.meta-matrix-table tbody tr')
@@ -163,7 +163,7 @@ describe('MetaMatrixTable in-row bars', () => {
     expect(counts.querySelector('.bar-track')).toHaveClass('is-grouped')
     cleanup()
 
-    const { container: share } = mountTable({ view: 'share' })
+    const { container: share } = mountTable({ view: 'percent' })
     expect(share.querySelector('.bar-track')).toHaveClass('is-stacked')
   })
 

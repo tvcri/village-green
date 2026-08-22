@@ -34,12 +34,12 @@ describe('orderRows', () => {
 
   it('sorts by a series column as a SHARE of total in share view', () => {
     // East Greenwich 44/193 = 22.8% beats Warwick 92/478 = 19.2%
-    expect(names(orderRows(ROWS, { sort: 'unmatched', dir: 'desc', view: 'share' })))
+    expect(names(orderRows(ROWS, { sort: 'unmatched', dir: 'desc', view: 'percent' })))
       .toEqual(['East Greenwich', 'Warwick', 'Barrington', 'Empty Harbor'])
   })
 
   it('treats a zero-total village as zero share rather than NaN', () => {
-    const ordered = orderRows(ROWS, { sort: 'completed', dir: 'asc', view: 'share' })
+    const ordered = orderRows(ROWS, { sort: 'completed', dir: 'asc', view: 'percent' })
     expect(ordered[0].villageName).toBe('Empty Harbor')
   })
 
@@ -80,7 +80,7 @@ describe('orderRows with a caller-supplied series set', () => {
 
   it('sorts a category column by share of the row in share view', () => {
     // Small is 80% errands, Mid 47%, Big 2%.
-    const out = orderRows(CAT_ROWS, { sort: 'Errands', dir: 'desc', view: 'share', seriesKeys: KEYS })
+    const out = orderRows(CAT_ROWS, { sort: 'Errands', dir: 'desc', view: 'percent', seriesKeys: KEYS })
     expect(names(out)).toEqual(['Small', 'Mid', 'Big'])
   })
 

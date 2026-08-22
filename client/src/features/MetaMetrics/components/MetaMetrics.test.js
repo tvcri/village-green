@@ -156,7 +156,7 @@ describe('MetaMetrics page shell', () => {
     mountPage()
     await waitFor(() => expect(screen.getByText('Percent')).toBeInTheDocument())
     await fireEvent.click(screen.getByText('Percent'))
-    await waitFor(() => expect(mockRoute.query.view).toBe('share'))
+    await waitFor(() => expect(mockRoute.query.view).toBe('percent'))
   })
 
   it('reads the sort from the URL and applies it to the chart', async () => {
@@ -191,7 +191,7 @@ describe('MetaMetrics page shell', () => {
   })
 
   it('changes the explanation with the view', async () => {
-    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', view: 'share' }
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', view: 'percent' }
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
     expect(container.querySelector('.scale-note').textContent)
@@ -383,7 +383,7 @@ describe('MetaMetrics page shell', () => {
     expect(getMetaMetrics).toHaveBeenCalledTimes(1)
 
     await fireEvent.click(screen.getByText('Percent'))
-    await waitFor(() => expect(mockRoute.query.view).toBe('share'))
+    await waitFor(() => expect(mockRoute.query.view).toBe('percent'))
     expect(getMetaMetrics).toHaveBeenCalledTimes(1)
 
     // Drive the real table header, not an internal setter.

@@ -24,7 +24,7 @@ export function matrixColumns (series, view, { full = false } = {}) {
   return [
     { header: 'Village', key: 'villageName' },
     ...series.map(s => ({ header: full ? s.label : (s.shortLabel ?? s.label), key: s.key })),
-    { header: view === 'share' ? 'Requests' : 'Total', key: 'total' },
+    { header: view === 'percent' ? 'Requests' : 'Total', key: 'total' },
   ]
 }
 
@@ -32,7 +32,7 @@ export function matrixCells (rows, series, view) {
   return rows.map(row => {
     const cells = { villageId: row.villageId, villageName: row.villageName, total: row.total }
     for (const s of series) {
-      cells[s.key] = view === 'share' ? pct(row[s.key], row.total) : row[s.key]
+      cells[s.key] = view === 'percent' ? pct(row[s.key], row.total) : row[s.key]
     }
     return cells
   })
@@ -46,9 +46,9 @@ export function matrixFooter (rows, series, view) {
     totals[s.key] = rows.reduce((sum, r) => sum + r[s.key], 0)
   }
 
-  const foot = { villageName: view === 'share' ? 'Hub' : 'Total', total: totals.total }
+  const foot = { villageName: view === 'percent' ? 'Hub' : 'Total', total: totals.total }
   for (const s of series) {
-    foot[s.key] = view === 'share' ? pct(totals[s.key], totals.total) : totals[s.key]
+    foot[s.key] = view === 'percent' ? pct(totals[s.key], totals.total) : totals[s.key]
   }
   return foot
 }

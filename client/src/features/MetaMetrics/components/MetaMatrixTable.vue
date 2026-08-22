@@ -10,7 +10,7 @@ import { barSegments, isStackedLayout } from '../lib/barGeometry.js'
 const props = defineProps({
   rows: { type: Array, required: true },      // ALREADY ordered by the parent
   series: { type: Array, required: true },
-  view: { type: String, required: true },     // 'counts' | 'share'
+  view: { type: String, required: true },     // 'counts' | 'percent'
   sort: { type: String, required: true },
   dir: { type: String, required: true },      // 'asc' | 'desc'
   csvFilename: { type: String, required: true },
@@ -62,7 +62,7 @@ const sortOrder = computed(() => (props.dir === 'desc' ? -1 : 1))
 // because the four categories genuinely partition a village's work — so the
 // tab passes layout="stacked" and the view only changes the track's length.
 const isStacked = computed(() =>
-  props.layout === 'stacked' || props.view === 'share')
+  props.layout === 'stacked' || props.view === 'percent')
 
 const barsById = computed(() => {
   const { segments, trackPct } = barSegments(
