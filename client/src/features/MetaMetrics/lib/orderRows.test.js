@@ -94,3 +94,31 @@ describe('orderRows with a caller-supplied series set', () => {
     expect(names(out)).toEqual(['Warwick', 'East Greenwich', 'Barrington', 'Empty Harbor'])
   })
 })
+
+// A sort key can be valid on one tab and meaningless on another — "unmatched"
+// is an Outcomes column, not a Categories one — and the PDF exports every tab
+// under whatever sort the page happens to carry.
+describe('falling back to the default sort', () => {
+  const ROWS2 = [
+    { villageId: '1', villageName: 'Zeta', Rides: 5, total: 6 },
+    { villageId: '2', villageName: 'Alpha', Rides: 40, total: 42 },
+  ]
+  const names = rows => rows.map(r => r.villageName)
+
+  it('uses the DEFAULT direction too, not the one meant for the other column', () => {
+    // 'desc' was the user's choice for `unmatched`. Carrying it onto the
+    // village-name fallback would list Z before A for no reason the reader
+    // could see.
+    const out = orderRows(ROWS2, {
+      sort: 'unmatched', dir: 'desc', view: 'counts', seriesKeys: ['Rides'],
+    })
+    expect(names(out)).toEqual(['Alpha', 'Zeta'])
+  })
+
+  it('still honours an explicit descending sort on a key that IS valid', () => {
+    const out = orderRows(ROWS2, {
+      sort: 'villageName', dir: 'desc', view: 'counts', seriesKeys: ['Rides'],
+    })
+    expect(names(out)).toEqual(['Zeta', 'Alpha'])
+  })
+})

@@ -28,10 +28,15 @@ function valueFor (row, sort, view, seriesKeys) {
 // click on "Rides" fall back to village name while the header arrow still
 // pointed at Rides — a sort that silently never happened.
 export function orderRows (rows, { sort, dir, view, seriesKeys = SERIES_KEYS }) {
-  const key = (sort === 'villageName' || sort === 'total' || seriesKeys.includes(sort))
-    ? sort
-    : DEFAULT_SORT.sort
-  const sign = dir === 'desc' ? -1 : 1
+  const valid = sort === 'villageName' || sort === 'total' || seriesKeys.includes(sort)
+  const key = valid ? sort : DEFAULT_SORT.sort
+  // The DIRECTION falls back with the key. A sort key can be valid on one tab
+  // and meaningless on another — 'unmatched' is an Outcomes column, not a
+  // Categories one — and the PDF exports every tab under whatever sort the page
+  // carries. Keeping 'desc' from the abandoned column would list villages Z-to-A
+  // for no reason a reader could see.
+  const dirUsed = valid ? dir : DEFAULT_SORT.dir
+  const sign = dirUsed === 'desc' ? -1 : 1
 
   // Copy first: callers pass a computed array that other consumers also read.
   return [...rows].sort((a, b) => {
