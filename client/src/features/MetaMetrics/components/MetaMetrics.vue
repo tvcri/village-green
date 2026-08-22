@@ -134,9 +134,21 @@ const series = computed(() => {
 })
 const seriesKeys = computed(() => series.value.map(s => s.key))
 
+// The LABEL is 'Percent', the value stays 'share'. Two different jobs: the
+// label has to land on a reader who sees it twice a month, and 'Share' did not
+// — it is analytics vocabulary that assumes "share of a whole". 'Percent' names
+// what the cells literally contain, and pairs with 'Counts' because both name a
+// FORMAT rather than a meaning; the note beside the toggle carries the meaning,
+// which differs per tab anyway.
+//
+// Rejected: 'Ratio' (conventionally 3:1 or 1.5x, not a part of a whole), 'Mix'
+// (right for Categories, wrong for a completion rate) and 'Rate' (the inverse).
+// Only a format word works across all three tabs.
+//
+// The value is untouched on purpose: ?view=share is in shared links.
 const VIEW_OPTIONS = [
   { label: 'Counts', value: 'counts' },
-  { label: 'Share', value: 'share' },
+  { label: 'Percent', value: 'share' },
 ]
 const view = urlState('view', ['counts', 'share'], 'counts')
 

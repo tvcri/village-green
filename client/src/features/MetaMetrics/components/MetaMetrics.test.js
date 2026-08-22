@@ -154,8 +154,8 @@ describe('MetaMetrics page shell', () => {
   it('writes the view to the URL when Share is chosen', async () => {
     getMetaMetrics.mockResolvedValue(PAYLOAD)
     mountPage()
-    await waitFor(() => expect(screen.getByText('Share')).toBeInTheDocument())
-    await fireEvent.click(screen.getByText('Share'))
+    await waitFor(() => expect(screen.getByText('Percent')).toBeInTheDocument())
+    await fireEvent.click(screen.getByText('Percent'))
     await waitFor(() => expect(mockRoute.query.view).toBe('share'))
   })
 
@@ -382,7 +382,7 @@ describe('MetaMetrics page shell', () => {
     await mountLoaded()
     expect(getMetaMetrics).toHaveBeenCalledTimes(1)
 
-    await fireEvent.click(screen.getByText('Share'))
+    await fireEvent.click(screen.getByText('Percent'))
     await waitFor(() => expect(mockRoute.query.view).toBe('share'))
     expect(getMetaMetrics).toHaveBeenCalledTimes(1)
 
