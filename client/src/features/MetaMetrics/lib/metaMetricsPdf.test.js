@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildMetaMetricsPdf, metaPdfSections, MAX_ROWS_PER_PAGE } from './metaMetricsPdf.js'
+import { barSegments } from './barGeometry.js'
 import { STATUS_SERIES } from './reduceCells.js'
 import { CATEGORY_SERIES } from './byVillageCategory.js'
 
@@ -22,8 +23,8 @@ const report = (over = {}) => ({
   },
   view: 'counts',
   sections: [
-    { key: 'outcomes', title: 'Outcomes', note: 'Bars share one scale.', rows: OUTCOME_ROWS, series: STATUS_SERIES, layout: 'grouped' },
-    { key: 'categories', title: 'Categories', note: 'Completed work only.', rows: CATEGORY_ROWS, series: CATEGORY_SERIES, layout: 'stacked' },
+    { key: 'outcomes', title: 'Outcomes', note: 'Bars share one scale.', rows: OUTCOME_ROWS, series: STATUS_SERIES },
+    { key: 'categories', title: 'Categories', note: 'Completed work only.', rows: CATEGORY_ROWS, series: CATEGORY_SERIES },
   ],
   ...over,
 })
@@ -34,11 +35,53 @@ describe('metaPdfSections', () => {
       villageId: String(i), villageName: `V${i}`, completed: 10, cancelled: 1, unmatched: 0, total: 11,
     }))
     const pages = metaPdfSections([
-      { key: 'outcomes', title: 'Outcomes', rows: many, series: STATUS_SERIES, layout: 'grouped' },
+      { key: 'outcomes', title: 'Outcomes', rows: many, series: STATUS_SERIES },
     ])
     expect(pages.length).toBe(2)
     expect(pages[0].rows).toHaveLength(MAX_ROWS_PER_PAGE)
     expect(pages[1].rows).toHaveLength(5)
+  })
+
+  // Both of these were real bugs, and neither was caught by asserting page
+  // count and PDF validity: a multi-page section computed its bar scale and its
+  // totals row from the PAGE's rows. Page 2's busiest village drew full width
+  // whatever page 1 held, and the totals row printed the page's sum under a
+  // bold "Total" — while the section note promised one shared scale.
+  it('carries the whole section beside each page slice', () => {
+    const many = Array.from({ length: MAX_ROWS_PER_PAGE + 5 }, (_, i) => ({
+      villageId: String(i), villageName: `V${i}`, completed: 10, cancelled: 1, unmatched: 0, total: 11,
+    }))
+    const [p1, p2] = metaPdfSections([
+      { key: 'outcomes', title: 'Outcomes', rows: many, series: STATUS_SERIES },
+    ])
+    expect(p1.allRows).toHaveLength(many.length)
+    expect(p2.allRows).toHaveLength(many.length)
+    // The offset is what lets a page take its own share of section-wide
+    // geometry without searching for its rows by identity.
+    expect(p1.rowOffset).toBe(0)
+    expect(p2.rowOffset).toBe(MAX_ROWS_PER_PAGE)
+  })
+
+  it('scales a section’s bars identically on every page it spans', () => {
+    // The busiest village is on page 1; an identical total on page 2 must draw
+    // the same length. Scoped to the page, page 2 would rescale to its own max.
+    const rows = Array.from({ length: MAX_ROWS_PER_PAGE + 3 }, (_, i) => ({
+      villageId: String(i), villageName: `V${i}`,
+      completed: 20, cancelled: 0, unmatched: 0, total: 20,
+    }))
+    rows[0] = { ...rows[0], completed: 500, total: 500 }   // page 1, the max
+    const pages = metaPdfSections([
+      { key: 'outcomes', title: 'Outcomes', rows, series: STATUS_SERIES },
+    ])
+    const widthOn = page => {
+      const scope = page.allRows
+      const { trackPct } = barSegments(scope, STATUS_SERIES, 'counts')
+      return trackPct[page.rowOffset]   // this page's FIRST row
+    }
+    // Page 2's first row has total 20, same as page 1's second row.
+    const { trackPct } = barSegments(pages[0].allRows, STATUS_SERIES, 'counts')
+    expect(widthOn(pages[1])).toBeCloseTo(trackPct[1], 6)
+    expect(widthOn(pages[1])).toBeCloseTo(20 / 500 * 100, 6)
   })
 
   it('marks a continued page so a reader knows the table did not restart', () => {
@@ -46,7 +89,7 @@ describe('metaPdfSections', () => {
       villageId: String(i), villageName: `V${i}`, completed: 1, cancelled: 0, unmatched: 0, total: 1,
     }))
     const pages = metaPdfSections([
-      { key: 'outcomes', title: 'Outcomes', rows: many, series: STATUS_SERIES, layout: 'grouped' },
+      { key: 'outcomes', title: 'Outcomes', rows: many, series: STATUS_SERIES },
     ])
     expect(pages[0].continued).toBe(false)
     expect(pages[1].continued).toBe(true)
@@ -61,8 +104,8 @@ describe('metaPdfSections', () => {
 
   it('drops a section with no rows rather than printing an empty table', () => {
     const pages = metaPdfSections([
-      { key: 'outcomes', title: 'Outcomes', rows: [], series: STATUS_SERIES, layout: 'grouped' },
-      { key: 'categories', title: 'Categories', rows: CATEGORY_ROWS, series: CATEGORY_SERIES, layout: 'stacked' },
+      { key: 'outcomes', title: 'Outcomes', rows: [], series: STATUS_SERIES },
+      { key: 'categories', title: 'Categories', rows: CATEGORY_ROWS, series: CATEGORY_SERIES },
     ])
     expect(pages).toHaveLength(1)
     expect(pages[0].key).toBe('categories')
@@ -101,7 +144,7 @@ describe('buildMetaMetricsPdf', () => {
       villageId: '3', villageName: 'Empty Harbor', completed: 0, cancelled: 0, unmatched: 0, total: 0,
     }]
     const bytes = await buildMetaMetricsPdf(report({
-      sections: [{ key: 'outcomes', title: 'Outcomes', rows, series: STATUS_SERIES, layout: 'grouped' }],
+      sections: [{ key: 'outcomes', title: 'Outcomes', rows, series: STATUS_SERIES }],
     }))
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-')
   })

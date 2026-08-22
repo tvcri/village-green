@@ -20,8 +20,6 @@ const props = defineProps({
   csvFilename: { type: String, required: true },
   dark: { type: Boolean, default: false },
   emptyMessage: { type: String, default: 'No requests in this range' },
-  // 'grouped' (Outcomes) or 'stacked' (Categories) — see MetaMatrixTable.
-  layout: { type: String, default: 'grouped' },
 })
 
 defineEmits(['update:sort'])
@@ -46,7 +44,6 @@ const hasRows = computed(() => props.rows.length > 0)
         :dir="dir"
         :csvFilename="csvFilename"
         :dark="dark"
-        :layout="layout"
         @update:sort="$emit('update:sort', $event)"
       />
     </template>

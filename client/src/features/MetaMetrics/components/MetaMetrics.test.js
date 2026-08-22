@@ -245,14 +245,15 @@ describe('MetaMetrics page shell', () => {
     expect(screen.getByRole('tab', { name: 'Categories' })).toBeInTheDocument()
   })
 
-  it('renders category columns and stacked bars on the Categories tab', async () => {
+  it('renders category columns and a composed bar on the Categories tab', async () => {
     mockRoute.query = { start: '2026-01-01', end: '2026-12-31', tab: 'categories' }
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
     expect(screen.getByText('Rides')).toBeInTheDocument()
     expect(screen.getByText('Errands')).toBeInTheDocument()
-    // Categories stacks in BOTH views; Outcomes would group here.
-    expect(container.querySelector('.bar-track')).toHaveClass('is-stacked')
+    // One composed bar per row, its segments in series order.
+    expect(container.querySelectorAll('.bar-track')[0].querySelectorAll('.bar-seg').length)
+      .toBeGreaterThan(0)
   })
 
   it('counts completed work only on the Categories tab', async () => {
@@ -291,8 +292,9 @@ describe('MetaMetrics page shell', () => {
     // are abbreviated further so they do not wrap.
     expect(screen.getByText('Medical')).toBeInTheDocument()
     expect(screen.getByText('Shopping')).toBeInTheDocument()
-    // Stacked like Categories, since services partition their category's work.
-    expect(container.querySelector('.bar-track')).toHaveClass('is-stacked')
+    // One composed bar per row, since the services partition their category.
+    expect(container.querySelectorAll('.bar-track')[0].querySelectorAll('.bar-seg').length)
+      .toBeGreaterThan(0)
   })
 
   it('offers no category with only one service, and no all-categories option', async () => {

@@ -305,7 +305,6 @@ function sectionFor (tabValue) {
       seriesKeys: sectionSeries.map(x => x.key),
     }),
     series: sectionSeries,
-    layout: tabValue === 'outcomes' ? 'grouped' : 'stacked',
   }
 }
 
@@ -432,9 +431,9 @@ const showCountingInfo = ref(false)
           />
         </div>
         <TabPanels>
-          <!-- Both panels render the same card; only the series, the layout and
-               the scale note differ, so the markup is shared rather than
-               duplicated. `lazy` on Tabs means only the active one mounts. -->
+          <!-- Both panels render the same card; only the series and the scale
+               note differ, so the markup is shared rather than duplicated.
+               `lazy` on Tabs means only the active one mounts. -->
           <TabPanel v-for="value in TAB_VALUES" :key="value" :value="value">
             <!-- Only genuinely per-tab controls live here. Outcomes and
                  Categories have none; Detail has its category selector, which
@@ -466,7 +465,6 @@ const showCountingInfo = ref(false)
               :dir="dir"
               :csvFilename="csvName"
               :dark="dark"
-              :layout="isOutcomes ? 'grouped' : 'stacked'"
               :emptyMessage="emptyMessage"
               @update:sort="onSortUpdate"
             />

@@ -8,10 +8,10 @@
 // they are plain rectangles from the same barSegments() the screen uses. Screen
 // and print cannot drift, because they read the same numbers.
 
-import { PDFDocument, StandardFonts } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import {
   PAGE_W as PORTRAIT_W, PAGE_H as PORTRAIT_H, MARGIN, INK, MUTED, LINE, BORDER, TINT,
-  formatRange, hexColor, drawText, rightText, roundedRect,
+  formatRange, hexColor, winAnsi, drawText, rightText, roundedRect,
 } from '../../../shared/lib/pdf/pdfPrimitives.js'
 
 // LANDSCAPE, unlike the village report. These tables are wide by nature — a
@@ -21,19 +21,28 @@ import {
 // browser's, which is what a reader is comparing the print against.
 const PAGE_W = PORTRAIT_H
 const PAGE_H = PORTRAIT_W
-import { barSegments, isStackedLayout } from './barGeometry.js'
+import { barSegments } from './barGeometry.js'
 import { matrixColumns, matrixCells, matrixFooter } from './matrixTable.js'
 
 const CONTENT_W = PAGE_W - MARGIN * 2
 
 const ROW_H = 18
 const HEADER_H = 20
-const NAME_W = 104
-const NUM_W = 46
+// The name column was 104pt against a 60.8pt widest name ("Aquidneck Island"
+// at 8pt) — 43pt of surplus sitting between the name and the first number.
+// Spending it on the numeric columns is what lets each series header carry a
+// colour swatch: "Unmatched" plus its swatch and padding needs 55.3pt, which
+// did not fit the old 46pt column and clipped into its neighbour.
+const NAME_W = 76
+const NUM_W = 56
 // What is left for the bar once the name and numeric columns are placed. The
 // bar column is elastic on screen for the same reason: it should absorb the
 // leftover rather than fix a width the columns must fit around.
 const BAR_GAP = 14
+// Matches the screen's 0.75rem header swatch, scaled to a 7.5pt header.
+// A header swatch, matching the screen's 0.75rem square scaled to 7.5pt text.
+const SWATCH = 5.5
+const SWATCH_GAP = 3
 
 const STRIP_H = 46
 const SECTION_TITLE_H = 26
@@ -61,6 +70,16 @@ export function metaPdfSections (sections) {
       pages.push({
         ...section,
         rows: section.rows.slice(i, i + MAX_ROWS_PER_PAGE),
+        // The WHOLE section, kept beside the page's slice. Two things are
+        // properties of the section and not of the page: the bar scale (every
+        // bar in a section shares one denominator, which is what the section
+        // note promises) and the totals row. Computing either from the slice
+        // makes page 2 disagree with page 1 about what a bar length means.
+        allRows: section.rows,
+        // Where this page's slice starts within allRows, so the drawing code
+        // can take its share of the section-wide geometry without having to
+        // search for its own rows by identity.
+        rowOffset: i,
         continued: i > 0,
       })
     }
@@ -98,10 +117,14 @@ function drawStrip (page, fonts, strip) {
 function drawSection (page, fonts, section, view) {
   const columns = matrixColumns(section.series, view)
   const cells = matrixCells(section.rows, section.series, view)
-  const foot = matrixFooter(section.rows, section.series, view)
-  const { segments, trackPct } = barSegments(
-    section.rows, section.series, view, { layout: section.layout },
-  )
+  const foot = matrixFooter(section.allRows ?? section.rows, section.series, view)
+  // Scaled across the whole section, then sliced to this page — so a village on
+  // page 2 draws against the same denominator as one on page 1.
+  const scope = section.allRows ?? section.rows
+  const all = barSegments(scope, section.series, view)
+  const from = section.rowOffset ?? 0
+  const segments = all.segments.slice(from, from + section.rows.length)
+  const trackPct = all.trackPct.slice(from, from + section.rows.length)
 
   let y = PAGE_H - MARGIN - 52 - STRIP_H - SECTION_TITLE_H
 
@@ -120,9 +143,27 @@ function drawSection (page, fonts, section, view) {
   const barX = MARGIN + NAME_W + numbersW + BAR_GAP
   const barW = PAGE_W - MARGIN - barX
 
+  // Each series column's header carries a square of that series' colour, left
+  // of the label — the same pairing the screen makes. The bars are composed, so
+  // without this nothing in the document names the colours.
+  // Village and Total/Requests are not series, so they get none. Keyed off the
+  // series key, not the column index: index math would silently mis-swatch if a
+  // column were ever reordered.
+  const seriesByKey = new Map(section.series.map(x => [x.key, x]))
+
   drawText(page, columns[0].header, MARGIN, y, 7.5, fonts.bold, MUTED)
   numCols.forEach((col, i) => {
-    rightText(page, col.header, MARGIN + NAME_W + NUM_W * (i + 1) - 6, y, 7.5, fonts.bold, MUTED)
+    const rightX = MARGIN + NAME_W + NUM_W * (i + 1) - 6
+    rightText(page, col.header, rightX, y, 7.5, fonts.bold, MUTED)
+    const s = seriesByKey.get(col.key)
+    if (s) {
+      const labelW = fonts.bold.widthOfTextAtSize(winAnsi(col.header, fonts.bold), 7.5)
+      page.drawRectangle({
+        x: rightX - labelW - SWATCH_GAP - SWATCH, y: y + 0.4,
+        width: SWATCH, height: SWATCH,
+        color: hexColor(s.colorLight),
+      })
+    }
   })
 
   y -= 6
@@ -141,30 +182,15 @@ function drawSection (page, fonts, section, view) {
 
     // The bar, in the same row as its numbers — the whole point of the screen
     // layout, and the reason this document needs no chart images.
+    // One composed bar, matching the screen on every tab and in both views.
     const track = (trackPct[r] / 100) * barW
-    if (isStackedLayout(section.layout, view)) {
-      let bx = barX
-      for (const seg of segments[r]) {
-        const w = (seg.width / 100) * track
-        if (w > 0) {
-          page.drawRectangle({ x: bx, y: y + 2, width: w, height: 9, color: hexColor(seg.colorLight) })
-          bx += w
-        }
+    let bx = barX
+    for (const seg of segments[r]) {
+      const w = (seg.width / 100) * track
+      if (w > 0) {
+        page.drawRectangle({ x: bx, y: y + 2, width: w, height: 9, color: hexColor(seg.colorLight) })
+        bx += w
       }
-    } else {
-      // Grouped: one thin bar per series, abutting, sharing one scale — the
-      // same treatment as the screen. Height is divided from the row rather
-      // than fixed, so three outcomes and four categories both fill it.
-      const h = 12 / segments[r].length
-      segments[r].forEach((seg, s) => {
-        const w = (seg.width / 100) * barW
-        if (w > 0) {
-          page.drawRectangle({
-            x: barX, y: y + 13 - (s + 1) * h, width: w, height: h - 0.4,
-            color: hexColor(seg.colorLight),
-          })
-        }
-      })
     }
 
     page.drawLine({
@@ -204,7 +230,7 @@ function drawFooter (page, fonts, index, total) {
 
 /**
  * @param {object} report
- *   {start, end, strip, view, sections:[{key,title,note,rows,series,layout}]}
+ *   {start, end, strip, view, sections:[{key,title,note,rows,series}]}
  * @returns {Promise<Uint8Array>}
  */
 export async function buildMetaMetricsPdf (report) {

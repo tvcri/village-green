@@ -5,7 +5,7 @@ import Column from 'primevue/column'
 import ColumnGroup from 'primevue/columngroup'
 import Row from 'primevue/row'
 import { matrixColumns, matrixCells, matrixFooter } from '../lib/matrixTable.js'
-import { barSegments, isStackedLayout } from '../lib/barGeometry.js'
+import { barSegments } from '../lib/barGeometry.js'
 
 const props = defineProps({
   rows: { type: Array, required: true },      // ALREADY ordered by the parent
@@ -15,9 +15,6 @@ const props = defineProps({
   dir: { type: String, required: true },      // 'asc' | 'desc'
   csvFilename: { type: String, required: true },
   dark: { type: Boolean, default: false },
-  // 'grouped' (Outcomes) draws one bar per series; 'stacked' (Categories) draws
-  // one composed bar whose length carries the row total in counts view.
-  layout: { type: String, default: 'grouped' },
 })
 
 const emit = defineEmits(['update:sort'])
@@ -57,16 +54,12 @@ const sortOrder = computed(() => (props.dir === 'desc' ? -1 : 1))
 // The bar lives in the same ROW as its numbers, which is the whole reason this
 // page has no chart. Keyed by villageId rather than row index so the bar cannot
 // drift from its row if PrimeVue ever renders out of order.
-// Outcomes groups its bars in counts and stacks them in share, because the
-// three outcomes do not compose into a whole. Categories stacks in BOTH views,
-// because the four categories genuinely partition a village's work — so the
-// tab passes layout="stacked" and the view only changes the track's length.
-const isStacked = computed(() =>
-  props.layout === 'stacked' || props.view === 'percent')
-
+// Every tab stacks, in both views: each series set partitions its row, so the
+// segments are always parts of one whole. Only the track's length changes with
+// the view — see barGeometry.js.
 const barsById = computed(() => {
   const { segments, trackPct } = barSegments(
-    props.rows, props.series, props.view, { layout: props.layout },
+    props.rows, props.series, props.view,
   )
   return new Map(props.rows.map((row, i) => [
     row.villageId,
@@ -78,12 +71,10 @@ function barFor (villageId) {
   return barsById.value.get(villageId) ?? { segments: [], trackPct: 0 }
 }
 
-// Grouped bars own their widths per segment and always fill the cell; a stacked
-// counts bar is shortened to carry its village's share of the busiest total.
+// A counts bar is shortened to carry its village's share of the busiest total;
+// in percent every track is full width, which barSegments already returns.
 function trackStyle (villageId) {
-  return props.layout === 'stacked'
-    ? { width: `${barFor(villageId).trackPct}%` }
-    : null
+  return { width: `${barFor(villageId).trackPct}%` }
 }
 
 function segColor (seg) {
@@ -133,16 +124,11 @@ function segTitle (seg) {
            the numbers in the same row, not a value of its own. -->
       <Column headerClass="bar-head" bodyClass="bar-cell">
         <template #body="{ data }">
-          <!-- Counts GROUPS: three thin bars stacked vertically, sharing one
-               scale. The three outcomes are independent quantities that do not
-               compose into a whole — an unmatched request is not part of the
-               same pile as a completed one — so butting them end to end would
-               assert a total that means nothing. Share STACKS, because there
-               the segments genuinely are parts of 100%. -->
-          <div
-            :class="['bar-track', isStacked ? 'is-stacked' : 'is-grouped']"
-            :style="trackStyle(data.villageId)"
-          >
+          <!-- One composed bar, on every tab and in both views. The series
+               partition the row — three terminal fates, or the categories of a
+               village's work — so the segments genuinely are parts of a whole.
+               In counts the track's LENGTH carries the row total. -->
+          <div class="bar-track" :style="trackStyle(data.villageId)">
             <span
               v-for="seg in barFor(data.villageId).segments"
               :key="seg.key"
@@ -234,40 +220,21 @@ function segTitle (seg) {
   display: flex;
 }
 
-/* Counts: one thin bar per outcome, stacked vertically and left-aligned so all
-   three start from a common zero. Modelled on the two-bar rows in the
-   ri-senate district report (page 4). Full width, like the stacked view — the
-   segments are percentages of the cell, so the bars grow with the column. */
-.bar-track.is-grouped {
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  /* NO gap. Colour and the shared left edge already separate the three bars, so
-     whitespace between them is redundant — and spending it on thickness is what
-     makes them read as bars rather than rules. Abutting is how the paired bars
-     in the ri-senate report carry their weight at this row height. */
-  gap: 0;
-}
-
-.bar-track.is-grouped .bar-seg { height: 9px; }
-
-/* Share: a single composed bar matching the grouped stack's total height
-   (3 x 9px), so switching views does not change the table's vertical rhythm. */
-/* Fills the cell rather than a fixed track: a share bar asserts "this is the
-   whole of this village", and one that visibly stops short of its container
-   undercuts exactly that. Counts keeps the fixed px track because ITS lengths
-   must be comparable across rows against a shared maximum. */
-.bar-track.is-stacked {
+/* One composed bar per row. 27px was chosen to match the total height of the
+   three 9px bars an earlier grouped layout drew, so the table's vertical
+   rhythm did not change when Outcomes moved to a stack.
+   The width comes from trackStyle(): full in percent, scaled to the busiest
+   village's total in counts. */
+.bar-track {
   flex-direction: row;
   align-items: center;
-  width: 100%;
   height: 27px;
   /* A 1px gap keeps adjacent segments distinguishable where one is a sliver;
      without it a 1px orange against a 1px purple reads as a single 2px mark. */
   gap: 1px;
 }
 
-.bar-track.is-stacked .bar-seg { height: 27px; }
+.bar-track .bar-seg { height: 27px; }
 
 /* NO border-radius. Rounding every segment was wrong in stacked bars: it landed
    on whichever segment happened to be last, so the rounding moved between rows

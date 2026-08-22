@@ -133,11 +133,18 @@ describe('MetaMatrixTable in-row bars', () => {
   })
 
   it('scales counts against one shared denominator so bars compare across villages', () => {
+    // A stacked bar draws a count as segment-share OF a scaled track, so the
+    // cross-village comparison lives in the product of the two, not in the
+    // segment width alone. Barrington completed 624, East Greenwich 88 — that
+    // ratio must survive the composition.
     const { container } = mountTable({ view: 'counts' })
     const rows = container.querySelectorAll('.meta-matrix-table tbody tr')
-    const widthOf = (tr, i) => parseFloat(tr.querySelectorAll('.bar-seg')[i].style.width)
-    // Barrington completed 624, East Greenwich 88 — the ratio must survive.
-    expect(widthOf(rows[0], 0) / widthOf(rows[1], 0)).toBeCloseTo(624 / 88, 1)
+    const drawnWidth = (tr, i) => {
+      const track = parseFloat(tr.querySelector('.bar-track').style.width)
+      const seg = parseFloat(tr.querySelectorAll('.bar-seg')[i].style.width)
+      return (track / 100) * seg
+    }
+    expect(drawnWidth(rows[0], 0) / drawnWidth(rows[1], 0)).toBeCloseTo(624 / 88, 1)
   })
 
   it('fills the same track for every row in share view', () => {
@@ -155,16 +162,21 @@ describe('MetaMatrixTable in-row bars', () => {
     expect(container.querySelector('.bar-seg').style.backgroundColor).toBe(probe.style.backgroundColor)
   })
 
-  it('groups the bars in counts view and stacks them in share view', () => {
-    // Not cosmetic. The three outcomes are independent quantities that do not
-    // compose into a whole, so counts draws them as three separate bars sharing
-    // a scale; share's segments genuinely are parts of 100%, so they stack.
+  it('scales the track in counts view and fills it in share view', () => {
+    // Not cosmetic, and the only thing the view changes about the bar. Every
+    // tab draws one composed bar in both views, because the series partition
+    // the row; in counts the track's LENGTH carries the row total, so a village
+    // short of the busiest one draws short. In share every track is full.
     const { container: counts } = mountTable({ view: 'counts' })
-    expect(counts.querySelector('.bar-track')).toHaveClass('is-grouped')
+    const countsTracks = counts.querySelectorAll('.bar-track')
+    expect(countsTracks[0].style.width).toBe('100%')          // the busiest
+    expect(countsTracks[1].style.width).not.toBe('100%')
     cleanup()
 
     const { container: share } = mountTable({ view: 'percent' })
-    expect(share.querySelector('.bar-track')).toHaveClass('is-stacked')
+    for (const track of share.querySelectorAll('.bar-track')) {
+      expect(track.style.width).toBe('100%')
+    }
   })
 
   it('titles the village name so an ellipsis-truncated one stays readable', () => {
