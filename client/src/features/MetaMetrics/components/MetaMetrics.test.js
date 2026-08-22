@@ -222,6 +222,22 @@ describe('MetaMetrics page shell', () => {
       .filter(b => /download csv/i.test(b.textContent))).toHaveLength(1)
   })
 
+  it('puts the PDF at page level and the CSV at table level', async () => {
+    // Scope decides placement. The PDF covers all three tabs AND the summary
+    // strip, so it belongs in the page-level row beside the view toggle. The
+    // CSV is exactly one table, so it stays on the tab strip. Together they
+    // would read as the same kind of export.
+    const { container } = mountPage()
+    await waitFor(() => expect(villageOrder(container).length).toBe(2))
+
+    const find = re => [...container.querySelectorAll('button')]
+      .find(b => re.test(b.textContent))
+
+    expect(find(/download pdf/i).closest('.view-bar')).toBeTruthy()
+    expect(find(/download pdf/i).closest('.tabs-csv')).toBeNull()
+    expect(find(/download csv/i).closest('.tabs-csv')).toBeTruthy()
+  })
+
   it('offers a Categories tab alongside Outcomes', async () => {
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))

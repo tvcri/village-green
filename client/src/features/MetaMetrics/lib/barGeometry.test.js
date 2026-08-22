@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { barSegments } from './barGeometry.js'
+import { barSegments, isStackedLayout } from './barGeometry.js'
 import { STATUS_SERIES } from './reduceCells.js'
 
 const ROWS = [
@@ -118,5 +118,20 @@ describe('stacked layout (the Categories tab)', () => {
     const { segments, trackPct } = barSegments(CROWS, CAT, 'counts', { layout: 'stacked' })
     expect(trackPct[2]).toBe(0)
     for (const seg of segments[2]) expect(seg.width).toBe(0)
+  })
+})
+
+// Screen and PDF both ask this, so the rule cannot drift between them. It did:
+// the PDF hardcoded `layout === 'stacked'` and drew grouped bars in share view
+// while the screen stacked them.
+describe('isStackedLayout', () => {
+  it('stacks whenever the view is share, whatever the tab asked for', () => {
+    expect(isStackedLayout('grouped', 'share')).toBe(true)
+    expect(isStackedLayout('stacked', 'share')).toBe(true)
+  })
+
+  it('honours the tab in counts view', () => {
+    expect(isStackedLayout('grouped', 'counts')).toBe(false)
+    expect(isStackedLayout('stacked', 'counts')).toBe(true)
   })
 })

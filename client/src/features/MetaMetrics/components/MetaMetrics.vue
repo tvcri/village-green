@@ -20,6 +20,7 @@ import { orderRows, DEFAULT_SORT } from '../lib/orderRows.js'
 import { metaStripStats } from '../lib/stripStats.js'
 import { metaCsvFilename, matrixColumns, matrixCells } from '../lib/matrixTable.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { buildMetaMetricsPdf } from '../lib/metaMetricsPdf.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
 import { dateToServiceDate } from '../../../shared/lib/civilDate.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -223,21 +224,26 @@ const csvName = computed(() => metaCsvFilename({
 // The bar means something different on each tab, so the caption has to say
 // which. Categories counts COMPLETED work only — its bar is work done, not
 // requests received — and that is not inferable from the chart itself.
-const scaleNote = computed(() => {
-  if (isDetail.value) {
-    return view.value === 'share'
-      ? `Completed ${detailCategory.value.toLowerCase()} only. Each bar is that village’s own mix.`
-      : `Completed ${detailCategory.value.toLowerCase()} only. Bar length is the village’s total; segments are its mix.`
+// Takes the tab rather than reading the active one, because the PDF needs the
+// note for all three sections at once, not just the one on screen.
+function noteFor (tabValue, viewValue) {
+  if (tabValue === 'detail') {
+    const cat = detailCategory.value.toLowerCase()
+    return viewValue === 'share'
+      ? `Completed ${cat} only. Each bar is that village’s own mix.`
+      : `Completed ${cat} only. Bar length is the village’s total; segments are its mix.`
   }
-  if (isCategories.value) {
-    return view.value === 'share'
+  if (tabValue === 'categories') {
+    return viewValue === 'share'
       ? 'Completed work only. Each bar is that village’s own mix of categories.'
       : 'Completed work only. Bar length is the village’s total work; segments are its mix.'
   }
-  return view.value === 'share'
+  return viewValue === 'share'
     ? 'Each bar is that village’s own total, split by outcome.'
     : 'Bars share one scale, so lengths compare directly between villages.'
-})
+}
+
+const scaleNote = computed(() => noteFor(tab.value, view.value))
 
 const emptyMessage = computed(() => (isCategories.value || isDetail.value
   ? 'No completed requests in this range'
@@ -250,6 +256,72 @@ const emptyMessage = computed(() => (isCategories.value || isDetail.value
 function onDownloadCsv () {
   const columns = matrixColumns(series.value, view.value, { full: true })
   downloadCsv(toCsv(matrixCells(orderedRows.value, series.value, view.value), columns), csvName.value)
+}
+
+// ---- PDF export ----
+// Covers ALL THREE tabs, like the village report — a document you hand someone,
+// not a print of whatever happens to be on screen. So it derives each section
+// from the payload directly rather than reading the active tab's state.
+//
+// The current view (counts vs share) IS carried through, because it is the
+// reader's stated question, not an accident of navigation.
+const isExporting = ref(false)
+
+function sectionFor (tabValue) {
+  if (!payload.value) return null
+  const { cells, villages } = payload.value
+
+  const rows = tabValue === 'outcomes'
+    ? byVillage(cells, villages, { legs: true })
+    : tabValue === 'categories'
+      ? byVillageCategory(cells, villages, { legs: true })
+      : byVillageService(cells, villages, detailCategory.value, { legs: true })
+
+  const sectionSeries = tabValue === 'outcomes'
+    ? STATUS_SERIES
+    : tabValue === 'categories'
+      ? CATEGORY_SERIES
+      : serviceSeries(cells, detailCategory.value)
+
+  if (!sectionSeries.length) return null
+
+  return {
+    key: tabValue,
+    // Detail's heading names the category, since "Detail" alone would not say
+    // which one the reader is looking at once the tab strip is gone.
+    title: tabValue === 'detail' ? `Detail — ${detailCategory.value}` : TAB_LABELS[tabValue],
+    note: noteFor(tabValue, view.value),
+    rows: orderRows(rows, {
+      sort: sort.value, dir: dir.value, view: view.value,
+      seriesKeys: sectionSeries.map(x => x.key),
+    }),
+    series: sectionSeries,
+    layout: tabValue === 'outcomes' ? 'grouped' : 'stacked',
+  }
+}
+
+async function onDownloadPdf () {
+  isExporting.value = true
+  try {
+    const bytes = await buildMetaMetricsPdf({
+      start: range.value.start,
+      end: range.value.end,
+      strip: strip.value,
+      view: view.value,
+      sections: TAB_VALUES.map(sectionFor).filter(Boolean),
+    })
+    const blob = new Blob([bytes], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = csvName.value.replace(/\.csv$/, '.pdf')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } finally {
+    isExporting.value = false
+  }
 }
 
 const showCountingInfo = ref(false)
@@ -311,6 +383,21 @@ const showCountingInfo = ref(false)
              lives outside it, and read as stray helper text while costing the
              table a line of vertical space. -->
         <p class="scale-note">{{ scaleNote }}</p>
+
+        <!-- PAGE level, beside the toggle, because that is its scope: the
+             document covers all three tabs AND the summary strip. Download CSV
+             stays on the tab strip because it is exactly one table — putting
+             the two together implied they were the same kind of export.
+             No spinner: a measured export runs well under a second, where one
+             would only flash. The disabled state prevents the
+             double-click-two-documents race. -->
+        <Button
+          class="pdf-button"
+          icon="pi pi-file-pdf"
+          :label="isExporting ? 'Preparing…' : 'Download PDF'"
+          :disabled="isExporting"
+          @click="onDownloadPdf"
+        />
       </div>
 
       <!-- The CSV button is absolutely positioned over the right of the tab
@@ -435,6 +522,9 @@ const showCountingInfo = ref(false)
   font-size: 0.8rem;
   color: var(--color-text-muted, #6b7280);
 }
+/* Pushes the export to the right edge, leaving the toggle and its note
+   left-grouped — the same shape as VillageMetrics' controls bar. */
+.pdf-button { margin-left: auto; }
 .panel-filters {
   display: flex;
   flex-wrap: wrap;

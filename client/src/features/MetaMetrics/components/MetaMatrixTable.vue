@@ -5,7 +5,7 @@ import Column from 'primevue/column'
 import ColumnGroup from 'primevue/columngroup'
 import Row from 'primevue/row'
 import { matrixColumns, matrixCells, matrixFooter } from '../lib/matrixTable.js'
-import { barSegments } from '../lib/barGeometry.js'
+import { barSegments, isStackedLayout } from '../lib/barGeometry.js'
 
 const props = defineProps({
   rows: { type: Array, required: true },      // ALREADY ordered by the parent

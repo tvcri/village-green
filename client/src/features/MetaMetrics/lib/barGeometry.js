@@ -40,18 +40,31 @@ function widthPct (value, denominator, floor) {
 }
 
 /**
- * One array of drawable segments per row, in series order. `width` is a
- * PERCENTAGE in both views — see the denominator note above.
+ * Whether a bar draws as one composed mark or as separate bars.
+ *
+ * Outcomes asks for 'grouped' because its three series do not compose into a
+ * whole — but ONLY in counts view. In share every bar is parts of 100%, which
+ * is a composition by definition, so share always stacks whatever the tab asked
+ * for. Screen and PDF both go through here so the two cannot disagree; the PDF
+ * once hardcoded its own version of this rule and rendered share as grouped.
+ */
+export function isStackedLayout (layout, view) {
+  return layout === 'stacked' || view === 'share'
+}
+
+/**
+ * One array of drawable segments per row, in series order, plus how wide each
+ * row's whole track is. `width` and `trackPct` are both PERCENTAGES.
  *
  * A small village still renders as a sliver under `counts`, and that is the
  * finding rather than a rendering failure: the number in the adjacent column
  * carries the precision the bar cannot.
  *
- * @returns {Array<Array<{key,label,value,width,colorLight,colorDark}>>}
+ * @returns {{segments: Array<Array<object>>, trackPct: number[]}}
  */
 export function barSegments (rows, series, view, { layout = 'grouped' } = {}) {
   const isShare = view === 'share'
-  const isStacked = layout === 'stacked'
+  const isStacked = isStackedLayout(layout, view)
 
   // GROUPED (Outcomes): scaled against the largest single SEGMENT, not the
   // largest row total. Counts draws the outcomes as separate bars and never
