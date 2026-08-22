@@ -160,7 +160,7 @@ describe('ServiceRequestCreateEdit start section', () => {
     vm.form.villageId = '1'
     vm.form.memberPersonId = '7'
     vm.selectedMember = { label: 'Mabel Member', value: '7' }
-    await waitFor(() => expect(getPerson).toHaveBeenCalledWith('7'))
+    await waitFor(() => expect(getPerson).toHaveBeenCalledWith('7', ['member']))
     // No Ride yet -> Start stays empty.
     expect(vm.form.startAddress).toBe('')
 
@@ -168,6 +168,74 @@ describe('ServiceRequestCreateEdit start section', () => {
     await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
     expect(vm.form.startCity).toBe('Springfield')
     expect(vm.form.startZip).toBe('22150')
+  })
+
+  // Confidential Notes: rendered only when the selected member actually has
+  // them. The panel has no empty state by design, so absence must render nothing.
+  describe('confidential notes', () => {
+    it('renders the panel when the member has confidential notes', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockResolvedValueOnce({
+        address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100',
+        member: { confidentialNotes: "Call her daughter Jo-Ann, not the member." }
+      })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+
+      await waitFor(() => {
+        expect(document.querySelector('[data-testid="confidential-notes"]')).not.toBeNull()
+      })
+      expect(document.querySelector('[data-testid="confidential-notes"]').textContent)
+        .toContain('Call her daughter Jo-Ann')
+      // The selection must fetch exactly once; a second fetch would overwrite
+      // the notes with a response that has no `member` projection.
+      expect(getPerson).toHaveBeenCalledTimes(1)
+    })
+
+    it('renders nothing when the member has no confidential notes', async () => {
+      // Default mock returns no `member` key at all.
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+
+      await waitFor(() => expect(vm.selectedMemberHome).not.toBeNull())
+      await new Promise((r) => setTimeout(r, 0))
+      expect(vm.selectedMemberConfidentialNotes).toBe('')
+      expect(document.querySelector('[data-testid="confidential-notes"]')).toBeNull()
+    })
+
+    it('renders nothing for whitespace-only notes', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockResolvedValueOnce({
+        address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100',
+        member: { confidentialNotes: '   \n  ' }
+      })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+
+      await waitFor(() => expect(vm.selectedMemberHome).not.toBeNull())
+      await new Promise((r) => setTimeout(r, 0))
+      expect(vm.selectedMemberConfidentialNotes).toBe('')
+      expect(document.querySelector('[data-testid="confidential-notes"]')).toBeNull()
+    })
+
+    it('clears the notes when the member is deselected', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockResolvedValueOnce({
+        address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100',
+        member: { confidentialNotes: 'Check for a duplicate request first.' }
+      })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.selectedMemberConfidentialNotes).toContain('duplicate'))
+
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.selectedMemberConfidentialNotes).toBe(''))
+      expect(document.querySelector('[data-testid="confidential-notes"]')).toBeNull()
+    })
   })
 
   it('does not clobber a non-empty Start when a member is selected', async () => {
