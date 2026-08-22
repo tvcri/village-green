@@ -336,7 +336,11 @@ watch(anyVillageVolunteers, () => {
 watch([allMemberOptions, () => form.value.memberPersonId], ([members, memberId]) => {
   if (members.length > 0 && memberId) {
     const matching = members.find(m => m.value === String(memberId))
-    if (matching) {
+    // Identity guard: the selectedMember watcher writes form.memberPersonId,
+    // which re-runs this watcher. Without comparing by value, we would assign a
+    // fresh object here, re-trigger that watcher, and fetch the member twice on
+    // every selection.
+    if (matching && selectedMember.value?.value !== matching.value) {
       selectedMember.value = matching
     }
   }
