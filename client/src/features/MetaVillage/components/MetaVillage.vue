@@ -7,6 +7,7 @@ const router = useRouter()
 const sections = [
   {
     key: 'constituents',
+    icon: 'pi-users',
     heading: 'Constituents',
     blurb:
       'Members and volunteers, from first application onward. Add new people, work applications through intake, and keep each record current.',
@@ -14,6 +15,7 @@ const sections = [
   },
   {
     key: 'operations',
+    icon: 'pi-list-check',
     heading: 'Operations',
     blurb:
       'The day-to-day service work. Create and track ride, errand, home help, and tech support requests, and look up friendly visits by member, volunteer, or date.',
@@ -24,6 +26,7 @@ const sections = [
   },
   {
     key: 'office',
+    icon: 'pi-envelope',
     heading: 'Office',
     blurb: 'Correspondence and print output for members and volunteers.',
     upcoming: 'Mail merge joins this soon.',
@@ -31,6 +34,7 @@ const sections = [
   },
   {
     key: 'reporting',
+    icon: 'pi-chart-bar',
     heading: 'Reporting',
     blurb: 'Service activity over a date range you choose.',
     upcoming: 'Roster snapshots join this soon.',
@@ -38,6 +42,7 @@ const sections = [
   },
   {
     key: 'advocacy',
+    icon: 'pi-megaphone',
     heading: 'Advocacy',
     blurb: 'Making the case for the Hub and the people it serves.',
     upcoming: 'Coming soon.',
@@ -57,7 +62,10 @@ const sections = [
         class="section-card"
         :class="{ 'is-placeholder': !section.actions.length }"
       >
-        <h2>{{ section.heading }}</h2>
+        <h2>
+          <i :class="['pi', section.icon]" aria-hidden="true"></i>
+          {{ section.heading }}
+        </h2>
         <p class="blurb">{{ section.blurb }}</p>
         <p v-if="section.upcoming" class="upcoming">{{ section.upcoming }}</p>
         <div v-if="section.actions.length" class="actions">
@@ -104,9 +112,21 @@ h1 {
 }
 
 .section-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   margin: 0;
   font-size: 1.15rem;
   color: var(--color-text-bright);
+}
+
+.section-card h2 .pi {
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}
+
+.is-placeholder h2 .pi {
+  color: var(--color-text-dim);
 }
 
 .blurb {
