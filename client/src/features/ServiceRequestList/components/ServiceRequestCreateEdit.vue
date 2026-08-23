@@ -219,7 +219,16 @@ const selectedMemberHome = ref(null)
 // person:read_confidential, so an unprivileged coordinator simply sees nothing.
 const selectedMemberConfidentialNotes = ref('')
 
+// Collapse state for the notes panel. Per-selection only: a coordinator who has
+// read the notes can fold them away to free up screen space, but choosing any
+// member starts expanded again. Deliberately not persisted — these notes exist
+// to be read at booking time, and a dismissal that outlived the selection would
+// silently hide them on a later request.
+const confidentialNotesCollapsed = ref(false)
+
 async function loadMemberHome (personId) {
+  // Any change of member starts expanded, including a change to no member.
+  confidentialNotesCollapsed.value = false
   if (!personId) {
     selectedMemberHome.value = null
     selectedMemberConfidentialNotes.value = ''
@@ -315,6 +324,7 @@ watch(selectedMember, (val) => {
     form.value.memberPersonId = null
     selectedMemberHome.value = null
     selectedMemberConfidentialNotes.value = ''
+    confidentialNotesCollapsed.value = false
   }
 })
 
@@ -1046,12 +1056,41 @@ const openPersonDialog = (personId) => {
                when absent. Most members have none, so for them the form is unchanged.
                Amber, not red: the content is operational ("call her daughter", "check
                for a duplicate first"), never a hazard warning. -->
-          <div v-if="selectedMemberConfidentialNotes" class="confidential-notes" data-testid="confidential-notes">
-            <div class="confidential-notes-header">
+          <div
+            v-if="selectedMemberConfidentialNotes"
+            class="confidential-notes"
+            :class="{ 'is-collapsed': confidentialNotesCollapsed }"
+            data-testid="confidential-notes"
+          >
+            <!-- The whole header is the toggle. A chevron, not an X: the panel folds
+                 away rather than being dismissed, and it always comes back on the next
+                 member. Collapsing leaves this bar in place, so the coordinator can
+                 still see that the member has notes. -->
+            <button
+              type="button"
+              class="confidential-notes-header"
+              data-testid="confidential-notes-toggle"
+              :aria-expanded="!confidentialNotesCollapsed"
+              aria-controls="confidential-notes-body"
+              @click="confidentialNotesCollapsed = !confidentialNotesCollapsed"
+            >
               <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-              <span>Confidential Notes</span>
-            </div>
-            <div class="confidential-notes-body">{{ selectedMemberConfidentialNotes }}</div>
+              <span class="confidential-notes-title">Confidential Notes</span>
+              <span class="confidential-notes-action">
+                {{ confidentialNotesCollapsed ? 'Show' : 'Hide' }}
+                <i
+                  class="pi"
+                  :class="confidentialNotesCollapsed ? 'pi-chevron-down' : 'pi-chevron-up'"
+                  aria-hidden="true"
+                ></i>
+              </span>
+            </button>
+            <div
+              v-show="!confidentialNotesCollapsed"
+              id="confidential-notes-body"
+              class="confidential-notes-body"
+              data-testid="confidential-notes-body"
+            >{{ selectedMemberConfidentialNotes }}</div>
           </div>
 
           <!-- Service Notes: display-only, sourced from the selected member's record -->
@@ -1453,16 +1492,57 @@ const openPersonDialog = (personId) => {
   --confidential-heading: #fbbf24;
 }
 
+/* The header doubles as the collapse toggle, so it is a <button> reset to look
+   like the heading it replaced. Full width keeps the whole bar clickable. */
 .confidential-notes-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
   font-weight: 700;
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--confidential-heading);
   margin-bottom: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.confidential-notes-header:focus-visible {
+  outline: 2px solid var(--confidential-border);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.confidential-notes-title {
+  flex: 1;
+}
+
+/* "Hide"/"Show" plus chevron. Lowercase against the uppercase title so it reads
+   as a control rather than part of the heading. */
+.confidential-notes-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.confidential-notes-header:hover .confidential-notes-action {
+  text-decoration: underline;
+}
+
+/* Collapsed, the bar is all that remains: drop the body's bottom spacing so it
+   reads as a single slim strip. */
+.confidential-notes.is-collapsed .confidential-notes-header {
+  margin-bottom: 0;
 }
 
 /* Notes run from one line to several sentences of instructions; never truncate.

@@ -221,6 +221,59 @@ describe('ServiceRequestCreateEdit start section', () => {
       expect(document.querySelector('[data-testid="confidential-notes"]')).toBeNull()
     })
 
+    it('collapses and re-expands the panel from the header toggle', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockResolvedValueOnce({
+        address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100',
+        member: { confidentialNotes: 'Call her daughter Jo-Ann, not the member.' }
+      })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+
+      const toggle = await waitFor(() => {
+        const el = document.querySelector('[data-testid="confidential-notes-toggle"]')
+        expect(el).not.toBeNull()
+        return el
+      })
+      // Starts expanded.
+      expect(vm.confidentialNotesCollapsed).toBe(false)
+      expect(toggle.getAttribute('aria-expanded')).toBe('true')
+
+      toggle.click()
+      await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(true))
+      // The bar itself stays, so the coordinator can still see a note exists.
+      expect(document.querySelector('[data-testid="confidential-notes"]')).not.toBeNull()
+      expect(toggle.getAttribute('aria-expanded')).toBe('false')
+      // v-show hides the body rather than unmounting it.
+      expect(document.querySelector('[data-testid="confidential-notes-body"]').style.display)
+        .toBe('none')
+
+      toggle.click()
+      await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(false))
+      expect(document.querySelector('[data-testid="confidential-notes-body"]').style.display)
+        .not.toBe('none')
+    })
+
+    it('re-expands when a different member is selected', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockResolvedValue({
+        address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100',
+        member: { confidentialNotes: 'Check for a duplicate request first.' }
+      })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.selectedMemberConfidentialNotes).toContain('duplicate'))
+
+      vm.confidentialNotesCollapsed = true
+      await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(true))
+
+      // A different member must not inherit the previous member's collapse.
+      vm.selectedMember = { label: 'Other Member', value: '8' }
+      await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(false))
+    })
+
     it('clears the notes when the member is deselected', async () => {
       const { getPerson } = await import('../../PersonList/api/personApi.js')
       getPerson.mockResolvedValueOnce({
