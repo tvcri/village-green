@@ -95,3 +95,19 @@ mysqldump -h 127.0.0.1 -P 3306 -u root -prootpw --routines --events --no-data --
 # '--no-create-info' flag ensures that table creation statements are not included, just the row insertions.
 mysqldump -h 127.0.0.1 -P 3306 -u root -prootpw --no-create-info "$db" $static_data_tables |
   awk 'tolower($0) !~ /character_set|set names/' > 20-vg-static.sql
+
+# Per-install seed rows that CANNOT ride in $static_data_tables because their
+# table also holds real data — dumping user_data would ship one deployment's
+# roster to every other. The dump above marks their migration executed in
+# _migrations, so the migration's own INSERT never runs on a fresh install:
+# without this append the row simply would not exist anywhere.
+#
+# evt_auto_complete_service_requests resolves this row by taskName and writes
+# its userId into audit_event. Absent, the event's guard makes it transition
+# nothing — silently, on a fresh install only. Keep in sync with the INSERT in
+# 0024-task-user-attribution.js; the two copies are unavoidable given the
+# scaffold model, so they must be changed together.
+cat >> 20-vg-static.sql <<'SEED'
+
+INSERT INTO user_data (username, taskName, status) VALUES ('_task_auto_complete', 'auto_complete', 'unavailable');
+SEED
