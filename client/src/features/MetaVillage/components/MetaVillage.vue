@@ -44,7 +44,8 @@ const sections = [
     key: 'advocacy',
     icon: 'pi-megaphone',
     heading: 'Advocacy',
-    blurb: 'Making the case for the Hub and the people it serves.',
+    blurb:
+      'Engaging civic leaders with evidence of TVCRI’s impact on the people it serves.',
     upcoming: 'Coming soon.',
     actions: [],
   },

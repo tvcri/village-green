@@ -57,5 +57,5 @@ export function matrixFooter (rows, series, view) {
 // csvFilename() in VillageMetrics' metricsCsv.js. Without it, a counts and a
 // share download of the same tab collide as one name in Downloads.
 export function metaCsvFilename ({ tab, view, start, end }) {
-  return ['meta', tab, view, start, end].filter(Boolean).join('-') + '.csv'
+  return ['tvcri', tab, view, start, end].filter(Boolean).join('-') + '.csv'
 }

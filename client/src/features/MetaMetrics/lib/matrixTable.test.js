@@ -58,7 +58,7 @@ describe('matrixFooter', () => {
 describe('metaCsvFilename', () => {
   it('carries tab, view and range', () => {
     expect(metaCsvFilename({ tab: 'outcomes', view: 'percent', start: '2026-01-01', end: '2026-08-21' }))
-      .toBe('meta-outcomes-percent-2026-01-01-2026-08-21.csv')
+      .toBe('tvcri-outcomes-percent-2026-01-01-2026-08-21.csv')
   })
 })
 

@@ -18,7 +18,7 @@ const mountTable = (props = {}) => render(MetaMatrixTable, {
     view: 'counts',
     sort: 'villageName',
     dir: 'asc',
-    csvFilename: 'meta-outcomes-counts-2026-01-01-2026-08-21.csv',
+    csvFilename: 'tvcri-outcomes-counts-2026-01-01-2026-08-21.csv',
     ...props,
   },
   global: { plugins: [PrimeVue] },

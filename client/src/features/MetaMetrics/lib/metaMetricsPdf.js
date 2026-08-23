@@ -215,7 +215,7 @@ function drawSection (page, fonts, section, view) {
 }
 
 function drawHeader (page, fonts, report) {
-  drawText(page, 'Meta Metrics', MARGIN, PAGE_H - MARGIN - 6, 16, fonts.bold, INK)
+  drawText(page, 'TVCRI Metrics', MARGIN, PAGE_H - MARGIN - 6, 16, fonts.bold, INK)
   drawText(page, formatRange(report.start, report.end), MARGIN, PAGE_H - MARGIN - 24, 9, fonts.helv, MUTED)
   drawText(
     page,

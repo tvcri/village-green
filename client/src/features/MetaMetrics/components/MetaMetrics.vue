@@ -360,7 +360,7 @@ const showCountingInfo = ref(false)
   <div class="meta-metrics">
     <header class="metrics-header">
       <div class="header-row">
-        <h1>Meta Metrics</h1>
+        <h1>TVCRI Metrics</h1>
       </div>
       <p class="exclusion-note">
         Hub-cancelled requests are excluded from all counts.
