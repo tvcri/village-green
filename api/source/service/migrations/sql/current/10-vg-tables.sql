@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.10, for Linux (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.11, for Linux (x86_64)
 --
--- Host: 127.0.0.1    Database: vg_test
+-- Host: 127.0.0.1    Database: vg
 -- ------------------------------------------------------
--- Server version	8.4.10
+-- Server version	8.4.11
 
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
@@ -481,6 +481,7 @@ CREATE TABLE `user_data` (
   `statusDate` datetime NOT NULL DEFAULT (`created`),
   `statusUser` int DEFAULT NULL,
   `webPreferences` json NOT NULL DEFAULT (_utf8mb4'{"darkMode": true, "lastWhatsNew": "2000-01-01"}'),
+  `taskName` varchar(45) DEFAULT NULL COMMENT 'Names the system task this account acts as; NULL for human users',
   PRIMARY KEY (`userId`),
   UNIQUE KEY `INDEX_username` (`username`),
   KEY `INDEX_status` (`status`)
@@ -616,7 +617,7 @@ CREATE TABLE `volunteer_village_associate` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Dumping events for database 'vg_test'
+-- Dumping events for database 'vg'
 --
 /*!50106 SET @save_time_zone= @@TIME_ZONE */ ;
 /*!50106 DROP EVENT IF EXISTS `evt_auto_complete_service_requests` */;
@@ -628,12 +629,47 @@ DELIMITER $
 /*!50003 SET @saved_time_zone      = @@time_zone */ $
 /*!50003 SET time_zone             = 'SYSTEM' */ $
 /*!50106 CREATE*/ /*!50117 */ /*!50106 EVENT `evt_auto_complete_service_requests` ON SCHEDULE EVERY 1 DAY STARTS '2026-07-07 05:01:00' ON COMPLETION NOT PRESERVE ENABLE DO BEGIN
-          UPDATE service_request SET `status` = 'Completed'
-          WHERE `status` = 'Confirmed' AND serviceDate <= CURDATE() - INTERVAL 1 DAY;
+    DECLARE v_taskUserId INT;
 
-          UPDATE service_request SET `status` = 'Unmatched'
-          WHERE `status` = 'Open' AND serviceDate <= CURDATE() - INTERVAL 1 DAY;
-        END */ $
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+      ROLLBACK;
+      RESIGNAL;
+    END;
+
+    SELECT userId INTO v_taskUserId FROM user_data WHERE taskName = 'auto_complete';
+
+    -- No task user row: transition nothing rather than write an unattributed
+    -- trail. Silence here is a seeding bug, and losing a day of aging is
+    -- recoverable; an audit gap is not.
+    IF v_taskUserId IS NOT NULL THEN
+
+      START TRANSACTION;
+
+      INSERT INTO audit_event (entityType, entityId, action, userId, changes)
+      SELECT 'serviceRequest', id, 'update', v_taskUserId,
+             JSON_OBJECT('diff', JSON_OBJECT('status',
+               JSON_OBJECT('old', 'Confirmed', 'new', 'Completed')))
+      FROM service_request
+      WHERE `status` = 'Confirmed' AND serviceDate <= CURDATE() - INTERVAL 1 DAY;
+
+      UPDATE service_request SET `status` = 'Completed'
+      WHERE `status` = 'Confirmed' AND serviceDate <= CURDATE() - INTERVAL 1 DAY;
+
+      INSERT INTO audit_event (entityType, entityId, action, userId, changes)
+      SELECT 'serviceRequest', id, 'update', v_taskUserId,
+             JSON_OBJECT('diff', JSON_OBJECT('status',
+               JSON_OBJECT('old', 'Open', 'new', 'Unmatched')))
+      FROM service_request
+      WHERE `status` = 'Open' AND serviceDate <= CURDATE() - INTERVAL 1 DAY;
+
+      UPDATE service_request SET `status` = 'Unmatched'
+      WHERE `status` = 'Open' AND serviceDate <= CURDATE() - INTERVAL 1 DAY;
+
+      COMMIT;
+
+    END IF;
+  END */ $
 /*!50003 SET time_zone             = @saved_time_zone */ $
 /*!50003 SET sql_mode              = @saved_sql_mode */ $
 /*!50003 SET collation_connection  = @saved_col_connection */ $
@@ -662,7 +698,7 @@ DELIMITER ;
 /*!50106 SET TIME_ZONE= @save_time_zone */ ;
 
 --
--- Dumping routines for database 'vg_test'
+-- Dumping routines for database 'vg'
 --
 
 --
@@ -694,4 +730,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-18 20:07:36
+-- Dump completed on 2026-08-23  1:22:32
