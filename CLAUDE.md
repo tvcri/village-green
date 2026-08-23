@@ -148,7 +148,20 @@ the split.
   name with its type suffix already removed. "Municipality" is the only term
   correct for both. The field is free-form and read-only in the UI; it is
   calculated from the person's address.
-- **`federation` → UI says "Hub".** API vocabulary is unchanged.
+- **`federation` → UI says "Hub" or "TVCRI", depending on audience.** API
+  vocabulary is unchanged. The display term is **three-way**, and picking
+  between the two UI words is about who is being addressed:
+  - `federation` — code, schema, API. Never user-facing.
+  - **Hub** — when a village refers to the federation it belongs to. An
+    inward, relational term: the hub this village is part of.
+  - **TVCRI** — when the text addresses or describes the organization to
+    outsiders, or reports on the organization as a whole. Advocacy copy,
+    outreach, and org-wide report titles say TVCRI; to a civic leader or a
+    funder the organization has a name, and "the Hub" is internal
+    vocabulary leaking out.
+
+  Getting this wrong is invisible to a grep for either word, so decide by
+  audience whenever new user-facing text names the federation.
 
 Because the UI term is unguessable from the code term, grepping the display
 word finds only a handful of lines. Search the data term when tracing these
