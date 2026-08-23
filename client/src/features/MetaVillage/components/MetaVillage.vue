@@ -3,17 +3,72 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 
 const router = useRouter()
+
+const sections = [
+  {
+    key: 'constituents',
+    heading: 'Constituents',
+    blurb:
+      'Members and volunteers, from first application onward. Add new people, work applications through intake, and keep each record current.',
+    actions: [{ label: 'Persons', route: 'meta-persons' }],
+  },
+  {
+    key: 'operations',
+    heading: 'Operations',
+    blurb:
+      'The day-to-day service work. Create and track ride, errand, home help, and tech support requests, and look up friendly visits by member, volunteer, or date.',
+    actions: [
+      { label: 'Service Requests', route: 'meta-service-requests' },
+      { label: 'Friends', route: 'meta-friends' },
+    ],
+  },
+  {
+    key: 'office',
+    heading: 'Office',
+    blurb: 'Correspondence and print output for members and volunteers.',
+    upcoming: 'Mail merge joins this soon.',
+    actions: [{ label: 'Mailing Labels', route: 'meta-mailing-labels' }],
+  },
+  {
+    key: 'reporting',
+    heading: 'Reporting',
+    blurb: 'Service activity over a date range you choose.',
+    upcoming: 'Roster snapshots join this soon.',
+    actions: [{ label: 'Metrics', route: 'meta-metrics' }],
+  },
+  {
+    key: 'advocacy',
+    heading: 'Advocacy',
+    blurb: 'Making the case for the Hub and the people it serves.',
+    upcoming: 'Coming soon.',
+    actions: [],
+  },
+]
 </script>
 
 <template>
   <div class="meta-village">
     <h1>Meta Village</h1>
-    <div class="actions">
-      <Button label="Persons" @click="router.push({ name: 'meta-persons' })" />
-      <Button label="Service Requests" @click="router.push({ name: 'meta-service-requests' })" />
-      <Button label="Metrics" @click="router.push({ name: 'meta-metrics' })" />
-      <Button label="Friends" @click="router.push({ name: 'meta-friends' })" />
-      <Button label="Mailing Labels" @click="router.push({ name: 'meta-mailing-labels' })" />
+
+    <div class="sections">
+      <section
+        v-for="section in sections"
+        :key="section.key"
+        class="section-card"
+        :class="{ 'is-placeholder': !section.actions.length }"
+      >
+        <h2>{{ section.heading }}</h2>
+        <p class="blurb">{{ section.blurb }}</p>
+        <p v-if="section.upcoming" class="upcoming">{{ section.upcoming }}</p>
+        <div v-if="section.actions.length" class="actions">
+          <Button
+            v-for="action in section.actions"
+            :key="action.route"
+            :label="action.label"
+            @click="router.push({ name: action.route })"
+          />
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -26,14 +81,58 @@ const router = useRouter()
   gap: 1.5rem;
 }
 
-.actions {
-  display: flex;
-  flex-direction: row;
-  gap: 0.75rem;
-}
-
 h1 {
   margin: 0;
   color: var(--color-text-primary);
+}
+
+.sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  background-color: var(--color-background-light);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  box-shadow: var(--box-shadow-card);
+}
+
+.section-card h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--color-text-bright);
+}
+
+.blurb {
+  margin: 0;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+.upcoming {
+  margin: 0;
+  color: var(--color-text-dim);
+  font-style: italic;
+}
+
+.actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+
+.is-placeholder {
+  background-color: var(--color-background-subtle);
+  box-shadow: none;
 }
 </style>
