@@ -90,7 +90,6 @@ h1 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
   gap: 1.25rem;
-  align-items: start;
 }
 
 .section-card {
