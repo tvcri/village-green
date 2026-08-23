@@ -219,16 +219,15 @@ const selectedMemberHome = ref(null)
 // person:read_confidential, so an unprivileged coordinator simply sees nothing.
 const selectedMemberConfidentialNotes = ref('')
 
-// Collapse state for the notes panel. Per-selection only: a coordinator who has
-// read the notes can fold them away to free up screen space, but choosing any
-// member starts expanded again. Deliberately not persisted — these notes exist
-// to be read at booking time, and a dismissal that outlived the selection would
-// silently hide them on a later request.
-const confidentialNotesCollapsed = ref(false)
+// Collapse state for the notes panel. Starts collapsed by customer request: the
+// coordinator sees that notes exist and clicks Show to read them. Per-selection
+// only, so choosing any member collapses again — never persisted, and never
+// left open from a previous member.
+const confidentialNotesCollapsed = ref(true)
 
 async function loadMemberHome (personId) {
-  // Any change of member starts expanded, including a change to no member.
-  confidentialNotesCollapsed.value = false
+  // Any change of member starts collapsed, including a change to no member.
+  confidentialNotesCollapsed.value = true
   if (!personId) {
     selectedMemberHome.value = null
     selectedMemberConfidentialNotes.value = ''
@@ -324,7 +323,7 @@ watch(selectedMember, (val) => {
     form.value.memberPersonId = null
     selectedMemberHome.value = null
     selectedMemberConfidentialNotes.value = ''
-    confidentialNotesCollapsed.value = false
+    confidentialNotesCollapsed.value = true
   }
 })
 

@@ -236,26 +236,27 @@ describe('ServiceRequestCreateEdit start section', () => {
         expect(el).not.toBeNull()
         return el
       })
-      // Starts expanded.
-      expect(vm.confidentialNotesCollapsed).toBe(false)
-      expect(toggle.getAttribute('aria-expanded')).toBe('true')
-
-      toggle.click()
-      await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(true))
-      // The bar itself stays, so the coordinator can still see a note exists.
-      expect(document.querySelector('[data-testid="confidential-notes"]')).not.toBeNull()
+      // Starts collapsed: the bar is visible, the note text is not.
+      expect(vm.confidentialNotesCollapsed).toBe(true)
       expect(toggle.getAttribute('aria-expanded')).toBe('false')
+      expect(document.querySelector('[data-testid="confidential-notes"]')).not.toBeNull()
       // v-show hides the body rather than unmounting it.
       expect(document.querySelector('[data-testid="confidential-notes-body"]').style.display)
         .toBe('none')
 
       toggle.click()
       await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(false))
+      expect(toggle.getAttribute('aria-expanded')).toBe('true')
       expect(document.querySelector('[data-testid="confidential-notes-body"]').style.display)
         .not.toBe('none')
+
+      toggle.click()
+      await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(true))
+      expect(document.querySelector('[data-testid="confidential-notes-body"]').style.display)
+        .toBe('none')
     })
 
-    it('re-expands when a different member is selected', async () => {
+    it('re-collapses when a different member is selected', async () => {
       const { getPerson } = await import('../../PersonList/api/personApi.js')
       getPerson.mockResolvedValue({
         address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100',
@@ -266,12 +267,13 @@ describe('ServiceRequestCreateEdit start section', () => {
       vm.selectedMember = { label: 'Mabel Member', value: '7' }
       await waitFor(() => expect(vm.selectedMemberConfidentialNotes).toContain('duplicate'))
 
-      vm.confidentialNotesCollapsed = true
-      await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(true))
-
-      // A different member must not inherit the previous member's collapse.
-      vm.selectedMember = { label: 'Other Member', value: '8' }
+      vm.confidentialNotesCollapsed = false
       await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(false))
+
+      // A different member must not inherit the previous member's expansion —
+      // one member's notes must never be on screen under another member's name.
+      vm.selectedMember = { label: 'Other Member', value: '8' }
+      await waitFor(() => expect(vm.confidentialNotesCollapsed).toBe(true))
     })
 
     it('clears the notes when the member is deselected', async () => {
