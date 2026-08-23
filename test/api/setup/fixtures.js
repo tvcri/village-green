@@ -113,6 +113,17 @@ function person (id, villageId, firstName, lastName, street, city, zip) {
   }
 }
 
+// The auto-complete task's actor row (migration 0024). NOT a persona: it holds
+// no grants, gets no token, and status 'unavailable' makes the auth gate refuse
+// it. Its userId is deliberately outside the 1-13 persona range — in production
+// the row lands at whatever auto-increment the install is at, and nothing may
+// depend on a particular value; the event finds it by taskName.
+export const taskUsers = {
+  autoComplete: {
+    userId: 900, username: '_task_auto_complete', taskName: 'auto_complete',
+  },
+}
+
 export const persons = {
   // Quahog: Family Guy (31 Spooner Street is the Griffins' address)
   quahogMember: person(1, villages.quahog.id, 'Peter', 'Griffin', '31 Spooner St', 'Quahog', '02860'),

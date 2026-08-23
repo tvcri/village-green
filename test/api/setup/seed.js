@@ -3,7 +3,7 @@
 // `--keep` re-runs start clean. Uses explicit IDs from fixtures.js.
 import mysql from 'mysql2/promise'
 import { config } from './env.js'
-import { villages, users, persons, members, volunteers, volunteerCapabilities, serviceRequests, fcvSubmissions } from './fixtures.js'
+import { villages, users, taskUsers, persons, members, volunteers, volunteerCapabilities, serviceRequests, fcvSubmissions } from './fixtures.js'
 
 // Tables we own, child-before-parent for clean truncation.
 const TABLES = [
@@ -20,7 +20,7 @@ const TABLES = [
 // named column instead of a mid-seed MySQL error. Update alongside the INSERTs.
 const EXPECTED_COLUMNS = {
   village: ['id', 'name'],
-  user_data: ['userId', 'username'],
+  user_data: ['userId', 'username', 'status', 'taskName'],
   role_grant: ['villageId', 'userId', 'roleId'],
   role: ['roleId', 'name', 'scope'],
   role_permission: ['roleId', 'permission'],
@@ -152,6 +152,17 @@ export async function seed () {
         )
       }
     }
+
+    // The auto-complete task's actor row (migration 0024). Not a persona: it
+    // holds no grants and no token — status 'unavailable' means the auth gate
+    // refuses it. It is seeded here rather than arriving from the scaffold
+    // because TRUNCATE above clears user_data. evt_auto_complete_service_requests
+    // resolves it by taskName and writes its userId into audit_event; without
+    // this row the event's guard makes it transition nothing.
+    await conn.query(
+      `INSERT INTO user_data (userId, username, status, taskName) VALUES (?, ?, ?, ?)`,
+      [taskUsers.autoComplete.userId, taskUsers.autoComplete.username, 'unavailable', taskUsers.autoComplete.taskName],
+    )
 
     for (const p of Object.values(persons)) {
       // person.address (street + unit) and person.fullName ("last, first") are
