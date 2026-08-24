@@ -27,6 +27,21 @@ import { matrixColumns, matrixCells, matrixFooter } from './matrixTable.js'
 const CONTENT_W = PAGE_W - MARGIN * 2
 
 const ROW_H = 18
+// Where a row's text baseline sits above its bottom rule, so the TEXT is
+// optically centred in the row rather than the baseline being centred.
+//
+// A baseline is not the middle of the ink: at 8pt Helvetica a capital rises
+// 5.74pt above it and a descender falls 1.66pt below — a 7.40pt glyph box.
+//
+// A row's band runs from the rule ABOVE it (the previous row's, at that row's
+// `y - 4`, i.e. this row's `y + 14`) down to its own rule at `y - 4`: 18pt.
+// Centring the 7.40pt of ink in it leaves 5.30pt of air on each side, which
+// puts the baseline at y + 2.96.
+//
+// The old flat `y + 5` left 3.26pt above the ink and 7.34pt below, so every
+// row's text sat high in its band — the same 8pt metrics for regular and bold,
+// so the totals line and the village rows were off by the same amount.
+const TEXT_BASELINE = 2.96
 const HEADER_H = 20
 // The name column was 104pt against a 60.8pt widest name ("Aquidneck Island"
 // at 8pt) — 43pt of surplus sitting between the name and the first number.
@@ -122,6 +137,20 @@ function drawSection (page, fonts, section, view) {
   // page 2 draws against the same denominator as one on page 1.
   const scope = section.allRows ?? section.rows
   const all = barSegments(scope, section.series, view)
+  // The totals line's own bar, share view only. Raw sums over the whole section
+  // — `foot` carries preformatted '64.0%' strings in this view, and passing the
+  // summed row alone makes it its own denominator, exactly as a share bar wants.
+  let totalsBar = null
+  if (view === 'percent') {
+    const raw = { total: 0 }
+    for (const s of section.series) raw[s.key] = 0
+    for (const row of scope) {
+      raw.total += row.total
+      for (const s of section.series) raw[s.key] += row[s.key]
+    }
+    const t = barSegments([raw], section.series, view)
+    totalsBar = { segments: t.segments[0], trackPct: t.trackPct[0] }
+  }
   const from = section.rowOffset ?? 0
   const segments = all.segments.slice(from, from + section.rows.length)
   const trackPct = all.trackPct.slice(from, from + section.rows.length)
@@ -172,12 +201,61 @@ function drawSection (page, fonts, section, view) {
     thickness: 0.75, color: BORDER,
   })
 
+  // The totals line leads the table, matching the screen. Only on a section's
+  // FIRST page: repeating it above each continuation would restate a total
+  // against a partial set of rows, and the reader has already seen it.
+  if (!section.continued) {
+    // ROW_H less the 4pt that the header rule's own lead-in already contributes
+    // above this row, so the totals line occupies the same 18pt band as a
+    // village row with its text symmetric in it: 9pt above the baseline, 9pt
+    // below, matching every row beneath.
+    //
+    // A full ROW_H here stacked the two gaps — a 22pt band with the text riding
+    // 13pt from its top and 9pt from its bottom, which read as a taller row
+    // whose label sat high. The village rows are unaffected either way: each is
+    // measured from the rule above it, so they stay 18pt and 9/9.
+    y -= ROW_H - 4
+    drawText(page, foot.villageName, MARGIN, y + TEXT_BASELINE, 8, fonts.bold, INK)
+    numCols.forEach((col, i) => {
+      // Same formatting as the body rows: an unseparated 3550 above a column of
+      // 3,550s reads as a different kind of number.
+      const raw = foot[col.key]
+      const value = typeof raw === 'number' ? raw.toLocaleString() : raw
+      rightText(page, String(value), MARGIN + NAME_W + NUM_W * (i + 1) - 6, y + TEXT_BASELINE, 8, fonts.bold, INK)
+    })
+
+    // The hub-wide bar, in SHARE view only — the same rule the screen follows.
+    // Every share track is full width, so this bar is exactly as long as the
+    // village bars below it and cannot be misread as a magnitude. In counts it
+    // would have no shared denominator, so none is drawn. See totalsBar in
+    // MetaMatrixTable.vue.
+    // Built over the WHOLE section (allRows), not this page's slice, so it
+    // states the section's total and not page one's.
+    if (totalsBar) {
+      const track = (totalsBar.trackPct / 100) * barW
+      let tx = barX
+      for (const seg of totalsBar.segments) {
+        const w = (seg.width / 100) * track
+        if (w > 0) {
+          page.drawRectangle({ x: tx, y: y + 2, width: w, height: 9, color: hexColor(seg.colorLight) })
+          tx += w
+        }
+      }
+    }
+    // Heavier than the 0.5 hairline between villages: this rule separates the
+    // total from the rows it totals, the job the tfoot border did on screen.
+    page.drawLine({
+      start: { x: MARGIN, y: y - 4 }, end: { x: PAGE_W - MARGIN, y: y - 4 },
+      thickness: 0.75, color: BORDER,
+    })
+  }
+
   cells.forEach((row, r) => {
     y -= ROW_H
-    drawText(page, row.villageName, MARGIN, y + 5, 8, fonts.helv, INK)
+    drawText(page, row.villageName, MARGIN, y + TEXT_BASELINE, 8, fonts.helv, INK)
     numCols.forEach((col, i) => {
       const value = typeof row[col.key] === 'number' ? row[col.key].toLocaleString() : row[col.key]
-      rightText(page, String(value), MARGIN + NAME_W + NUM_W * (i + 1) - 6, y + 5, 8, fonts.helv, MUTED)
+      rightText(page, String(value), MARGIN + NAME_W + NUM_W * (i + 1) - 6, y + TEXT_BASELINE, 8, fonts.helv, MUTED)
     })
 
     // The bar, in the same row as its numbers — the whole point of the screen
@@ -199,19 +277,6 @@ function drawSection (page, fonts, section, view) {
     })
   })
 
-  // Totals only on the last page of a section — repeating them under a partial
-  // table would state a total the rows above do not add up to.
-  if (!section.hasMore) {
-    y -= ROW_H
-    drawText(page, foot.villageName, MARGIN, y + 5, 8, fonts.bold, INK)
-    numCols.forEach((col, i) => {
-      // Same formatting as the body rows: an unseparated 3550 under a column of
-      // 3,550s reads as a different kind of number.
-      const raw = foot[col.key]
-      const value = typeof raw === 'number' ? raw.toLocaleString() : raw
-      rightText(page, String(value), MARGIN + NAME_W + NUM_W * (i + 1) - 6, y + 5, 8, fonts.bold, INK)
-    })
-  }
 }
 
 function drawHeader (page, fonts, report) {

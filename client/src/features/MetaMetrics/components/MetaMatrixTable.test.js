@@ -24,6 +24,11 @@ const mountTable = (props = {}) => render(MetaMatrixTable, {
   global: { plugins: [PrimeVue] },
 })
 
+// The first body row is the pinned 'All Villages' totals line, not a village.
+// Tests that index rows want the VILLAGE rows beneath it.
+const villageRows = (container) =>
+  [...container.querySelectorAll('.meta-matrix-table tbody tr:not(.totals-row)')]
+
 beforeEach(() => { vi.restoreAllMocks() })
 afterEach(() => cleanup())
 
@@ -38,8 +43,8 @@ describe('MetaMatrixTable', () => {
 
   it('names the last column Total in counts view', () => {
     mountTable({ view: 'counts' })
-    // Counts view also labels the footer row 'Total' (see the footer test
-    // below), so 'Total' appears twice; scope to the column header.
+    // Scoped to the column header: the totals ROW is labelled 'All Villages',
+    // but keeping this on columnheader guards the header specifically.
     expect(screen.getByRole('columnheader', { name: 'Total' })).toBeInTheDocument()
   })
 
@@ -51,9 +56,11 @@ describe('MetaMatrixTable', () => {
   it('renders rows in the order given, without re-sorting them', () => {
     mountTable({ sort: 'unmatched', dir: 'desc' })
     const cells = screen.getAllByRole('cell').map(c => c.textContent.trim())
+    // cells[0] is the pinned totals line; the villages start after it.
     // Parent passed Barrington first; the table must not reorder to put
     // East Greenwich (higher unmatched) on top.
-    expect(cells[0]).toBe('Barrington')
+    const names = cells.filter(t => t === 'Barrington' || t === 'East Greenwich')
+    expect(names).toEqual(['Barrington', 'East Greenwich'])
   })
 
   it('shows percentages in share view', () => {
@@ -68,14 +75,80 @@ describe('MetaMatrixTable', () => {
     expect(emitted()['update:sort'][0][0]).toMatchObject({ sort: 'unmatched' })
   })
 
-  it('renders a Total footer row in counts view', () => {
+  it('renders the totals line in counts view', () => {
     mountTable({ view: 'counts' })
     expect(screen.getByText('712')).toBeInTheDocument()
   })
 
-  it('labels the footer Hub in share view', () => {
+  it('labels the totals line All Villages in both views', () => {
+    mountTable({ view: 'counts' })
+    expect(screen.getByText('All Villages')).toBeInTheDocument()
+    cleanup()
     mountTable({ view: 'percent' })
-    expect(screen.getByText('Hub')).toBeInTheDocument()
+    expect(screen.getByText('All Villages')).toBeInTheDocument()
+  })
+
+  // The customer asked for the totals as the FIRST line of the table, which is
+  // why it rides in the body instead of the <tfoot> it used to occupy.
+  it('puts the totals line first, above every village row', () => {
+    const { container } = mountTable()
+    const firstRow = container.querySelector('.meta-matrix-table tbody tr')
+    expect(firstRow).toHaveClass('totals-row')
+    expect(firstRow.textContent).toContain('All Villages')
+  })
+
+  it('keeps the totals line first under any sort', () => {
+    const { container } = mountTable({ sort: 'completed', dir: 'desc' })
+    const rows = [...container.querySelectorAll('.meta-matrix-table tbody tr')]
+    expect(rows[0]).toHaveClass('totals-row')
+    expect(rows.slice(1).some(r => r.classList.contains('totals-row'))).toBe(false)
+  })
+
+  // As the footer drew none: a hub-wide bar is on a different scale from the
+  // per-village bars beneath it, and inviting the comparison would mislead.
+  // In counts the track carries magnitude against the busiest VILLAGE, and the
+  // hub total is the sum of every village — there is no shared denominator that
+  // could place it honestly beside the rows below.
+  it('draws no bar on the totals line in counts view', () => {
+    const { container } = mountTable({ view: 'counts' })
+    const firstRow = container.querySelector('.meta-matrix-table tbody tr')
+    expect(firstRow.querySelector('.bar-track')).toBeNull()
+    // The village rows below it still draw theirs.
+    const villageRow = container.querySelectorAll('.meta-matrix-table tbody tr')[1]
+    expect(villageRow.querySelector('.bar-track')).not.toBeNull()
+  })
+
+  // In share every track is full width, so the hub-wide bar is exactly as long
+  // as the village bars and reads as the same partition taken over all of them.
+  it('draws a bar on the totals line in share view', () => {
+    const { container } = mountTable({ view: 'percent' })
+    const firstRow = container.querySelector('.meta-matrix-table tbody tr')
+    const track = firstRow.querySelector('.bar-track')
+    expect(track).not.toBeNull()
+    expect(track.querySelectorAll('.bar-seg')).toHaveLength(STATUS_SERIES.length)
+  })
+
+  it('gives the totals bar the same length as every village bar in share view', () => {
+    const { container } = mountTable({ view: 'percent' })
+    const tracks = [...container.querySelectorAll('.bar-track')]
+    // One per village plus the totals line.
+    expect(tracks).toHaveLength(ROWS.length + 1)
+    for (const track of tracks) expect(track.style.width).toBe('100%')
+  })
+
+  // The segments are the hub-wide rates, i.e. what matrixFooter puts in the
+  // number columns of the same row: completed 712 / 1112 = 64.0%.
+  it('splits the totals bar by the hub-wide rate, not by an average of rows', () => {
+    const { container } = mountTable({ view: 'percent' })
+    const firstRow = container.querySelector('.meta-matrix-table tbody tr')
+    const completed = firstRow.querySelector('.bar-seg')
+    expect(parseFloat(completed.style.width)).toBeCloseTo(64.0, 1)
+    expect(completed.getAttribute('title')).toBe('Completed: 712')
+  })
+
+  it('renders no tfoot totals row any more', () => {
+    const { container } = mountTable()
+    expect(container.querySelector('.meta-matrix-table tfoot')).toBeNull()
   })
 
   // There is no chart and no separate legend: each series header's swatch is
@@ -125,7 +198,7 @@ describe('MetaMatrixTable in-row bars', () => {
 
   it('puts each row’s bar in that row, beside its own numbers', () => {
     const { container } = mountTable()
-    const firstRow = container.querySelectorAll('.meta-matrix-table tbody tr')[0]
+    const firstRow = villageRows(container)[0]
     expect(firstRow.textContent).toContain('Barrington')
     // Barrington's completed count and its bar are in the SAME <tr>.
     expect(firstRow.textContent).toContain('624')
@@ -138,7 +211,7 @@ describe('MetaMatrixTable in-row bars', () => {
     // segment width alone. Barrington completed 624, East Greenwich 88 — that
     // ratio must survive the composition.
     const { container } = mountTable({ view: 'counts' })
-    const rows = container.querySelectorAll('.meta-matrix-table tbody tr')
+    const rows = villageRows(container)
     const drawnWidth = (tr, i) => {
       const track = parseFloat(tr.querySelector('.bar-track').style.width)
       const seg = parseFloat(tr.querySelectorAll('.bar-seg')[i].style.width)
@@ -151,7 +224,7 @@ describe('MetaMatrixTable in-row bars', () => {
     const { container } = mountTable({ view: 'percent' })
     const total = tr => [...tr.querySelectorAll('.bar-seg')]
       .reduce((sum, s) => sum + parseFloat(s.style.width), 0)
-    const rows = container.querySelectorAll('.meta-matrix-table tbody tr')
+    const rows = villageRows(container)
     expect(total(rows[0])).toBeCloseTo(total(rows[1]), 0)
   })
 
@@ -184,7 +257,7 @@ describe('MetaMatrixTable in-row bars', () => {
     // longer than the track truncates rather than wrapping or widening the
     // table. The title attribute is what keeps it recoverable.
     const { container } = mountTable()
-    const nameCell = container.querySelector('.meta-matrix-table tbody td')
+    const nameCell = villageRows(container)[0].querySelector('td')
     expect(nameCell.querySelector('[title]').getAttribute('title')).toBe('Barrington')
   })
 

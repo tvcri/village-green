@@ -2,8 +2,6 @@
 import { computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import ColumnGroup from 'primevue/columngroup'
-import Row from 'primevue/row'
 import { matrixColumns, matrixCells, matrixFooter } from '../lib/matrixTable.js'
 import { barSegments } from '../lib/barGeometry.js'
 
@@ -22,8 +20,60 @@ const emit = defineEmits(['update:sort'])
 defineOptions({ name: 'MetaMatrixTable' })
 
 const columns = computed(() => matrixColumns(props.series, props.view))
-const cells = computed(() => matrixCells(props.rows, props.series, props.view))
 const footer = computed(() => matrixFooter(props.rows, props.series, props.view))
+
+// The totals line is the FIRST row of the table, by customer request. PrimeVue
+// renders a ColumnGroup footer into <tfoot> and offers no header-side
+// equivalent, so the line rides in the body as an ordinary row instead, styled
+// back into a totals line by the .totals-row rule below.
+//
+// Prepended AFTER the parent has sorted `rows`, which is what pins it: a click
+// on any column reorders the villages beneath it and never moves it. It carries
+// a `villageId` of null so `dataKey` stays unique and it cannot collide with a
+// real village.
+const TOTALS_ROW_ID = null
+const cells = computed(() => [
+  { ...footer.value, villageId: TOTALS_ROW_ID },
+  ...matrixCells(props.rows, props.series, props.view),
+])
+
+function isTotalsRow (data) {
+  return data.villageId === TOTALS_ROW_ID
+}
+
+// PrimeVue applies this per rendered row; it is what makes the pinned first row
+// read as a totals line rather than a village called "All Villages".
+function rowClass (data) {
+  return isTotalsRow(data) ? 'totals-row' : null
+}
+
+// The totals line gets a bar in SHARE view only.
+//
+// In share every track is full width by construction (barGeometry.js), so the
+// hub-wide bar is exactly as long as every village bar above which it sits and
+// reads as what it is: the same partition, taken over every village at once.
+// There is no scale to mistake.
+//
+// In counts the track carries magnitude, scaled against the busiest VILLAGE.
+// The hub total is the sum of all of them, so its bar would either overflow the
+// track or silently rescale every other row against a denominator no village
+// owns. It stays suppressed there — that was the original objection, and it is
+// a counts-view objection specifically.
+//
+// Built from raw sums rather than from `footer`, whose share-view values are
+// preformatted strings ('64.0%'). Passing the row alone makes it its own
+// denominator, which is what a share bar wants.
+const totalsBar = computed(() => {
+  if (props.view !== 'percent') return null
+  const raw = { total: 0 }
+  for (const s of props.series) raw[s.key] = 0
+  for (const row of props.rows) {
+    raw.total += row.total
+    for (const s of props.series) raw[s.key] += row[s.key]
+  }
+  const { segments, trackPct } = barSegments([raw], props.series, props.view)
+  return { segments: segments[0], trackPct: trackPct[0] }
+})
 
 // Each series column header carries the same swatch color as the bar segments
 // drawn in that column's rows — there is no chart and no separate legend, so
@@ -98,6 +148,7 @@ function segTitle (seg) {
       :sortOrder="sortOrder"
       @sort="onSort"
       dataKey="villageId"
+      :rowClass="rowClass"
       class="meta-matrix-table"
     >
       <Column
@@ -116,7 +167,7 @@ function segTitle (seg) {
              what keeps an ellipsis-truncated village name readable. Every other
              column renders its field value as usual. -->
         <template v-if="i === 0" #body="{ data }">
-          <span :title="data.villageName">{{ data.villageName }}</span>
+          <span :title="isTotalsRow(data) ? null : data.villageName">{{ data.villageName }}</span>
         </template>
       </Column>
 
@@ -127,8 +178,16 @@ function segTitle (seg) {
           <!-- One composed bar, on every tab and in both views. The series
                partition the row — three terminal fates, or the categories of a
                village's work — so the segments genuinely are parts of a whole.
-               In counts the track's LENGTH carries the row total. -->
-          <div class="bar-track" :style="trackStyle(data.villageId)">
+               In counts the track's LENGTH carries the row total.
+               The totals row draws a bar in SHARE view only, where every track
+               is full width so it cannot be mis-scaled against the rows below
+               it; in counts its magnitude has no shared denominator and it
+               draws none. See totalsBar above. -->
+          <div
+            v-if="!isTotalsRow(data)"
+            class="bar-track"
+            :style="trackStyle(data.villageId)"
+          >
             <span
               v-for="seg in barFor(data.villageId).segments"
               :key="seg.key"
@@ -137,24 +196,21 @@ function segTitle (seg) {
               :title="segTitle(seg)"
             />
           </div>
+          <div
+            v-else-if="totalsBar"
+            class="bar-track"
+            :style="{ width: `${totalsBar.trackPct}%` }"
+          >
+            <span
+              v-for="seg in totalsBar.segments"
+              :key="seg.key"
+              class="bar-seg"
+              :style="{ width: `${seg.width}%`, backgroundColor: segColor(seg) }"
+              :title="segTitle(seg)"
+            />
+          </div>
         </template>
       </Column>
-
-      <ColumnGroup type="footer">
-        <Row>
-          <Column
-            v-for="(col, i) in columns"
-            :key="col.key"
-            :footer="String(footer[col.key])"
-            :footerClass="i === 0 ? 'name-cell' : 'num-cell'"
-          />
-          <!-- Matches the bar column so the footer's cells stay aligned with
-               the body's. Deliberately empty: a hub-wide bar would invite
-               reading it against the per-village bars, which are on a
-               different scale. -->
-          <Column />
-        </Row>
-      </ColumnGroup>
     </DataTable>
   </div>
 </template>
@@ -194,9 +250,19 @@ function segTitle (seg) {
   justify-content: flex-end;
 }
 
-.meta-matrix-table :deep(tfoot td) {
+/* The totals line, now the first BODY row rather than a <tfoot>. The 2px rule
+   moves to the bottom edge so it still separates the total from the villages —
+   the separator belongs between the two, and the line changed sides when the
+   row did. */
+.meta-matrix-table :deep(tr.totals-row > td) {
   font-weight: 700;
-  border-top: 2px solid var(--color-border-default, #e5e7eb);
+  border-bottom: 2px solid var(--color-border-default, #e5e7eb);
+}
+
+/* PrimeVue's row hover/stripe would make the totals line read as one of the
+   selectable village rows beneath it. */
+.meta-matrix-table :deep(tr.totals-row:hover > td) {
+  background: transparent;
 }
 
 /* The bar column takes the leftover width so the numeric columns keep their

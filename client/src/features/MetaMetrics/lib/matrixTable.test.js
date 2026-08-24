@@ -43,15 +43,22 @@ describe('matrixCells', () => {
 })
 
 describe('matrixFooter', () => {
-  it('sums each series in counts view and is labelled Total', () => {
+  it('sums each series in counts view', () => {
     const foot = matrixFooter(ROWS, STATUS_SERIES, 'counts')
-    expect(foot).toMatchObject({ villageName: 'Total', completed: 712, unmatched: 48, total: 1112 })
+    expect(foot).toMatchObject({ villageName: 'All Villages', completed: 712, unmatched: 48, total: 1112 })
   })
 
-  it('is a hub-wide rate labelled Hub in share view', () => {
+  it('is a hub-wide rate in share view', () => {
     const foot = matrixFooter(ROWS, STATUS_SERIES, 'percent')
     // 712 / 1112 = 64.0%
-    expect(foot).toMatchObject({ villageName: 'Hub', completed: '64.0%', total: 1112 })
+    expect(foot).toMatchObject({ villageName: 'All Villages', completed: '64.0%', total: 1112 })
+  })
+
+  // The label names the SCOPE of the line, not its arithmetic, so unlike every
+  // other value in the row it does not change with the view.
+  it('labels the line All Villages in both views', () => {
+    expect(matrixFooter(ROWS, STATUS_SERIES, 'counts').villageName)
+      .toBe(matrixFooter(ROWS, STATUS_SERIES, 'percent').villageName)
   })
 })
 

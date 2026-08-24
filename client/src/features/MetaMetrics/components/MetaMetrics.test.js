@@ -36,12 +36,16 @@ import MetaMetrics from './MetaMetrics.vue'
 // The bars live IN the table rows, so there is no chart to stub and no chart
 // props to inspect. These read the rendered DOM instead, which is a stronger
 // assertion: it exercises the real PrimeVue DataTable rather than a stand-in.
+// The table's first body row is the pinned 'All Villages' totals line, not a
+// village — every helper here indexes the VILLAGE rows beneath it.
+const villageRows = (container) =>
+  [...container.querySelectorAll('.meta-matrix-table tbody tr:not(.totals-row)')]
+
 const villageOrder = (container) =>
-  [...container.querySelectorAll('.meta-matrix-table tbody tr')]
-    .map(tr => tr.querySelector('td')?.textContent.trim())
+  villageRows(container).map(tr => tr.querySelector('td')?.textContent.trim())
 
 const barWidths = (container, rowIndex) =>
-  [...container.querySelectorAll('.meta-matrix-table tbody tr')[rowIndex]
+  [...villageRows(container)[rowIndex]
     .querySelectorAll('.bar-seg')].map(s => parseFloat(s.style.width))
 
 const PAYLOAD = {
@@ -150,7 +154,7 @@ describe('MetaMetrics page shell', () => {
     const { container } = mountPage()
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
     // Barrington: completed 10 + roundTrips 3 = 13, in its own row.
-    const firstRow = container.querySelectorAll('.meta-matrix-table tbody tr')[0]
+    const firstRow = villageRows(container)[0]
     expect(firstRow.textContent).toContain('Barrington')
     expect(firstRow.textContent).toContain('13')
   })
@@ -266,8 +270,7 @@ describe('MetaMetrics page shell', () => {
     await waitFor(() => expect(villageOrder(container).length).toBe(2))
     // Warwick rides: medical 8 + 2 round trips, plus shopping 6 = 16.
     // Errands 4. Its 5 unmatched and 3 cancelled are NOT work done.
-    const warwick = [...container.querySelectorAll('.meta-matrix-table tbody tr')]
-      .find(tr => tr.textContent.includes('Warwick'))
+    const warwick = villageRows(container).find(tr => tr.textContent.includes('Warwick'))
     expect(warwick.textContent).toContain('16')
     expect(warwick.textContent).toContain('4')
   })

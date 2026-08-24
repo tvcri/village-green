@@ -12,6 +12,11 @@ function pct (value, total) {
   return `${(total === 0 ? 0 : (value / total) * 100).toFixed(1)}%`
 }
 
+// The label on the totals line. Exported so tests and any future caller name it
+// rather than re-typing the literal; the screen, PDF and CSV all reach it
+// through matrixFooter().
+export const ALL_VILLAGES_LABEL = 'All Villages'
+
 // The last column changes meaning with the view. In share view it stays an
 // ABSOLUTE count — it is the answer to "share hides magnitude", letting a
 // reader see that a 45.6% completion rate is out of only 193 requests.
@@ -38,15 +43,24 @@ export function matrixCells (rows, series, view) {
   })
 }
 
+// The totals line. Named `matrixFooter` for its arithmetic, not its position:
+// the customer asked for it as the FIRST line of every table, so callers render
+// it above the village rows (see MetaMatrixTable.vue and drawSection() in
+// metaMetricsPdf.js). It is not part of the sortable body — it stays pinned
+// first under every sort key and direction.
+//
 // A column of percentages does not sum to anything meaningful, so share view
-// shows the hub-wide RATE rather than a total, and is labelled accordingly.
+// shows the hub-wide RATE rather than a total. The LABEL is the same either
+// way: 'All Villages' names the scope of the line, which does not change with
+// the view, where 'Total'/'Hub' described the arithmetic and read as a fourth
+// village once the line moved to the top of the table.
 export function matrixFooter (rows, series, view) {
   const totals = { total: rows.reduce((sum, r) => sum + r.total, 0) }
   for (const s of series) {
     totals[s.key] = rows.reduce((sum, r) => sum + r[s.key], 0)
   }
 
-  const foot = { villageName: view === 'percent' ? 'Hub' : 'Total', total: totals.total }
+  const foot = { villageName: ALL_VILLAGES_LABEL, total: totals.total }
   for (const s of series) {
     foot[s.key] = view === 'percent' ? pct(totals[s.key], totals.total) : totals[s.key]
   }
