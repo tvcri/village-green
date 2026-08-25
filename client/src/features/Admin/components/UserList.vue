@@ -17,6 +17,10 @@ import { getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHe
 import AccessTags from '../../../components/AccessTags.vue'
 import { accessSortString, matchesScopeFilter, HUB_FILTER } from '../../../shared/lib/accessTagHelpers.js'
 import { getVillages } from '../api/villageGrantApi.js'
+import ExportButton from '../../../components/ExportButton.vue'
+import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { createSheet } from '../../../shared/services/googleSheetsService.js'
+import { columnsForCsv, userRowsForCsv } from '../lib/userCsv.js'
 
 defineOptions({ name: 'UserList' })
 
@@ -25,6 +29,7 @@ const toast = useToast()
 
 const searchText = ref('')
 const pageRows = ref(10)
+const isCreatingSheet = ref(false)
 
 const { state: users, isLoading, execute: refetchUsers } = useAsyncState(
   () => getUsersWithGrants(),
@@ -64,7 +69,8 @@ const filteredUsers = computed(() => {
 })
 
 // Unavailable = soft-deleted (username retained). The dimmed row IS the
-// status indicator; there is no Status column.
+// status indicator; the table has no Status column. The CSV/Sheet export
+// does add one, since dimming cannot survive a flat file.
 const rowClass = (data) => (data.status === 'available' ? '' : 'row-unavailable')
 
 function goToCreate() {
@@ -77,6 +83,54 @@ function goToGrants(userId, displayName) {
 
 function onRowClick(event) {
   goToGrants(event.data.userId, event.data.displayName)
+}
+
+// Exports exactly the rows the table is showing (search + scope filter
+// applied), so the file always matches what the admin is looking at.
+const usersForCsv = computed(() => userRowsForCsv(filteredUsers.value))
+
+function handleDownloadCsv() {
+  downloadCsv(toCsv(usersForCsv.value, columnsForCsv), 'users.csv')
+}
+
+async function handleCreateSheet() {
+  try {
+    isCreatingSheet.value = true
+    const result = await createSheet(usersForCsv.value, columnsForCsv, 'Village Green Users')
+    const sheetUrl = result.url || result
+    if (result.popupBlocked) {
+      toast.add({
+        severity: 'success',
+        summary: 'Sheet Created',
+        detail: `Your Google Sheet has been created. <a href="${sheetUrl}" target="_blank" style="color: inherit; text-decoration: underline;">Open it here</a>.`,
+        life: 0,
+      })
+    }
+    else {
+      toast.add({
+        severity: 'success',
+        summary: 'Sheet Created',
+        detail: 'Your Google Sheet has been created and opened in a new tab.',
+        life: 3000,
+      })
+    }
+  }
+  catch (err) {
+    let message = 'Failed to create Google Sheet'
+    if (err.message?.includes('Popup was blocked')) {
+      message = 'Please allow popups for this site to use Google Sheets export'
+    }
+    else if (err.message?.includes('timeout')) {
+      message = 'Sheet creation timed out. Please try again.'
+    }
+    else {
+      message = `Error: ${err.message}`
+    }
+    toast.add({ severity: 'error', summary: 'Sheet Creation Failed', detail: message, life: 5000 })
+  }
+  finally {
+    isCreatingSheet.value = false
+  }
 }
 
 async function onDeleteUser(user) {
@@ -144,6 +198,11 @@ async function onDeleteUser(user) {
           <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
           <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
           <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+          <ExportButton
+            :disabled="isLoading || isCreatingSheet"
+            @download="handleDownloadCsv"
+            @export="handleCreateSheet"
+          />
         </div>
       </template>
 
