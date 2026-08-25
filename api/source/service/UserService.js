@@ -154,6 +154,21 @@ exports.queryUsers = async function (inProjection, inPredicates, userObject) {
     predicates.statements.push('ud.status = ?')
     predicates.binds.push(inPredicates.status)
   }
+
+  // Task users (0024) live in user_data only because audit_event.userId is a
+  // NOT NULL FK and the scheduled event needed a real actor row. They are not
+  // members of the administered user collection: they cannot authenticate,
+  // hold no meaningful grants, and carry no claims. getUsers opts in to
+  // excluding them so every consumer of the collection — admin table, count,
+  // export — gets humans by default.
+  //
+  // Deliberately opt-in rather than unconditional: getUserByUserId,
+  // getUserByUsername and deleteUser share queryUsers and must still resolve
+  // the row by id/username, or the task actor becomes unfetchable and
+  // undeletable through the API.
+  if (inPredicates.excludeTaskUsers) {
+    predicates.statements.push('ud.taskName is null')
+  }
   
   if (needsCollectionGrantees) {
     ctes.push(dbUtils.sqlGrantees({userId: inPredicates.userId, username: inPredicates.username, returnCte: true}))
@@ -390,7 +405,8 @@ exports.getUsers = async function(username, usernameMatch, status, projection, u
     let rows = await _this.queryUsers( projection, {
       username,
       usernameMatch,
-      status
+      status,
+      excludeTaskUsers: true
     }, userObject)
     return (rows)
   }
