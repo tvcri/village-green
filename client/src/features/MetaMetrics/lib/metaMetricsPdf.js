@@ -8,7 +8,7 @@
 // they are plain rectangles from the same barSegments() the screen uses. Screen
 // and print cannot drift, because they read the same numbers.
 
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 import {
   PAGE_W as PORTRAIT_W, PAGE_H as PORTRAIT_H, MARGIN, INK, MUTED, LINE, BORDER, TINT,
   formatRange, hexColor, winAnsi, drawText, rightText, roundedRect,

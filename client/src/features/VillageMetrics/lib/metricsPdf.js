@@ -1,11 +1,11 @@
 // Assembles the Village Metrics PDF. Takes already-captured chart images plus
 // row data and returns bytes — no DOM, no Vue, no canvas, so it is unit-testable.
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 // Page geometry, palette and drawing primitives are shared with the Meta
 // Metrics document — see shared/lib/pdf/pdfPrimitives.js. What stays here is
 // the village REPORT: its section order and its village-specific fields.
 import {
-  PAGE_W, PAGE_H, MARGIN, INK, MUTED, LINE, BORDER, TINT, CARD_RADIUS,
+  PAGE_W, PAGE_H, MARGIN, INK, MUTED, LINE,
   formatCivil, formatRange, winAnsi, hexColor, drawText, rightText, roundedRect,
 } from '../../../shared/lib/pdf/pdfPrimitives.js'
 

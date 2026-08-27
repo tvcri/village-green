@@ -119,10 +119,6 @@ const tab = urlState('tab', TAB_VALUES, 'outcomes')
 
 const TAB_LABELS = { outcomes: 'Outcomes', categories: 'Categories', detail: 'Detail' }
 
-// Outcomes GROUPS because its three series do not compose into a whole.
-// Categories and Detail both STACK: categories partition a village's work, and
-// a category's services partition that category.
-const isOutcomes = computed(() => tab.value === 'outcomes')
 const isCategories = computed(() => tab.value === 'categories')
 const isDetail = computed(() => tab.value === 'detail')
 
