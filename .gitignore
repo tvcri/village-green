@@ -14,7 +14,7 @@ client/dist/
 .vite/
 .env.development
 .superpowers/
-docs/superpowers/specs/*
+docs/superpowers/
 
 # docker-compose #
 .env
