@@ -79,6 +79,37 @@ describe('serviceSeries', () => {
   it('returns an empty series for a category with no cells', () => {
     expect(serviceSeries(CELLS, 'Nonexistent')).toEqual([])
   })
+
+  // The Detail tab displays completed + round-trip legs, so the ranking has to
+  // be computed on that same basis. Shopping leads on raw completed counts
+  // (50 vs 45) but the table prints Medical as the larger number (85 vs 50).
+  it('ranks on the legs basis when legs are counted, matching the displayed values', () => {
+    const cells = [
+      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(50, 0, 0, 0), completedRoundTrips: 0 },
+      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(45, 0, 0, 0), completedRoundTrips: 40 },
+    ]
+
+    expect(serviceSeries(cells, 'Rides', { legs: true }).map(s => s.key))
+      .toEqual(['Ride: Medical Appnt', 'Ride: Shopping'])
+
+    // Without legs the raw counts still decide, so the default is unchanged.
+    expect(serviceSeries(cells, 'Rides').map(s => s.key))
+      .toEqual(['Ride: Shopping', 'Ride: Medical Appnt'])
+  })
+
+  it('hands the leading ramp colour to the service the table shows as largest', () => {
+    const cells = [
+      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(50, 0, 0, 0), completedRoundTrips: 0 },
+      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(45, 0, 0, 0), completedRoundTrips: 40 },
+    ]
+    const [first] = serviceSeries(cells, 'Rides', { legs: true })
+    const rows = byVillageService(cells, [{ villageId: '1', villageName: 'Quahog' }], 'Rides', { legs: true })
+
+    // The first column is also the biggest number in the row.
+    const values = Object.entries(rows[0]).filter(([k]) => k.startsWith('Ride: '))
+    const biggest = values.sort((a, b) => b[1] - a[1])[0][0]
+    expect(first.key).toBe(biggest)
+  })
 })
 
 describe('byVillageService', () => {

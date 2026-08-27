@@ -127,7 +127,7 @@ const isDetail = computed(() => tab.value === 'detail')
 // would be a single column identical to the total. Derived from the payload so
 // a category appears the moment it gains a second service.
 const detailOptions = computed(() =>
-  payload.value ? drilldownCategories(payload.value.cells) : [])
+  payload.value ? drilldownCategories(payload.value.cells, { legs: true }) : [])
 
 // REQUIRED, with no "all": a table of every service across every category is
 // the 130-cell explosion this tab exists to avoid. Defaults to the first
@@ -145,7 +145,7 @@ const detailCategory = computed({
 // Each tab supplies its own series, and with them its own valid sort columns.
 const series = computed(() => {
   if (isDetail.value) {
-    return payload.value ? serviceSeries(payload.value.cells, detailCategory.value) : []
+    return payload.value ? serviceSeries(payload.value.cells, detailCategory.value, { legs: true }) : []
   }
   return isCategories.value ? CATEGORY_SERIES : STATUS_SERIES
 })
@@ -307,7 +307,7 @@ function sectionFor (tabValue) {
     ? STATUS_SERIES
     : tabValue === 'categories'
       ? CATEGORY_SERIES
-      : serviceSeries(cells, detailCategory.value)
+      : serviceSeries(cells, detailCategory.value, { legs: true })
 
   if (!sectionSeries.length) return null
 

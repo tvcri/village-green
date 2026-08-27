@@ -36,9 +36,8 @@ function shortServiceName (serviceName, category) {
 
 /**
  * The categories worth drilling into: those with more than one service in the
- * data. Derived rather than hardcoded, so a new category appears the moment it
- * has a second service — the customer expects to split Friends into visits,
- * calls and texts once they start recording it.
+ * data. Derived rather than hardcoded, so a category appears the moment it
+ * gains a second service without an edit here.
  *
  * Home Help and Tech Support have exactly one service each today, so drilling
  * into them would show a single column identical to the row total.
@@ -46,10 +45,9 @@ function shortServiceName (serviceName, category) {
  * BUSIEST FIRST, because the caller takes [0] as the default selection.
  * Alphabetical order opened the tab on Errands (~5% of requests) rather than
  * Rides (~74%) — the least interesting slice of the data, chosen by accident of
- * spelling. Ordering by volume keeps the default honest as the mix changes,
- * including when Friends arrives and possibly rivals Rides.
+ * spelling. Ordering by volume keeps the default honest as the mix changes.
  */
-export function drilldownCategories (cells) {
+export function drilldownCategories (cells, { legs = false } = {}) {
   const byCategory = new Map()
   for (const cell of cells) {
     if (cell.category === null) continue
@@ -58,7 +56,7 @@ export function drilldownCategories (cells) {
     }
     const entry = byCategory.get(cell.category)
     entry.names.add(cell.serviceName)
-    entry.completed += cell.byStatus.completed
+    entry.completed += cell.byStatus.completed + (legs ? cell.completedRoundTrips : 0)
   }
   return [...byCategory.entries()]
     .filter(([, { names }]) => names.size > 1)
@@ -86,17 +84,22 @@ const SERVICE_SHORT_LABELS = {
  * carrying a ramp colour, a prefix-stripped label, and — where the label is
  * long enough to wrap a header — a shortLabel.
  */
-export function serviceSeries (cells, category) {
+export function serviceSeries (cells, category, { legs = false } = {}) {
   const totals = new Map()
   for (const cell of cells) {
     if (cell.category !== category) continue
     const prior = totals.get(cell.serviceName) ?? 0
-    totals.set(cell.serviceName, prior + cell.byStatus.completed)
+    totals.set(cell.serviceName, prior + cell.byStatus.completed + (legs ? cell.completedRoundTrips : 0))
   }
 
   return [...totals.entries()]
     // Busiest first so the ramp's strongest hue lands on the dominant service
     // and the column order matches the bar's segment order.
+    //
+    // `legs` MUST match what byVillageService() is given, or this ranking is
+    // computed on a different basis than the numbers it orders: a round-trip
+    // heavy service displaying 85 would sort below a one-way service displaying
+    // 50, taking the leading column and the strongest hue with it.
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([serviceName], i) => {
       const short = SERVICE_SHORT_LABELS[serviceName]
@@ -118,7 +121,9 @@ export function serviceSeries (cells, category) {
  * work that never happened.
  */
 export function byVillageService (cells, villages, category, { legs = false } = {}) {
-  const series = serviceSeries(cells, category)
+  // Same `legs` basis, so the column order this produces agrees with the values
+  // filled in below.
+  const series = serviceSeries(cells, category, { legs })
 
   const rows = new Map(villages.map(v => {
     const row = { villageId: v.villageId, villageName: v.villageName, total: 0 }
