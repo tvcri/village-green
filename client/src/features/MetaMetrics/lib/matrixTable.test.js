@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matrixColumns, matrixCells, matrixFooter, metaCsvFilename } from './matrixTable.js'
+import { matrixColumns, matrixCells, matrixFooter, metaCsvFilename, metaPdfFilename } from './matrixTable.js'
 import { STATUS_SERIES } from './reduceCells.js'
 
 const ROWS = [
@@ -66,6 +66,29 @@ describe('metaCsvFilename', () => {
   it('carries tab, view and range', () => {
     expect(metaCsvFilename({ tab: 'outcomes', view: 'percent', start: '2026-01-01', end: '2026-08-21' }))
       .toBe('tvcri-outcomes-percent-2026-01-01-2026-08-21.csv')
+  })
+})
+
+describe('metaPdfFilename', () => {
+  it('carries view and range', () => {
+    expect(metaPdfFilename({ view: 'percent', start: '2026-01-01', end: '2026-08-21' }))
+      .toBe('tvcri-metrics-percent-2026-01-01-2026-08-21.pdf')
+  })
+
+  // The document always holds all three tabs, so the tab it was launched from
+  // must not reach the name — otherwise two byte-identical files download under
+  // different names.
+  it('does not vary with the tab it was exported from', () => {
+    const args = { view: 'counts', start: '2026-01-01', end: '2026-08-21' }
+    expect(metaPdfFilename({ ...args, tab: 'detail-rides' }))
+      .toBe(metaPdfFilename({ ...args, tab: 'categories' }))
+  })
+
+  // counts and share ARE different documents, so they must not collide.
+  it('separates counts from share', () => {
+    const range = { start: '2026-01-01', end: '2026-08-21' }
+    expect(metaPdfFilename({ ...range, view: 'counts' }))
+      .not.toBe(metaPdfFilename({ ...range, view: 'percent' }))
   })
 })
 

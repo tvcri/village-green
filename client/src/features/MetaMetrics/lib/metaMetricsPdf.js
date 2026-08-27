@@ -306,8 +306,6 @@ export async function buildMetaMetricsPdf (report) {
   }
 
   const pages = metaPdfSections(report.sections ?? [])
-  // Flags the last page of each section, so only it draws the totals row.
-  pages.forEach((p, i) => { p.hasMore = pages[i + 1]?.key === p.key })
 
   // A range with no data anywhere still produces a document: the header and the
   // strip are the answer to "what did we do this period", and zero is an answer.

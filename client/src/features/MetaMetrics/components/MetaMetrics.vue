@@ -18,7 +18,7 @@ import { byVillageCategory, CATEGORY_SERIES } from '../lib/byVillageCategory.js'
 import { byVillageService, serviceSeries, drilldownCategories } from '../lib/byVillageService.js'
 import { orderRows, DEFAULT_SORT } from '../lib/orderRows.js'
 import { metaStripStats } from '../lib/stripStats.js'
-import { metaCsvFilename, matrixColumns, matrixCells } from '../lib/matrixTable.js'
+import { metaCsvFilename, metaPdfFilename, matrixColumns, matrixCells } from '../lib/matrixTable.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { buildMetaMetricsPdf } from '../lib/metaMetricsPdf.js'
 import { getHttpStatus } from '../../../shared/api/apiClient.js'
@@ -339,7 +339,11 @@ async function onDownloadPdf () {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = csvName.value.replace(/\.csv$/, '.pdf')
+    link.download = metaPdfFilename({
+      view: view.value,
+      start: range.value.start,
+      end: range.value.end,
+    })
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)

@@ -78,3 +78,11 @@ export function matrixFooter (rows, series, view) {
 export function metaCsvFilename ({ tab, view, start, end }) {
   return ['tvcri', tab, view, start, end].filter(Boolean).join('-') + '.csv'
 }
+
+// The PDF carries ALL THREE tabs, so it is NOT named for the one that happened
+// to be on screen: that produced differently-named files with byte-identical
+// contents. `view` stays, because counts and share really are different
+// documents; the tab does not, because it is not in the document at all.
+export function metaPdfFilename ({ view, start, end }) {
+  return ['tvcri-metrics', view, start, end].filter(Boolean).join('-') + '.pdf'
+}
