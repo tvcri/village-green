@@ -13,8 +13,13 @@ function pct (value, total) {
 }
 
 // The label on the totals line. Exported so tests and any future caller name it
-// rather than re-typing the literal; the screen, PDF and CSV all reach it
+// rather than re-typing the literal; the screen and the PDF both reach it
 // through matrixFooter().
+//
+// The CSV deliberately does NOT carry the totals line. It is read by a
+// spreadsheet, not a person: an aggregate row inside the data breaks sorting,
+// skews a pivot, and double-counts under any SUM() over the column. The totals
+// line is a presentation device for the two rendered outputs.
 export const ALL_VILLAGES_LABEL = 'All Villages'
 
 // The last column changes meaning with the view. In share view it stays an

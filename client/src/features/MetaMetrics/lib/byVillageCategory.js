@@ -30,12 +30,14 @@ const CATEGORY_STYLES = {
   'Tech Support': { colorLight: '#8b5cf6', colorDark: '#a78bfa', shortLabel: 'Tech' },
 }
 
-// The vocabulary is expected to GROW: friendly calls and visits are a likely
-// fifth category, and the customer expects them to rival Rides by volume once
-// they are willing to record them. A category added to CATEGORY_ORDER without
-// a style here would otherwise spread to `undefined` colors and render as an
-// INVISIBLE bar segment — a silent failure. This gives it a visible neutral
-// grey and says so, loudly, in the console.
+// A safety net for a category added to CATEGORY_ORDER without a style here: it
+// would otherwise spread to `undefined` colors and render as an INVISIBLE bar
+// segment — a silent failure. This gives it a visible neutral grey and says so,
+// loudly, in the console.
+//
+// The vocabulary is not expected to grow (Friends work is not a service request
+// and gets its own presentation — see CATEGORY_ORDER in reduceCells.js), so this
+// guards a developer mistake rather than an anticipated addition.
 const FALLBACK_STYLE = { colorLight: '#64748b', colorDark: '#94a3b8' }
 
 export function buildCategorySeries (order) {
