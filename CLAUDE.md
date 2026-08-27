@@ -1,5 +1,52 @@
 # Village Green — project guidance
 
+## What this project is
+
+Village Green serves **one customer** as **one deployment**. @csmig is the sole
+developer. There is no fleet, no second install, no other team.
+
+**This is not STIG Manager.** The two share a parent directory, a
+Node/Express + MySQL + OIDC stack, and about four lines of inherited dead
+scaffold (the `/docs` Sphinx mount). Nothing else. Do not import STIG
+Manager's assumptions — multi-deployment compatibility, fleet upgrade paths,
+multi-developer coordination, hundreds of installs. Those are correct there
+and actively wrong here. Reason about *this* deployment: the one snapshot
+that exists is the one that is tested.
+
+**This is not a licence to be sloppy.** Fewer deployments means fewer
+*compatibility* constraints, not a lower correctness bar. Enforcement gaps
+are defects to fix, tests are wanted, and review should be rigorous. What is
+unwanted is effort spent on an environment that does not exist: hedging
+migrations against other installs, fleet-safe rollout plans, or security
+findings about inert scaffold.
+
+## Plans & specs go in `scratch/`
+
+Superpowers artifacts — brainstorming specs, implementation plans, handoffs —
+are written to **`scratch/superpowers/`**, never `docs/superpowers/`:
+
+- Plans: `scratch/superpowers/plans/YYYY-MM-DD-<feature>.md`
+- Specs: `scratch/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
+
+`scratch/` is gitignored working space. The superpowers skill defaults toward
+`docs/`, so this needs deciding **before** the file is written, not corrected
+after it is staged. `docs/superpowers/` is now gitignored as well, but five
+legacy files there are already tracked — leave them; do not move or delete
+them, and do not add new ones.
+
+## Merge is deploy
+
+A squash-merge to `main` is **in production within about a minute**: the merge
+builds a container, Docker Hub fires an Azure webhook, and the app restarts on
+the new image. There is no staging tier, no release train, no separate deploy
+step to schedule or wait for.
+
+Two consequences. **Merge date == production date** — when dating a feature's
+go-live for reporting, the PR merge date is the answer. And **merging is the
+risky moment**, not some later ceremony: a merged regression is live
+immediately, which is why review happens before the merge rather than before a
+release.
+
 ## Interaction rules
 
 **Questions are questions, not commands.** When the user asks a question — including "why", "how", "is this possible", "does X work" — answer it and stop. Do not make code changes, propose fixes, or begin implementation. The user will use imperative language ("fix", "change", "add", "update") when they want action.
@@ -86,6 +133,33 @@ Inside running text (sentences, dialogs, toasts) a name reads
 `CONCAT_WS(', ', lastName, firstName)`). Never string-unparse `fullName`
 to get the informal form — serve `firstName`/`lastName` alongside it and
 compose client-side. Emergency-contact names are free-text and exempt.
+
+## Who's who — coordinator vs volunteer vs member
+
+Three distinct roles that are easy to conflate in user-facing copy. Getting
+these wrong reads as a category error to the customer, and a grep won't
+catch it.
+
+- **Service coordinator** — enters and manages service requests. This is the
+  person at the keyboard in any create/edit screen. Recorded as
+  `service_request.createdUserId` (a `user_data` row), **not** as a person
+  on the request. There are only ~12 of them across 8,600+ requests.
+- **Volunteer** — *drives*. Assigned to a request as
+  `volunteerPersonId`; sees ride details, never the entry form.
+- **Member** — the person receiving the service. `memberPersonId`.
+
+So: a coordinator *picks a destination*; a volunteer *drives to it*. Copy
+about search results, form fields, or data entry says **coordinator**; copy
+about what someone sees on the road says **volunteer**. Dual-role people
+exist (member and volunteer both), which is why
+[village role counts overlap by design].
+
+**Service requests are created and managed at the federation level.**
+Coordinators are not attached to a local village — they handle requests
+across all 13. Local coordination may be supported eventually; it is not
+how it works today. Do not scope coordinator-facing features by "their"
+village. Any village scoping derives from the **member on the request**,
+never from who is logged in.
 
 ## UI vocabulary vs data vocabulary
 
