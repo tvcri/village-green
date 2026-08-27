@@ -11,7 +11,6 @@ const props = defineProps({
   view: { type: String, required: true },     // 'counts' | 'percent'
   sort: { type: String, required: true },
   dir: { type: String, required: true },      // 'asc' | 'desc'
-  csvFilename: { type: String, required: true },
   dark: { type: Boolean, default: false },
 })
 

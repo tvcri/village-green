@@ -484,7 +484,6 @@ const showCountingInfo = ref(false)
               :view="view"
               :sort="sort"
               :dir="dir"
-              :csvFilename="csvName"
               :dark="dark"
               :emptyMessage="emptyMessage"
               @update:sort="onSortUpdate"

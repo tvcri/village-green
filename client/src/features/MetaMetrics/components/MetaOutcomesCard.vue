@@ -17,7 +17,6 @@ const props = defineProps({
   view: { type: String, required: true },      // 'counts' | 'percent'
   sort: { type: String, required: true },
   dir: { type: String, required: true },       // 'asc' | 'desc'
-  csvFilename: { type: String, required: true },
   dark: { type: Boolean, default: false },
   emptyMessage: { type: String, default: 'No requests in this range' },
 })
@@ -42,7 +41,6 @@ const hasRows = computed(() => props.rows.length > 0)
         :view="view"
         :sort="sort"
         :dir="dir"
-        :csvFilename="csvFilename"
         :dark="dark"
         @update:sort="$emit('update:sort', $event)"
       />
