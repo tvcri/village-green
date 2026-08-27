@@ -1,19 +1,15 @@
 // Assembles the Village Metrics PDF. Takes already-captured chart images plus
 // row data and returns bytes — no DOM, no Vue, no canvas, so it is unit-testable.
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
+// Page geometry, palette and drawing primitives are shared with the Meta
+// Metrics document — see shared/lib/pdf/pdfPrimitives.js. What stays here is
+// the village REPORT: its section order and its village-specific fields.
+import {
+  PAGE_W, PAGE_H, MARGIN, INK, MUTED, LINE,
+  formatCivil, formatRange, winAnsi, hexColor, drawText, rightText, roundedRect,
+} from '../../../shared/lib/pdf/pdfPrimitives.js'
 
-const PAGE_W = 612
-const PAGE_H = 792
-const MARGIN = 54
-
-const INK = rgb(0.09, 0.09, 0.11)
-const MUTED = rgb(0.42, 0.45, 0.5)
-const LINE = rgb(0.9, 0.91, 0.92)
-// One step darker than LINE. The hairline LINE reads fine on a screen but can
-// nearly vanish on a laser printer, and this is a document people print.
-const BORDER = rgb(0.82, 0.84, 0.86)
-// Barely-there card fill (#f9fafb).
-const TINT = rgb(0.976, 0.980, 0.985)
+export { formatCivil, formatRange, winAnsi }
 
 // The square pie's edge length, and the default chart slot width. Smaller than
 // the unframed layout's 200 so the chart sits inside CARD_PAD without crowding
@@ -36,7 +32,6 @@ export function chartSlotWidth (chartType) {
 const ROW_H = 15
 
 const CARD_PAD = 14
-const CARD_RADIUS = 8
 // Title row inside a card: heading baseline plus the gap to the content below.
 const CARD_TITLE_H = 24
 // Vertical gap between stacked cards.
@@ -59,66 +54,6 @@ const STATUS_TEXT = {
   volunteerCancelled: 'Volunteer cancelled',
 }
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December']
-
-// 'YYYY-MM-DD' -> 'January 1, 2026'. Splits the string rather than going
-// through a JS Date: these are civil calendar values, and 'YYYY-MM-DD' parses
-// as UTC midnight, which lands on the previous day in western zones. The
-// filenames stay ISO — only the human-facing header is reformatted.
-// Anything that isn't a well-formed civil date is passed through untouched.
-export function formatCivil (s) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s ?? ''))
-  if (!m) return String(s ?? '')
-  const month = MONTHS[Number(m[2]) - 1]
-  if (!month) return String(s)
-  return `${month} ${Number(m[3])}, ${Number(m[1])}`
-}
-
-// "January 1 – July 30, 2026" when both ends share a year, otherwise the two
-// full dates. En dash (U+2013) is the range convention and encodes in WinAnsi.
-export function formatRange (start, end) {
-  const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(start ?? ''))
-  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(end ?? ''))
-  if (!a || !b) return `${formatCivil(start)} – ${formatCivil(end)}`
-  if (a[1] === b[1]) {
-    const ma = MONTHS[Number(a[2]) - 1]
-    const mb = MONTHS[Number(b[2]) - 1]
-    if (ma && mb) return `${ma} ${Number(a[3])} – ${mb} ${Number(b[3])}, ${Number(b[1])}`
-  }
-  return `${formatCivil(start)} – ${formatCivil(end)}`
-}
-
-// Standard Helvetica encodes WinAnsi only; one character outside it makes
-// drawText throw and kills the whole document. WinAnsi is much wider than
-// printable ASCII (it covers em dash, middle dot, precomposed Latin-1
-// accents like "ë", etc.), so pdf-lib's own encoder is used as the sole
-// authority on what's encodable — no hand-maintained character table.
-// Same guard generateLabelPdf uses.
-export function winAnsi (text, font) {
-  const s = String(text ?? '')
-  if (isEncodable(s, font)) return s
-
-  let out = ''
-  for (const ch of s) out += isEncodable(ch, font) ? ch : '?'
-  return out
-}
-
-function isEncodable (s, font) {
-  try {
-    font.widthOfTextAtSize(s, 12)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function hexColor (hex) {
-  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '')
-  if (!m) return MUTED
-  return rgb(parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255)
-}
-
 export function topN (rows, limit) {
   return [...rows].sort((a, b) => b.count - a.count).slice(0, limit)
 }
@@ -128,32 +63,6 @@ export function peopleFooter (shown, total, noun) {
   return shown < total
     ? `Showing top ${shown} of ${total} ${noun} by completed requests.`
     : `Showing all ${total} ${noun} by completed requests.`
-}
-
-function drawText (page, text, x, y, size, font, color) {
-  page.drawText(winAnsi(text, font), { x, y, size, font, color })
-}
-
-function rightText (page, text, rightX, y, size, font, color) {
-  const s = winAnsi(text, font)
-  page.drawText(s, { x: rightX - font.widthOfTextAtSize(s, size), y, size, font, color })
-}
-
-// A card frame. pdf-lib's drawRectangle has no borderRadius, so this is an SVG
-// path — and drawSvgPath anchors SVG-style at the top-left with +y pointing
-// DOWN, unlike every other pdf-lib call in this file. The path is therefore
-// authored in local coordinates from (0,0) and anchored at the card's TOP-left
-// (x, y): h is added going down, not subtracted. Getting this backwards draws
-// the frame mirrored off the content — which is exactly what happened first try.
-function roundedRect (page, { x, y, w, h, r = CARD_RADIUS, fill = TINT }) {
-  const d = [
-    `M ${r} 0`,
-    `L ${w - r} 0`, `Q ${w} 0 ${w} ${r}`,
-    `L ${w} ${h - r}`, `Q ${w} ${h} ${w - r} ${h}`,
-    `L ${r} ${h}`, `Q 0 ${h} 0 ${h - r}`,
-    `L 0 ${r}`, `Q 0 0 ${r} 0`, 'Z',
-  ].join(' ')
-  page.drawSvgPath(d, { x, y, borderColor: BORDER, borderWidth: 1, color: fill })
 }
 
 // What drawLegend consumes vertically: 6 (header -> rule) + 14 (rule -> first

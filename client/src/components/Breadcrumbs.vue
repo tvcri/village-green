@@ -133,6 +133,21 @@ const breadcrumbs = computed(() => {
     })
   }
 
+  // The meta sections, in one place. Each page's droplist is "the others",
+  // derived — these were four hand-maintained arrays, and adding Metrics to
+  // them meant editing every one or having the new page silently missing from
+  // its neighbours' menus.
+  const META_SECTIONS = [
+    { label: 'Metrics', name: 'meta-metrics' },
+    { label: 'Persons', name: 'meta-persons' },
+    { label: 'Service Requests', name: 'meta-service-requests' },
+    { label: 'Friends', name: 'meta-friends' },
+    { label: 'Mailing Labels', name: 'meta-mailing-labels' },
+  ]
+  const otherMetaSections = (current) => META_SECTIONS
+    .filter(s => s.name !== current)
+    .map(s => ({ label: s.label, route: { name: s.name } }))
+
   // Add page-specific breadcrumb
   const personName = route.params.personName
   const metaSiblings = villages.value?.length
@@ -149,13 +164,13 @@ const breadcrumbs = computed(() => {
     case 'meta':
       crumbs.push({ label: 'Meta', siblings: metaSiblings })
       break
+    case 'meta-metrics':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Metrics', siblings: otherMetaSections('meta-metrics') })
+      break
     case 'meta-service-requests':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Service Requests', siblings: [
-        { label: 'Persons', route: { name: 'meta-persons' } },
-        { label: 'Friends', route: { name: 'meta-friends' } },
-        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
-      ]})
+      crumbs.push({ label: 'Service Requests', siblings: otherMetaSections('meta-service-requests') })
       break
     case 'meta-service-request-create':
     case 'meta-service-request-edit':
@@ -165,37 +180,22 @@ const breadcrumbs = computed(() => {
       break
     case 'meta-persons':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', siblings: [
-        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
-        { label: 'Friends', route: { name: 'meta-friends' } },
-        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
-      ]})
+      crumbs.push({ label: 'Persons', siblings: otherMetaSections('meta-persons') })
       break
     case 'meta-friends':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Friends', siblings: [
-        { label: 'Persons', route: { name: 'meta-persons' } },
-        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
-        { label: 'Mailing Labels', route: { name: 'meta-mailing-labels' } }
-      ]})
+      crumbs.push({ label: 'Friends', siblings: otherMetaSections('meta-friends') })
       break
     case 'meta-mailing-labels':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Mailing Labels', siblings: [
-        { label: 'Persons', route: { name: 'meta-persons' } },
-        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
-        { label: 'Friends', route: { name: 'meta-friends' } }
-      ]})
+      crumbs.push({ label: 'Mailing Labels', siblings: otherMetaSections('meta-mailing-labels') })
       break
     case 'friends':
       crumbs.push({ label: 'Friends', siblings: getSiblings('friends', { villageId: vId }) })
       break
     case 'meta-person-detail':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: [
-        { label: 'Service Requests', route: { name: 'meta-service-requests' } },
-        { label: 'Friends', route: { name: 'meta-friends' } }
-      ]})
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
       crumbs.push({ label: route.params.personName || 'Person' })
       break
     case 'meta-person-create':

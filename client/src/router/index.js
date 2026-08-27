@@ -116,6 +116,11 @@ const routes = [
     component: () => import('../features/MetaVillage/components/MetaVillage.vue'),
   },
   {
+    path: '/meta/metrics',
+    name: 'meta-metrics',
+    component: () => import('../features/MetaMetrics/components/MetaMetrics.vue'),
+  },
+  {
     path: '/meta/service-requests',
     name: 'meta-service-requests',
     component: () => import('../features/ServiceRequestList/components/MetaServiceRequestList.vue'),
