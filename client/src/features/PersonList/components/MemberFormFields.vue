@@ -186,7 +186,7 @@ watch(memberLevel, (level) => {
     </div>
 
     <div class="form-field">
-      <label class="label" for="confidentialNotes">Confidential Notes
+      <label class="label" for="confidentialNotes">Service Coordinator Notes
         <i v-if="uncertain.confidentialNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('confidentialNotes')" />
       </label>
       <Textarea id="confidentialNotes" v-model="confidentialNotes" rows="3" class="w-full" @input="edited('confidentialNotes')" />

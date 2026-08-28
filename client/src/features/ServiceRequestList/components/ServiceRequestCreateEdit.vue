@@ -1050,7 +1050,9 @@ const openPersonDialog = (personId) => {
           <!-- Remaining sections, revealed once a member is chosen -->
           <template v-if="form.villageId && form.memberPersonId">
 
-          <!-- Confidential Notes: rendered ONLY when the member has them. Deliberately
+          <!-- Service Coordinator Notes (the member.confidentialNotes column — the UI
+               name is deliberately different, see CLAUDE.md): rendered ONLY when the
+               member has them. Deliberately
                not a titled section like Service Notes below — no empty state, no header
                when absent. Most members have none, so for them the form is unchanged.
                Amber, not red: the content is operational ("call her daughter", "check
@@ -1074,7 +1076,7 @@ const openPersonDialog = (personId) => {
               @click="confidentialNotesCollapsed = !confidentialNotesCollapsed"
             >
               <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-              <span class="confidential-notes-title">Confidential Notes</span>
+              <span class="confidential-notes-title">Service Coordinator Notes</span>
               <span class="confidential-notes-action">
                 {{ confidentialNotesCollapsed ? 'Show' : 'Hide' }}
                 <i
@@ -1469,7 +1471,7 @@ const openPersonDialog = (personId) => {
   font-style: italic;
 }
 
-/* Confidential Notes panel. Amber rather than red: the notes are operational
+/* Service Coordinator Notes panel. Amber rather than red: the notes are operational
    heads-ups for the coordinator, not hazard warnings. The palette in style.css
    has no amber token, so the two shades are defined locally with an app-dark
    override. Rendered only when the member actually has notes. */
@@ -1520,14 +1522,19 @@ const openPersonDialog = (personId) => {
 
 .confidential-notes-title {
   flex: 1;
+  min-width: 0;
 }
 
 /* "Hide"/"Show" plus chevron. Lowercase against the uppercase title so it reads
-   as a control rather than part of the heading. */
+   as a control rather than part of the heading. flex-none + nowrap keep the
+   control intact when the longer title wraps on a narrow screen — the title
+   takes the extra line, the control never splits from its chevron. */
 .confidential-notes-action {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
+  flex: none;
+  white-space: nowrap;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: none;

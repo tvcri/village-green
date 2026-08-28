@@ -231,7 +231,7 @@ const copyEmail = async (email) => {
       <div v-if="person.confidentialNotes || person.statusChangeNotes || person.miscNotes" class="section">
         <h3 class="section-header">Member Notes</h3>
         <div v-if="person.confidentialNotes" class="detail-field notes-field">
-          <span class="label">Confidential Notes:</span>
+          <span class="label">Service Coordinator Notes:</span>
           <span class="value">{{ person.confidentialNotes }}</span>
         </div>
 

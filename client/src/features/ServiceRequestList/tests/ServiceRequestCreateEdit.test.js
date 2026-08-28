@@ -170,8 +170,9 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(vm.form.startZip).toBe('22150')
   })
 
-  // Confidential Notes: rendered only when the selected member actually has
-  // them. The panel has no empty state by design, so absence must render nothing.
+  // Service Coordinator Notes (the member.confidentialNotes column): rendered only
+  // when the selected member actually has them. The panel has no empty state by
+  // design, so absence must render nothing.
   describe('confidential notes', () => {
     it('renders the panel when the member has confidential notes', async () => {
       const { getPerson } = await import('../../PersonList/api/personApi.js')
@@ -191,6 +192,25 @@ describe('ServiceRequestCreateEdit start section', () => {
       // The selection must fetch exactly once; a second fetch would overwrite
       // the notes with a response that has no `member` projection.
       expect(getPerson).toHaveBeenCalledTimes(1)
+    })
+
+    it('labels the panel Service Coordinator Notes, not the column name', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockResolvedValueOnce({
+        address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100',
+        member: { confidentialNotes: 'Call her daughter Jo-Ann, not the member.' }
+      })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+
+      const toggle = await waitFor(() => {
+        const el = document.querySelector('[data-testid="confidential-notes-toggle"]')
+        expect(el).not.toBeNull()
+        return el
+      })
+      expect(toggle.textContent).toContain('Service Coordinator Notes')
+      expect(toggle.textContent).not.toContain('Confidential')
     })
 
     it('renders nothing when the member has no confidential notes', async () => {

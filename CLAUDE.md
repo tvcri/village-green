@@ -207,8 +207,8 @@ never from who is logged in.
 
 ## UI vocabulary vs data vocabulary
 
-Two terms deliberately differ between what the UI displays and what the
-code/schema calls them. Both are **intentional — do not "fix" either by
+Three terms deliberately differ between what the UI displays and what the
+code/schema calls them. All are **intentional — do not "fix" any of them by
 renaming one side to match the other**, and when adding related code, keep
 the split.
 
@@ -236,6 +236,16 @@ the split.
 
   Getting this wrong is invisible to a grep for either word, so decide by
   audience whenever new user-facing text names the federation.
+- **`confidentialNotes` → UI says "Service Coordinator Notes".** The
+  `member.confidentialNotes` column, the `person:read_confidential`
+  permission, and the `member` projection key all keep `confidentialNotes`.
+  Every user-facing string says *Service Coordinator Notes*: the service
+  request form panel, the person detail card, and the member edit form.
+  Reason: the notes are operational instructions addressed to the service
+  coordinator ("her daughter calls in the requests, contact her, not the
+  member"), not a confidentiality classification. "Confidential" was
+  dropped deliberately; plain "Coordinator" was rejected by the customer
+  because other kinds of coordinator exist.
 
 Because the UI term is unguessable from the code term, grepping the display
 word finds only a handful of lines. Search the data term when tracing these
