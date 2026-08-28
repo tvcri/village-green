@@ -1075,7 +1075,10 @@ const openPersonDialog = (personId) => {
               @click="scNotesCollapsed = !scNotesCollapsed"
             >
               <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-              <span class="sc-notes-title">Service Coordinator Notes</span>
+              <span class="sc-notes-title">
+                Service Coordinator Notes
+                <span class="sc-notes-badge">Confidential</span>
+              </span>
               <span class="sc-notes-action">
                 {{ scNotesCollapsed ? 'Show' : 'Hide' }}
                 <i
@@ -1522,6 +1525,26 @@ const openPersonDialog = (personId) => {
 .sc-notes-title {
   flex: 1;
   min-width: 0;
+}
+
+/* "Confidential" as an outline pill rather than more heading text. The word is
+   how to treat the notes, not what they are called, so it reads as a separate
+   object: hairline border, no fill, smaller and less letter-spaced than the
+   uppercase title it sits beside. Borrows the panel's own amber tokens so it
+   stays subordinate to the heading — the bar already carries a warning icon,
+   and a second loud signal would be noise. */
+.sc-notes-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--sc-notes-border);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: 0.05em;
 }
 
 /* "Hide"/"Show" plus chevron. Lowercase against the uppercase title so it reads

@@ -210,7 +210,12 @@ describe('ServiceRequestCreateEdit start section', () => {
         return el
       })
       expect(toggle.textContent).toContain('Service Coordinator Notes')
-      expect(toggle.textContent).not.toContain('Confidential')
+      // "Confidential" is a badge beside the heading, not part of the name:
+      // the title element itself must not have been renamed back.
+      expect(toggle.querySelector('.sc-notes-title').firstChild.textContent.trim())
+        .toBe('Service Coordinator Notes')
+      expect(toggle.querySelector('.sc-notes-badge').textContent.trim())
+        .toBe('Confidential')
     })
 
     it('renders nothing when the member has no sc notes', async () => {
