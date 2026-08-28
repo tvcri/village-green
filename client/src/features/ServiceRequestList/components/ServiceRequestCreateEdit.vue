@@ -1075,10 +1075,8 @@ const openPersonDialog = (personId) => {
               @click="scNotesCollapsed = !scNotesCollapsed"
             >
               <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-              <span class="sc-notes-title">
-                Service Coordinator Notes
-                <span class="sc-notes-badge">Confidential</span>
-              </span>
+              <span class="sc-notes-title">Service Coordinator Notes</span>
+              <span class="sc-notes-badge">Confidential</span>
               <span class="sc-notes-action">
                 {{ scNotesCollapsed ? 'Show' : 'Hide' }}
                 <i
@@ -1481,6 +1479,8 @@ const openPersonDialog = (personId) => {
   --sc-notes-bg: #fffbeb;
   --sc-notes-border: #f59e0b;
   --sc-notes-heading: #92400e;
+  --sc-notes-badge-bg: #92400e;
+  --sc-notes-badge-fg: #fffbeb;
   background: var(--sc-notes-bg);
   border: 1px solid var(--sc-notes-border);
   border-left: 5px solid var(--sc-notes-border);
@@ -1493,6 +1493,12 @@ const openPersonDialog = (personId) => {
   --sc-notes-bg: rgba(245, 158, 11, 0.12);
   --sc-notes-border: #d97706;
   --sc-notes-heading: #fbbf24;
+  /* Tailored, not borrowed: reusing the heading amber as a fill would give a
+     bright pill with near-black text — far louder than the light theme's. A
+     muted brown with warm text keeps the badge at the same visual weight in
+     both themes. */
+  --sc-notes-badge-bg: #7c4a12;
+  --sc-notes-badge-fg: #fde8c8;
 }
 
 /* The header doubles as the collapse toggle, so it is a <button> reset to look
@@ -1523,29 +1529,29 @@ const openPersonDialog = (personId) => {
 }
 
 .sc-notes-title {
-  flex: 1;
   min-width: 0;
 }
 
-/* "Confidential" as an outline pill rather than more heading text. The word is
-   how to treat the notes, not what they are called, so it reads as a separate
-   object: hairline border, no fill, smaller and less letter-spaced than the
-   uppercase title it sits beside. Borrows the panel's own amber tokens so it
-   stays subordinate to the heading — the bar already carries a warning icon,
-   and a second loud signal would be noise. */
+/* "Confidential" as a solid pill rather than more heading text: the word is how
+   to treat the notes, not what they are called, so it reads as a separate
+   object beside the name. A flex sibling of the title, not inline inside it —
+   inline-block would align on the text baseline and sit a pixel or two low
+   against the uppercase heading, whereas the header row's align-items:center
+   centres it exactly. */
 .sc-notes-badge {
-  display: inline-block;
-  margin-left: 0.5rem;
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--sc-notes-border);
+  flex: none;
+  margin-left: 0.6rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 999px;
+  background: var(--sc-notes-badge-bg);
+  color: var(--sc-notes-badge-fg);
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.3px;
-  line-height: 1.5;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
   white-space: nowrap;
-  vertical-align: 0.05em;
 }
+
 
 /* "Hide"/"Show" plus chevron. Lowercase against the uppercase title so it reads
    as a control rather than part of the heading. flex-none + nowrap keep the
@@ -1556,6 +1562,9 @@ const openPersonDialog = (personId) => {
   align-items: center;
   gap: 0.3rem;
   flex: none;
+  /* The title no longer absorbs the row (the badge sits beside it), so the
+     control is pushed to the right edge here. */
+  margin-left: auto;
   white-space: nowrap;
   font-size: 0.8rem;
   font-weight: 600;
