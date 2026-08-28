@@ -1493,12 +1493,17 @@ const openPersonDialog = (personId) => {
   --sc-notes-bg: rgba(245, 158, 11, 0.12);
   --sc-notes-border: #d97706;
   --sc-notes-heading: #fbbf24;
-  /* Tailored, not borrowed: reusing the heading amber as a fill would give a
-     bright pill with near-black text — far louder than the light theme's. A
-     muted brown with warm text keeps the badge at the same visual weight in
-     both themes. */
-  --sc-notes-badge-bg: #7c4a12;
-  --sc-notes-badge-fg: #fde8c8;
+  /* Tailored, not borrowed. The pill stays a *light* object in both themes and
+     only the ground around it flips, so here the fill is amber and the text
+     dark — the reverse of the light theme's dark fill with pale text.
+     Measured against the panel ground (#2e3916, the 12% amber over the app-dark
+     page): fill 4.36:1 so the pill's shape is legible (WCAG 1.4.11 wants 3:1),
+     text on fill 5.96:1. An earlier muted brown (#7c4a12) read fine as text but
+     sat at 1.66:1 against the panel, so the pill barely separated from it —
+     and darkening it further makes that worse, not better, because the panel's
+     own luminance sits in that range. */
+  --sc-notes-badge-bg: #d08c28;
+  --sc-notes-badge-fg: #2b1a05;
 }
 
 /* The header doubles as the collapse toggle, so it is a <button> reset to look
