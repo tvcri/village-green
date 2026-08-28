@@ -3450,7 +3450,7 @@ components:
         printedNewsletter:
           type: boolean
           nullable: true
-        confidentialNotes:
+        scNotes:
           type: string
           nullable: true
         statusChangeNotes:
@@ -3479,7 +3479,7 @@ components:
         householdDues:   { type: number }
         quickbooksKey:   { type: string, maxLength: 50 }
         printedNewsletter: { type: boolean }
-        confidentialNotes: { type: string }
+        scNotes: { type: string }
         statusChangeNotes: { type: string }
         miscNotes:         { type: string }
     MemberDetail:
@@ -3550,7 +3550,7 @@ components:
         printedNewsletter:
           type: boolean
           nullable: true
-        confidentialNotes:
+        scNotes:
           type: string
           nullable: true
         statusChangeNotes:

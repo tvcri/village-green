@@ -27,7 +27,7 @@ const form = reactive({
   serviceNotes: '', joinDate: '',
   status: 'Active', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
-  confidentialNotes: '', statusChangeNotes: '', miscNotes: '',
+  scNotes: '', statusChangeNotes: '', miscNotes: '',
   ...mapMemberForm(props.extraction, props.memberIndex, props.primaryPersonId),
 })
 const uncertain = reactive(uncertainMapForMember(props.extraction, props.memberIndex))
@@ -149,7 +149,7 @@ async function saveVillageAndRetry () {
         v-model:quickbooks-key="form.quickbooksKey"
         v-model:printed-newsletter="form.printedNewsletter"
         v-model:service-notes="form.serviceNotes"
-        v-model:confidential-notes="form.confidentialNotes"
+        v-model:sc-notes="form.scNotes"
         v-model:status-change-notes="form.statusChangeNotes"
         v-model:misc-notes="form.miscNotes"
         :errors="errors"

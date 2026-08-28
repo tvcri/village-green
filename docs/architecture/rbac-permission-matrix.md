@@ -10,15 +10,21 @@ check that caught the missing `village:read`.
 
 ## 1. Seeded roles (migration 0013, as of commit a962138b)
 
+> **Updated by migration 0025:** `person:read_confidential` was renamed to
+> `member:read_sc_note` (the column it gates, `member.confidentialNotes`, was
+> renamed to `member.scNotes` in the same migration). Holders are unchanged —
+> Staff and Service Coordinator both keep it. The table below reflects the
+> post-0025 names.
+
 | permission | LSC (v) | Steering Cmte (v) | Village Lead (v) | Admin (f) | Staff (f) | Board (f) | Svc Coord (f) |
 |---|---|---|---|---|---|---|---|
 | person:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
 | person:write | — | — | — | * | ✓ | — | — |
-| person:read_confidential | — | — | — | * | ✓ | — | ✓ |
 | member:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
 | member:write | — | — | — | * | ✓ | — | — |
 | member:read_financial | — | — | ✓ | * | ✓ | — | — |
 | member:read_inactive | — | — | — | * | ✓ | — | — |
+| member:read_sc_note | — | — | — | * | ✓ | — | ✓ |
 | volunteer:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
 | volunteer:write | — | — | — | * | ✓ | — | — |
 | volunteer:read_inactive | — | — | — | * | ✓ | — | — |

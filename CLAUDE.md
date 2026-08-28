@@ -207,8 +207,8 @@ never from who is logged in.
 
 ## UI vocabulary vs data vocabulary
 
-Three terms deliberately differ between what the UI displays and what the
-code/schema calls them. All are **intentional — do not "fix" any of them by
+Two terms deliberately differ between what the UI displays and what the
+code/schema calls them. Both are **intentional — do not "fix" either by
 renaming one side to match the other**, and when adding related code, keep
 the split.
 
@@ -236,16 +236,6 @@ the split.
 
   Getting this wrong is invisible to a grep for either word, so decide by
   audience whenever new user-facing text names the federation.
-- **`confidentialNotes` → UI says "Service Coordinator Notes".** The
-  `member.confidentialNotes` column, the `person:read_confidential`
-  permission, and the `member` projection key all keep `confidentialNotes`.
-  Every user-facing string says *Service Coordinator Notes*: the service
-  request form panel, the person detail card, and the member edit form.
-  Reason: the notes are operational instructions addressed to the service
-  coordinator ("her daughter calls in the requests, contact her, not the
-  member"), not a confidentiality classification. "Confidential" was
-  dropped deliberately; plain "Coordinator" was rejected by the customer
-  because other kinds of coordinator exist.
 
 Because the UI term is unguessable from the code term, grepping the display
 word finds only a handful of lines. Search the data term when tracing these
@@ -273,6 +263,26 @@ features end to end.
   `member` or `volunteer` must end with the corresponding
   `CREATE OR REPLACE VIEW active_... AS SELECT * FROM ...` or the new
   column reads as NULL through the view with no error.
+
+## RBAC permission naming
+
+Permission keys are `object:verb[_qualifier]`, and the **object names the
+table the data lives on**, not the service that enforces the check. The
+qualifier is always singular: `read_financial`, `read_inactive`,
+`read_sc_note` — never a plural.
+
+`member:read_sc_note` was `person:read_confidential` until 0025. It gated
+`member.scNotes` but was namespaced `person:*` because `PersonService`
+enforces it on the `getPerson` member projection. Naming a permission after
+its enforcement site rather than its data is how that mismatch happened;
+don't repeat it.
+
+`role_permission.permission` is a plain `varchar(100)` with **no FK to a
+catalog table** — the catalog lives in code (`api/source/utils/permissions.js`)
+and the DB stores only role→permission strings. So renaming a permission is a
+one-line `UPDATE role_permission SET permission = ...` in a migration, plus
+the catalog key and its call sites. Already-applied seeding migrations
+(0013) are never edited; the new migration carries the change forward.
 
 ## MySQL / OAS traps
 

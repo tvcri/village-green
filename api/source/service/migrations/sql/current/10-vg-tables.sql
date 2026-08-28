@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.11, for Linux (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.10, for Linux (x86_64)
 --
--- Host: 127.0.0.1    Database: vg
+-- Host: 127.0.0.1    Database: vg_test
 -- ------------------------------------------------------
--- Server version	8.4.11
+-- Server version	8.4.10
 
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
@@ -46,7 +46,7 @@ DROP TABLE IF EXISTS `active_member`;
  1 AS `householdDues`,
  1 AS `quickbooksKey`,
  1 AS `printedNewsletter`,
- 1 AS `confidentialNotes`,
+ 1 AS `scNotes`,
  1 AS `statusChangeNotes`,
  1 AS `miscNotes`*/;
 
@@ -224,7 +224,7 @@ CREATE TABLE `member` (
   `householdDues` decimal(10,2) DEFAULT NULL,
   `quickbooksKey` varchar(50) DEFAULT NULL,
   `printedNewsletter` bit(1) DEFAULT NULL,
-  `confidentialNotes` text,
+  `scNotes` text,
   `statusChangeNotes` text,
   `miscNotes` text,
   PRIMARY KEY (`id`),
@@ -617,7 +617,7 @@ CREATE TABLE `volunteer_village_associate` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Dumping events for database 'vg'
+-- Dumping events for database 'vg_test'
 --
 /*!50106 SET @save_time_zone= @@TIME_ZONE */ ;
 /*!50106 DROP EVENT IF EXISTS `evt_auto_complete_service_requests` */;
@@ -698,7 +698,7 @@ DELIMITER ;
 /*!50106 SET TIME_ZONE= @save_time_zone */ ;
 
 --
--- Dumping routines for database 'vg'
+-- Dumping routines for database 'vg_test'
 --
 
 --
@@ -709,7 +709,7 @@ DELIMITER ;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50001 VIEW `active_member` AS select `member`.`id` AS `id`,`member`.`personId` AS `personId`,`member`.`memberNumber` AS `memberNumber`,`member`.`memberLevel` AS `memberLevel`,`member`.`memberType` AS `memberType`,`member`.`primaryPersonId` AS `primaryPersonId`,`member`.`secondaryType` AS `secondaryType`,`member`.`serviceNotes` AS `serviceNotes`,`member`.`joinDate` AS `joinDate`,`member`.`createdDate` AS `createdDate`,`member`.`status` AS `status`,`member`.`dropReason` AS `dropReason`,`member`.`householdSize` AS `householdSize`,`member`.`householdDues` AS `householdDues`,`member`.`quickbooksKey` AS `quickbooksKey`,`member`.`printedNewsletter` AS `printedNewsletter`,`member`.`confidentialNotes` AS `confidentialNotes`,`member`.`statusChangeNotes` AS `statusChangeNotes`,`member`.`miscNotes` AS `miscNotes` from `member` where (`member`.`status` = 'Active') */;
+/*!50001 VIEW `active_member` AS select `member`.`id` AS `id`,`member`.`personId` AS `personId`,`member`.`memberNumber` AS `memberNumber`,`member`.`memberLevel` AS `memberLevel`,`member`.`memberType` AS `memberType`,`member`.`primaryPersonId` AS `primaryPersonId`,`member`.`secondaryType` AS `secondaryType`,`member`.`serviceNotes` AS `serviceNotes`,`member`.`joinDate` AS `joinDate`,`member`.`createdDate` AS `createdDate`,`member`.`status` AS `status`,`member`.`dropReason` AS `dropReason`,`member`.`householdSize` AS `householdSize`,`member`.`householdDues` AS `householdDues`,`member`.`quickbooksKey` AS `quickbooksKey`,`member`.`printedNewsletter` AS `printedNewsletter`,`member`.`scNotes` AS `scNotes`,`member`.`statusChangeNotes` AS `statusChangeNotes`,`member`.`miscNotes` AS `miscNotes` from `member` where (`member`.`status` = 'Active') */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 
 --
@@ -730,4 +730,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-23  1:22:32
+-- Dump completed on 2026-08-28 20:43:40

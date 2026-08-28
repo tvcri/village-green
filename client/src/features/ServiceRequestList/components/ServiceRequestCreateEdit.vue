@@ -213,24 +213,24 @@ const selectedVolunteer = ref(null)
 // fill convenience only — never stored as SR state.
 const selectedMemberHome = ref(null)
 
-// The selected member's confidential notes, from the same fetch as the home
+// The selected member's service coordinator notes, from the same fetch as the home
 // address. Rare (a few percent of members) and permission-gated: the `member`
 // projection omits the key entirely unless the caller holds
-// person:read_confidential, so an unprivileged coordinator simply sees nothing.
-const selectedMemberConfidentialNotes = ref('')
+// member:read_sc_note, so an unprivileged coordinator simply sees nothing.
+const selectedMemberScNotes = ref('')
 
 // Collapse state for the notes panel. Starts collapsed by customer request: the
 // coordinator sees that notes exist and clicks Show to read them. Per-selection
 // only, so choosing any member collapses again — never persisted, and never
 // left open from a previous member.
-const confidentialNotesCollapsed = ref(true)
+const scNotesCollapsed = ref(true)
 
 async function loadMemberHome (personId) {
   // Any change of member starts collapsed, including a change to no member.
-  confidentialNotesCollapsed.value = true
+  scNotesCollapsed.value = true
   if (!personId) {
     selectedMemberHome.value = null
-    selectedMemberConfidentialNotes.value = ''
+    selectedMemberScNotes.value = ''
     return
   }
   try {
@@ -238,10 +238,10 @@ async function loadMemberHome (personId) {
     selectedMemberHome.value = p
       ? { address: p.address || '', city: p.city || '', state: p.state || '', zip: p.zip || '', phone: p.phone || '' }
       : null
-    selectedMemberConfidentialNotes.value = (p?.member?.confidentialNotes || '').trim()
+    selectedMemberScNotes.value = (p?.member?.scNotes || '').trim()
   } catch {
     selectedMemberHome.value = null
-    selectedMemberConfidentialNotes.value = ''
+    selectedMemberScNotes.value = ''
   }
 }
 
@@ -322,8 +322,8 @@ watch(selectedMember, (val) => {
   } else {
     form.value.memberPersonId = null
     selectedMemberHome.value = null
-    selectedMemberConfidentialNotes.value = ''
-    confidentialNotesCollapsed.value = true
+    selectedMemberScNotes.value = ''
+    scNotesCollapsed.value = true
   }
 })
 
@@ -1050,18 +1050,17 @@ const openPersonDialog = (personId) => {
           <!-- Remaining sections, revealed once a member is chosen -->
           <template v-if="form.villageId && form.memberPersonId">
 
-          <!-- Service Coordinator Notes (the member.confidentialNotes column — the UI
-               name is deliberately different, see CLAUDE.md): rendered ONLY when the
+          <!-- Service Coordinator Notes (member.scNotes): rendered ONLY when the
                member has them. Deliberately
                not a titled section like Service Notes below — no empty state, no header
                when absent. Most members have none, so for them the form is unchanged.
                Amber, not red: the content is operational ("call her daughter", "check
                for a duplicate first"), never a hazard warning. -->
           <div
-            v-if="selectedMemberConfidentialNotes"
-            class="confidential-notes"
-            :class="{ 'is-collapsed': confidentialNotesCollapsed }"
-            data-testid="confidential-notes"
+            v-if="selectedMemberScNotes"
+            class="sc-notes"
+            :class="{ 'is-collapsed': scNotesCollapsed }"
+            data-testid="sc-notes"
           >
             <!-- The whole header is the toggle. A chevron, not an X: the panel folds
                  away rather than being dismissed, and it always comes back on the next
@@ -1069,29 +1068,29 @@ const openPersonDialog = (personId) => {
                  still see that the member has notes. -->
             <button
               type="button"
-              class="confidential-notes-header"
-              data-testid="confidential-notes-toggle"
-              :aria-expanded="!confidentialNotesCollapsed"
-              aria-controls="confidential-notes-body"
-              @click="confidentialNotesCollapsed = !confidentialNotesCollapsed"
+              class="sc-notes-header"
+              data-testid="sc-notes-toggle"
+              :aria-expanded="!scNotesCollapsed"
+              aria-controls="sc-notes-body"
+              @click="scNotesCollapsed = !scNotesCollapsed"
             >
               <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-              <span class="confidential-notes-title">Service Coordinator Notes</span>
-              <span class="confidential-notes-action">
-                {{ confidentialNotesCollapsed ? 'Show' : 'Hide' }}
+              <span class="sc-notes-title">Service Coordinator Notes</span>
+              <span class="sc-notes-action">
+                {{ scNotesCollapsed ? 'Show' : 'Hide' }}
                 <i
                   class="pi"
-                  :class="confidentialNotesCollapsed ? 'pi-chevron-down' : 'pi-chevron-up'"
+                  :class="scNotesCollapsed ? 'pi-chevron-down' : 'pi-chevron-up'"
                   aria-hidden="true"
                 ></i>
               </span>
             </button>
             <div
-              v-show="!confidentialNotesCollapsed"
-              id="confidential-notes-body"
-              class="confidential-notes-body"
-              data-testid="confidential-notes-body"
-            >{{ selectedMemberConfidentialNotes }}</div>
+              v-show="!scNotesCollapsed"
+              id="sc-notes-body"
+              class="sc-notes-body"
+              data-testid="sc-notes-body"
+            >{{ selectedMemberScNotes }}</div>
           </div>
 
           <!-- Service Notes: display-only, sourced from the selected member's record -->
@@ -1475,27 +1474,27 @@ const openPersonDialog = (personId) => {
    heads-ups for the coordinator, not hazard warnings. The palette in style.css
    has no amber token, so the two shades are defined locally with an app-dark
    override. Rendered only when the member actually has notes. */
-.confidential-notes {
-  --confidential-bg: #fffbeb;
-  --confidential-border: #f59e0b;
-  --confidential-heading: #92400e;
-  background: var(--confidential-bg);
-  border: 1px solid var(--confidential-border);
-  border-left: 5px solid var(--confidential-border);
+.sc-notes {
+  --sc-notes-bg: #fffbeb;
+  --sc-notes-border: #f59e0b;
+  --sc-notes-heading: #92400e;
+  background: var(--sc-notes-bg);
+  border: 1px solid var(--sc-notes-border);
+  border-left: 5px solid var(--sc-notes-border);
   border-radius: 6px;
   padding: 0.85rem 1rem;
   margin-bottom: 1.25rem;
 }
 
-:root.app-dark .confidential-notes {
-  --confidential-bg: rgba(245, 158, 11, 0.12);
-  --confidential-border: #d97706;
-  --confidential-heading: #fbbf24;
+:root.app-dark .sc-notes {
+  --sc-notes-bg: rgba(245, 158, 11, 0.12);
+  --sc-notes-border: #d97706;
+  --sc-notes-heading: #fbbf24;
 }
 
 /* The header doubles as the collapse toggle, so it is a <button> reset to look
    like the heading it replaced. Full width keeps the whole bar clickable. */
-.confidential-notes-header {
+.sc-notes-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1508,19 +1507,19 @@ const openPersonDialog = (personId) => {
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--confidential-heading);
+  color: var(--sc-notes-heading);
   margin-bottom: 0.5rem;
   cursor: pointer;
   text-align: left;
 }
 
-.confidential-notes-header:focus-visible {
-  outline: 2px solid var(--confidential-border);
+.sc-notes-header:focus-visible {
+  outline: 2px solid var(--sc-notes-border);
   outline-offset: 2px;
   border-radius: 3px;
 }
 
-.confidential-notes-title {
+.sc-notes-title {
   flex: 1;
   min-width: 0;
 }
@@ -1529,7 +1528,7 @@ const openPersonDialog = (personId) => {
    as a control rather than part of the heading. flex-none + nowrap keep the
    control intact when the longer title wraps on a narrow screen — the title
    takes the extra line, the control never splits from its chevron. */
-.confidential-notes-action {
+.sc-notes-action {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -1541,19 +1540,19 @@ const openPersonDialog = (personId) => {
   letter-spacing: 0;
 }
 
-.confidential-notes-header:hover .confidential-notes-action {
+.sc-notes-header:hover .sc-notes-action {
   text-decoration: underline;
 }
 
 /* Collapsed, the bar is all that remains: drop the body's bottom spacing so it
    reads as a single slim strip. */
-.confidential-notes.is-collapsed .confidential-notes-header {
+.sc-notes.is-collapsed .sc-notes-header {
   margin-bottom: 0;
 }
 
 /* Notes run from one line to several sentences of instructions; never truncate.
    pre-wrap preserves the line breaks the coordinator typed. */
-.confidential-notes-body {
+.sc-notes-body {
   white-space: pre-wrap;
   color: var(--color-text-primary);
   line-height: 1.5;

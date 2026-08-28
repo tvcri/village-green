@@ -71,7 +71,7 @@ const DETAIL_COLUMN = `JSON_OBJECT(
       'disabilities', ${DISABILITIES_SUBQUERY}
     ) AS detail`
 
-function memberColumn ({ financial, confidential, inactive }) {
+function memberColumn ({ financial, scNote, inactive }) {
   // Row gating: without member:read_inactive the source is the
   // active_member view, so a dropped/deceased member yields NULL here.
   const memberSource = inactive ? 'member' : 'active_member'
@@ -95,7 +95,7 @@ function memberColumn ({ financial, confidential, inactive }) {
       'householdSize', m2.householdSize,
       ${financial ? `'quickbooksKey', m2.quickbooksKey,` : ''}
       'printedNewsletter', m2.printedNewsletter != 0,
-      ${confidential ? `'confidentialNotes', m2.confidentialNotes,` : ''}
+      ${scNote ? `'scNotes', m2.scNotes,` : ''}
       'statusChangeNotes', m2.statusChangeNotes,
       'miscNotes', m2.miscNotes
     ) FROM ${memberSource} m2 WHERE m2.personId = p.id) AS \`member\``
@@ -165,7 +165,7 @@ function volunteerColumn ({ inactive }) {
 // inOptions:
 //   summary           - PersonSummary column set instead of full Person
 //   detail            - add the `detail` object to summary rows (getPersons projection)
-//   member            - { financial, confidential, inactive } projection gates
+//   member            - { financial, scNote, inactive } projection gates
 //   volunteer         - { inactive } projection gates
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const { summary = false, detail = false, member = null, volunteer = null } = inOptions
@@ -264,7 +264,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
 
 module.exports.getPerson = async function (personId, projections = [], userObject = null) {
   // The member/volunteer projections carry village-scoped gated content:
-  // sensitive fields (financial/confidential) and inactive-row visibility
+  // sensitive fields (financial/scNote) and inactive-row visibility
   // (read_inactive). Gates must be evaluated against *this* person's
   // village. getPerson is single-row (predicated on p.id), so that village
   // is a query-level constant — a cheap pre-fetch resolves it before the
@@ -274,26 +274,26 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   const wantsMember = projections.includes('member')
   const wantsVolunteer = projections.includes('volunteer')
   let financial = false
-  let confidential = false
+  let scNote = false
   let memberInactive = false
   let volunteerInactive = false
   if (wantsMember) {
     financial = hasPermission(userObject, 'member:read_financial')
-    confidential = hasPermission(userObject, 'person:read_confidential')
+    scNote = hasPermission(userObject, 'member:read_sc_note')
     memberInactive = hasPermission(userObject, 'member:read_inactive')
   }
   if (wantsVolunteer) {
     volunteerInactive = hasPermission(userObject, 'volunteer:read_inactive')
   }
   const unresolved =
-    (wantsMember && !(financial && confidential && memberInactive)) ||
+    (wantsMember && !(financial && scNote && memberInactive)) ||
     (wantsVolunteer && !volunteerInactive)
   if (unresolved) {
     const [[personVillage]] = await dbUtils.pool.query('SELECT villageId FROM person WHERE id = ?', [personId])
     const villageId = personVillage?.villageId
     if (wantsMember) {
       financial ||= hasPermission(userObject, 'member:read_financial', { villageId })
-      confidential ||= hasPermission(userObject, 'person:read_confidential', { villageId })
+      scNote ||= hasPermission(userObject, 'member:read_sc_note', { villageId })
       memberInactive ||= hasPermission(userObject, 'member:read_inactive', { villageId })
     }
     if (wantsVolunteer) {
@@ -303,7 +303,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   const rows = await queryPersons(
     { personId },
     {
-      member: wantsMember ? { financial, confidential, inactive: memberInactive } : null,
+      member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
       volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null
     }
   )
