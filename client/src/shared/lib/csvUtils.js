@@ -51,3 +51,50 @@ export function downloadCsv(csvString, filename) {
 
   URL.revokeObjectURL(url)
 }
+
+// Number format that renders a 1/0 flag as a checkmark in Google Sheets while
+// keeping the underlying value numeric, so SUM() still counts the column.
+// Ignored by toCsv(), which reads only `header` and `key`.
+const FLAG_NUMBER_FORMAT = { type: 'NUMBER', pattern: '[=1]"✓";[=0]"";General' }
+
+/**
+ * Build one flag column per distinct value found in a multi-value field.
+ *
+ * Mirrors the export to the table state that produced it: the column set is
+ * derived from the rows passed in, so a filtered export carries only the
+ * values its rows actually hold.
+ *
+ * Note: centering these columns is not possible here. spreadsheets.create
+ * honors numberFormat and textFormat in rowData but drops
+ * horizontalAlignment, which needs an explicit `fields` mask and so a
+ * separate batchUpdate/repeatCell call after the sheet exists.
+ *
+ * @param {Array<object>} rows - the rows being exported
+ * @param {string} key - row property holding an array of values
+ * @returns {{columns: Array<{header, key, numberFormat}>, values: string[]}}
+ */
+export function buildFlagColumns(rows, key) {
+  const distinct = new Set()
+  for (const row of rows ?? []) {
+    for (const value of row?.[key] ?? []) distinct.add(value)
+  }
+  const values = [...distinct].sort((a, b) => a.localeCompare(b))
+  return {
+    values,
+    columns: values.map(value => ({
+      header: value,
+      key: `${key}:${value}`,
+      numberFormat: FLAG_NUMBER_FORMAT
+    }))
+  }
+}
+
+/**
+ * Add a 1/0 property per flag column to a row, keyed to match buildFlagColumns().
+ */
+export function withFlagValues(row, key, values) {
+  const held = new Set(row?.[key] ?? [])
+  const flags = {}
+  for (const value of values) flags[`${key}:${value}`] = held.has(value) ? 1 : 0
+  return flags
+}
