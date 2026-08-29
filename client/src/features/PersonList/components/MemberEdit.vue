@@ -27,7 +27,7 @@ const form = reactive({
   serviceNotes: '', joinDate: todayCivilDate(),
   status: 'Active', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
-  confidentialNotes: '', statusChangeNotes: '', miscNotes: '',
+  scNotes: '', statusChangeNotes: '', miscNotes: '',
 })
 const createdDate = ref('')
 const primaryPersonName = ref('')
@@ -140,7 +140,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           v-model:quickbooks-key="form.quickbooksKey"
           v-model:printed-newsletter="form.printedNewsletter"
           v-model:service-notes="form.serviceNotes"
-          v-model:confidential-notes="form.confidentialNotes"
+          v-model:sc-notes="form.scNotes"
           v-model:status-change-notes="form.statusChangeNotes"
           v-model:misc-notes="form.miscNotes"
           :errors="errors"

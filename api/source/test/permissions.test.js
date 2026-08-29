@@ -22,7 +22,7 @@ test('elevation-flagged permissions are exactly the admin tier', () => {
 
 test('expected non-elevated permissions exist', () => {
   for (const key of [
-    'person:read', 'person:write', 'person:read_confidential',
+    'person:read', 'person:write',
     'member:read', 'member:write', 'member:read_financial',
     'volunteer:read', 'volunteer:write',
     'sr:read', 'sr:write', 'friend:read', 'friend:write',

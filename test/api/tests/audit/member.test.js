@@ -27,7 +27,7 @@ test('member put(create)/patch/delete audit lifecycle with redaction', async () 
   // PUT with no existing row -> action 'create'
   const put = await vgCall('putPersonMember', { personId }, {
     token: tokens.users.staff,
-    body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15', confidentialNotes: 'the-secret-text' },
+    body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15', scNotes: 'the-secret-text' },
   })
   assert.equal(put.status, 200)
   const memberId = await memberIdFor(personId)
@@ -40,18 +40,18 @@ test('member put(create)/patch/delete audit lifecycle with redaction', async () 
   assert.equal(rows[0].changes.snapshot.status, 'Active')
   // Capture-everything model (2026-08-19): sensitive fields are recorded
   // verbatim; sensitivity is a read-surface concern (the trail is SQL-only).
-  assert.equal(rows[0].changes.snapshot.confidentialNotes, 'the-secret-text')
+  assert.equal(rows[0].changes.snapshot.scNotes, 'the-secret-text')
   assert.equal(rows[0].changes.snapshot.joinDate, '2026-01-15', 'civil DATE recorded as the plain date string sent')
 
   // PATCH a sensitive field -> ordinary old/new diff (recorded verbatim)
   const patch = await vgCall('patchPersonMember', { personId }, {
-    token: tokens.users.staff, body: { confidentialNotes: 'the-second-secret' },
+    token: tokens.users.staff, body: { scNotes: 'the-second-secret' },
   })
   assert.equal(patch.status, 200)
   rows = await auditRows('member', memberId)
   assert.equal(rows.length, 2)
   assert.equal(rows[1].action, 'update')
-  assert.deepEqual(rows[1].changes.diff.confidentialNotes, { old: 'the-secret-text', new: 'the-second-secret' })
+  assert.deepEqual(rows[1].changes.diff.scNotes, { old: 'the-secret-text', new: 'the-second-secret' })
 
   // DELETE -> snapshot survives
   const del = await vgCall('deletePersonMember', { personId }, { token: tokens.users.staff })

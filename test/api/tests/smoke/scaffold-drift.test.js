@@ -81,7 +81,7 @@ test('the active_* views survive the scaffold with column-expanded definitions',
 
   // The base column each view would lose if it were re-created from SELECT *
   // before that column existed.
-  for (const [view, column] of [['active_member', 'confidentialNotes'], ['active_volunteer', 'providerType']]) {
+  for (const [view, column] of [['active_member', 'scNotes'], ['active_volunteer', 'providerType']]) {
     const def = await withDb(conn => conn.query(`SHOW CREATE VIEW \`${view}\``)
       .then(([rows]) => rows[0]['Create View']))
     assert.ok(def.includes(`\`${column}\``),

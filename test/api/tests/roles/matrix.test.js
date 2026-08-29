@@ -13,7 +13,7 @@ import { villages, serviceRequests as sr, persons } from '../../setup/fixtures.j
 //   federation scope (villageId null; reach every village):
 //     5 Staff — all reads + writes (+ confidential/financial/inactive extras)
 //     6 Board — the six :reads only; sees everything, writes nothing
-//     7 Service Coordinator — reads + person:read_confidential; sr:write is its ONLY write
+//     7 Service Coordinator — reads + member:read_sc_note; sr:write is its ONLY write
 // Writes are federation-only: no village role can write anything.
 
 // serviceDateStart is required; this window spans all SR fixtures (2026-07-10..12).

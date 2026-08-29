@@ -9,7 +9,7 @@ import { persons, members, villages } from '../../setup/fixtures.js'
 // name. Exercised in an authorized (own-village) context — cross-village
 // denial is covered in authz.test.js. Sensitive member fields are key-gated
 // per caller permission: householdDues/quickbooksKey need member:read_financial
-// (Village Lead / staff), confidentialNotes needs person:read_confidential
+// (Village Lead / staff), scNotes needs member:read_sc_note
 // (no village-scoped role holds it).
 
 test('person projection=member expands member details', async () => {
@@ -42,8 +42,8 @@ test('member:read_financial (Village Lead) unlocks the financial member keys', a
     { token: tokens.users.owner_v1 })
   assert.equal(status, 200)
   assert.ok('householdDues' in json.member, 'householdDues key present with member:read_financial')
-  // owner_v1 still lacks person:read_confidential — confidential notes stay hidden.
-  assert.ok(!('confidentialNotes' in json.member), 'confidentialNotes hidden without person:read_confidential')
+  // owner_v1 still lacks member:read_sc_note — sc notes stay hidden.
+  assert.ok(!('scNotes' in json.member), 'scNotes hidden without member:read_sc_note')
 })
 
 test('old projection names (memberInfo/volunteerInfo) are gone from the enum -> 400', async () => {

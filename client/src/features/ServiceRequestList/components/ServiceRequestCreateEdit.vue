@@ -213,24 +213,24 @@ const selectedVolunteer = ref(null)
 // fill convenience only — never stored as SR state.
 const selectedMemberHome = ref(null)
 
-// The selected member's confidential notes, from the same fetch as the home
+// The selected member's service coordinator notes, from the same fetch as the home
 // address. Rare (a few percent of members) and permission-gated: the `member`
 // projection omits the key entirely unless the caller holds
-// person:read_confidential, so an unprivileged coordinator simply sees nothing.
-const selectedMemberConfidentialNotes = ref('')
+// member:read_sc_note, so an unprivileged coordinator simply sees nothing.
+const selectedMemberScNotes = ref('')
 
 // Collapse state for the notes panel. Starts collapsed by customer request: the
 // coordinator sees that notes exist and clicks Show to read them. Per-selection
 // only, so choosing any member collapses again — never persisted, and never
 // left open from a previous member.
-const confidentialNotesCollapsed = ref(true)
+const scNotesCollapsed = ref(true)
 
 async function loadMemberHome (personId) {
   // Any change of member starts collapsed, including a change to no member.
-  confidentialNotesCollapsed.value = true
+  scNotesCollapsed.value = true
   if (!personId) {
     selectedMemberHome.value = null
-    selectedMemberConfidentialNotes.value = ''
+    selectedMemberScNotes.value = ''
     return
   }
   try {
@@ -238,10 +238,10 @@ async function loadMemberHome (personId) {
     selectedMemberHome.value = p
       ? { address: p.address || '', city: p.city || '', state: p.state || '', zip: p.zip || '', phone: p.phone || '' }
       : null
-    selectedMemberConfidentialNotes.value = (p?.member?.confidentialNotes || '').trim()
+    selectedMemberScNotes.value = (p?.member?.scNotes || '').trim()
   } catch {
     selectedMemberHome.value = null
-    selectedMemberConfidentialNotes.value = ''
+    selectedMemberScNotes.value = ''
   }
 }
 
@@ -322,8 +322,8 @@ watch(selectedMember, (val) => {
   } else {
     form.value.memberPersonId = null
     selectedMemberHome.value = null
-    selectedMemberConfidentialNotes.value = ''
-    confidentialNotesCollapsed.value = true
+    selectedMemberScNotes.value = ''
+    scNotesCollapsed.value = true
   }
 })
 
@@ -1050,16 +1050,17 @@ const openPersonDialog = (personId) => {
           <!-- Remaining sections, revealed once a member is chosen -->
           <template v-if="form.villageId && form.memberPersonId">
 
-          <!-- Confidential Notes: rendered ONLY when the member has them. Deliberately
+          <!-- Service Coordinator Notes (member.scNotes): rendered ONLY when the
+               member has them. Deliberately
                not a titled section like Service Notes below — no empty state, no header
                when absent. Most members have none, so for them the form is unchanged.
                Amber, not red: the content is operational ("call her daughter", "check
                for a duplicate first"), never a hazard warning. -->
           <div
-            v-if="selectedMemberConfidentialNotes"
-            class="confidential-notes"
-            :class="{ 'is-collapsed': confidentialNotesCollapsed }"
-            data-testid="confidential-notes"
+            v-if="selectedMemberScNotes"
+            class="sc-notes"
+            :class="{ 'is-collapsed': scNotesCollapsed }"
+            data-testid="sc-notes"
           >
             <!-- The whole header is the toggle. A chevron, not an X: the panel folds
                  away rather than being dismissed, and it always comes back on the next
@@ -1067,29 +1068,30 @@ const openPersonDialog = (personId) => {
                  still see that the member has notes. -->
             <button
               type="button"
-              class="confidential-notes-header"
-              data-testid="confidential-notes-toggle"
-              :aria-expanded="!confidentialNotesCollapsed"
-              aria-controls="confidential-notes-body"
-              @click="confidentialNotesCollapsed = !confidentialNotesCollapsed"
+              class="sc-notes-header"
+              data-testid="sc-notes-toggle"
+              :aria-expanded="!scNotesCollapsed"
+              aria-controls="sc-notes-body"
+              @click="scNotesCollapsed = !scNotesCollapsed"
             >
               <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-              <span class="confidential-notes-title">Confidential Notes</span>
-              <span class="confidential-notes-action">
-                {{ confidentialNotesCollapsed ? 'Show' : 'Hide' }}
+              <span class="sc-notes-title">Service Coordinator Notes</span>
+              <span class="sc-notes-badge">Confidential</span>
+              <span class="sc-notes-action">
+                {{ scNotesCollapsed ? 'Show' : 'Hide' }}
                 <i
                   class="pi"
-                  :class="confidentialNotesCollapsed ? 'pi-chevron-down' : 'pi-chevron-up'"
+                  :class="scNotesCollapsed ? 'pi-chevron-down' : 'pi-chevron-up'"
                   aria-hidden="true"
                 ></i>
               </span>
             </button>
             <div
-              v-show="!confidentialNotesCollapsed"
-              id="confidential-notes-body"
-              class="confidential-notes-body"
-              data-testid="confidential-notes-body"
-            >{{ selectedMemberConfidentialNotes }}</div>
+              v-show="!scNotesCollapsed"
+              id="sc-notes-body"
+              class="sc-notes-body"
+              data-testid="sc-notes-body"
+            >{{ selectedMemberScNotes }}</div>
           </div>
 
           <!-- Service Notes: display-only, sourced from the selected member's record -->
@@ -1469,31 +1471,44 @@ const openPersonDialog = (personId) => {
   font-style: italic;
 }
 
-/* Confidential Notes panel. Amber rather than red: the notes are operational
+/* Service Coordinator Notes panel. Amber rather than red: the notes are operational
    heads-ups for the coordinator, not hazard warnings. The palette in style.css
    has no amber token, so the two shades are defined locally with an app-dark
    override. Rendered only when the member actually has notes. */
-.confidential-notes {
-  --confidential-bg: #fffbeb;
-  --confidential-border: #f59e0b;
-  --confidential-heading: #92400e;
-  background: var(--confidential-bg);
-  border: 1px solid var(--confidential-border);
-  border-left: 5px solid var(--confidential-border);
+.sc-notes {
+  --sc-notes-bg: #fffbeb;
+  --sc-notes-border: #f59e0b;
+  --sc-notes-heading: #92400e;
+  --sc-notes-badge-bg: #92400e;
+  --sc-notes-badge-fg: #fffbeb;
+  background: var(--sc-notes-bg);
+  border: 1px solid var(--sc-notes-border);
+  border-left: 5px solid var(--sc-notes-border);
   border-radius: 6px;
   padding: 0.85rem 1rem;
   margin-bottom: 1.25rem;
 }
 
-:root.app-dark .confidential-notes {
-  --confidential-bg: rgba(245, 158, 11, 0.12);
-  --confidential-border: #d97706;
-  --confidential-heading: #fbbf24;
+:root.app-dark .sc-notes {
+  --sc-notes-bg: rgba(245, 158, 11, 0.12);
+  --sc-notes-border: #d97706;
+  --sc-notes-heading: #fbbf24;
+  /* Tailored, not borrowed. The pill stays a *light* object in both themes and
+     only the ground around it flips, so here the fill is amber and the text
+     dark — the reverse of the light theme's dark fill with pale text.
+     Measured against the panel ground (#2e3916, the 12% amber over the app-dark
+     page): fill 4.36:1 so the pill's shape is legible (WCAG 1.4.11 wants 3:1),
+     text on fill 5.96:1. An earlier muted brown (#7c4a12) read fine as text but
+     sat at 1.66:1 against the panel, so the pill barely separated from it —
+     and darkening it further makes that worse, not better, because the panel's
+     own luminance sits in that range. */
+  --sc-notes-badge-bg: #d08c28;
+  --sc-notes-badge-fg: #2b1a05;
 }
 
 /* The header doubles as the collapse toggle, so it is a <button> reset to look
    like the heading it replaced. Full width keeps the whole bar clickable. */
-.confidential-notes-header {
+.sc-notes-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1506,47 +1521,75 @@ const openPersonDialog = (personId) => {
   font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--confidential-heading);
+  color: var(--sc-notes-heading);
   margin-bottom: 0.5rem;
   cursor: pointer;
   text-align: left;
 }
 
-.confidential-notes-header:focus-visible {
-  outline: 2px solid var(--confidential-border);
+.sc-notes-header:focus-visible {
+  outline: 2px solid var(--sc-notes-border);
   outline-offset: 2px;
   border-radius: 3px;
 }
 
-.confidential-notes-title {
-  flex: 1;
+.sc-notes-title {
+  min-width: 0;
 }
 
+/* "Confidential" as a solid pill rather than more heading text: the word is how
+   to treat the notes, not what they are called, so it reads as a separate
+   object beside the name. A flex sibling of the title, not inline inside it —
+   inline-block would align on the text baseline and sit a pixel or two low
+   against the uppercase heading, whereas the header row's align-items:center
+   centres it exactly. */
+.sc-notes-badge {
+  flex: none;
+  margin-left: 0.6rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--sc-notes-badge-bg);
+  color: var(--sc-notes-badge-fg);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+
 /* "Hide"/"Show" plus chevron. Lowercase against the uppercase title so it reads
-   as a control rather than part of the heading. */
-.confidential-notes-action {
+   as a control rather than part of the heading. flex-none + nowrap keep the
+   control intact when the longer title wraps on a narrow screen — the title
+   takes the extra line, the control never splits from its chevron. */
+.sc-notes-action {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
+  flex: none;
+  /* The title no longer absorbs the row (the badge sits beside it), so the
+     control is pushed to the right edge here. */
+  margin-left: auto;
+  white-space: nowrap;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
 }
 
-.confidential-notes-header:hover .confidential-notes-action {
+.sc-notes-header:hover .sc-notes-action {
   text-decoration: underline;
 }
 
 /* Collapsed, the bar is all that remains: drop the body's bottom spacing so it
    reads as a single slim strip. */
-.confidential-notes.is-collapsed .confidential-notes-header {
+.sc-notes.is-collapsed .sc-notes-header {
   margin-bottom: 0;
 }
 
 /* Notes run from one line to several sentences of instructions; never truncate.
    pre-wrap preserves the line breaks the coordinator typed. */
-.confidential-notes-body {
+.sc-notes-body {
   white-space: pre-wrap;
   color: var(--color-text-primary);
   line-height: 1.5;

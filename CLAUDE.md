@@ -264,6 +264,26 @@ features end to end.
   `CREATE OR REPLACE VIEW active_... AS SELECT * FROM ...` or the new
   column reads as NULL through the view with no error.
 
+## RBAC permission naming
+
+Permission keys are `object:verb[_qualifier]`, and the **object names the
+table the data lives on**, not the service that enforces the check. The
+qualifier is always singular: `read_financial`, `read_inactive`,
+`read_sc_note` — never a plural.
+
+`member:read_sc_note` was `person:read_confidential` until 0025. It gated
+`member.scNotes` but was namespaced `person:*` because `PersonService`
+enforces it on the `getPerson` member projection. Naming a permission after
+its enforcement site rather than its data is how that mismatch happened;
+don't repeat it.
+
+`role_permission.permission` is a plain `varchar(100)` with **no FK to a
+catalog table** — the catalog lives in code (`api/source/utils/permissions.js`)
+and the DB stores only role→permission strings. So renaming a permission is a
+one-line `UPDATE role_permission SET permission = ...` in a migration, plus
+the catalog key and its call sites. Already-applied seeding migrations
+(0013) are never edited; the new migration carries the change forward.
+
 ## MySQL / OAS traps
 
 - `JSON_ARRAYAGG(DISTINCT ...)` is MariaDB-only; MySQL throws

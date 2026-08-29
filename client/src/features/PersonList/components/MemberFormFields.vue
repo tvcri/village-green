@@ -31,7 +31,7 @@ const householdDues = defineModel('householdDues')
 const quickbooksKey = defineModel('quickbooksKey')
 const printedNewsletter = defineModel('printedNewsletter')
 const serviceNotes = defineModel('serviceNotes')
-const confidentialNotes = defineModel('confidentialNotes')
+const scNotes = defineModel('scNotes')
 const statusChangeNotes = defineModel('statusChangeNotes')
 const miscNotes = defineModel('miscNotes')
 
@@ -186,10 +186,10 @@ watch(memberLevel, (level) => {
     </div>
 
     <div class="form-field">
-      <label class="label" for="confidentialNotes">Confidential Notes
-        <i v-if="uncertain.confidentialNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('confidentialNotes')" />
+      <label class="label" for="scNotes">Service Coordinator Notes
+        <i v-if="uncertain.scNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('scNotes')" />
       </label>
-      <Textarea id="confidentialNotes" v-model="confidentialNotes" rows="3" class="w-full" @input="edited('confidentialNotes')" />
+      <Textarea id="scNotes" v-model="scNotes" rows="3" class="w-full" @input="edited('scNotes')" />
     </div>
 
     <div class="form-field">
