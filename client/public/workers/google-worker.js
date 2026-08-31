@@ -230,10 +230,15 @@ function buildSheetData(rows, columns) {
   // Data rows
   for (const row of rows) {
     const values = columns.map(col => {
-      const value = row[col.key]
-      return {
-        userEnteredValue: formatCellValue(value),
+      const cell = { userEnteredValue: formatCellValue(row[col.key]) }
+      // Optional per-column display format, e.g. rendering a 1/0 flag as a
+      // checkmark while keeping the value numeric so SUM() still works.
+      // Only value-bearing formats survive spreadsheets.create; presentation
+      // fields like horizontalAlignment need a follow-up batchUpdate.
+      if (col.numberFormat) {
+        cell.userEnteredFormat = { numberFormat: col.numberFormat }
       }
+      return cell
     })
     rowData.push({ values })
   }

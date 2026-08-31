@@ -16,7 +16,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
-import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { toCsv, downloadCsv, buildFlagColumns, withFlagValues } from '../../../shared/lib/csvUtils.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
@@ -124,11 +124,21 @@ const filteredVolunteers = computed(() => {
 
 const isEmpty = computed(() => !isLoading.value && filteredVolunteers.value.length === 0)
 
+// One flag column per capability present in the filtered rows, so the export
+// mirrors the table state that produced it.
+const capabilityFlags = computed(() => buildFlagColumns(filteredVolunteers.value, 'capabilities'))
+
 const volunteersForCsv = computed(() => {
   if (!Array.isArray(persons.value)) return []
+  const { values } = capabilityFlags.value
   return filteredVolunteers.value.map(v => {
     const p = persons.value?.find(p => p.personId === v.personId) ?? {}
-    return { ...p, ...v, capabilities: v.capabilities?.join('; ') ?? '' }
+    return {
+      ...p,
+      ...v,
+      ...withFlagValues(v, 'capabilities', values),
+      capabilities: v.capabilities?.join('; ') ?? ''
+    }
   })
 })
 
@@ -144,9 +154,10 @@ const navigateToVolunteer = (volunteer) => {
   })
 }
 
-const columnsForCsv = [
+const columnsForCsv = computed(() => [
   { header: 'Full Name', key: 'fullName' },
   { header: 'Capabilities', key: 'capabilities' },
+  ...capabilityFlags.value.columns,
   { header: 'Email', key: 'email' },
   { header: 'Phone', key: 'phone' },
   { header: 'Cell', key: 'cell' },
@@ -160,11 +171,11 @@ const columnsForCsv = [
   { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
   { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
   { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
-]
+])
 
 const handleDownloadCsv = async () => {
   if (!persons.value) await fetchPersons()
-  const csv = toCsv(volunteersForCsv.value, columnsForCsv)
+  const csv = toCsv(volunteersForCsv.value, columnsForCsv.value)
   const villageName = persons.value?.[0]?.village?.name || 'village'
   const filename = `${villageName}-volunteers.csv`
   downloadCsv(csv, filename)
@@ -180,7 +191,7 @@ async function handleCreateSheet() {
 
     const result = await createSheet(
       volunteersForCsv.value,
-      columnsForCsv,
+      columnsForCsv.value,
       sheetName
     )
 
