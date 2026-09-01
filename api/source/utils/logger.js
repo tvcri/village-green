@@ -190,11 +190,34 @@ function requestLogger (req, res, next) {
   next()
 }
 
+// Names whose VALUE is a credential. Matched against the whole variable name,
+// so the *_FILE and *_URI path variables that merely sit near a secret are
+// unaffected. VG_GOOGLE_MAPS_KEY is deliberately absent: it is served to the
+// browser by getClientEnv(), so masking it in the log would hide nothing.
+//
+// This is a DENYLIST by pattern rather than by exact name on purpose. The
+// previous version masked the single literal 'VG_DB_PASSWORD', so every
+// credential added afterwards (Anthropic, Google OAuth, Keycloak admin, the
+// enrollment sidecar) printed in the clear at startup — a log that reaches
+// `docker compose logs`, Azure log storage, and the CI api-test-artifacts
+// upload. Failing open is the defect; a suffix rule covers names not yet
+// written.
+const SECRET_ENV = /(PASSWORD|PASSPHRASE|SECRET|TOKEN)$/i
+const SECRET_ENV_EXACT = new Set([
+  'VG_ANTHROPIC_API_KEY',
+  'VG_ENROLL_SIDECAR_KEY',
+  'VG_SYNC_WEBHOOK_KEY',
+])
+
+function isSecretEnvName (key) {
+  return SECRET_ENV.test(key) || SECRET_ENV_EXACT.has(key)
+}
+
 function serializeEnvironment () {
   let env = {}
   for (const [key, value] of Object.entries(process.env)) {
     if (/^(NODE|VG)_/.test(key)) {
-      env[key] = key === 'VG_DB_PASSWORD' ? '*' : value
+      env[key] = isSecretEnvName(key) ? '*' : value
     }
   }
   return env
@@ -329,6 +352,7 @@ module.exports = {
   sanitizeHeaders, 
   serializeRequest,
   serializeEnvironment,
+  isSecretEnvName,
   writeError, 
   writeWarn, 
   writeInfo, 
