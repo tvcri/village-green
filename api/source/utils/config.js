@@ -69,7 +69,12 @@ const config = {
         tls: {
             key_file: process.env.VG_API_TLS_KEY_FILE,
             key_passphrase: process.env.VG_API_TLS_KEY_PASSPHRASE,
-            cert_file: process.env.VG_API_TLS_CERT_FILE
+            cert_file: process.env.VG_API_TLS_CERT_FILE,
+            toJSON: function () {
+                const {key_passphrase, ...props} = this
+                props.key_passphrase = !!key_passphrase
+                return props
+            }
         }
     },
     database: {
@@ -117,7 +122,12 @@ const config = {
         }
     },
     webhook: {
-        key: process.env.VG_SYNC_WEBHOOK_KEY
+        key: process.env.VG_SYNC_WEBHOOK_KEY,
+        toJSON: function () {
+            const {key, ...props} = this
+            props.key = !!key
+            return props
+        }
     },
     log: {
         level: parseInt(process.env.VG_LOG_LEVEL) || 3,
@@ -133,15 +143,33 @@ const config = {
         clientSecret: process.env.VG_GOOGLE_CLIENT_SECRET ?? '',
         redirectUri: process.env.VG_GOOGLE_REDIRECT_URI ?? '',
         mapsKey: process.env.VG_GOOGLE_MAPS_KEY ?? '',
+        // logAppConfig() logs this whole object; report the secret's presence,
+        // never its value (same shape as database.toJSON). mapsKey stays in the
+        // clear — getClientEnv() serves it to the browser anyway.
+        toJSON: function () {
+            const {clientSecret, ...props} = this
+            props.clientSecret = !!clientSecret
+            return props
+        }
     },
     anthropic: {
         // Server-side only. Never expose via getClientEnv().
-        apiKey: process.env.VG_ANTHROPIC_API_KEY
+        apiKey: process.env.VG_ANTHROPIC_API_KEY,
+        toJSON: function () {
+            const {apiKey, ...props} = this
+            props.apiKey = !!apiKey
+            return props
+        }
     },
     keycloak: {
         // Server-side only. Never expose via getClientEnv().
         adminClientId: process.env.VG_KC_ADMIN_CLIENT_ID,
-        adminClientSecret: process.env.VG_KC_ADMIN_CLIENT_SECRET
+        adminClientSecret: process.env.VG_KC_ADMIN_CLIENT_SECRET,
+        toJSON: function () {
+            const {adminClientSecret, ...props} = this
+            props.adminClientSecret = !!adminClientSecret
+            return props
+        }
     },
     privacy: {
         ackIntervalDays: (() => {
@@ -158,7 +186,12 @@ const config = {
         // POST; must match the sidecar's VG_ENROLL_SIDECAR_KEY. Unset => the
         // API skips the POST and logs an error (fail-closed).
         // Server-side only. Never expose via getClientEnv().
-        sidecarKey: process.env.VG_ENROLL_SIDECAR_KEY
+        sidecarKey: process.env.VG_ENROLL_SIDECAR_KEY,
+        toJSON: function () {
+            const {sidecarKey, ...props} = this
+            props.sidecarKey = !!sidecarKey
+            return props
+        }
     }
 }
 
