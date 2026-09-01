@@ -76,7 +76,7 @@ export function buildGuide (ds) {
     `- **Duplicate email** (${p.duplicateEmail.email}): ${p.duplicateEmail.persons.map(w).join(' and ')}`,
     `- **Inactive/Dropped members:** ${p.inactiveMembers.map(x => `${w(x)} [${x.status}]`).join(', ')}`,
     `- **Inactive volunteers:** ${p.inactiveVolunteers.map(w).join(', ')}`,
-    `- **Confidential-notes member (staff-only visibility):** ${w(p.confidentialNotesMember)}`,
+    `- **Service Coordinator notes member (staff-only visibility):** ${w(p.scNotesMember)}`,
     p.flexibleRide ? `- **"No specific times" ride:** request #${p.flexibleRide.id} for ${w(p.flexibleRide.member)}` : null,
     p.outHomeRide ? `- **Ride home from a venue:** request #${p.outHomeRide.id} for ${w(p.outHomeRide.member)}` : null,
     `- **Standing series:** ${w(p.standingSeries.member)} — ${p.standingSeries.serviceName} ×${p.standingSeries.count}`,

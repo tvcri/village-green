@@ -72,10 +72,10 @@ export function applyPlants (ds, rng) {
   plants.inactiveMembers = ds.member.filter(m => m.status !== 'Active').map(m => ({ ...who(m.personId), status: m.status }))
   plants.inactiveVolunteers = ds.volunteer.filter(v => v.active === 0).map(v => who(v.personId))
 
-  // confidential-notes member (0.4 prob — force if absent)
-  let conf = ds.member.find(m => m.confidentialNotes)
-  if (!conf) { conf = ds.member[0]; conf.confidentialNotes = 'Family requests staff-only handling of contact changes.' }
-  plants.confidentialNotesMember = who(conf.personId)
+  // service-coordinator-notes member (0.4 prob — force if absent)
+  let conf = ds.member.find(m => m.scNotes)
+  if (!conf) { conf = ds.member[0]; conf.scNotes = 'Family requests staff-only handling of contact changes.' }
+  plants.scNotesMember = who(conf.personId)
 
   // flexible ride + out->home ride — flip one existing ride if probability missed
   const rides = ds.service_request.filter(sr => sr.serviceName.startsWith('Ride:'))
