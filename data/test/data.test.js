@@ -119,9 +119,9 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   // ~66% of members carry a standing service note (echoed into request instructions)
   const noteShare = m.member.filter(r => r.serviceNotes).length / m.member.length
   assert.ok(noteShare > 0.55 && noteShare < 0.78, `serviceNotes share ${noteShare.toFixed(2)} not ~0.66`)
-  // ~40% carry a staff-only confidential note
-  const confShare = m.member.filter(r => r.confidentialNotes).length / m.member.length
-  assert.ok(confShare > 0.28 && confShare < 0.52, `confidentialNotes share ${confShare.toFixed(2)} not ~0.4`)
+  // ~40% carry a staff-only service-coordinator note
+  const confShare = m.member.filter(r => r.scNotes).length / m.member.length
+  assert.ok(confShare > 0.28 && confShare < 0.52, `scNotes share ${confShare.toFixed(2)} not ~0.4`)
   // every member has MONTHLY dues, $0–50 with $40/mo the common tier, and
   // some cents-y yearly÷12 importer-style values
   assert.ok(m.member.every(r => typeof r.householdDues === 'number' && r.householdDues >= 0 && r.householdDues <= 50))
@@ -487,7 +487,7 @@ test('plants: every scenario exists and is recorded', () => {
   assert.ok(ds.member.some(m => m.primaryPersonId !== null), 'dual household')
   assert.ok(ds.member.some(m => m.status !== 'Active'), 'inactive member')
   assert.ok(ds.volunteer.some(v => v.active === 0), 'inactive volunteer')
-  assert.ok(ds.member.some(m => m.confidentialNotes), 'confidential notes')
+  assert.ok(ds.member.some(m => m.scNotes), 'service coordinator notes')
   assert.ok(ds.service_request.some(sr => sr.serviceName.startsWith('Ride:') && sr.timesFlexible === 1), 'flexible ride')
   assert.ok(ds.service_request.some(sr => sr.destination === 'Home'), 'out->home ride')
   assert.equal(p.ackModalUsername, 'ezra.stiles@newcomer.test')

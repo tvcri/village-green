@@ -5,6 +5,7 @@
   "user_data.status": "DB default 'available' is correct",
   "user_data.statusDate": "DB default (created) is correct",
   "user_data.statusUser": "runtime bookkeeping, set by the app",
+  "user_data.taskName": "names a system task account (migration 0024); NULL for the human personas the generator seeds",
   "user_data.webPreferences": "DB default preferences JSON is correct",
   "role_grant.userGroupId": "demo grants are per-user, not per-group",
   "person.emailStatus": "app-managed email verification state",

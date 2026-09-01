@@ -14,7 +14,7 @@ export function buildMembership (plan, content, rng) {
   const vetting_type = content.services.vettingTypes.map((v, i) => ({ id: i + 1, name: v.type || v }))
   const dropReasons = content.services.memberDropReasons
   const serviceNotes = content.services.memberServiceNotes || []
-  const confidentialNotes = content.services.memberConfidentialNotes || []
+  const scNotes = content.services.memberScNotes || []
   const volunteerNotes = content.services.volunteerNotes || []
   // deliberately disability-agnostic phrasing — a random note pairs with any condition
   const disabilityNotes = content.services.disabilityNotes || []
@@ -46,8 +46,8 @@ export function buildMembership (plan, content, rng) {
         householdDues: rng.weighted([[40, 12], [0, 1], [20, 2], [25, 1], [33.33, 2], [50, 2], [8.33, 2]]),
         // standing mobility/quirk notes; requests echo these as instructions
         serviceNotes: serviceNotes.length && rng.bool(0.66) ? rng.pick(serviceNotes) : null,
-        // staff-only notes — the app restricts who can see these
-        confidentialNotes: confidentialNotes.length && rng.bool(0.4) ? rng.pick(confidentialNotes) : null,
+        // service-coordinator notes — the app restricts who can see these
+        scNotes: scNotes.length && rng.bool(0.4) ? rng.pick(scNotes) : null,
       })
     }
     // ~1 household per village: link a second member to a primary as 'Spouse'

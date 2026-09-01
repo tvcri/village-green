@@ -5,12 +5,20 @@
 #
 #   unit tests -> doctor -> roundtrip (seed:db -> emit -> seed:api -> sanity) -> export
 #
-# The DOCTOR step is the schema-drift gate: it FAILS the workflow when the live
-# schema and the generator's builders/baseline disagree (renamed/dropped column,
-# new NOT NULL column, or a new column nobody has populated or acknowledged in
-# data/generator/doctor-baseline.json). A PR that changes the schema is expected
-# to update the generator in the same PR. To demote drift to a warning instead,
-# add `continue-on-error: true` to that step.
+# The DOCTOR step reports schema drift: the live schema and the generator's
+# builders/baseline disagree (renamed/dropped column, new NOT NULL column, or a
+# new column nobody has populated or acknowledged in
+# data/generator/doctor-baseline.json).
+#
+# ADVISORY, NOT A GATE. On pull_request the generator steps run with
+# `continue-on-error: true`: drift is surfaced in the checks list as a warning
+# so it can be fixed in the same PR as the migration that caused it, but it
+# never blocks a merge. `data/` is a local dev tool — a stale builder is a
+# chore, not a defect in the shipped app. Remove the continue-on-error lines to
+# make it a hard gate.
+#
+# On workflow_dispatch the steps fail normally, so a manual run still gives an
+# unambiguous pass/fail before seeding a demo DB.
 #
 # Artifacts: the generator-emitted demo-appdata.jsonl and the app-exported
 # appdata-export.jsonl from the freshly seeded DB.
@@ -19,6 +27,11 @@ name: demo-data
 
 on:
   workflow_dispatch:
+  # Advisory run on PRs that could desync the generator from the schema.
+  pull_request:
+    paths:
+      - 'api/source/service/migrations/**'
+      - 'data/**'
 
 jobs:
   generate:
@@ -93,16 +106,19 @@ jobs:
           exit 1
 
       - name: Unit tests
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         working-directory: data
         run: npm test
 
       # THE schema-drift gate. Red here means the live schema and the generator
       # disagree — fix a builder or acknowledge the column in doctor-baseline.json.
-      - name: Doctor (schema-drift gate)
+      - name: Doctor (schema-drift check)
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         working-directory: data
         run: npm run doctor
 
       - name: Roundtrip (seed:db -> emit -> seed:api -> sanity)
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         working-directory: data
         run: npm run roundtrip
 
