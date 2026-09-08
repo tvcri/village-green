@@ -164,6 +164,36 @@ describe('ServiceRequestCreateEdit start section', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Look up destination' })).toBeTruthy())
   })
 
+  it('shows a "Look up…" button for the Ride starting location too', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Ride: Medical Appnt'
+    // One per leg: Starting Location and Destination.
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Look up destination' })).toHaveLength(1))
+    expect(screen.getAllByRole('button', { name: 'Look up starting location' })).toHaveLength(1)
+  })
+
+  it('applying a looked-up place fills the start fields and leaves start phone alone', async () => {
+    const vm = await mountAndExpose()
+    vm.form.startPhone = '401-555-0199'
+    vm.applyPlaceToStart({
+      placeId: 'p1',
+      name: 'Newport Hospital',
+      formattedAddress: '20 Powel Ave, Newport, RI 02840, USA',
+      address: '20 Powel Avenue',
+      city: 'Newport',
+      state: 'RI',
+      zip: '02840'
+    })
+    expect(vm.form.start).toBe('Newport Hospital')
+    expect(vm.form.startAddress).toBe('20 Powel Avenue')
+    expect(vm.form.startCity).toBe('Newport')
+    expect(vm.form.startState).toBe('RI')
+    expect(vm.form.startZip).toBe('02840')
+    expect(vm.form.startPhone).toBe('401-555-0199')
+  })
+
   it('applying a looked-up place fills the destination fields and leaves phone alone', async () => {
     const vm = await mountAndExpose()
     vm.form.phone = '401-555-0100'

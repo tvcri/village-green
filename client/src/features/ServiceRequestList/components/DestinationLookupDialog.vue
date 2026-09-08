@@ -15,9 +15,10 @@ const props = defineProps({
   // "Hopkinton" resolves to Massachusetts.
   town: { type: String, default: '' },
   state: { type: String, default: '' },
-  // Whatever is already in the Destination field, so a coordinator who has
-  // started typing does not have to start over.
-  initialText: { type: String, default: '' }
+  // What the dialog is filling — "Destination" or "Starting Location". Used
+  // for the header and the input label so a coordinator can see which leg
+  // they are looking up.
+  legLabel: { type: String, default: 'Destination' }
 })
 
 const emit = defineEmits(['update:visible', 'select'])
@@ -33,9 +34,14 @@ const places = ref(null)
 const elapsedMs = ref(0)
 const isSearching = ref(false)
 
+// Opens blank every time. The field being filled is usually already populated
+// — Starting Location auto-fills with "Member's Home", and edit mode carries a
+// saved destination — so seeding the box from it would mean clearing text
+// nobody wants to search for, and would invite an accidental overwrite of a
+// good address.
 watch(() => props.visible, (isVisible) => {
   if (isVisible) {
-    text.value = props.initialText
+    text.value = ''
     places.value = null
   }
 }, { immediate: true })
@@ -79,12 +85,12 @@ const summary = computed(() => {
   <Dialog
     v-model:visible="dialogVisible"
     modal
-    header="Look up destination"
+    :header="`Look up ${legLabel.toLowerCase()}`"
     :style="{ width: '40rem' }"
     :breakpoints="{ '640px': '95vw' }"
   >
     <form class="lookup-form" @submit.prevent="find">
-      <label for="destination-lookup-text" class="lookup-label">Destination</label>
+      <label for="destination-lookup-text" class="lookup-label">{{ legLabel }}</label>
       <div class="lookup-row">
         <InputText
           id="destination-lookup-text"

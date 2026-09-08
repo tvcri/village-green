@@ -35,7 +35,7 @@ async function openAndSearch (text, props = {}) {
   const { searchPlaces } = await import('../api/serviceRequestApi.js')
   searchPlaces.mockResolvedValue({ places: [SERRA] })
   const utils = render(DestinationLookupDialog, {
-    props: { visible: true, town: 'Barrington', state: 'RI', initialText: '', ...props },
+    props: { visible: true, town: 'Barrington', state: 'RI', ...props },
     global: globalOpts
   })
   // PrimeVue's Portal teleports the dialog body only after mount, so the
@@ -52,6 +52,18 @@ describe('DestinationLookupDialog', () => {
     await waitFor(() => expect(searchPlaces).toHaveBeenCalledTimes(1))
     // State matters: a bare "Hopkinton" resolves to Massachusetts.
     expect(searchPlaces).toHaveBeenCalledWith({ text: 'Serra Physical Therapy', town: 'Barrington', state: 'RI' })
+  })
+
+  // The field the lookup fills is usually already populated — Starting
+  // Location auto-fills with "Member's Home", and edit mode carries a saved
+  // destination. Pre-filling would seed the search with text nobody wants to
+  // search for, and invite an accidental overwrite of a good address.
+  it('opens with an empty search box, and re-opens empty after a search', async () => {
+    const { rerender } = await openAndSearch('Serra Physical Therapy')
+    await waitFor(() => screen.getByText('Serra Physical Therapy'))
+    await rerender({ visible: false, town: 'Barrington', state: 'RI' })
+    await rerender({ visible: true, town: 'Barrington', state: 'RI' })
+    expect(await screen.findByLabelText('Destination')).toHaveValue('')
   })
 
   it('tells the coordinator it is searching near the member town and state', async () => {
@@ -78,7 +90,8 @@ describe('DestinationLookupDialog', () => {
   it('shows a no-matches message when nothing comes back', async () => {
     const { searchPlaces } = await import('../api/serviceRequestApi.js')
     searchPlaces.mockResolvedValue({ places: [] })
-    render(DestinationLookupDialog, { props: { visible: true, town: '', initialText: 'zzz' }, global: globalOpts })
+    render(DestinationLookupDialog, { props: { visible: true, town: '' }, global: globalOpts })
+    await fireEvent.update(await screen.findByLabelText('Destination'), 'zzz')
     await fireEvent.click(await screen.findByRole('button', { name: 'Find matches' }))
     await waitFor(() => expect(screen.getByText(/no matches/i)).toBeInTheDocument())
   })

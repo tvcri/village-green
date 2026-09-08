@@ -217,6 +217,7 @@ const selectedMemberHome = ref(null)
 // "CVS" resolves to the member's CVS. Fill convenience only — never stored.
 const selectedMemberTown = ref('')
 const lookupVisible = ref(false)
+const startLookupVisible = ref(false)
 
 // The selected member's service coordinator notes, from the same fetch as the home
 // address. Rare (a few percent of members) and permission-gated: the `member`
@@ -278,6 +279,17 @@ function applyMemberHomeToDestination () {
   form.value.state = h.state
   form.value.zip = h.zip
   form.value.phone = h.phone
+}
+
+// Fill the start leg from a place chosen in the lookup dialog. A ride does not
+// always begin at the member's home — a return trip from a hospital, say.
+function applyPlaceToStart (place) {
+  if (!place) return
+  form.value.start = place.name
+  form.value.startAddress = place.address
+  form.value.startCity = place.city
+  form.value.startState = place.state
+  form.value.startZip = place.zip
 }
 
 // Fill the destination leg from a place chosen in the lookup dialog. Phone is
@@ -1251,6 +1263,7 @@ const openPersonDialog = (personId) => {
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Starting Location</h3>
               <div style="display: flex; gap: 0.5rem;">
                 <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToStart" />
+                <Button type="button" size="small" outlined icon="pi pi-search" label="Look up…" aria-label="Look up starting location" @click="startLookupVisible = true" />
                 <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear start" @click="clearStart" />
               </div>
             </div>
@@ -1469,10 +1482,16 @@ const openPersonDialog = (personId) => {
       :person-id="personDialogPersonId"
     />
     <DestinationLookupDialog
+      v-model:visible="startLookupVisible"
+      leg-label="Starting location"
+      :town="selectedMemberTown"
+      :state="selectedMemberHome?.state ?? ''"
+      @select="applyPlaceToStart"
+    />
+    <DestinationLookupDialog
       v-model:visible="lookupVisible"
       :town="selectedMemberTown"
       :state="selectedMemberHome?.state ?? ''"
-      :initial-text="form.destination"
       @select="applyPlaceToDestination"
     />
   </div>
