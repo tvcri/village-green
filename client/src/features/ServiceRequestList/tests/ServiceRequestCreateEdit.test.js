@@ -29,7 +29,8 @@ vi.mock('../../PersonList/api/personApi.js', () => ({
 vi.mock('../api/serviceRequestApi.js', () => ({
   getServiceRequest: vi.fn().mockResolvedValue(null),
   createServiceRequest: vi.fn().mockResolvedValue({ serviceRequestId: 1 }),
-  updateServiceRequest: vi.fn().mockResolvedValue({ serviceRequestId: 1 })
+  updateServiceRequest: vi.fn().mockResolvedValue({ serviceRequestId: 1 }),
+  searchPlaces: vi.fn().mockResolvedValue({ places: [] })
 }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({
   getVillages: vi.fn().mockResolvedValue([{ villageId: '1', name: 'V1' }])
@@ -151,6 +152,36 @@ describe('ServiceRequestCreateEdit start section', () => {
       // Ride renders both Start and Destination use-home buttons.
       expect(document.querySelectorAll('.use-home-btn').length).toBe(2)
     })
+  })
+
+  it('shows a "Look up…" button for a Ride destination', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Ride: Medical Appnt'
+    // Accessible name is the aria-label, per the sibling "Clear fields" /
+    // "Clear destination" convention.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Look up destination' })).toBeTruthy())
+  })
+
+  it('applying a looked-up place fills the destination fields and leaves phone alone', async () => {
+    const vm = await mountAndExpose()
+    vm.form.phone = '401-555-0100'
+    vm.applyPlaceToDestination({
+      placeId: 'ChIJuxtkRqxR5IkRgn0NsxVSiws',
+      name: 'Serra Physical Therapy',
+      formattedAddress: '60 Bay Spring Ave A2, Barrington, RI 02806, USA',
+      address: '60 Bay Spring Avenue, Suite A2',
+      city: 'Barrington',
+      state: 'RI',
+      zip: '02806'
+    })
+    expect(vm.form.destination).toBe('Serra Physical Therapy')
+    expect(vm.form.address).toBe('60 Bay Spring Avenue, Suite A2')
+    expect(vm.form.city).toBe('Barrington')
+    expect(vm.form.state).toBe('RI')
+    expect(vm.form.zip).toBe('02806')
+    expect(vm.form.phone).toBe('401-555-0100')
   })
 
   it('auto-populates Start from member home when a Ride is selected and Start is empty', async () => {

@@ -1,6 +1,7 @@
 const config = require('../utils/config')
 const OperationService = require(`../service/OperationService`)
 const TownResolutionService = require('../service/TownResolutionService')
+const PlacesService = require('../service/PlacesService')
 const escape = require('../utils/escape')
 const {JSONPath} = require('jsonpath-plus')
 const SmError = require('../utils/error.js')
@@ -197,6 +198,16 @@ module.exports.geocodeTown = async function geocodeTown (req, res, next) {
   try {
     const { town } = await TownResolutionService.resolveTown(req.body)
     res.json({ town })
+  }
+  catch (err) {
+    next(err)
+  }
+}
+
+module.exports.searchPlaces = async function searchPlaces (req, res, next) {
+  try {
+    const places = await PlacesService.searchPlaces(req.body)
+    res.json({ places })
   }
   catch (err) {
     next(err)

@@ -143,6 +143,10 @@ const config = {
         clientSecret: process.env.VG_GOOGLE_CLIENT_SECRET ?? '',
         redirectUri: process.env.VG_GOOGLE_REDIRECT_URI ?? '',
         mapsKey: process.env.VG_GOOGLE_MAPS_KEY ?? '',
+        // Server-side only. Never expose via getClientEnv().
+        // Referer sent with Places API calls so the referrer-restricted Maps
+        // key accepts them. Prototype shortcut; see PlacesService.js.
+        placesReferer: process.env.VG_GOOGLE_PLACES_REFERER ?? '',
         // logAppConfig() logs this whole object; report the secret's presence,
         // never its value (same shape as database.toJSON). mapsKey stays in the
         // clear — getClientEnv() serves it to the browser anyway.

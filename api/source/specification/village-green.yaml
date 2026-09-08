@@ -646,6 +646,76 @@ paths:
       security:
       - oauth:
         - vg:read
+  /op/places/search:
+    post:
+      tags:
+      - Operation
+      summary: Find places matching a destination name
+      description: 'Asks the Google Places API for places matching free text,
+        optionally narrowed by a town. Returns each match with its address
+        already split into the service-request address fields. Writes
+        nothing. Returns an empty list when nothing matches or the lookup
+        fails.
+
+        '
+      operationId: searchPlaces
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              additionalProperties: false
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                town:
+                  type: string
+                  maxLength: 100
+                state:
+                  type: string
+                  maxLength: 50
+      responses:
+        '200':
+          description: Matching places, best match first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [places]
+                properties:
+                  places:
+                    type: array
+                    items:
+                      type: object
+                      required: [placeId, name, formattedAddress, address, city, state, zip]
+                      properties:
+                        placeId:
+                          type: string
+                        name:
+                          type: string
+                        formattedAddress:
+                          type: string
+                        address:
+                          type: string
+                        city:
+                          type: string
+                        state:
+                          type: string
+                        zip:
+                          type: string
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:read
   /op/roles:
     get:
       summary: List roles and their permissions

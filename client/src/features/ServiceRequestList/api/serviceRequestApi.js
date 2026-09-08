@@ -34,5 +34,7 @@ export const getServiceRequests = ({ status, villageId, hasNotifications, servic
 export const createServiceRequest = (payload) =>
   apiCall('createServiceRequest', payload)
 
+export const searchPlaces = (body) => apiCall('searchPlaces', {}, body)
+
 export const updateServiceRequest = (serviceRequestId, payload, projection = []) =>
   apiCall('patchServiceRequest', { serviceRequestId, ...(projection.length && { projection }) }, payload)

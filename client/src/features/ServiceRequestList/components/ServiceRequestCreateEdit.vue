@@ -23,6 +23,7 @@ import { getPerson } from '../../PersonList/api/personApi.js'
 import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
+import DestinationLookupDialog from './DestinationLookupDialog.vue'
 import {
   minutesToTimeString, timeStringToMinutes,
   dateToServiceDate, serviceDateToDate
@@ -212,6 +213,10 @@ const selectedVolunteer = ref(null)
 // omits address fields, so fetch the person to obtain home. "Member's home" is a
 // fill convenience only — never stored as SR state.
 const selectedMemberHome = ref(null)
+// The member's municipality (person.town), passed to the destination lookup so
+// "CVS" resolves to the member's CVS. Fill convenience only — never stored.
+const selectedMemberTown = ref('')
+const lookupVisible = ref(false)
 
 // The selected member's service coordinator notes, from the same fetch as the home
 // address. Rare (a few percent of members) and permission-gated: the `member`
@@ -231,6 +236,7 @@ async function loadMemberHome (personId) {
   if (!personId) {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
+    selectedMemberTown.value = ''
     return
   }
   try {
@@ -239,9 +245,11 @@ async function loadMemberHome (personId) {
       ? { address: p.address || '', city: p.city || '', state: p.state || '', zip: p.zip || '', phone: p.phone || '' }
       : null
     selectedMemberScNotes.value = (p?.member?.scNotes || '').trim()
+    selectedMemberTown.value = p?.town || ''
   } catch {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
+    selectedMemberTown.value = ''
   }
 }
 
@@ -270,6 +278,18 @@ function applyMemberHomeToDestination () {
   form.value.state = h.state
   form.value.zip = h.zip
   form.value.phone = h.phone
+}
+
+// Fill the destination leg from a place chosen in the lookup dialog. Phone is
+// deliberately left alone: Google's number is usually a switchboard, and the
+// field is being dropped from scope anyway.
+function applyPlaceToDestination (place) {
+  if (!place) return
+  form.value.destination = place.name
+  form.value.address = place.address
+  form.value.city = place.city
+  form.value.state = place.state
+  form.value.zip = place.zip
 }
 
 function clearStart () {
@@ -323,6 +343,7 @@ watch(selectedMember, (val) => {
     form.value.memberPersonId = null
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
+    selectedMemberTown.value = ''
     scNotesCollapsed.value = true
   }
 })
@@ -1304,6 +1325,7 @@ const openPersonDialog = (personId) => {
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
               <div v-if="isRideService" style="display: flex; gap: 0.5rem;">
                 <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
+                <Button type="button" size="small" outlined icon="pi pi-search" label="Look up…" aria-label="Look up destination" @click="lookupVisible = true" />
                 <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear destination" @click="clearDestination" />
               </div>
             </div>
@@ -1445,6 +1467,13 @@ const openPersonDialog = (personId) => {
     <PersonDetailDialog
       v-model:visible="personDialogVisible"
       :person-id="personDialogPersonId"
+    />
+    <DestinationLookupDialog
+      v-model:visible="lookupVisible"
+      :town="selectedMemberTown"
+      :state="selectedMemberHome?.state ?? ''"
+      :initial-text="form.destination"
+      @select="applyPlaceToDestination"
     />
   </div>
 </template>
