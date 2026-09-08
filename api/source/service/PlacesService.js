@@ -89,9 +89,20 @@ async function searchPlaces ({ text, town, state }) {
     'X-Goog-Api-Key': config.google.mapsKey,
     'X-Goog-FieldMask': FIELD_MASK
   }
-  // PROTOTYPE SHORTCUT. The Maps key is HTTP-referrer-restricted for the
-  // browser embeds, and a server-side call carries no referrer. Sending one
-  // satisfies the restriction. The proper fix is a second, IP-restricted key.
+  // The Maps key is HTTP-referrer-restricted for the browser embeds, and a
+  // server-side call carries no referrer, so we set one.
+  //
+  // This is deliberate, not a stopgap. An IP-restricted key is impractical
+  // here: on Azure App Service the outbound pool changes when the app scales
+  // or moves, and through ngrok the egress address is a dynamic home IP —
+  // ngrok's published ranges are inbound only. Either way a rotated address
+  // fails as a 403, which this service turns into "no matches" — a silent
+  // break.
+  //
+  // A referrer restriction is advisory in any case (the caller sets the
+  // header), and this key already ships to browsers via VG.Env for the map
+  // embeds. The controls that actually bound the risk are the key's API
+  // restrictions and a Cloud console quota cap, not the referrer.
   if (config.google.placesReferer) headers.Referer = config.google.placesReferer
 
   const body = JSON.stringify({

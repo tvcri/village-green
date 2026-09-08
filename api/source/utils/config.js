@@ -145,7 +145,8 @@ const config = {
         mapsKey: process.env.VG_GOOGLE_MAPS_KEY ?? '',
         // Server-side only. Never expose via getClientEnv().
         // Referer sent with Places API calls so the referrer-restricted Maps
-        // key accepts them. Prototype shortcut; see PlacesService.js.
+        // key accepts them. Deliberate — an IP-restricted key is impractical
+        // on Azure App Service and through ngrok; see PlacesService.js.
         placesReferer: process.env.VG_GOOGLE_PLACES_REFERER ?? '',
         // logAppConfig() logs this whole object; report the secret's presence,
         // never its value (same shape as database.toJSON). mapsKey stays in the
