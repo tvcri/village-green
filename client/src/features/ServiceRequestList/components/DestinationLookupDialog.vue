@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import { searchPlaces } from '../api/serviceRequestApi.js'
 
 defineOptions({ name: 'DestinationLookupDialog' })
@@ -29,6 +30,10 @@ const dialogVisible = computed({
 })
 
 const text = ref('')
+// Whether to narrow the search to the member's town. Off by default and reset
+// on every open: the member's town is right for a local errand and wrong for an
+// appointment across the state, and the coordinator is the one who knows which.
+const useMemberTown = ref(false)
 // null until a search has run, so the results area stays hidden on open.
 const places = ref(null)
 const elapsedMs = ref(0)
@@ -42,6 +47,7 @@ const isSearching = ref(false)
 watch(() => props.visible, (isVisible) => {
   if (isVisible) {
     text.value = ''
+    useMemberTown.value = false
     places.value = null
   }
 }, { immediate: true })
@@ -52,7 +58,11 @@ async function find () {
   isSearching.value = true
   const started = performance.now()
   try {
-    const res = await searchPlaces({ text: q, town: props.town, state: props.state })
+    const res = await searchPlaces(
+      useMemberTown.value && props.town
+        ? { text: q, town: props.town, state: props.state }
+        : { text: q }
+    )
     places.value = Array.isArray(res?.places) ? res.places : []
   } catch {
     places.value = []
@@ -101,7 +111,10 @@ const summary = computed(() => {
         />
         <Button type="submit" label="Find matches" :loading="isSearching" :disabled="!text.trim()" />
       </div>
-      <small v-if="nearText" class="lookup-hint">Searching near {{ nearText }}</small>
+      <div v-if="nearText" class="lookup-near">
+        <Checkbox v-model="useMemberTown" input-id="lookup-near" binary />
+        <label for="lookup-near">Search near {{ nearText }}</label>
+      </div>
     </form>
 
     <div v-if="places" class="lookup-results">
@@ -126,7 +139,8 @@ const summary = computed(() => {
 .lookup-label { font-weight: 500; }
 .lookup-row { display: flex; gap: 0.5rem; }
 .lookup-input { flex: 1; min-width: 0; }
-.lookup-hint { color: var(--p-text-muted-color); }
+.lookup-near { display: flex; align-items: center; gap: 0.5rem; }
+.lookup-near label { color: var(--p-text-muted-color); cursor: pointer; }
 
 .lookup-results { margin-top: 1.25rem; }
 .lookup-summary {

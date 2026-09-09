@@ -31,7 +31,7 @@ afterEach(() => {
 
 const globalOpts = { plugins: [PrimeVue] }
 
-async function openAndSearch (text, props = {}) {
+async function openAndSearch (text, props = {}, opts = {}) {
   const { searchPlaces } = await import('../api/serviceRequestApi.js')
   searchPlaces.mockResolvedValue({ places: [SERRA] })
   const utils = render(DestinationLookupDialog, {
@@ -42,16 +42,39 @@ async function openAndSearch (text, props = {}) {
   // content is a tick behind render(); findBy* waits for it.
   const input = await screen.findByLabelText('Destination')
   await fireEvent.update(input, text)
+  if (opts.near) await fireEvent.click(await screen.findByLabelText(/near Barrington, RI/i))
   await fireEvent.click(await screen.findByRole('button', { name: 'Find matches' }))
   return { ...utils, searchPlaces }
 }
 
 describe('DestinationLookupDialog', () => {
-  it('searches with the typed text and the member town and state', async () => {
+  // The town narrows "CVS" to the member's CVS, but it is wrong whenever the
+  // appointment is out of area — so the coordinator opts in, per lookup.
+  it('searches exactly what was entered by default', async () => {
     const { searchPlaces } = await openAndSearch('Serra Physical Therapy')
+    await waitFor(() => expect(searchPlaces).toHaveBeenCalledTimes(1))
+    expect(searchPlaces).toHaveBeenCalledWith({ text: 'Serra Physical Therapy' })
+  })
+
+  it('adds the member town and state when the coordinator turns it on', async () => {
+    const { searchPlaces } = await openAndSearch('Serra Physical Therapy', {}, { near: true })
     await waitFor(() => expect(searchPlaces).toHaveBeenCalledTimes(1))
     // State matters: a bare "Hopkinton" resolves to Massachusetts.
     expect(searchPlaces).toHaveBeenCalledWith({ text: 'Serra Physical Therapy', town: 'Barrington', state: 'RI' })
+  })
+
+  it('starts off again the next time the dialog opens', async () => {
+    const { rerender, searchPlaces } = await openAndSearch('Serra', {}, { near: true })
+    await waitFor(() => expect(searchPlaces).toHaveBeenCalledTimes(1))
+    await rerender({ visible: false, town: 'Barrington', state: 'RI' })
+    await rerender({ visible: true, town: 'Barrington', state: 'RI' })
+    expect(await screen.findByLabelText(/near Barrington, RI/i)).not.toBeChecked()
+  })
+
+  it('offers no toggle when the member has no town on file', async () => {
+    render(DestinationLookupDialog, { props: { visible: true, town: '', state: '' }, global: globalOpts })
+    await screen.findByLabelText('Destination')
+    expect(screen.queryByRole('checkbox')).toBeNull()
   })
 
   // The field the lookup fills is usually already populated — Starting
@@ -66,10 +89,11 @@ describe('DestinationLookupDialog', () => {
     expect(await screen.findByLabelText('Destination')).toHaveValue('')
   })
 
-  it('tells the coordinator it is searching near the member town and state', async () => {
+  it('names the member town and state on the toggle, and starts unchecked', async () => {
     render(DestinationLookupDialog, { props: { visible: true, town: 'Barrington', state: 'RI' }, global: globalOpts })
     // "near", never "in" — the search is biased toward the town, not fenced to it.
-    expect(await screen.findByText('Searching near Barrington, RI')).toBeInTheDocument()
+    const toggle = await screen.findByLabelText('Search near Barrington, RI')
+    expect(toggle).not.toBeChecked()
   })
 
   it('lists each match by name and address, with a count and timing', async () => {
