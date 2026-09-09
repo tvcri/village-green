@@ -87,12 +87,6 @@ describe('DestinationLookupDialog', () => {
     expect(await screen.findByLabelText('Max results')).toHaveValue(20)
   })
 
-  // The list scrolls, so the tail is off-screen; the count below it says how
-  // many there are without the coordinator having to scroll to find out.
-  it('closes the list with a count of what came back', async () => {
-    await openAndSearch('Serra')
-    expect(await screen.findByText('1 result')).toBeInTheDocument()
-  })
 
   it('offers no toggle when the member has no town on file', async () => {
     render(DestinationLookupDialog, { props: { visible: true, town: '', state: '' }, global: globalOpts })

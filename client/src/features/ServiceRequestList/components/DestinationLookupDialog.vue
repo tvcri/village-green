@@ -95,13 +95,6 @@ const nearText = computed(() =>
   props.town ? [props.town, props.state].filter(Boolean).join(', ') : ''
 )
 
-// Closes the list. The list scrolls, so its tail is off-screen — this says how
-// many there are without the coordinator scrolling to find the end.
-const countText = computed(() => {
-  const n = places.value?.length ?? 0
-  return `${n} ${n === 1 ? 'result' : 'results'}`
-})
-
 const summary = computed(() => {
   if (!places.value) return ''
   const n = places.value.length
@@ -155,7 +148,6 @@ const summary = computed(() => {
           </button>
         </li>
       </ul>
-      <p v-if="places.length" class="result-count">{{ countText }}</p>
     </div>
   </Dialog>
 </template>
@@ -189,12 +181,6 @@ const summary = computed(() => {
   font-variant-numeric: tabular-nums;
 }
 .lookup-empty { margin: 0; color: var(--p-text-muted-color); }
-.result-count {
-  margin: 0.5rem 0 0;
-  font-size: 0.85rem;
-  color: var(--p-text-muted-color);
-  font-variant-numeric: tabular-nums;
-}
 
 /* Scroll the results, not the whole dialog. PrimeVue caps the dialog at 90%
    of the viewport and scrolls .p-dialog-content, which would carry the search
