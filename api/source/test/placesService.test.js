@@ -111,11 +111,13 @@ test('clampResultCount bounds the request to what Google will honour', () => {
   assert.equal(clampResultCount(-5), 1)
 })
 
+// The default matches the dialog's, which omits the field when it is
+// unchanged — so an untouched lookup must get the same count either way.
 test('clampResultCount falls back to the default when unusable', () => {
-  assert.equal(clampResultCount(undefined), 8)
-  assert.equal(clampResultCount(null), 8)
+  assert.equal(clampResultCount(undefined), 20)
+  assert.equal(clampResultCount(null), 20)
   assert.equal(clampResultCount('12'), 12)
-  assert.equal(clampResultCount('abc'), 8)
+  assert.equal(clampResultCount('abc'), 20)
   assert.equal(clampResultCount(7.6), 7)
 })
 

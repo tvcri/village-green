@@ -10,7 +10,9 @@ const { safeReadBody } = require('../utils/safeReadBody')
 // TownResolutionService, which hardcodes the Census endpoint the same way.
 const PLACES_URL = 'https://places.googleapis.com/v1/places:searchText'
 const TIMEOUT_MS = 10000
-const DEFAULT_RESULTS = 8
+// Matches the dialog's default, which omits `maxResults` when unchanged — the
+// two must agree or an untouched lookup silently gets a different count.
+const DEFAULT_RESULTS = 20
 // Google's ceiling for one page of Text Search. Asking for more is not an
 // error — it silently returns 20 — so clamp here, where the limit is visible.
 const GOOGLE_MAX_RESULTS = 20

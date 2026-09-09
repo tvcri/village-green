@@ -82,9 +82,16 @@ describe('DestinationLookupDialog', () => {
     await waitFor(() => expect(searchPlaces).toHaveBeenCalledWith({ text: 'Ortho RI', maxResults: 15 }))
   })
 
-  it('defaults the demo result count to 8', async () => {
+  it('defaults the demo result count to 20, Google\'s ceiling', async () => {
     render(DestinationLookupDialog, { props: { visible: true, town: '', state: '' }, global: globalOpts })
-    expect(await screen.findByLabelText('Max results')).toHaveValue(8)
+    expect(await screen.findByLabelText('Max results')).toHaveValue(20)
+  })
+
+  // The list scrolls, so the tail is off-screen; the count below it says how
+  // many there are without the coordinator having to scroll to find out.
+  it('closes the list with a count of what came back', async () => {
+    await openAndSearch('Serra')
+    expect(await screen.findByText('1 result')).toBeInTheDocument()
   })
 
   it('offers no toggle when the member has no town on file', async () => {
