@@ -10,7 +10,10 @@ const { safeReadBody } = require('../utils/safeReadBody')
 // TownResolutionService, which hardcodes the Census endpoint the same way.
 const PLACES_URL = 'https://places.googleapis.com/v1/places:searchText'
 const TIMEOUT_MS = 10000
-const MAX_RESULTS = 8
+const DEFAULT_RESULTS = 8
+// Google's ceiling for one page of Text Search. Asking for more is not an
+// error — it silently returns 20 — so clamp here, where the limit is visible.
+const GOOGLE_MAX_RESULTS = 20
 
 // Every field here is Pro tier. Adding a phone number or opening hours would
 // move the whole call to Enterprise (1,000 free/month instead of 5,000).
@@ -74,6 +77,18 @@ function interpretPlacesResponse (json) {
 // state returned the one RI clinic). The bias circle cannot override text.
 // Appending the state does not suppress cross-border results; Seekonk MA
 // still surfaces for "Stop & Shop, Barrington, RI".
+// DEMO-ONLY. Exposed so the working group can vary the result count live while
+// we learn what a useful list looks like. Remove this, the `maxResults` request
+// field, and the dialog's input together when the count is settled.
+function clampResultCount (n) {
+  // Guard null explicitly: Number(null) is 0, which would clamp to a
+  // one-result search rather than falling back to the default.
+  if (n === null || n === undefined || n === '') return DEFAULT_RESULTS
+  const v = Math.floor(Number(n))
+  if (!Number.isFinite(v)) return DEFAULT_RESULTS
+  return Math.min(Math.max(v, 1), GOOGLE_MAX_RESULTS)
+}
+
 function buildQuery ({ text, town, state }) {
   return [text, town, state].map((s) => (s ?? '').trim()).filter(Boolean).join(', ')
 }
@@ -81,7 +96,7 @@ function buildQuery ({ text, town, state }) {
 // Search for places. Never throws: any failure — transport error, a bad key,
 // or a Google-side problem — resolves to [] so the dialog shows "no matches"
 // rather than the global error modal.
-async function searchPlaces ({ text, town, state }) {
+async function searchPlaces ({ text, town, state, maxResults }) {
   if (!text?.trim()) return []
 
   const headers = {
@@ -107,7 +122,7 @@ async function searchPlaces ({ text, town, state }) {
 
   const body = JSON.stringify({
     textQuery: buildQuery({ text, town, state }),
-    maxResultCount: MAX_RESULTS,
+    maxResultCount: clampResultCount(maxResults),
     locationBias: RI_BIAS
   })
 
@@ -137,4 +152,4 @@ async function searchPlaces ({ text, town, state }) {
   }
 }
 
-module.exports = { interpretPlacesResponse, buildQuery, searchPlaces }
+module.exports = { interpretPlacesResponse, buildQuery, clampResultCount, searchPlaces }

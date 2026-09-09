@@ -71,6 +71,22 @@ describe('DestinationLookupDialog', () => {
     expect(await screen.findByLabelText(/near Barrington, RI/i)).not.toBeChecked()
   })
 
+  // DEMO-ONLY control; remove with the maxResults request field.
+  it('sends the demo result count when it has been changed', async () => {
+    const { searchPlaces } = await import('../api/serviceRequestApi.js')
+    searchPlaces.mockResolvedValue({ places: [SERRA] })
+    render(DestinationLookupDialog, { props: { visible: true, town: '', state: '' }, global: globalOpts })
+    await fireEvent.update(await screen.findByLabelText('Destination'), 'Ortho RI')
+    await fireEvent.update(await screen.findByLabelText('Max results'), '15')
+    await fireEvent.click(await screen.findByRole('button', { name: 'Find matches' }))
+    await waitFor(() => expect(searchPlaces).toHaveBeenCalledWith({ text: 'Ortho RI', maxResults: 15 }))
+  })
+
+  it('defaults the demo result count to 8', async () => {
+    render(DestinationLookupDialog, { props: { visible: true, town: '', state: '' }, global: globalOpts })
+    expect(await screen.findByLabelText('Max results')).toHaveValue(8)
+  })
+
   it('offers no toggle when the member has no town on file', async () => {
     render(DestinationLookupDialog, { props: { visible: true, town: '', state: '' }, global: globalOpts })
     await screen.findByLabelText('Destination')

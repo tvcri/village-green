@@ -34,6 +34,11 @@ const text = ref('')
 // on every open: the member's town is right for a local errand and wrong for an
 // appointment across the state, and the coordinator is the one who knows which.
 const useMemberTown = ref(false)
+// DEMO-ONLY. A knob for the working group to vary the result count live while
+// we learn what a useful list looks like. Google's ceiling is 20. Remove this,
+// the input, and the API's `maxResults` field together once the count settles.
+const DEFAULT_MAX_RESULTS = 8
+const maxResults = ref(DEFAULT_MAX_RESULTS)
 // null until a search has run, so the results area stays hidden on open.
 const places = ref(null)
 const elapsedMs = ref(0)
@@ -48,6 +53,7 @@ watch(() => props.visible, (isVisible) => {
   if (isVisible) {
     text.value = ''
     useMemberTown.value = false
+    maxResults.value = DEFAULT_MAX_RESULTS
     places.value = null
   }
 }, { immediate: true })
@@ -58,11 +64,16 @@ async function find () {
   isSearching.value = true
   const started = performance.now()
   try {
-    const res = await searchPlaces(
-      useMemberTown.value && props.town
-        ? { text: q, town: props.town, state: props.state }
-        : { text: q }
-    )
+    const body = useMemberTown.value && props.town
+      ? { text: q, town: props.town, state: props.state }
+      : { text: q }
+    // DEMO-ONLY: only sent when moved off the default, so the request stays
+    // clean once this control is removed.
+    const n = Number(maxResults.value)
+    if (Number.isFinite(n) && n !== DEFAULT_MAX_RESULTS) {
+      body.maxResults = Math.min(Math.max(Math.floor(n), 1), 20)
+    }
+    const res = await searchPlaces(body)
     places.value = Array.isArray(res?.places) ? res.places : []
   } catch {
     places.value = []
@@ -111,9 +122,16 @@ const summary = computed(() => {
         />
         <Button type="submit" label="Find matches" :loading="isSearching" :disabled="!text.trim()" />
       </div>
-      <div v-if="nearText" class="lookup-near">
-        <Checkbox v-model="useMemberTown" input-id="lookup-near" binary />
-        <label for="lookup-near">Search near {{ nearText }}</label>
+      <div class="lookup-opts">
+        <div v-if="nearText" class="lookup-near">
+          <Checkbox v-model="useMemberTown" input-id="lookup-near" binary />
+          <label for="lookup-near">Search near {{ nearText }}</label>
+        </div>
+        <!-- DEMO-ONLY control; remove with the API's maxResults field. -->
+        <div class="lookup-count">
+          <label for="lookup-max">Max results</label>
+          <input id="lookup-max" v-model.number="maxResults" type="number" min="1" max="20" />
+        </div>
       </div>
     </form>
 
@@ -139,8 +157,21 @@ const summary = computed(() => {
 .lookup-label { font-weight: 500; }
 .lookup-row { display: flex; gap: 0.5rem; }
 .lookup-input { flex: 1; min-width: 0; }
+.lookup-opts { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .lookup-near { display: flex; align-items: center; gap: 0.5rem; }
 .lookup-near label { color: var(--p-text-muted-color); cursor: pointer; }
+
+/* DEMO-ONLY control. Deliberately understated — it is an experiment knob,
+   not part of the coordinator's workflow. Remove with the maxResults field. */
+.lookup-count { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; }
+.lookup-count label { color: var(--p-text-muted-color); font-size: 0.85rem; }
+.lookup-count input {
+  width: 3.6rem; padding: 0.2rem 0.4rem; font: inherit; font-size: 0.85rem;
+  color: var(--p-text-color);
+  background: var(--p-content-background);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius-sm, 4px);
+}
 
 .lookup-results { margin-top: 1.25rem; }
 .lookup-summary {

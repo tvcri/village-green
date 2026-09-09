@@ -678,6 +678,15 @@ paths:
                 state:
                   type: string
                   maxLength: 50
+                maxResults:
+                  description: 'DEMO-ONLY. Lets the working group vary the result
+                    count live while we learn what a useful list looks like.
+                    Remove with the dialog input when the count is settled.
+
+                    '
+                  type: integer
+                  minimum: 1
+                  maximum: 20
       responses:
         '200':
           description: Matching places, best match first
