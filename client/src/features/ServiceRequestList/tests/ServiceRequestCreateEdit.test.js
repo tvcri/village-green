@@ -143,6 +143,23 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(screen.queryByText(/^Clear fields$/)).toBeNull()
   })
 
+  // An Errand has a destination but no starting location, and no fill/clear
+  // helpers. The lookup is about the destination, not the ride, so it belongs
+  // here too — it was gated on isRideService by mistake.
+  it('offers the destination lookup for an Errand', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Errand: Shopping'
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Look up destination' })).toBeTruthy()
+    })
+    // Still no starting-location lookup: an Errand has no start leg.
+    expect(screen.queryByRole('button', { name: 'Look up starting location' })).toBeNull()
+    // And the fill/clear helpers stay hidden, as before.
+    expect(document.querySelectorAll('.use-home-btn').length).toBe(0)
+  })
+
   it('shows a "Use member\'s home" button for a Ride destination', async () => {
     const vm = await mountAndExpose()
     vm.form.villageId = '1'
