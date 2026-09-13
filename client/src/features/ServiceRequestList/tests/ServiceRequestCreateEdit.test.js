@@ -24,7 +24,9 @@ vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
 vi.mock('../../PersonList/api/personApi.js', () => ({
   getPerson: vi.fn().mockResolvedValue({
     address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100'
-  })
+  }),
+  // Reused on member-select to geocode the home for the lookup's bias circle.
+  geocodeTown: vi.fn().mockResolvedValue({ town: 'Springfield', latitude: 38.77, longitude: -77.19 })
 }))
 vi.mock('../api/serviceRequestApi.js', () => ({
   getServiceRequest: vi.fn().mockResolvedValue(null),
@@ -249,6 +251,70 @@ describe('ServiceRequestCreateEdit start section', () => {
     await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
     expect(vm.form.startCity).toBe('Springfield')
     expect(vm.form.startZip).toBe('22150')
+  })
+
+  // The destination lookup ranks results near the member. The coordinates come
+  // from geocoding the member's home on select — nothing is persisted — and the
+  // geocode overlaps with the coordinator choosing a service and a date, so it
+  // costs the search itself no latency.
+  describe('member coordinates for the lookup bias', () => {
+    it('geocodes the member home on select and hands it to the lookup', async () => {
+      const { geocodeTown } = await import('../../PersonList/api/personApi.js')
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(geocodeTown).toHaveBeenCalledWith({
+        street: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150'
+      }))
+      await waitFor(() => expect(vm.selectedMemberCoords).toEqual({ latitude: 38.77, longitude: -77.19 }))
+    })
+
+    // Null, not a partial object: the dialog and the API both read absence as
+    // "fall back to the statewide circle".
+    it('leaves the coordinates null when the address does not geocode', async () => {
+      const { geocodeTown } = await import('../../PersonList/api/personApi.js')
+      geocodeTown.mockResolvedValueOnce({ town: null, latitude: null, longitude: null })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(geocodeTown).toHaveBeenCalled())
+      expect(vm.selectedMemberCoords).toBeNull()
+    })
+
+    it('survives a geocode failure without disturbing the rest of the form', async () => {
+      const { geocodeTown } = await import('../../PersonList/api/personApi.js')
+      geocodeTown.mockRejectedValueOnce(new Error('network'))
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      // The home address still loaded — the geocode is a side errand.
+      await waitFor(() => expect(vm.selectedMemberHome?.address).toBe('1 Home St'))
+      expect(vm.selectedMemberCoords).toBeNull()
+    })
+
+    // A member with no address on file has nothing to geocode; skip the call
+    // rather than sending Census an empty query.
+    it('does not geocode a member with no usable address', async () => {
+      const { getPerson, geocodeTown } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockResolvedValueOnce({ address: '', city: '', state: '', zip: '', phone: '' })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(getPerson).toHaveBeenCalled())
+      expect(geocodeTown).not.toHaveBeenCalled()
+      expect(vm.selectedMemberCoords).toBeNull()
+    })
+
+    // Coordinates from a previously-selected member must never centre the
+    // circle on the wrong home.
+    it('clears the coordinates when the member is deselected', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.selectedMemberCoords).toBeTruthy())
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.selectedMemberCoords).toBeNull())
+    })
   })
 
   // Service Coordinator Notes (member.scNotes): rendered only

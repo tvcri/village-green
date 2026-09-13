@@ -23,7 +23,44 @@ const FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.
 
 // Bias, never restrict: members routinely travel out of town (Seekonk MA is a
 // common Stop & Shop). A restriction would bury the right answer.
-const RI_BIAS = { circle: { center: { latitude: 41.72, longitude: -71.30 }, radius: 50000.0 } }
+//
+// 50 km is Google's ceiling for a bias circle, so the centre is the only lever
+// and it has to be chosen to reach the whole service area. The obvious centre —
+// Barrington, where the first version put it — does NOT: Westerly is 58 km out
+// and Pawcatuck 58.7, both outside. Westerly is the second-largest village (184
+// members) and the CT-border test case. This point, near Coventry, reaches
+// everything: Westerly 42.7 km, Pawcatuck 43.1, Woonsocket 33.8, Newport 30.6,
+// Providence 17.9, Seekonk 21.2.
+const RI_CENTER = { latitude: 41.70, longitude: -71.55 }
+const BIAS_RADIUS_M = 50000.0
+
+const circleAround = ({ latitude, longitude }) => ({
+  circle: { center: { latitude, longitude }, radius: BIAS_RADIUS_M }
+})
+
+// Which circle, if any, to send. Three coordinator-chosen modes:
+//
+//   'member'    — centre on the member's home. The default, and the reason this
+//                 exists: a fixed statewide centre measurably steered results
+//                 toward the towns near it.
+//   'statewide' — the RI_CENTER circle. Also the fallback whenever 'member' is
+//                 asked for without usable coordinates.
+//   'none'      — send no locationBias at all. DEV-ONLY. Google then falls back
+//                 to biasing on the CALLER's IP, which in production is an Azure
+//                 App Service address in northern Virginia. Locally this looks
+//                 harmless only because the dev machine egresses from RI.
+function resolveBias ({ bias, latitude, longitude }) {
+  if (bias === 'none') return null
+  if (bias !== 'statewide') {
+    // Number(null) is 0 — a real coordinate in the Gulf of Guinea — and null
+    // is exactly what a failed geocode sends, so reject it before converting
+    // rather than centring the circle off the coast of Africa.
+    const lat = latitude === null || latitude === undefined || latitude === '' ? NaN : Number(latitude)
+    const lon = longitude === null || longitude === undefined || longitude === '' ? NaN : Number(longitude)
+    if (Number.isFinite(lat) && Number.isFinite(lon)) return circleAround({ latitude: lat, longitude: lon })
+  }
+  return circleAround(RI_CENTER)
+}
 
 // A subpremise that already names its kind, so no "Suite " prefix is added.
 const SUBPREMISE_DESIGNATOR = /^(?:#|(?:suite|ste|unit|apt|apartment|bldg|building|fl|floor|rm|room)\b)/i
@@ -98,7 +135,7 @@ function buildQuery ({ text, town, state }) {
 // Search for places. Never throws: any failure — transport error, a bad key,
 // or a Google-side problem — resolves to [] so the dialog shows "no matches"
 // rather than the global error modal.
-async function searchPlaces ({ text, town, state, maxResults }) {
+async function searchPlaces ({ text, town, state, maxResults, bias, latitude, longitude }) {
   if (!text?.trim()) return []
 
   const headers = {
@@ -122,10 +159,12 @@ async function searchPlaces ({ text, town, state, maxResults }) {
   // restrictions and a Cloud console quota cap, not the referrer.
   if (config.google.placesReferer) headers.Referer = config.google.placesReferer
 
+  const locationBias = resolveBias({ bias, latitude, longitude })
   const body = JSON.stringify({
     textQuery: buildQuery({ text, town, state }),
     maxResultCount: clampResultCount(maxResults),
-    locationBias: RI_BIAS
+    // Omitted entirely for bias 'none' — sending null is not the same thing.
+    ...(locationBias ? { locationBias } : {})
   })
 
   try {
@@ -154,4 +193,4 @@ async function searchPlaces ({ text, town, state, maxResults }) {
   }
 }
 
-module.exports = { interpretPlacesResponse, buildQuery, clampResultCount, searchPlaces }
+module.exports = { interpretPlacesResponse, buildQuery, clampResultCount, resolveBias, searchPlaces, RI_CENTER }

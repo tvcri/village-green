@@ -1,7 +1,7 @@
 'use strict'
 const test = require('node:test')
 const assert = require('node:assert')
-const { interpretPlacesResponse, buildQuery, clampResultCount } = require('../service/PlacesService')
+const { interpretPlacesResponse, buildQuery, clampResultCount, resolveBias, RI_CENTER } = require('../service/PlacesService')
 
 // Verbatim Places API (New) Text Search response for
 // "Serra Physical Therapy, Barrington, RI", captured 2026-08-25.
@@ -133,4 +133,86 @@ test('leaves fields empty rather than undefined when components are missing', ()
     placeId: 'p', name: 'Somewhere', formattedAddress: 'Somewhere, RI',
     address: '', city: '', state: '', zip: ''
   }])
+})
+
+// --- location bias -------------------------------------------------------
+//
+// The bias circle is not cosmetic. On Azure App Service the Google caller IP
+// is in northern Virginia, and Google's fallback when no bias is sent is
+// IP-based — so the circle is the only thing keeping production results in
+// Rhode Island. Locally that is masked, because the dev machine egresses
+// from RI and even "no bias" looks reasonable.
+
+const MEMBER = { latitude: 41.429478, longitude: -71.518224 } // 283 Post Rd, South Kingstown
+
+test('centres the circle on the member when coordinates are supplied', () => {
+  assert.deepEqual(resolveBias({ bias: 'member', ...MEMBER }),
+    { circle: { center: MEMBER, radius: 50000 } })
+})
+
+// 'member' is the default: an omitted bias with coordinates still centres on
+// them, which is what the dialog sends when the coordinator leaves it alone.
+test('treats an absent bias as member-centred', () => {
+  assert.deepEqual(resolveBias({ ...MEMBER }),
+    { circle: { center: MEMBER, radius: 50000 } })
+})
+
+// A member whose address does not geocode must not silently lose the bias —
+// that would hand production over to the Virginia IP fallback.
+test('falls back to the statewide circle when coordinates are unusable', () => {
+  const statewide = { circle: { center: RI_CENTER, radius: 50000 } }
+  assert.deepEqual(resolveBias({ bias: 'member' }), statewide)
+  assert.deepEqual(resolveBias({ bias: 'member', latitude: null, longitude: null }), statewide)
+  assert.deepEqual(resolveBias({ bias: 'member', latitude: 41.4, longitude: 'abc' }), statewide)
+  assert.deepEqual(resolveBias({}), statewide)
+})
+
+// Number(null) is 0, a real coordinate in the Gulf of Guinea, and null is
+// exactly what a failed geocode returns — so a truthiness-free Number() guard
+// silently centres the circle off Africa. Caught by the test above; pinned
+// here because the null path is the common one, not an edge case.
+test('does not read a null coordinate as zero', () => {
+  const c = resolveBias({ bias: 'member', latitude: null, longitude: null }).circle.center
+  assert.notDeepEqual(c, { latitude: 0, longitude: 0 })
+  assert.deepEqual(c, RI_CENTER)
+})
+
+test('ignores coordinates when statewide is chosen explicitly', () => {
+  assert.deepEqual(resolveBias({ bias: 'statewide', ...MEMBER }),
+    { circle: { center: RI_CENTER, radius: 50000 } })
+})
+
+// Null, not an empty circle: searchPlaces omits locationBias entirely rather
+// than sending a null value, which Google would reject.
+test('sends no circle at all for bias none', () => {
+  assert.equal(resolveBias({ bias: 'none' }), null)
+  assert.equal(resolveBias({ bias: 'none', ...MEMBER }), null)
+})
+
+// Google caps a bias circle at 50 km, so the centre is the only lever and it
+// has to reach the whole service area. Barrington (41.72, -71.30), the first
+// centre used, left Westerly (184 members, the CT-border test case) 58 km out
+// — outside the circle. Guard the measured replacement.
+test('the statewide centre reaches the far corners of the service area', () => {
+  const km = (aLat, aLon, bLat, bLon) => {
+    const R = 6371
+    const rad = (d) => (d * Math.PI) / 180
+    const dLat = rad(bLat - aLat)
+    const dLon = rad(bLon - aLon)
+    const h = Math.sin(dLat / 2) ** 2 +
+      Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLon / 2) ** 2
+    return 2 * R * Math.asin(Math.sqrt(h))
+  }
+  const corners = {
+    Westerly: [41.3776, -71.8273],
+    Pawcatuck: [41.3776, -71.8590],
+    Woonsocket: [42.0029, -71.5147],
+    Newport: [41.4901, -71.3128],
+    Providence: [41.8240, -71.4128],
+    Seekonk: [41.8073, -71.3395]
+  }
+  for (const [name, [lat, lon]] of Object.entries(corners)) {
+    const d = km(RI_CENTER.latitude, RI_CENTER.longitude, lat, lon)
+    assert.ok(d < 50, `${name} is ${d.toFixed(1)} km from the statewide centre, outside the 50 km circle`)
+  }
 })

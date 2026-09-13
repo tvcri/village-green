@@ -10,7 +10,25 @@ const { safeReadBody } = require('../utils/safeReadBody')
 // token endpoint while config holds only credentials.
 const CENSUS_URL = 'https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress'
 const TIMEOUT_MS = 10000
-const UNRESOLVED = { town: null }
+const UNRESOLVED = { town: null, latitude: null, longitude: null }
+
+// Pure. Pull the coordinates off the first candidate match.
+//
+// Deliberately NOT subject to the agreement rule the town is held to. A wrong
+// municipality misroutes services, so a disputed town is refused; coordinates
+// are only a map-search bias centre, where two candidates a few hundred metres
+// apart are equally serviceable. Refusing them would leave the bias circle on
+// its statewide fallback for exactly the border addresses that most need a
+// local centre.
+//
+// Census names the axes x/y, not lon/lat: x is LONGITUDE, y is LATITUDE.
+function interpretCoordinates (matches) {
+  const c = matches[0]?.coordinates
+  const latitude = Number(c?.y)
+  const longitude = Number(c?.x)
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return { latitude: null, longitude: null }
+  return { latitude, longitude }
+}
 
 // Pure. Given a Census geographies response, decide what to store.
 //
@@ -23,20 +41,25 @@ const UNRESOLVED = { town: null }
 // fuzzy-matches street names, so a single confident-looking match can be a
 // different street; when candidates disagree the address sits on or near a
 // municipal line and we refuse to guess rather than direct a member to the
-// wrong municipality's services.
+// wrong municipality's services. Coordinates are returned regardless — see
+// interpretCoordinates.
 function interpretGeocoderResponse (json) {
   const matches = json?.result?.addressMatches
   if (!Array.isArray(matches) || matches.length === 0) return { ...UNRESOLVED }
+
+  const coordinates = interpretCoordinates(matches)
 
   const names = new Set()
   for (const m of matches) {
     const subs = m?.geographies?.['County Subdivisions']
     if (Array.isArray(subs) && subs.length > 0) names.add(subs[0]?.BASENAME)
   }
-  if (names.size !== 1) return { ...UNRESOLVED }
+  if (names.size !== 1) return { ...UNRESOLVED, ...coordinates }
 
   const town = [...names][0]
-  return typeof town === 'string' && town.trim() ? { town } : { ...UNRESOLVED }
+  return typeof town === 'string' && town.trim()
+    ? { town, ...coordinates }
+    : { ...UNRESOLVED, ...coordinates }
 }
 
 function buildUrl ({ street, city, state, zip }) {
@@ -50,9 +73,9 @@ function buildUrl ({ street, city, state, zip }) {
   return `${CENSUS_URL}?${params}`
 }
 
-// Resolve one address. Never throws: any failure — transport error or an
-// unusable address — resolves to { town: null } so a caller can retry later
-// or a coordinator can set the town by hand.
+// Resolve one address to its municipality and coordinates. Never throws: any
+// failure — transport error or an unusable address — resolves to all-null so a
+// caller can retry later or a coordinator can set the town by hand.
 //
 // Note there is deliberately NO guard on state. Members just over the CT/MA
 // line are served by the Villages and their towns are useful; the catalog is

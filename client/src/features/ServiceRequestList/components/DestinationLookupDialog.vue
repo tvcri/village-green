@@ -4,6 +4,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
+import Select from 'primevue/select'
 import { searchPlaces } from '../api/serviceRequestApi.js'
 
 defineOptions({ name: 'DestinationLookupDialog' })
@@ -16,6 +17,11 @@ const props = defineProps({
   // "Hopkinton" resolves to Massachusetts.
   town: { type: String, default: '' },
   state: { type: String, default: '' },
+  // The member's home coordinates, `{ latitude, longitude }` or null. Centres
+  // the search's bias circle so results are ranked near the member rather than
+  // near a fixed statewide point. Null until the geocode returns, or forever if
+  // it fails — the API then uses the statewide circle.
+  memberCoords: { type: Object, default: null },
   // What the dialog is filling — "Destination" or "Starting Location". Used
   // for the header and the input label so a coordinator can see which leg
   // they are looking up.
@@ -34,6 +40,25 @@ const text = ref('')
 // on every open: the member's town is right for a local errand and wrong for an
 // appointment across the state, and the coordinator is the one who knows which.
 const useMemberTown = ref(false)
+
+// Which geographic bias circle to ask for. Separate mechanism from the town
+// checkbox above, and deliberately so: the checkbox edits the query TEXT,
+// which is strong evidence to Google and can fence results into a town; this
+// is a ranking nudge, which excludes nothing outside the circle. The customer
+// asked about exactly this distinction — do not conflate them.
+//
+// "No bias" is labelled dev-only for a reason that is invisible here. Google's
+// fallback when no bias is sent is the CALLER's IP, and in production that is
+// an Azure App Service address in northern Virginia. The playground makes it
+// look harmless only because this machine egresses from Rhode Island.
+const BIAS_OPTIONS = [
+  { label: 'Near the member', value: 'member' },
+  { label: 'Statewide', value: 'statewide' },
+  { label: 'No bias (dev only)', value: 'none' }
+]
+const DEFAULT_BIAS = 'member'
+const bias = ref(DEFAULT_BIAS)
+
 // DEMO-ONLY. A knob for the working group to vary the result count live while
 // we learn what a useful list looks like. Google's ceiling is 20. Remove this,
 // the input, and the API's `maxResults` field together once the count settles.
@@ -53,6 +78,7 @@ watch(() => props.visible, (isVisible) => {
   if (isVisible) {
     text.value = ''
     useMemberTown.value = false
+    bias.value = DEFAULT_BIAS
     maxResults.value = DEFAULT_MAX_RESULTS
     places.value = null
   }
@@ -67,6 +93,17 @@ async function find () {
     const body = useMemberTown.value && props.town
       ? { text: q, town: props.town, state: props.state }
       : { text: q }
+    body.bias = bias.value
+    // Only sent for the member-centred mode, and only when the geocode
+    // actually returned. Without them the API falls back to statewide, which
+    // is what we want for a member whose address does not resolve.
+    if (bias.value === 'member' && props.memberCoords) {
+      const { latitude, longitude } = props.memberCoords
+      if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+        body.latitude = latitude
+        body.longitude = longitude
+      }
+    }
     // DEMO-ONLY: only sent when moved off the default, so the request stays
     // clean once this control is removed.
     const n = Number(maxResults.value)
@@ -94,6 +131,17 @@ function choose (place) {
 const nearText = computed(() =>
   props.town ? [props.town, props.state].filter(Boolean).join(', ') : ''
 )
+
+// Shown only when the chosen mode does not do what its label says. "Near the
+// member" without coordinates falls back to statewide on the server, and the
+// coordinator has no other way to see that — a stale or unmappable member
+// address looks identical to a working one from here.
+const biasHint = computed(() => {
+  if (bias.value !== 'member') return ''
+  const c = props.memberCoords
+  if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) return ''
+  return "member's address not located — using statewide"
+})
 
 const summary = computed(() => {
   if (!places.value) return ''
@@ -126,6 +174,21 @@ const summary = computed(() => {
         <div v-if="nearText" class="lookup-near">
           <Checkbox v-model="useMemberTown" input-id="lookup-near" binary />
           <label for="lookup-near">Search near {{ nearText }}</label>
+        </div>
+        <div class="lookup-bias">
+          <label for="lookup-bias">Rank results</label>
+          <Select
+            input-id="lookup-bias"
+            v-model="bias"
+            :options="BIAS_OPTIONS"
+            option-label="label"
+            option-value="value"
+            size="small"
+          />
+          <!-- Only shown when it changes what happens: "Near the member" with
+               no coordinates silently behaves as Statewide, and a coordinator
+               reading the droplist would have no way to know. -->
+          <span v-if="biasHint" class="lookup-bias-hint">{{ biasHint }}</span>
         </div>
         <!-- DEMO-ONLY control; remove with the API's maxResults field. -->
         <div class="lookup-count">
@@ -160,6 +223,14 @@ const summary = computed(() => {
 .lookup-opts { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .lookup-near { display: flex; align-items: center; gap: 0.5rem; }
 .lookup-near label { color: var(--p-text-muted-color); cursor: pointer; }
+
+.lookup-bias { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.lookup-bias label { color: var(--p-text-muted-color); }
+.lookup-bias-hint {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--p-text-muted-color);
+}
 
 /* DEMO-ONLY control. Deliberately understated — it is an experiment knob,
    not part of the coordinator's workflow. Remove with the maxResults field. */

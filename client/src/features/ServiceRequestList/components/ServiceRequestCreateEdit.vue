@@ -19,7 +19,7 @@ import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
-import { getPerson } from '../../PersonList/api/personApi.js'
+import { getPerson, geocodeTown } from '../../PersonList/api/personApi.js'
 import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
@@ -216,6 +216,14 @@ const selectedMemberHome = ref(null)
 // The member's municipality (person.town), passed to the destination lookup so
 // "CVS" resolves to the member's CVS. Fill convenience only — never stored.
 const selectedMemberTown = ref('')
+// The member's home coordinates, used to centre the destination lookup's bias
+// circle. Nothing is persisted — they are geocoded on member-select and held
+// only for the life of the form.
+//
+// The geocode runs while the coordinator is still choosing a service and a
+// date, so it costs the search itself no latency. When it fails, or the member
+// has no usable address, the lookup falls back to a statewide circle.
+const selectedMemberCoords = ref(null)
 const lookupVisible = ref(false)
 const startLookupVisible = ref(false)
 
@@ -231,9 +239,31 @@ const selectedMemberScNotes = ref('')
 // left open from a previous member.
 const scNotesCollapsed = ref(true)
 
+// Geocode the member's home to coordinates for the lookup's bias circle. Fire
+// and forget: the result lands in selectedMemberCoords whenever it arrives, and
+// nothing waits on it. A failure leaves the coordinates null, which the API
+// reads as "use the statewide circle".
+//
+// Guarded on the member still being the selected one, so a slow response for a
+// previously-chosen member cannot centre the circle on the wrong home.
+async function loadMemberCoords (personId, home) {
+  if (!home?.address || !home?.zip) return
+  try {
+    const { latitude, longitude } = await geocodeTown({
+      street: home.address, city: home.city, state: home.state, zip: home.zip
+    })
+    if (String(form.value.memberPersonId) !== String(personId)) return
+    selectedMemberCoords.value =
+      typeof latitude === 'number' && typeof longitude === 'number' ? { latitude, longitude } : null
+  } catch {
+    // Leave the coordinates null; the lookup falls back to statewide.
+  }
+}
+
 async function loadMemberHome (personId) {
   // Any change of member starts collapsed, including a change to no member.
   scNotesCollapsed.value = true
+  selectedMemberCoords.value = null
   if (!personId) {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
@@ -247,6 +277,9 @@ async function loadMemberHome (personId) {
       : null
     selectedMemberScNotes.value = (p?.member?.scNotes || '').trim()
     selectedMemberTown.value = p?.town || ''
+    // Not awaited: the coordinator carries on choosing a service and a date
+    // while this runs, so it adds no latency to the search itself.
+    loadMemberCoords(personId, selectedMemberHome.value)
   } catch {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
@@ -356,6 +389,7 @@ watch(selectedMember, (val) => {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
     selectedMemberTown.value = ''
+    selectedMemberCoords.value = null
     scNotesCollapsed.value = true
   }
 })
@@ -1491,12 +1525,14 @@ const openPersonDialog = (personId) => {
       leg-label="Starting location"
       :town="selectedMemberTown"
       :state="selectedMemberHome?.state ?? ''"
+      :member-coords="selectedMemberCoords"
       @select="applyPlaceToStart"
     />
     <DestinationLookupDialog
       v-model:visible="lookupVisible"
       :town="selectedMemberTown"
       :state="selectedMemberHome?.state ?? ''"
+      :member-coords="selectedMemberCoords"
       @select="applyPlaceToDestination"
     />
   </div>

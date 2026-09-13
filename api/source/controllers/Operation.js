@@ -196,8 +196,8 @@ module.exports.getRoles = async function getRoles (req, res, next) {
 
 module.exports.geocodeTown = async function geocodeTown (req, res, next) {
   try {
-    const { town } = await TownResolutionService.resolveTown(req.body)
-    res.json({ town })
+    const { town, latitude, longitude } = await TownResolutionService.resolveTown(req.body)
+    res.json({ town, latitude, longitude })
   }
   catch (err) {
     next(err)
