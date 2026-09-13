@@ -367,6 +367,24 @@ function applyPlaceToDestination (place) {
   form.value.zip = place.zip
 }
 
+// Whether a leg currently holds the given member's home, rather than a real
+// destination. Compares the address fields, not the name: the name is the
+// MEMBER_HOME_LABEL constant when filled by the button, but a coordinator may
+// have typed over it, and the address is what actually identifies the place.
+//
+// `home` is the home being replaced — the OUTGOING member's — so this must be
+// called before selectedMemberHome is overwritten.
+function legHoldsHome (leg, home) {
+  if (!home) return false
+  const same = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase()
+  // An address alone is enough; city/zip guard against two members on the
+  // same street number in different towns.
+  return same(leg.address, home.address) &&
+    same(leg.city, home.city) &&
+    same(leg.zip, home.zip) &&
+    Boolean((home.address || '').trim())
+}
+
 function clearStart () {
   form.value.start = ''
   form.value.startAddress = ''
@@ -403,9 +421,41 @@ const filterVolunteers = (event) => {
   )
 }
 
+// Drop location data that belonged to the member being replaced. The address
+// fields are COPIES — applyMemberHomeTo* writes values into the form — so
+// nulling selectedMemberHome does not disturb them, and they would otherwise
+// survive a member change and be submitted against the new member.
+//
+// The Start leg is member-derived by construction (it auto-fills with the
+// member's home), so it always clears. The Destination usually is not — it is
+// the doctor's office the coordinator typed or looked up — so it clears only
+// when it actually holds the outgoing member's home, the "Use member's home"
+// case for a return trip.
+//
+// Must run BEFORE selectedMemberHome is replaced: it needs the outgoing home
+// to recognise it.
+function clearOutgoingMemberLocations () {
+  const outgoing = selectedMemberHome.value
+  if (!outgoing) return
+  if (legHoldsHome(
+    { address: form.value.startAddress, city: form.value.startCity, zip: form.value.startZip },
+    outgoing
+  )) clearStart()
+  if (legHoldsHome(
+    { address: form.value.address, city: form.value.city, zip: form.value.zip },
+    outgoing
+  )) clearDestination()
+}
+
 watch(selectedMember, (val) => {
   // Only update if it's a complete selected object with both label and value
   if (val && typeof val === 'object' && val.label && val.value) {
+    const changingMember = String(val.value) !== String(form.value.memberPersonId || '')
+    // Drop the previous member's address before fetching the new one, so a
+    // stale Start cannot block the refill below — startIsEmpty was false
+    // because the OLD member's address was still sitting in it, which is why
+    // changing member used to leave the first member's home on the form.
+    if (changingMember) clearOutgoingMemberLocations()
     form.value.memberPersonId = String(val.value)
     // Fetch the member's home. Only fill Start here when the service is already
     // a Ride and Start is empty (covers changing the member on an existing Ride);
@@ -415,6 +465,7 @@ watch(selectedMember, (val) => {
       if (isRideService.value && startIsEmpty.value) applyMemberHomeToStart()
     })
   } else {
+    clearOutgoingMemberLocations()
     form.value.memberPersonId = null
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
@@ -438,6 +489,11 @@ watch(() => form.value.villageId, (villageId, oldVillageId) => {
   // Clear member/volunteer when switching from one village to another.
   // Skip on initial population (oldVillageId is empty), so edit-loads keep their values.
   if (oldVillageId && villageId !== oldVillageId) {
+    // Changing village clears the member, so the member's address must go with
+    // it. Done here explicitly rather than leaning on the selectedMember
+    // watcher: that watcher does clear it, but only on the next tick, and the
+    // ordering is not something a later edit should have to know about.
+    clearOutgoingMemberLocations()
     selectedMember.value = null
     selectedVolunteer.value = null
     form.value.memberPersonId = null

@@ -253,6 +253,96 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(vm.form.startZip).toBe('22150')
   })
 
+  // The address fields are COPIES — applyMemberHomeTo* writes values into the
+  // form — so nulling selectedMemberHome leaves them untouched. They used to
+  // survive a member change and be submitted against the new member.
+  describe('member-derived addresses follow the member', () => {
+    const OTHER_HOME = {
+      address: '99 Other Rd', city: 'Newport', state: 'RI', zip: '02840', phone: '555-0199'
+    }
+
+    it('clears the start address when the member is cleared', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.form.startAddress).toBe(''))
+      expect(vm.form.start).toBe('')
+      expect(vm.form.startCity).toBe('')
+      expect(vm.form.startZip).toBe('')
+    })
+
+    // The bug as reported: the stale address made startIsEmpty false, so the
+    // refill guard declined to run and the FIRST member's home stayed on the
+    // form under the second member's name.
+    it('replaces the start address when a different member is chosen', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+
+      getPerson.mockResolvedValueOnce(OTHER_HOME)
+      vm.selectedMember = { label: 'Other Member', value: '8' }
+      await waitFor(() => expect(vm.form.startAddress).toBe('99 Other Rd'))
+      expect(vm.form.startCity).toBe('Newport')
+      expect(vm.form.startZip).toBe('02840')
+    })
+
+    it('clears the start address when the village changes', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+
+      vm.form.villageId = '2'
+      await waitFor(() => expect(vm.form.startAddress).toBe(''))
+      expect(vm.selectedMember).toBeNull()
+    })
+
+    // A destination the coordinator typed or looked up has nothing to do with
+    // which member is travelling. Clearing it would destroy real work.
+    it('keeps a real destination when the member changes', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+
+      vm.form.destination = 'Newport Hospital'
+      vm.form.address = '11 Friendship St'
+      vm.form.city = 'Newport'
+      vm.form.zip = '02840'
+
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.form.startAddress).toBe(''))
+      // Untouched: it was never the member's home.
+      expect(vm.form.destination).toBe('Newport Hospital')
+      expect(vm.form.address).toBe('11 Friendship St')
+    })
+
+    // ...but a destination holding the member's home (the "Use member's home"
+    // return-trip case) is member-derived and must go with them.
+    it('clears a destination that holds the outgoing member home', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.selectedMemberHome?.address).toBe('1 Home St'))
+      vm.applyMemberHomeToDestination()
+      await waitFor(() => expect(vm.form.address).toBe('1 Home St'))
+
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.form.address).toBe(''))
+      expect(vm.form.destination).toBe('')
+    })
+  })
+
   // The destination lookup ranks results near the member. The coordinates come
   // from geocoding the member's home on select — nothing is persisted — and the
   // geocode overlaps with the coordinator choosing a service and a date, so it
