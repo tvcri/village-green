@@ -130,7 +130,7 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(screen.queryAllByText(/^Starting Location$/).length).toBe(0)
   })
 
-  it('hides the Destination fill/clear buttons for an Errand', async () => {
+  it('hides "Use member\'s home" on the Destination for an Errand', async () => {
     const vm = await mountAndExpose()
     vm.form.villageId = '1'
     vm.form.memberPersonId = '7'
@@ -138,13 +138,14 @@ describe('ServiceRequestCreateEdit start section', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/^Destination$/).length).toBeGreaterThan(0)
     })
-    // Errands match production: plain address fields, no fill/clear helpers.
+    // An Errand's destination is a shop, not the member's house — so the
+    // home-fill helper stays Rides-only. Clear fields is NOT gated: the
+    // lookup can populate the fields for an Errand, so it must be undoable.
     expect(document.querySelectorAll('.use-home-btn').length).toBe(0)
-    expect(screen.queryByText(/^Clear fields$/)).toBeNull()
   })
 
-  // An Errand has a destination but no starting location, and no fill/clear
-  // helpers. The lookup is about the destination, not the ride, so it belongs
+  // An Errand has a destination but no starting location, and no home-fill
+  // helper. The lookup is about the destination, not the ride, so it belongs
   // here too — it was gated on isRideService by mistake.
   it('offers the destination lookup for an Errand', async () => {
     const vm = await mountAndExpose()
@@ -156,8 +157,10 @@ describe('ServiceRequestCreateEdit start section', () => {
     })
     // Still no starting-location lookup: an Errand has no start leg.
     expect(screen.queryByRole('button', { name: 'Look up starting location' })).toBeNull()
-    // And the fill/clear helpers stay hidden, as before.
+    // The home-fill helper stays hidden, as before.
     expect(document.querySelectorAll('.use-home-btn').length).toBe(0)
+    // But Clear fields is offered: a lookup that can fill must be undoable.
+    expect(screen.getByRole('button', { name: 'Clear destination' })).toBeTruthy()
   })
 
   it('shows a "Use member\'s home" button for a Ride destination', async () => {

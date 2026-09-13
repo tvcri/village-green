@@ -1337,12 +1337,14 @@ const openPersonDialog = (personId) => {
             <div style="display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
               <!-- The lookup is about the destination, not the ride: every
-                   service with a destination gets it. The fill/clear helpers
-                   stay Rides-only, matching production. -->
+                   service with a destination gets it, and so does Clear
+                   fields — a lookup that can fill has to be undoable.
+                   "Use member's home" stays Rides-only: an Errand's
+                   destination is a shop, not the member's house. -->
               <div style="display: flex; gap: 0.5rem;">
                 <Button v-if="isRideService" type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
                 <Button type="button" size="small" outlined icon="pi pi-search" label="Look up…" aria-label="Look up destination" @click="lookupVisible = true" />
-                <Button v-if="isRideService" type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear destination" @click="clearDestination" />
+                <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear destination" @click="clearDestination" />
               </div>
             </div>
 
