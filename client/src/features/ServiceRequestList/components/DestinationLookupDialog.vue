@@ -177,18 +177,24 @@ const summary = computed(() => {
         </div>
         <div class="lookup-bias">
           <label for="lookup-bias">Rank results</label>
-          <Select
-            input-id="lookup-bias"
-            v-model="bias"
-            :options="BIAS_OPTIONS"
-            option-label="label"
-            option-value="value"
-            size="small"
-          />
-          <!-- Only shown when it changes what happens: "Near the member" with
-               no coordinates silently behaves as Statewide, and a coordinator
-               reading the droplist would have no way to know. -->
-          <span v-if="biasHint" class="lookup-bias-hint">{{ biasHint }}</span>
+          <!-- The Select is sized by the widest option, not by the selected
+               one, so choosing a shorter label cannot shrink it. The sizer
+               below is laid out (so it sets the grid column's width) but
+               painted transparent and hidden from assistive tech; the real
+               Select is stacked on top of it. -->
+          <div class="bias-select">
+            <span class="bias-sizer" aria-hidden="true">
+              <span v-for="o in BIAS_OPTIONS" :key="o.value">{{ o.label }}</span>
+            </span>
+            <Select
+              input-id="lookup-bias"
+              v-model="bias"
+              :options="BIAS_OPTIONS"
+              option-label="label"
+              option-value="value"
+              size="small"
+            />
+          </div>
         </div>
         <!-- DEMO-ONLY control; remove with the API's maxResults field. -->
         <div class="lookup-count">
@@ -196,6 +202,12 @@ const summary = computed(() => {
           <input id="lookup-max" v-model.number="maxResults" type="number" min="1" max="20" />
         </div>
       </div>
+      <!-- On its own line, below the controls, so that appearing and
+           disappearing never re-wraps the row above it. Only shown when it
+           changes what happens: "Near the member" with no coordinates
+           silently behaves as Statewide, and a coordinator reading the
+           droplist would have no way to know. -->
+      <p v-if="biasHint" class="lookup-bias-hint">{{ biasHint }}</p>
     </form>
 
     <div v-if="places" class="lookup-results">
@@ -224,9 +236,40 @@ const summary = computed(() => {
 .lookup-near { display: flex; align-items: center; gap: 0.5rem; }
 .lookup-near label { color: var(--p-text-muted-color); cursor: pointer; }
 
-.lookup-bias { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.lookup-bias { display: flex; align-items: center; gap: 0.5rem; }
 .lookup-bias label { color: var(--p-text-muted-color); }
+
+/* A PrimeVue Select sizes itself to the SELECTED option's text, so picking a
+   shorter one ("Statewide") shrinks the control and the whole options row
+   re-wraps under it — the checkbox and Max results visibly jump between one
+   line and two.
+
+   Fix by stacking the Select on a hidden sizer holding every option label, in
+   a 1x1 grid: the grid column is as wide as the widest label, so the control
+   keeps that width whatever is selected. Measured rather than hardcoded, so a
+   longer option or a different font size stays correct. */
+.bias-select { display: grid; }
+.bias-select > * { grid-area: 1 / 1; }
+.bias-sizer {
+  /* Laid out (it must set the column width) but invisible and untabbable.
+     visibility:hidden, not display:none — the latter measures nothing. */
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  /* Room for the Select's own horizontal padding and its dropdown chevron,
+     which the sizer's bare text does not account for. Widening the sizer is
+     what reserves the space — padding on .p-select would only move the
+     chevron inward. */
+  padding-right: 3rem;
+}
+/* The labels stack rather than sum: only the widest sets the column. */
+.bias-sizer span { display: block; }
+.bias-select :deep(.p-select) { width: 100%; }
+.bias-select :deep(.p-select-label) { white-space: nowrap; }
 .lookup-bias-hint {
+  margin: 0;
   font-size: 0.8rem;
   font-style: italic;
   color: var(--p-text-muted-color);

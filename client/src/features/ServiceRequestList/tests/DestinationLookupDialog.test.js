@@ -237,6 +237,27 @@ describe('DestinationLookupDialog', () => {
     }))
   })
 
+  // The Select would otherwise size to the SELECTED option, so picking
+  // "Statewide" shrank it and the options row re-wrapped — the checkbox and
+  // Max results jumped between one line and two on every change. A hidden
+  // sizer carrying every label holds the width. It looks like dead markup;
+  // it is not.
+  it('sizes the bias droplist by every option, not the selected one', async () => {
+    render(DestinationLookupDialog, {
+      props: { visible: true, town: '', state: '' },
+      global: globalOpts
+    })
+    await screen.findByLabelText('Destination')
+    const sizer = document.querySelector('.bias-sizer')
+    expect(sizer).toBeTruthy()
+    // Every option label is present, so the widest one sets the width.
+    expect(sizer.textContent).toContain('Near the member')
+    expect(sizer.textContent).toContain('Statewide')
+    expect(sizer.textContent).toContain('No bias (dev only)')
+    // Hidden from assistive tech: it duplicates the real Select's options.
+    expect(sizer.getAttribute('aria-hidden')).toBe('true')
+  })
+
   it('shows a no-matches message when nothing comes back', async () => {
     const { searchPlaces } = await import('../api/serviceRequestApi.js')
     searchPlaces.mockResolvedValue({ places: [] })
