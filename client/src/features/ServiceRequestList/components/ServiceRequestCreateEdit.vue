@@ -224,6 +224,20 @@ const selectedMemberTown = ref('')
 // date, so it costs the search itself no latency. When it fails, or the member
 // has no usable address, the lookup falls back to a statewide circle.
 const selectedMemberCoords = ref(null)
+// How the geocode above is getting on. The lookup dialog needs to tell three
+// situations apart that a null `selectedMemberCoords` cannot:
+//
+//   'idle'    — no member selected yet.
+//   'pending' — geocode in flight. Treated as optimistically OK: the option
+//               stays selectable, because it almost always succeeds and a
+//               disabled state that flickers for a fraction of a second is
+//               worse than the narrow window where a search fired right now
+//               falls back to statewide.
+//   'ok'      — coordinates are usable.
+//   'failed'  — no address on file, the geocode failed, or it returned
+//               nothing usable. The dialog disables "Near the member" and
+//               says why, rather than offering a choice it cannot honour.
+const memberCoordsStatus = ref('idle')
 const lookupVisible = ref(false)
 const startLookupVisible = ref(false)
 
@@ -247,16 +261,27 @@ const scNotesCollapsed = ref(true)
 // Guarded on the member still being the selected one, so a slow response for a
 // previously-chosen member cannot centre the circle on the wrong home.
 async function loadMemberCoords (personId, home) {
-  if (!home?.address || !home?.zip) return
+  // No street or zip is a settled answer, not a pending one: Census cannot
+  // place the member and never will, so the dialog can say so immediately.
+  if (!home?.address || !home?.zip) {
+    memberCoordsStatus.value = 'failed'
+    return
+  }
+  memberCoordsStatus.value = 'pending'
   try {
     const { latitude, longitude } = await geocodeTown({
       street: home.address, city: home.city, state: home.state, zip: home.zip
     })
+    // A response for a member who is no longer selected must not land: it
+    // would centre the circle on the previous member's home.
     if (String(form.value.memberPersonId) !== String(personId)) return
-    selectedMemberCoords.value =
-      typeof latitude === 'number' && typeof longitude === 'number' ? { latitude, longitude } : null
+    const usable = typeof latitude === 'number' && typeof longitude === 'number'
+    selectedMemberCoords.value = usable ? { latitude, longitude } : null
+    memberCoordsStatus.value = usable ? 'ok' : 'failed'
   } catch {
-    // Leave the coordinates null; the lookup falls back to statewide.
+    if (String(form.value.memberPersonId) !== String(personId)) return
+    selectedMemberCoords.value = null
+    memberCoordsStatus.value = 'failed'
   }
 }
 
@@ -264,6 +289,7 @@ async function loadMemberHome (personId) {
   // Any change of member starts collapsed, including a change to no member.
   scNotesCollapsed.value = true
   selectedMemberCoords.value = null
+  memberCoordsStatus.value = 'idle'
   if (!personId) {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
@@ -284,6 +310,10 @@ async function loadMemberHome (personId) {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
     selectedMemberTown.value = ''
+    // The person fetch failed, so loadMemberCoords never ran and there is no
+    // address to geocode. Settle the status rather than leaving it 'idle',
+    // which the dialog would read as "still coming".
+    memberCoordsStatus.value = 'failed'
   }
 }
 
@@ -390,6 +420,7 @@ watch(selectedMember, (val) => {
     selectedMemberScNotes.value = ''
     selectedMemberTown.value = ''
     selectedMemberCoords.value = null
+    memberCoordsStatus.value = 'idle'
     scNotesCollapsed.value = true
   }
 })
@@ -1526,6 +1557,7 @@ const openPersonDialog = (personId) => {
       :town="selectedMemberTown"
       :state="selectedMemberHome?.state ?? ''"
       :member-coords="selectedMemberCoords"
+      :member-coords-status="memberCoordsStatus"
       @select="applyPlaceToStart"
     />
     <DestinationLookupDialog
@@ -1533,6 +1565,7 @@ const openPersonDialog = (personId) => {
       :town="selectedMemberTown"
       :state="selectedMemberHome?.state ?? ''"
       :member-coords="selectedMemberCoords"
+      :member-coords-status="memberCoordsStatus"
       @select="applyPlaceToDestination"
     />
   </div>

@@ -267,6 +267,7 @@ describe('ServiceRequestCreateEdit start section', () => {
         street: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150'
       }))
       await waitFor(() => expect(vm.selectedMemberCoords).toEqual({ latitude: 38.77, longitude: -77.19 }))
+      expect(vm.memberCoordsStatus).toBe('ok')
     })
 
     // Null, not a partial object: the dialog and the API both read absence as
@@ -277,7 +278,7 @@ describe('ServiceRequestCreateEdit start section', () => {
       const vm = await mountAndExpose()
       vm.form.villageId = '1'
       vm.selectedMember = { label: 'Mabel Member', value: '7' }
-      await waitFor(() => expect(geocodeTown).toHaveBeenCalled())
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('failed'))
       expect(vm.selectedMemberCoords).toBeNull()
     })
 
@@ -289,6 +290,7 @@ describe('ServiceRequestCreateEdit start section', () => {
       vm.selectedMember = { label: 'Mabel Member', value: '7' }
       // The home address still loaded — the geocode is a side errand.
       await waitFor(() => expect(vm.selectedMemberHome?.address).toBe('1 Home St'))
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('failed'))
       expect(vm.selectedMemberCoords).toBeNull()
     })
 
@@ -300,7 +302,9 @@ describe('ServiceRequestCreateEdit start section', () => {
       const vm = await mountAndExpose()
       vm.form.villageId = '1'
       vm.selectedMember = { label: 'Mabel Member', value: '7' }
-      await waitFor(() => expect(getPerson).toHaveBeenCalled())
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('failed'))
+      // Settled, not pending: there is nothing to wait for, so the dialog can
+      // disable the option immediately rather than offering it optimistically.
       expect(geocodeTown).not.toHaveBeenCalled()
       expect(vm.selectedMemberCoords).toBeNull()
     })
@@ -314,6 +318,34 @@ describe('ServiceRequestCreateEdit start section', () => {
       await waitFor(() => expect(vm.selectedMemberCoords).toBeTruthy())
       vm.selectedMember = null
       await waitFor(() => expect(vm.selectedMemberCoords).toBeNull())
+      expect(vm.memberCoordsStatus).toBe('idle')
+    })
+
+    // The window this is all about: between member-select and the geocode
+    // landing, the option stays offered rather than flickering disabled.
+    it('reports pending while the geocode is in flight', async () => {
+      const { geocodeTown } = await import('../../PersonList/api/personApi.js')
+      let release
+      geocodeTown.mockReturnValueOnce(new Promise((r) => { release = r }))
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('pending'))
+      release({ town: 'Springfield', latitude: 38.77, longitude: -77.19 })
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('ok'))
+    })
+
+    // The person fetch failing means loadMemberCoords never runs. Left at
+    // 'idle' the dialog would read that as "still coming" and keep offering a
+    // centre that is never going to arrive.
+    it('settles the status when the person fetch itself fails', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockRejectedValueOnce(new Error('network'))
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('failed'))
+      expect(vm.selectedMemberCoords).toBeNull()
     })
   })
 

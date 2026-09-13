@@ -22,6 +22,10 @@ const props = defineProps({
   // near a fixed statewide point. Null until the geocode returns, or forever if
   // it fails — the API then uses the statewide circle.
   memberCoords: { type: Object, default: null },
+  // Whether those coordinates are coming, usable, or never arriving:
+  // 'idle' | 'pending' | 'ok' | 'failed'. Drives whether "Near the member" can
+  // be chosen at all. 'pending' counts as selectable — see BIAS_OPTIONS.
+  memberCoordsStatus: { type: String, default: 'idle' },
   // What the dialog is filling — "Destination" or "Starting Location". Used
   // for the header and the input label so a coordinator can see which leg
   // they are looking up.
@@ -51,13 +55,36 @@ const useMemberTown = ref(false)
 // fallback when no bias is sent is the CALLER's IP, and in production that is
 // an Azure App Service address in northern Virginia. The playground makes it
 // look harmless only because this machine egresses from Rhode Island.
-const BIAS_OPTIONS = [
-  { label: 'Near the member', value: 'member' },
-  { label: 'Statewide', value: 'statewide' },
-  { label: 'No bias (dev only)', value: 'none' }
-]
 const DEFAULT_BIAS = 'member'
 const bias = ref(DEFAULT_BIAS)
+
+// Whether the member can actually be the centre. 'pending' counts as yes: the
+// geocode nearly always succeeds, and flickering the option disabled for the
+// fraction of a second it is outstanding is worse than the narrow window in
+// which a search fired right now falls back to statewide.
+const canCentreOnMember = computed(() => props.memberCoordsStatus !== 'failed')
+
+// Built from the status, so the droplist never offers a centre it cannot
+// honour. "Near the member" stays in the list when it is unavailable — the
+// list keeps a stable length, and a disabled row with a reason tells the
+// coordinator the member's address is bad, which an option that had silently
+// vanished would not.
+const BIAS_OPTIONS = computed(() => [
+  {
+    label: 'Near the member',
+    value: 'member',
+    disabled: !canCentreOnMember.value,
+    // Rendered under the label in the dropdown, not in the closed control, so
+    // the reason is visible where the choice is made without widening the box.
+    note: canCentreOnMember.value ? '' : "member's address not located"
+  },
+  { label: 'Statewide', value: 'statewide' },
+  { label: 'No bias (dev only)', value: 'none' }
+])
+
+// Every label, for the width sizer. Static: the option labels themselves never
+// change, so the control keeps one width for the life of the dialog.
+const BIAS_SIZER_LABELS = ['Near the member', 'Statewide', 'No bias (dev only)']
 
 // DEMO-ONLY. A knob for the working group to vary the result count live while
 // we learn what a useful list looks like. Google's ceiling is 20. Remove this,
@@ -78,11 +105,21 @@ watch(() => props.visible, (isVisible) => {
   if (isVisible) {
     text.value = ''
     useMemberTown.value = false
-    bias.value = DEFAULT_BIAS
+    // Statewide when the member cannot be the centre, so the dialog never
+    // opens on a disabled option.
+    bias.value = canCentreOnMember.value ? DEFAULT_BIAS : 'statewide'
     maxResults.value = DEFAULT_MAX_RESULTS
     places.value = null
   }
 }, { immediate: true })
+
+// A geocode can fail while the dialog is already open — it is fired on
+// member-select and the coordinator may well have got here first. Move the
+// selection off "Near the member" when that happens, rather than leaving a
+// disabled option selected and searching something other than what it says.
+watch(canCentreOnMember, (canCentre) => {
+  if (!canCentre && bias.value === 'member') bias.value = 'statewide'
+})
 
 async function find () {
   const q = text.value.trim()
@@ -132,17 +169,6 @@ const nearText = computed(() =>
   props.town ? [props.town, props.state].filter(Boolean).join(', ') : ''
 )
 
-// Shown only when the chosen mode does not do what its label says. "Near the
-// member" without coordinates falls back to statewide on the server, and the
-// coordinator has no other way to see that — a stale or unmappable member
-// address looks identical to a working one from here.
-const biasHint = computed(() => {
-  if (bias.value !== 'member') return ''
-  const c = props.memberCoords
-  if (c && Number.isFinite(c.latitude) && Number.isFinite(c.longitude)) return ''
-  return "member's address not located — using statewide"
-})
-
 const summary = computed(() => {
   if (!places.value) return ''
   const n = places.value.length
@@ -184,7 +210,7 @@ const summary = computed(() => {
                Select is stacked on top of it. -->
           <div class="bias-select">
             <span class="bias-sizer" aria-hidden="true">
-              <span v-for="o in BIAS_OPTIONS" :key="o.value">{{ o.label }}</span>
+              <span v-for="label in BIAS_SIZER_LABELS" :key="label">{{ label }}</span>
             </span>
             <Select
               input-id="lookup-bias"
@@ -192,8 +218,18 @@ const summary = computed(() => {
               :options="BIAS_OPTIONS"
               option-label="label"
               option-value="value"
+              option-disabled="disabled"
               size="small"
-            />
+            >
+              <template #option="{ option }">
+                <div class="bias-option">
+                  <span>{{ option.label }}</span>
+                  <!-- Why the option cannot be picked, shown at the point of
+                       choosing rather than as a hint elsewhere in the form. -->
+                  <small v-if="option.note">{{ option.note }}</small>
+                </div>
+              </template>
+            </Select>
           </div>
         </div>
         <!-- DEMO-ONLY control; remove with the API's maxResults field. -->
@@ -202,12 +238,6 @@ const summary = computed(() => {
           <input id="lookup-max" v-model.number="maxResults" type="number" min="1" max="20" />
         </div>
       </div>
-      <!-- On its own line, below the controls, so that appearing and
-           disappearing never re-wraps the row above it. Only shown when it
-           changes what happens: "Near the member" with no coordinates
-           silently behaves as Statewide, and a coordinator reading the
-           droplist would have no way to know. -->
-      <p v-if="biasHint" class="lookup-bias-hint">{{ biasHint }}</p>
     </form>
 
     <div v-if="places" class="lookup-results">
@@ -268,12 +298,9 @@ const summary = computed(() => {
 .bias-sizer span { display: block; }
 .bias-select :deep(.p-select) { width: 100%; }
 .bias-select :deep(.p-select-label) { white-space: nowrap; }
-.lookup-bias-hint {
-  margin: 0;
-  font-size: 0.8rem;
-  font-style: italic;
-  color: var(--p-text-muted-color);
-}
+/* The reason a bias option cannot be picked, shown inside the dropdown row. */
+.bias-option { display: flex; flex-direction: column; line-height: 1.25; }
+.bias-option small { font-size: 0.75rem; font-style: italic; opacity: 0.85; }
 
 /* DEMO-ONLY control. Deliberately understated — it is an experiment knob,
    not part of the coordinator's workflow. Remove with the maxResults field. */

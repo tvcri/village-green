@@ -180,24 +180,61 @@ describe('DestinationLookupDialog', () => {
     await waitFor(() => expect(searchPlaces).toHaveBeenCalledWith({ text: 'Serra', bias: 'member' }))
   })
 
-  // "Near the member" with no coordinates silently behaves as Statewide. The
-  // coordinator has no other way to see that — a stale or unmappable member
-  // address looks identical to a working one from inside this dialog.
-  it('says so when member-centred is not actually possible', async () => {
-    render(DestinationLookupDialog, {
-      props: { visible: true, town: 'Barrington', state: 'RI', memberCoords: null },
-      global: globalOpts
-    })
-    expect(await screen.findByText(/not located — using statewide/i)).toBeInTheDocument()
-  })
-
-  it('shows no such warning once the coordinates arrive', async () => {
-    render(DestinationLookupDialog, {
-      props: { visible: true, town: 'Barrington', state: 'RI', memberCoords: MEMBER_COORDS },
-      global: globalOpts
+  // A choice the dialog cannot honour must not be offered. Rather than
+  // silently falling back to statewide behind a droplist still reading "Near
+  // the member", the option is disabled and says why.
+  it('disables member-centred when the address cannot be located', async () => {
+    const { setup } = renderExposed({
+      visible: true, town: 'Barrington', state: 'RI',
+      memberCoords: null, memberCoordsStatus: 'failed'
     })
     await screen.findByLabelText('Destination')
-    expect(screen.queryByText(/not located/i)).toBeNull()
+    const opts = setup().BIAS_OPTIONS
+    const member = opts.find(o => o.value === 'member')
+    expect(member.disabled).toBe(true)
+    expect(member.note).toMatch(/not located/i)
+    // The other two stay available, so a search is still possible.
+    expect(opts.filter(o => o.disabled).length).toBe(1)
+  })
+
+  // Opening on a disabled option would be a dead control: the coordinator
+  // would have to notice and change it before the search meant anything.
+  it('opens on Statewide when the member cannot be the centre', async () => {
+    const { setup } = renderExposed({
+      visible: true, town: 'Barrington', state: 'RI',
+      memberCoords: null, memberCoordsStatus: 'failed'
+    })
+    await screen.findByLabelText('Destination')
+    expect(setup().bias).toBe('statewide')
+  })
+
+  // The geocode is fired on member-select and the coordinator may well reach
+  // the dialog first, so it can fail while this is already open.
+  it('moves off member-centred if the geocode fails while open', async () => {
+    const { rerender, setup } = renderExposed({
+      visible: true, town: 'Barrington', state: 'RI',
+      memberCoords: null, memberCoordsStatus: 'pending'
+    })
+    await screen.findByLabelText('Destination')
+    // Pending is optimistically selectable — the geocode nearly always works.
+    expect(setup().bias).toBe('member')
+    await rerender({
+      visible: true, town: 'Barrington', state: 'RI',
+      memberCoords: null, memberCoordsStatus: 'failed'
+    })
+    expect(setup().bias).toBe('statewide')
+  })
+
+  it('leaves member-centred enabled and unannotated once coordinates arrive', async () => {
+    const { setup } = renderExposed({
+      visible: true, town: 'Barrington', state: 'RI',
+      memberCoords: MEMBER_COORDS, memberCoordsStatus: 'ok'
+    })
+    await screen.findByLabelText('Destination')
+    const member = setup().BIAS_OPTIONS.find(o => o.value === 'member')
+    expect(member.disabled).toBe(false)
+    expect(member.note).toBe('')
+    expect(setup().bias).toBe('member')
   })
 
   it('sends the chosen bias, and drops the coordinates when it is not member', async () => {
