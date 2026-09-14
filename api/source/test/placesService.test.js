@@ -1,7 +1,7 @@
 'use strict'
 const test = require('node:test')
 const assert = require('node:assert')
-const { interpretPlacesResponse, buildQuery, clampResultCount, resolveBias, RI_CENTER } = require('../service/PlacesService')
+const { interpretPlacesResponse, buildQuery, resolveBias, RI_CENTER } = require('../service/PlacesService')
 
 // Verbatim Places API (New) Text Search response for
 // "Serra Physical Therapy, Barrington, RI", captured 2026-08-25.
@@ -98,27 +98,6 @@ test('returns an empty list for no places or malformed input', () => {
 test('buildQuery appends the member town and state to the text', () => {
   assert.equal(buildQuery({ text: 'South Shore Mental Health', town: 'Hopkinton', state: 'RI' }),
     'South Shore Mental Health, Hopkinton, RI')
-})
-
-// DEMO-ONLY knob. Google's ceiling is 20 and it silently clamps anything
-// higher, so clamp here where a bad value is visible rather than mysterious.
-test('clampResultCount bounds the request to what Google will honour', () => {
-  assert.equal(clampResultCount(15), 15)
-  assert.equal(clampResultCount(1), 1)
-  assert.equal(clampResultCount(20), 20)
-  assert.equal(clampResultCount(21), 20)
-  assert.equal(clampResultCount(0), 1)
-  assert.equal(clampResultCount(-5), 1)
-})
-
-// The default matches the dialog's, which omits the field when it is
-// unchanged — so an untouched lookup must get the same count either way.
-test('clampResultCount falls back to the default when unusable', () => {
-  assert.equal(clampResultCount(undefined), 20)
-  assert.equal(clampResultCount(null), 20)
-  assert.equal(clampResultCount('12'), 12)
-  assert.equal(clampResultCount('abc'), 20)
-  assert.equal(clampResultCount(7.6), 7)
 })
 
 test('buildQuery tolerates a missing town or state', () => {

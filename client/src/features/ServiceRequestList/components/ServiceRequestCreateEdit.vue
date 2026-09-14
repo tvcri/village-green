@@ -213,9 +213,6 @@ const selectedVolunteer = ref(null)
 // omits address fields, so fetch the person to obtain home. "Member's home" is a
 // fill convenience only — never stored as SR state.
 const selectedMemberHome = ref(null)
-// The member's municipality (person.town), passed to the destination lookup so
-// "CVS" resolves to the member's CVS. Fill convenience only — never stored.
-const selectedMemberTown = ref('')
 // The member's home coordinates, used to centre the destination lookup's bias
 // circle. Nothing is persisted — they are geocoded on member-select and held
 // only for the life of the form.
@@ -293,7 +290,6 @@ async function loadMemberHome (personId) {
   if (!personId) {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
-    selectedMemberTown.value = ''
     return
   }
   try {
@@ -302,14 +298,12 @@ async function loadMemberHome (personId) {
       ? { address: p.address || '', city: p.city || '', state: p.state || '', zip: p.zip || '', phone: p.phone || '' }
       : null
     selectedMemberScNotes.value = (p?.member?.scNotes || '').trim()
-    selectedMemberTown.value = p?.town || ''
     // Not awaited: the coordinator carries on choosing a service and a date
     // while this runs, so it adds no latency to the search itself.
     loadMemberCoords(personId, selectedMemberHome.value)
   } catch {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
-    selectedMemberTown.value = ''
     // The person fetch failed, so loadMemberCoords never ran and there is no
     // address to geocode. Settle the status rather than leaving it 'idle',
     // which the dialog would read as "still coming".
@@ -469,7 +463,6 @@ watch(selectedMember, (val) => {
     form.value.memberPersonId = null
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
-    selectedMemberTown.value = ''
     selectedMemberCoords.value = null
     memberCoordsStatus.value = 'idle'
     scNotesCollapsed.value = true
@@ -1610,16 +1603,12 @@ const openPersonDialog = (personId) => {
     <DestinationLookupDialog
       v-model:visible="startLookupVisible"
       leg-label="Starting location"
-      :town="selectedMemberTown"
-      :state="selectedMemberHome?.state ?? ''"
       :member-coords="selectedMemberCoords"
       :member-coords-status="memberCoordsStatus"
       @select="applyPlaceToStart"
     />
     <DestinationLookupDialog
       v-model:visible="lookupVisible"
-      :town="selectedMemberTown"
-      :state="selectedMemberHome?.state ?? ''"
       :member-coords="selectedMemberCoords"
       :member-coords-status="memberCoordsStatus"
       @select="applyPlaceToDestination"

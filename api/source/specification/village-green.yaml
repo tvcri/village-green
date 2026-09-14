@@ -687,15 +687,6 @@ paths:
                 state:
                   type: string
                   maxLength: 50
-                maxResults:
-                  description: 'DEMO-ONLY. Lets the working group vary the result
-                    count live while we learn what a useful list looks like.
-                    Remove with the dialog input when the count is settled.
-
-                    '
-                  type: integer
-                  minimum: 1
-                  maximum: 20
                 bias:
                   description: 'Which geographic bias circle to send. `member`
                     centres it on the coordinates below, falling back to
