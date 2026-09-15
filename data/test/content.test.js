@@ -7,10 +7,10 @@ import { SERVICE_CATEGORIES } from '../generator/constants.js'
 const load = (name) =>
   JSON.parse(readFileSync(fileURLToPath(new URL(`../content/${name}`, import.meta.url)), 'utf8'))
 
-// The 13 capability names every serviceName.capability must match.
-const CAPS = new Set(['Circles', 'Errands', 'Friends', 'Governance', 'Healthcare Support',
-  'Home Help', 'New Member Intake', 'Office Services', 'Rides', 'Safety Net',
-  'Service Referrals', 'Tech Support', 'Village Affiliation'])
+// The 5 capability names the federation uses (constants.js CAPABILITIES).
+// Eight finer-grained tags were retired — a volunteer could hold one and match
+// no service request, leaving the VSS claimable pool empty.
+const CAPS = new Set(['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support'])
 
 test('services.json has the expected shape and valid capabilities', () => {
   const s = load('services.json')

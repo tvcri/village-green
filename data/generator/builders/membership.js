@@ -1,5 +1,5 @@
 import { BASE_DATE } from '../env.js'
-import { CAPABILITIES } from '../constants.js'
+import { CAPABILITIES, SERVICE_CAPABILITIES } from '../constants.js'
 
 const isoDate = (d) => d.toISOString().slice(0, 10)
 const addDays = (d, n) => new Date(d.getTime() + n * 86400000)
@@ -36,6 +36,11 @@ export function buildMembership (plan, content, rng) {
         id: mId, personId: personId,
         memberNumber: `M-${String(vid).padStart(2, '0')}${String(mId).padStart(4, '0')}`,
         memberType: rng.pick(['Individual', 'Household']), primaryPersonId: null,
+        // memberLevel vocabulary is closed to Primary/Secondary
+        // (MemberFormFields.vue). Everyone starts Primary; the household pass
+        // below flips the linked spouse to Secondary, matching how the importer
+        // derives it (importMapping.js: index 0 -> Primary, rest -> Secondary).
+        memberLevel: 'Primary',
         secondaryType: null, joinDate: isoDate(addDays(BASE_DATE, -rng.int(30, 3000))),
         status: 'Active', // ~5% flip to Inactive/Dropped in the post-pass below
         dropReason: null,
@@ -55,6 +60,7 @@ export function buildMembership (plan, content, rng) {
     if (villageMembers.length >= 2 && rng.bool(0.8)) {
       const [primary, secondary] = rng.shuffle(villageMembers).slice(0, 2)
       secondary.primaryPersonId = primary.personId
+      secondary.memberLevel = 'Secondary'
       secondary.secondaryType = 'Spouse'
       secondary.householdSize = 2; primary.householdSize = 2
     }
@@ -68,7 +74,12 @@ export function buildMembership (plan, content, rng) {
         notes: volunteerNotes.length && rng.bool(0.5) ? rng.pick(volunteerNotes) : null,
       })
       // 1-3 capabilities
-      const caps = rng.shuffle(CAPABILITIES).slice(0, rng.int(1, 3))
+      // Always include at least one service capability: a volunteer holding
+      // only 'Friends' matches no service_request, which is what left half the
+      // VSS logins staring at an empty claimable pool.
+      const primaryCap = rng.pick(SERVICE_CAPABILITIES)
+      const caps = [primaryCap, ...rng.shuffle(CAPABILITIES.filter(c => c.id !== primaryCap.id))
+        .slice(0, rng.int(0, 2))]
       for (const c of caps) { vcId += 1; volunteer_capability.push({ id: vcId, volunteerId: vId, capabilityId: c.id }) }
       // ~40% have a vetting record; vettings never expire in practice (spec §6)
       if (rng.bool(0.4) && vetting_type.length) {
