@@ -79,7 +79,7 @@ const shared = useServiceRequestFilters(requests, { initialStatuses: ['open', 'c
 const {
   selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
   memberNames: memberOptions, volunteerNames: volunteerOptions,
-  serviceNames: serviceOptions, clearAll
+  serviceNames: serviceOptions, clearAll, statusFilterLabel
 } = shared
 
 // The Selects use null as "no filter" (so show-clear only appears for a real
@@ -238,7 +238,8 @@ const tableProps = computed(() => ({
   hasLoadedOnce: hasLoadedOnce.value,
   error: error.value,
   showVillageColumn: true,
-  flashRowId: flashRowId.value
+  flashRowId: flashRowId.value,
+  statusFilterLabel: statusFilterLabel.value
 }))
 
 const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)
@@ -306,12 +307,18 @@ const clearFilters = () => {
         <div v-if="!filtersCollapsed" class="filters-content">
           <div class="status-filter-group">
             <label class="filter-group-label">Status:</label>
-            <div class="status-filters">
-              <div v-for="status in ALL_STATUSES" :key="status" class="status-filter">
-                <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
-                <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
+            <div class="status-row">
+              <div class="status-filters">
+                <div v-for="status in ALL_STATUSES" :key="status" class="status-filter">
+                  <Checkbox v-model="selectedStatuses" :input-id="`status-${status}`" :value="status" />
+                  <label :for="`status-${status}`">{{ status.charAt(0).toUpperCase() + status.slice(1) }}</label>
+                </div>
               </div>
-              <div class="status-filter">
+              <!-- VSS Signup is not a status -- it's an orthogonal "how did this
+                   request get picked up" flag. Kept on the status line to avoid
+                   a whole extra row, but pushed to the right so it doesn't read
+                   as a sixth status checkbox. -->
+              <div class="vss-filter">
                 <Checkbox v-model="vssSignupOnly" input-id="vss-signup-filter" binary />
                 <label for="vss-signup-filter">VSS Signup</label>
               </div>
@@ -328,11 +335,36 @@ const clearFilters = () => {
           </div>
           <div class="search-box">
             <label>Member:</label>
-            <Select v-model="memberChoice" :options="memberOptions" placeholder="All members" show-clear />
+            <!-- `filter` searches within the existing options; it cannot yield
+                 an off-list value. (`editable` is the prop that would allow
+                 free text -- deliberately not used.) Options are "Last, First",
+                 so filterMatchMode must be `contains` for a first-name search
+                 to hit. -->
+            <Select
+              v-model="memberChoice"
+              :options="memberOptions"
+              placeholder="All members"
+              show-clear
+              filter
+              filter-match-mode="contains"
+              filter-placeholder="Type to find a member"
+              reset-filter-on-hide
+              auto-filter-focus
+            />
           </div>
           <div class="search-box">
             <label>Volunteer:</label>
-            <Select v-model="volunteerChoice" :options="volunteerOptions" placeholder="All volunteers" show-clear />
+            <Select
+              v-model="volunteerChoice"
+              :options="volunteerOptions"
+              placeholder="All volunteers"
+              show-clear
+              filter
+              filter-match-mode="contains"
+              filter-placeholder="Type to find a volunteer"
+              reset-filter-on-hide
+              auto-filter-focus
+            />
           </div>
           <div class="search-box">
             <label>Service:</label>
@@ -413,8 +445,18 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .filters-content .search-box label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .status-filter { display: flex; align-items: center; gap: 0.375rem; }
+/* margin-left:auto pushes VSS Signup to the far right of the status line. The
+   distance is the separation -- it is not a status, and sitting apart from the
+   five status boxes says so. A divider was tried here and removed: at this
+   size the border token is near-invisible in both themes, and a rule with
+   nothing either side of it reads as an artifact rather than a boundary. */
+.status-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.vss-filter { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
+  /* Once the row wraps, VSS gets its own line -- pushing it right there would
+     strand it, so let it sit with the statuses. */
+  .vss-filter { margin-left: 0; }
 }
 .date-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .date-range label { color: var(--color-text-dim); font-size: 0.9rem; }
