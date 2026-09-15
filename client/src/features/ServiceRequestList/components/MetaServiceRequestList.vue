@@ -316,8 +316,8 @@ const clearFilters = () => {
               </div>
               <!-- VSS Signup is not a status -- it's an orthogonal "how did this
                    request get picked up" flag. Kept on the status line to avoid
-                   a whole extra row, but pushed right behind a divider so it
-                   doesn't read as a sixth status checkbox. -->
+                   a whole extra row, but pushed to the right so it doesn't read
+                   as a sixth status checkbox. -->
               <div class="vss-filter">
                 <Checkbox v-model="vssSignupOnly" input-id="vss-signup-filter" binary />
                 <label for="vss-signup-filter">VSS Signup</label>
@@ -445,15 +445,18 @@ h1 { margin: 1rem 0 0 0; color: var(--color-text-primary); }
 .filters-content .search-box label { font-weight: 500; color: var(--color-text-primary); font-size: 0.9rem; }
 .status-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .status-filter { display: flex; align-items: center; gap: 0.375rem; }
-/* margin-left:auto pushes VSS Signup to the far right of the status line; the
-   left border is the visual break that says "different kind of filter". When
-   the row wraps at narrow widths the auto margin collapses, so drop the rule
-   and the padding with it. */
+/* margin-left:auto pushes VSS Signup to the far right of the status line. The
+   distance is the separation -- it is not a status, and sitting apart from the
+   five status boxes says so. A divider was tried here and removed: at this
+   size the border token is near-invisible in both themes, and a rule with
+   nothing either side of it reads as an artifact rather than a boundary. */
 .status-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.vss-filter { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; padding-left: 1.25rem; border-left: 1px solid var(--color-border-default); }
+.vss-filter { display: flex; align-items: center; gap: 0.375rem; margin-left: auto; }
 @media (max-width: 768px) {
   .service-request-list { padding: 1rem; }
-  .vss-filter { margin-left: 0; padding-left: 0; border-left: none; }
+  /* Once the row wraps, VSS gets its own line -- pushing it right there would
+     strand it, so let it sit with the statuses. */
+  .vss-filter { margin-left: 0; }
 }
 .date-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .date-range label { color: var(--color-text-dim); font-size: 0.9rem; }
