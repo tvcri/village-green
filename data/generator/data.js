@@ -1,4 +1,5 @@
 import { makeRng } from './rng.js'
+import { BASE_DATE } from './env.js'
 import { CAPABILITIES } from './constants.js'
 import { resolveVillages } from './sizing.js'
 import { buildVillagesAndUsers } from './builders/villages.js'
@@ -8,6 +9,7 @@ import { buildMembership } from './builders/membership.js'
 import { buildCommunities } from './builders/communities.js'
 import { buildVssUsers } from './builders/vss.js'
 import { buildRequests } from './builders/requests.js'
+import { grantVillageRolesToVssVolunteers } from './builders/vss-roles.js'
 import { applyPlants } from './plants.js'
 
 export function buildDataset (content, seed, sizing = {}) {
@@ -24,6 +26,10 @@ export function buildDataset (content, seed, sizing = {}) {
   const vss = buildVssUsers(personsPlan, membership, user_data, rng)
   const privacy = buildPrivacy(user_data, rng)
   const requests = buildRequests(personsPlan, membership, content, rng, creatorUserIds, vss.userIdByPersonId)
+  // Dual-role demo: a volunteer who also holds a village role. Runs after
+  // buildRequests so it can pick volunteers with real workload.
+  const vssRoleGrants = grantVillageRolesToVssVolunteers(
+    personsPlan, membership, vss, role_grant, requests.service_request, rng, BASE_DATE)
 
   const dataset = {
     village, user_data, role_grant,
@@ -41,7 +47,7 @@ export function buildDataset (content, seed, sizing = {}) {
   }
 
   const plants = applyPlants(dataset, rng)
-  dataset.__meta = { plants, villagesList, gagIndex: requests.gagIndex }
+  dataset.__meta = { plants, villagesList, gagIndex: requests.gagIndex, vssRoleGrants }
 
   return dataset
 }
