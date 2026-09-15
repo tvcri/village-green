@@ -334,11 +334,36 @@ const clearFilters = () => {
           </div>
           <div class="search-box">
             <label>Member:</label>
-            <Select v-model="memberChoice" :options="memberOptions" placeholder="All members" show-clear />
+            <!-- `filter` searches within the existing options; it cannot yield
+                 an off-list value. (`editable` is the prop that would allow
+                 free text -- deliberately not used.) Options are "Last, First",
+                 so filterMatchMode must be `contains` for a first-name search
+                 to hit. -->
+            <Select
+              v-model="memberChoice"
+              :options="memberOptions"
+              placeholder="All members"
+              show-clear
+              filter
+              filter-match-mode="contains"
+              filter-placeholder="Type to find a member"
+              reset-filter-on-hide
+              auto-filter-focus
+            />
           </div>
           <div class="search-box">
             <label>Volunteer:</label>
-            <Select v-model="volunteerChoice" :options="volunteerOptions" placeholder="All volunteers" show-clear />
+            <Select
+              v-model="volunteerChoice"
+              :options="volunteerOptions"
+              placeholder="All volunteers"
+              show-clear
+              filter
+              filter-match-mode="contains"
+              filter-placeholder="Type to find a volunteer"
+              reset-filter-on-hide
+              auto-filter-focus
+            />
           </div>
           <div class="search-box">
             <label>Service:</label>
