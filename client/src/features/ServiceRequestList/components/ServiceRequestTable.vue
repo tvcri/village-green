@@ -17,6 +17,10 @@ const props = defineProps({
   hasLoadedOnce: { type: Boolean, required: true },
   error: { type: Error, required: true },
   showVillageColumn: { type: Boolean, default: false },
+  // Comma-joined status names for the empty state, e.g. 'Open, Confirmed'.
+  // '' when no status filter is active, which reads as "all statuses" and so
+  // has nothing to name. Defaulted so existing callers need not pass it.
+  statusFilterLabel: { type: String, default: '' },
   flashRowId: { type: [String, Number], default: null },
   // Initial serviceDate sort: 1 = ascending (soonest first), -1 = descending.
   // The lists default to ascending so upcoming work reads in the order it will
@@ -118,7 +122,8 @@ const rowClass = computed(() => {
       <p>Unable to load service requests. Please try again.</p>
     </div>
     <div v-else-if="!rows.length" class="empty-state">
-      <p>No service requests found</p>
+      <p v-if="statusFilterLabel">No service requests found with status {{ statusFilterLabel }}</p>
+      <p v-else>No service requests found</p>
     </div>
 
     <DataTable

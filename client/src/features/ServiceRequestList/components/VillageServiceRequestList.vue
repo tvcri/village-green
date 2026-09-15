@@ -67,7 +67,7 @@ const DEFAULT_STATUSES = ['open', 'confirmed']
 const {
   selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
   memberNames, volunteerNames, serviceNames,
-  filteredRows: filteredRequests, clearAll
+  filteredRows: filteredRequests, clearAll, statusFilterLabel
 } = useServiceRequestFilters(requests, { initialStatuses: DEFAULT_STATUSES })
 
 const onNotified = (updated) => {
@@ -250,7 +250,8 @@ const tableProps = computed(() => ({
   isLoading: isLoading.value,
   hasLoadedOnce: hasLoadedOnce.value,
   error: error.value,
-  flashRowId: flashRowId.value
+  flashRowId: flashRowId.value,
+  statusFilterLabel: statusFilterLabel.value
 }))
 
 const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)

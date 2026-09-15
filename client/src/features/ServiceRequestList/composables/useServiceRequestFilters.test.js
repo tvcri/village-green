@@ -181,4 +181,39 @@ describe('useServiceRequestFilters', () => {
       expect(memberNames.value).toContain('Completed Carl')
     })
   })
+
+  describe('statusFilterLabel', () => {
+    const labelFor = (statuses) =>
+      useServiceRequestFilters(ref([]), { initialStatuses: statuses }).statusFilterLabel
+
+    // [] means "show every status", so there is nothing to name and the empty
+    // state falls back to the plain message.
+    it('is empty when no status filter is active', () => {
+      expect(labelFor([]).value).toBe('')
+    })
+
+    it('capitalises and joins the selected statuses', () => {
+      expect(labelFor(['open', 'confirmed']).value).toBe('Open, Confirmed')
+    })
+
+    // selectedStatuses is a checkbox v-model, so its order follows click order.
+    // The label must not reshuffle as boxes are toggled.
+    it('orders by the canonical status order, not selection order', () => {
+      expect(labelFor(['cancelled', 'open', 'completed']).value)
+        .toBe('Open, Completed, Cancelled')
+    })
+
+    // 'cancelled' is one UI key covering three DB values; name it as ticked.
+    it('names the rolled-up cancelled key once', () => {
+      expect(labelFor(['cancelled']).value).toBe('Cancelled')
+    })
+
+    it('tracks later changes to the selection', () => {
+      const { selectedStatuses, statusFilterLabel } =
+        useServiceRequestFilters(ref([]), { initialStatuses: ['open'] })
+      expect(statusFilterLabel.value).toBe('Open')
+      selectedStatuses.value = ['completed', 'unmatched']
+      expect(statusFilterLabel.value).toBe('Completed, Unmatched')
+    })
+  })
 })

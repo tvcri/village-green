@@ -5,6 +5,14 @@ import { ref, computed } from 'vue'
 // both. The meta list previously used exact equality and silently missed rows.
 const normalizeService = (s) => s?.toLowerCase().replace(/:\s*/g, ': ').trim()
 
+// Display order for the status filter label. Mirrors ALL_STATUSES in
+// useServiceRequestWindow.js -- duplicated rather than imported to keep this
+// composable free of a dependency on the window/fetch composable. An unknown
+// key simply drops out of the label.
+const STATUS_KEY_ORDER = Object.freeze([
+  'open', 'confirmed', 'completed', 'unmatched', 'cancelled'
+])
+
 const sortedUnique = (rows, key) =>
   Array.from(new Set((rows ?? []).map(r => r[key]).filter(Boolean))).sort()
 
@@ -68,6 +76,23 @@ export function useServiceRequestFilters (rows, { initialStatuses = [] } = {}) {
 
   const filteredRows = computed(() => safeRows.value.filter(matches))
 
+  // The status checkboxes hide behind the collapsed Filters button, so an empty
+  // grid looks unexplained -- the date window and village are still on screen,
+  // but the statuses are not. This names them for the empty state. It restates
+  // the selection rather than diagnosing a cause: with several filters set, any
+  // guess at which one emptied the grid can be wrong, and a confident wrong
+  // answer is worse than none. '' when nothing is selected, since [] means "all
+  // statuses" and there is nothing to name.
+  //
+  // Ordered by STATUS_KEY_ORDER, not by selection order: selectedStatuses is a
+  // checkbox v-model, so its order follows clicks and the label would otherwise
+  // reshuffle as boxes are toggled. 'Cancelled' is one key covering the three
+  // DB cancel values -- name it as the user ticked it, not as it is stored.
+  const statusFilterLabel = computed(() => STATUS_KEY_ORDER
+    .filter(k => selectedStatuses.value.includes(k))
+    .map(k => k.charAt(0).toUpperCase() + k.slice(1))
+    .join(', '))
+
   const clearAll = () => {
     selectedMember.value = ''
     selectedVolunteer.value = ''
@@ -79,6 +104,6 @@ export function useServiceRequestFilters (rows, { initialStatuses = [] } = {}) {
   return {
     selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
     memberNames, volunteerNames, serviceNames,
-    matches, filteredRows, clearAll
+    matches, filteredRows, clearAll, statusFilterLabel
   }
 }

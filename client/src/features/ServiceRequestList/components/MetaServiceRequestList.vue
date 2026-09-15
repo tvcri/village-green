@@ -79,7 +79,7 @@ const shared = useServiceRequestFilters(requests, { initialStatuses: ['open', 'c
 const {
   selectedMember, selectedVolunteer, selectedService, idSearch, selectedStatuses,
   memberNames: memberOptions, volunteerNames: volunteerOptions,
-  serviceNames: serviceOptions, clearAll
+  serviceNames: serviceOptions, clearAll, statusFilterLabel
 } = shared
 
 // The Selects use null as "no filter" (so show-clear only appears for a real
@@ -238,7 +238,8 @@ const tableProps = computed(() => ({
   hasLoadedOnce: hasLoadedOnce.value,
   error: error.value,
   showVillageColumn: true,
-  flashRowId: flashRowId.value
+  flashRowId: flashRowId.value,
+  statusFilterLabel: statusFilterLabel.value
 }))
 
 const onRowClick = (event) => navigateToRequest(event.data.serviceRequestId, event.data.villageId)
