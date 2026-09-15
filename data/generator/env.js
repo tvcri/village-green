@@ -23,4 +23,15 @@ export const config = {
 }
 
 // Fixed clock for deterministic data. NEVER use Date.now() in builders.
-export const BASE_DATE = new Date('2026-06-30T12:00:00Z')
+// Override with VG_DEMO_BASE_DATE=YYYY-MM-DD (or 'today') to re-anchor the
+// dataset's window; unset keeps the pinned date so `emit` stays byte-identical.
+const baseDateEnv = e.VG_DEMO_BASE_DATE
+const resolveBaseDate = () => {
+  if (!baseDateEnv) return '2026-06-30'
+  if (baseDateEnv === 'today') return new Date().toISOString().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(baseDateEnv)) {
+    throw new Error(`VG_DEMO_BASE_DATE must be YYYY-MM-DD or 'today', got: ${baseDateEnv}`)
+  }
+  return baseDateEnv
+}
+export const BASE_DATE = new Date(`${resolveBaseDate()}T12:00:00Z`)
