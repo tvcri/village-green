@@ -1,4 +1,6 @@
 import { ROLE, ROLE_NAMES } from './constants.js'
+import { BASE_DATE } from './env.js'
+import { SERVICE_CAPABILITIES } from './constants.js'
 
 const ROLE_DEMOS = {
   [ROLE.lsc]: 'village-scoped read access as a Local Service Coordinator',
@@ -32,9 +34,53 @@ export function buildLogins (ds) {
       featured: FEATURED.has(u.username),
     }
   })
-  // feature the first three VSS logins so the droplist default shows the flow
-  let vssFeatured = 0
-  for (const l of logins) if (vssByUsername.has(l.username) && vssFeatured < 3) { l.featured = true; vssFeatured++ }
+  // Feature the three VSS logins with the most demo-able workload. Picking the
+  // *first* three featured volunteers with no assigned requests at all, which
+  // makes the VSS surface look empty in a demo. Rank by "has upcoming work AND
+  // history" so the featured logins always show both halves of the flow.
+  const base = BASE_DATE.toISOString().slice(0, 10)
+  const personIdByEmail = Object.fromEntries(ds.person.map(p => [p.email, p.id]))
+  const srByVolunteer = {}
+  for (const sr of ds.service_request) {
+    if (sr.volunteerPersonId) (srByVolunteer[sr.volunteerPersonId] ??= []).push(sr)
+  }
+  // A volunteer with no SERVICE capability can claim nothing, so their VSS
+  // board is empty no matter how many requests are assigned to them. Rank that
+  // out first — it outranks workload.
+  const serviceCapIds = new Set(SERVICE_CAPABILITIES.map(c => c.id))
+  const volunteerIdByPersonId = Object.fromEntries(ds.volunteer.map(v => [v.personId, v.id]))
+  const serviceCapByVolunteerId = {}
+  for (const vc of ds.volunteer_capability) {
+    if (serviceCapIds.has(vc.capabilityId)) serviceCapByVolunteerId[vc.volunteerId] = true
+  }
+  const vssScore = (username) => {
+    const personId = personIdByEmail[username]
+    const srs = srByVolunteer[personId] || []
+    const canClaim = serviceCapByVolunteerId[volunteerIdByPersonId[personId]] ? 1 : 0
+    const upcoming = srs.filter(s => s.serviceDate >= base && s.status === 'Confirmed').length
+    const history = srs.filter(s => s.serviceDate < base && s.status === 'Completed').length
+    // both halves present beats a lopsided pile of either one
+    return [canClaim, Math.min(upcoming, 1) + Math.min(history, 1), upcoming + history, upcoming]
+  }
+  const vssRanked = logins.filter(l => vssByUsername.has(l.username))
+    .map(l => ({ l, score: vssScore(l.username) }))
+    .sort((a, b) => b.score[0] - a.score[0] || b.score[1] - a.score[1] ||
+      b.score[2] - a.score[2] || b.score[3] - a.score[3])
+  for (const { l, score } of vssRanked.slice(0, 3)) {
+    l.featured = true
+    const dual = l.role ? `${l.role} + ` : ''
+    l.demos = `${dual}volunteer self-service (VSS) — ${score[3]} upcoming, ${score[2] - score[3]} completed`
+  }
+  // Guarantee at least one dual-role login is featured even if the ranking's
+  // top three happened to miss them.
+  for (const g of ds.__meta.vssRoleGrants || []) {
+    const email = ds.user_data.find(u => u.userId === g.userId)?.username
+    const l = logins.find(x => x.username === email)
+    if (l && !l.featured) {
+      l.featured = true
+      l.demos = `${l.role} + volunteer self-service (VSS) — ${g.upcoming} upcoming, ${g.completed} completed`
+    }
+  }
   logins.push({
     username: ds.__meta.plants.ackModalUsername, name: 'Ezra Stiles (new arrival)',
     villages: [], role: '', featured: true,

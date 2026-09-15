@@ -1,5 +1,5 @@
 {
-  "_comment": "Columns the generator consciously leaves unset (DB default/NULL applies). The doctor errors on any unset column NOT listed here — when the schema grows a column, either populate it in a builder or acknowledge it here with a reason.",
+  "_comment": "Columns the generator consciously leaves unset (DB default/NULL applies). The doctor errors on any unset column NOT listed here \u2014 when the schema grows a column, either populate it in a builder or acknowledge it here with a reason.",
   "user_data.created": "DB default CURRENT_TIMESTAMP is correct",
   "user_data.lastAccess": "runtime bookkeeping, set by the app on login",
   "user_data.status": "DB default 'available' is correct",
@@ -9,7 +9,6 @@
   "user_data.webPreferences": "DB default preferences JSON is correct",
   "role_grant.userGroupId": "demo grants are per-user, not per-group",
   "person.emailStatus": "app-managed email verification state",
-  "member.memberLevel": "CE-era field, not exercised in demo",
   "member.createdDate": "joinDate covers demo needs",
   "member.quickbooksKey": "billing not exercised in demo",
   "member.printedNewsletter": "ops field, not exercised in demo",
@@ -20,5 +19,5 @@
   "notification_event.failedAt": "demo data has no failed sends",
   "fcv_submission.fuzzyVolunteerName": "populated by the app's FCV fuzzy-match intake",
   "fcv_submission.fuzzyMemberName": "populated by the app's FCV fuzzy-match intake",
-  "notification_event.payload": "app-populated notification payload; seeded rows predate real sends — intentionally NULL (matches prod rows)"
+  "notification_event.payload": "app-populated notification payload; seeded rows predate real sends \u2014 intentionally NULL (matches prod rows)"
 }

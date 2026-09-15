@@ -423,7 +423,7 @@ test('buildDataset is deterministic and complete', () => {
   const a = buildDataset(fullContentWithDest(), 20260630)
   const b = buildDataset(fullContentWithDest(), 20260630)
   assert.deepEqual(a, b)
-  assert.equal(a.capability.length, 13)
+  assert.equal(a.capability.length, 5)
   assert.ok(a.person.length >= 290, `person count ${a.person.length}`)
   assert.ok(a.service_request.length >= 180, `service_request count ${a.service_request.length}`)
   assert.ok(a.fcv_submission.length >= 30, `fcv_submission count ${a.fcv_submission.length}`)

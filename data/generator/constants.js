@@ -1,12 +1,20 @@
 // capability ids are FIXED by the static migration seed — reference these exact ids.
+// The capabilities the federation actually uses. Ids match the static catalog
+// in 20-vg-static.sql — reference them, never invent new ones: the generator
+// previously seeded eight extras (Circles, Governance, Healthcare Support, New
+// Member Intake, Office Services, Safety Net, Service Referrals, Village
+// Affiliation) that exist in no real deployment, and a volunteer holding only
+// those matched no service request, so their VSS board came up empty.
+// 'Friends' is Friendly Calls & Visits — live in the client's capability filter
+// and backed by fcv_submission, but it serves no service_request, so it is not
+// a SERVICE_CAPABILITIES member.
 export const CAPABILITIES = [
   { id: 1, name: 'Errands' }, { id: 2, name: 'Friends' }, { id: 3, name: 'Home Help' },
-  { id: 4, name: 'Tech Support' }, { id: 5, name: 'Rides' }, { id: 6, name: 'Circles' },
-  { id: 9, name: 'Governance' }, { id: 10, name: 'Healthcare Support' },
-  { id: 12, name: 'New Member Intake' }, { id: 13, name: 'Office Services' },
-  { id: 15, name: 'Safety Net' }, { id: 16, name: 'Service Referrals' },
-  { id: 18, name: 'Village Affiliation' },
+  { id: 4, name: 'Tech Support' }, { id: 5, name: 'Rides' },
 ]
+// Capabilities that map to a service_request serviceName — every volunteer gets
+// at least one so the VSS claimable pool is never empty for them.
+export const SERVICE_CAPABILITIES = CAPABILITIES.filter(c => c.name !== 'Friends')
 
 // role ids are FIXED by the static catalog (20-vg-static.sql) — reference, never insert.
 export const ROLE = { lsc: 1, steering: 2, lead: 3, admin: 4, staff: 5, board: 6, serviceCoordinator: 7 }
