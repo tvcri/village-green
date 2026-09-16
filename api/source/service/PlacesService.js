@@ -43,12 +43,13 @@ const circleAround = ({ latitude, longitude }) => ({
 //                 toward the towns near it.
 //   'statewide' — the RI_CENTER circle. Also the fallback whenever 'member' is
 //                 asked for without usable coordinates.
-//   'none'      — send no locationBias at all. DEV-ONLY. Google then falls back
-//                 to biasing on the CALLER's IP, which in production is an Azure
-//                 App Service address in northern Virginia. Locally this looks
-//                 harmless only because the dev machine egresses from RI.
+//
+// A third mode, 'none' (send no locationBias, letting Google bias on the
+// CALLER's IP), was removed from the OAS enum once the client's bias droplist
+// went: in production the caller is an Azure App Service address in northern
+// Virginia, and it only ever looked harmless locally because the dev machine
+// egresses from RI. The validator now rejects it, so there is no branch for it.
 function resolveBias ({ bias, latitude, longitude }) {
-  if (bias === 'none') return null
   if (bias !== 'statewide') {
     // Number(null) is 0 — a real coordinate in the Gulf of Guinea — and null
     // is exactly what a failed geocode sends, so reject it before converting
@@ -118,11 +119,54 @@ function buildQuery ({ text, town, state }) {
   return [text, town, state].map((s) => (s ?? '').trim()).filter(Boolean).join(', ')
 }
 
+// Circuit breaker on a runaway caller, NOT a fairness limiter. Every call here
+// is billed against the Places Pro free tier (5,000/month), and a loop — a
+// retry storm, a re-render, a script pointed at the wrong host — can spend the
+// month in minutes. The ceiling is far above what a coordinator produces (a
+// busy hour is tens of lookups) and far below what a loop does.
+//
+// Deliberately in-process and NOT persisted. A monthly counter would have to
+// survive restarts to mean anything, and here merge IS deploy — the container
+// restarts on every squash-merge to main, which would zero it far more often
+// than the quota it claims to track. A runaway does its damage inside one
+// container lifetime, so a per-minute window is the scope that actually
+// matches the failure. The slow leak (sustained calls just under the ceiling)
+// is knowingly not covered; the backstop for that is the Cloud console quota
+// cap, noted with the referrer comment below.
+const MAX_CALLS_PER_MINUTE = 60
+let windowStart = 0
+let windowCount = 0
+
+function withinRate (now = Date.now()) {
+  if (now - windowStart >= 60000) {
+    windowStart = now
+    windowCount = 0
+  }
+  if (windowCount >= MAX_CALLS_PER_MINUTE) return false
+  windowCount++
+  return true
+}
+
+// Test seam: the breaker is module state, so a test that trips it would leak
+// into the next one.
+function resetRateWindow () {
+  windowStart = 0
+  windowCount = 0
+}
+
 // Search for places. Never throws: any failure — transport error, a bad key,
 // or a Google-side problem — resolves to [] so the dialog shows "no matches"
 // rather than the global error modal.
 async function searchPlaces ({ text, town, state, bias, latitude, longitude }) {
   if (!text?.trim()) return []
+
+  // Returns [] like every other failure here, so no caller changes. The log is
+  // the point: without it, tripping the breaker is indistinguishable from
+  // Google not knowing the place.
+  if (!withinRate()) {
+    logger.writeError('searchPlaces', 'rateLimited', { limit: MAX_CALLS_PER_MINUTE, windowStart })
+    return []
+  }
 
   const headers = {
     'Content-Type': 'application/json',
@@ -149,7 +193,8 @@ async function searchPlaces ({ text, town, state, bias, latitude, longitude }) {
   const body = JSON.stringify({
     textQuery: buildQuery({ text, town, state }),
     maxResultCount: RESULT_COUNT,
-    // Omitted entirely for bias 'none' — sending null is not the same thing.
+    // resolveBias always returns a circle now, but the guard costs nothing and
+    // keeps sending an explicit null impossible.
     ...(locationBias ? { locationBias } : {})
   })
 
@@ -179,4 +224,4 @@ async function searchPlaces ({ text, town, state, bias, latitude, longitude }) {
   }
 }
 
-module.exports = { interpretPlacesResponse, buildQuery, resolveBias, searchPlaces, RI_CENTER }
+module.exports = { interpretPlacesResponse, buildQuery, resolveBias, searchPlaces, withinRate, resetRateWindow, RI_CENTER, MAX_CALLS_PER_MINUTE }

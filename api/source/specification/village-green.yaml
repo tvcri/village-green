@@ -690,14 +690,11 @@ paths:
                 bias:
                   description: 'Which geographic bias circle to send. `member`
                     centres it on the coordinates below, falling back to
-                    `statewide` when they are absent or unusable. `none` sends
-                    no bias at all, which lets Google fall back to biasing on
-                    the API caller''s IP — in production an Azure address in
-                    northern Virginia, so this is a development option only.
+                    `statewide` when they are absent or unusable.
 
                     '
                   type: string
-                  enum: [member, statewide, none]
+                  enum: [member, statewide]
                   default: member
                 latitude:
                   description: 'Bias centre latitude, used only with bias

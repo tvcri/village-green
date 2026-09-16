@@ -1,7 +1,8 @@
 'use strict'
 const test = require('node:test')
 const assert = require('node:assert')
-const { interpretPlacesResponse, buildQuery, resolveBias, RI_CENTER } = require('../service/PlacesService')
+const { interpretPlacesResponse, buildQuery, resolveBias, searchPlaces, withinRate,
+  resetRateWindow, RI_CENTER, MAX_CALLS_PER_MINUTE } = require('../service/PlacesService')
 
 // Verbatim Places API (New) Text Search response for
 // "Serra Physical Therapy, Barrington, RI", captured 2026-08-25.
@@ -161,11 +162,14 @@ test('ignores coordinates when statewide is chosen explicitly', () => {
     { circle: { center: RI_CENTER, radius: 50000 } })
 })
 
-// Null, not an empty circle: searchPlaces omits locationBias entirely rather
-// than sending a null value, which Google would reject.
-test('sends no circle at all for bias none', () => {
-  assert.equal(resolveBias({ bias: 'none' }), null)
-  assert.equal(resolveBias({ bias: 'none', ...MEMBER }), null)
+// 'none' was removed from the OAS enum with the client's bias droplist, so the
+// validator rejects it before resolveBias is reached. An unrecognised value
+// falls through to the statewide circle rather than disabling the bias.
+test('an unrecognised bias falls back to the statewide circle', () => {
+  assert.deepEqual(resolveBias({ bias: 'none' }),
+    { circle: { center: RI_CENTER, radius: 50000 } })
+  assert.deepEqual(resolveBias({ bias: 'nonsense', ...MEMBER }),
+    { circle: { center: MEMBER, radius: 50000 } })
 })
 
 // Google caps a bias circle at 50 km, so the centre is the only lever and it
@@ -194,4 +198,45 @@ test('the statewide centre reaches the far corners of the service area', () => {
     const d = km(RI_CENTER.latitude, RI_CENTER.longitude, lat, lon)
     assert.ok(d < 50, `${name} is ${d.toFixed(1)} km from the statewide centre, outside the 50 km circle`)
   }
+})
+
+// --- rate breaker ---------------------------------------------------------
+//
+// A circuit breaker on a runaway caller, not a fairness limiter: every call is
+// billed against the Places free tier, and a loop can spend the month in
+// minutes. Tripping it returns [] like every other failure mode here, so no
+// caller has to change.
+// The breaker is tested through withinRate directly rather than searchPlaces:
+// PlacesService calls undici's fetch (not globalThis.fetch), so a test driving
+// searchPlaces would make 60 real network calls to Google. `now` is injectable
+// precisely so the window can be exercised without waiting a minute.
+test('the rate breaker allows the ceiling then refuses', () => {
+  resetRateWindow()
+  const t = 1_000_000
+  for (let i = 0; i < MAX_CALLS_PER_MINUTE; i++) {
+    assert.equal(withinRate(t + i), true, `call ${i + 1} should be allowed`)
+  }
+  assert.equal(withinRate(t + 999), false, 'the call past the ceiling is refused')
+  assert.equal(withinRate(t + 1000), false, 'and it stays refused within the window')
+  resetRateWindow()
+})
+
+test('the rate breaker reopens on the next minute', () => {
+  resetRateWindow()
+  const t = 5_000_000
+  for (let i = 0; i < MAX_CALLS_PER_MINUTE; i++) withinRate(t)
+  assert.equal(withinRate(t + 59_999), false, 'still inside the window')
+  assert.equal(withinRate(t + 60_000), true, 'a new window opens at 60s')
+  resetRateWindow()
+})
+
+test('an empty query never spends budget against the breaker', async () => {
+  resetRateWindow()
+  for (let i = 0; i < MAX_CALLS_PER_MINUTE + 5; i++) {
+    assert.deepEqual(await searchPlaces({ text: '   ' }), [])
+  }
+  // The empty-text guard returns before withinRate(), so the window is untouched
+  // and a real search still gets through.
+  assert.deepEqual(await searchPlaces({ text: '' }), [])
+  resetRateWindow()
 })
