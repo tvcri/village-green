@@ -340,6 +340,12 @@ function applyMemberHomeToDestination () {
 
 // Fill the start leg from a place chosen in the lookup dialog. A ride does not
 // always begin at the member's home — a return trip from a hospital, say.
+//
+// Phone is cleared, not filled: Google's number is behind the Enterprise field
+// mask we deliberately did not buy. Clearing matters because the leg may
+// already hold the member's home phone from "Use member's home" — leaving it
+// would put the member's home number on a hospital, rendered as a tel: link.
+// Replacing a leg replaces all of it, as clearStart/clearDestination do.
 function applyPlaceToStart (place) {
   if (!place) return
   form.value.start = place.name
@@ -347,11 +353,11 @@ function applyPlaceToStart (place) {
   form.value.startCity = place.city
   form.value.startState = place.state
   form.value.startZip = place.zip
+  form.value.startPhone = ''
 }
 
 // Fill the destination leg from a place chosen in the lookup dialog. Phone is
-// deliberately left alone: Google's number is usually a switchboard, and the
-// field is being dropped from scope anyway.
+// cleared rather than populated — see applyPlaceToStart.
 function applyPlaceToDestination (place) {
   if (!place) return
   form.value.destination = place.name
@@ -359,6 +365,7 @@ function applyPlaceToDestination (place) {
   form.value.city = place.city
   form.value.state = place.state
   form.value.zip = place.zip
+  form.value.phone = ''
 }
 
 // Whether a leg currently holds the given member's home, rather than a real

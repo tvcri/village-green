@@ -22,10 +22,18 @@ const UNRESOLVED = { town: null, latitude: null, longitude: null }
 // local centre.
 //
 // Census names the axes x/y, not lon/lat: x is LONGITUDE, y is LATITUDE.
+// Number(null), Number('') and Number([]) are all 0 — a real coordinate in the
+// Gulf of Guinea — so an absent axis must be rejected BEFORE conversion, the
+// same guard PlacesService.resolveBias applies to what this returns. A literal
+// 0 from Census is a genuine coordinate and is kept.
+function usableAxis (v) {
+  return typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? Number(v) : NaN
+}
+
 function interpretCoordinates (matches) {
   const c = matches[0]?.coordinates
-  const latitude = Number(c?.y)
-  const longitude = Number(c?.x)
+  const latitude = usableAxis(c?.y)
+  const longitude = usableAxis(c?.x)
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return { latitude: null, longitude: null }
   return { latitude, longitude }
 }

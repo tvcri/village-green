@@ -83,3 +83,29 @@ test('does not discard a zero coordinate as missing', () => {
   const json = { result: { addressMatches: [sub('Nowhere', { x: 0, y: 0 })] } }
   assert.deepEqual(interpretGeocoderResponse(json), { town: 'Nowhere', latitude: 0, longitude: 0 })
 })
+
+// ...but the inputs that COERCE to 0 must not be mistaken for one. Number(null),
+// Number('') and Number([]) are all 0, which is finite and passes every
+// downstream guard, silently relocating the bias circle to the Gulf of Guinea.
+test('rejects axis values that coerce to a zero coordinate', () => {
+  for (const coords of [
+    { x: null, y: null },
+    { x: -71.5, y: null },
+    { x: null, y: 41.4 },
+    { x: '', y: '' },
+    { x: '  ', y: '  ' },
+    { x: [], y: [] },
+    { x: true, y: true }
+  ]) {
+    const json = { result: { addressMatches: [sub('Hopkinton', coords)] } }
+    assert.deepEqual(interpretGeocoderResponse(json), { town: 'Hopkinton', ...NOWHERE },
+      `expected null coordinates for ${JSON.stringify(coords)}`)
+  }
+})
+
+// Census sends the axes as JSON numbers, but a numeric string is still a
+// usable coordinate and is converted rather than refused.
+test('accepts numeric-string axis values', () => {
+  const json = { result: { addressMatches: [sub('Hopkinton', { x: '-71.518224', y: '41.429478' })] } }
+  assert.deepEqual(interpretGeocoderResponse(json), { town: 'Hopkinton', ...LATLON })
+})

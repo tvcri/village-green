@@ -196,7 +196,7 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(screen.getAllByRole('button', { name: 'Look up starting location' })).toHaveLength(1)
   })
 
-  it('applying a looked-up place fills the start fields and leaves start phone alone', async () => {
+  it('applying a looked-up place fills the start fields and clears start phone', async () => {
     const vm = await mountAndExpose()
     vm.form.startPhone = '401-555-0199'
     vm.applyPlaceToStart({
@@ -213,10 +213,10 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(vm.form.startCity).toBe('Newport')
     expect(vm.form.startState).toBe('RI')
     expect(vm.form.startZip).toBe('02840')
-    expect(vm.form.startPhone).toBe('401-555-0199')
+    expect(vm.form.startPhone).toBe('')
   })
 
-  it('applying a looked-up place fills the destination fields and leaves phone alone', async () => {
+  it('applying a looked-up place fills the destination fields and clears phone', async () => {
     const vm = await mountAndExpose()
     vm.form.phone = '401-555-0100'
     vm.applyPlaceToDestination({
@@ -233,7 +233,36 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(vm.form.city).toBe('Barrington')
     expect(vm.form.state).toBe('RI')
     expect(vm.form.zip).toBe('02806')
-    expect(vm.form.phone).toBe('401-555-0100')
+    expect(vm.form.phone).toBe('')
+  })
+
+  // The sequence that made this matter: "Use member's home" fills all six
+  // fields including the member's home phone, then a lookup replaces the place.
+  // Leaving the phone behind put the member's home number on a hospital, shown
+  // as a tel: link on the detail view. Google's number is not substituted —
+  // it sits behind the Enterprise field mask we chose not to buy — so the
+  // field is emptied for the coordinator to fill if they want it.
+  it('does not leave the member home phone on a looked-up place', async () => {
+    const vm = await mountAndExpose()
+    vm.selectedMemberHome = {
+      address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100'
+    }
+    vm.applyMemberHomeToDestination()
+    expect(vm.form.phone).toBe('555-0100')
+    vm.applyPlaceToDestination({
+      placeId: 'p2', name: 'Newport Hospital', address: '20 Powel Avenue',
+      city: 'Newport', state: 'RI', zip: '02840'
+    })
+    expect(vm.form.destination).toBe('Newport Hospital')
+    expect(vm.form.phone).toBe('')
+
+    vm.applyMemberHomeToStart()
+    expect(vm.form.startPhone).toBe('555-0100')
+    vm.applyPlaceToStart({
+      placeId: 'p3', name: 'Newport Hospital', address: '20 Powel Avenue',
+      city: 'Newport', state: 'RI', zip: '02840'
+    })
+    expect(vm.form.startPhone).toBe('')
   })
 
   it('auto-populates Start from member home when a Ride is selected and Start is empty', async () => {
