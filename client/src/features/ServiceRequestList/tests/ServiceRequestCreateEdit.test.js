@@ -24,12 +24,15 @@ vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
 vi.mock('../../PersonList/api/personApi.js', () => ({
   getPerson: vi.fn().mockResolvedValue({
     address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100'
-  })
+  }),
+  // Reused on member-select to geocode the home for the lookup's bias circle.
+  geocodeTown: vi.fn().mockResolvedValue({ town: 'Springfield', latitude: 38.77, longitude: -77.19 })
 }))
 vi.mock('../api/serviceRequestApi.js', () => ({
   getServiceRequest: vi.fn().mockResolvedValue(null),
   createServiceRequest: vi.fn().mockResolvedValue({ serviceRequestId: 1 }),
-  updateServiceRequest: vi.fn().mockResolvedValue({ serviceRequestId: 1 })
+  updateServiceRequest: vi.fn().mockResolvedValue({ serviceRequestId: 1 }),
+  searchPlaces: vi.fn().mockResolvedValue({ places: [] })
 }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({
   getVillages: vi.fn().mockResolvedValue([{ villageId: '1', name: 'V1' }])
@@ -129,7 +132,7 @@ describe('ServiceRequestCreateEdit start section', () => {
     expect(screen.queryAllByText(/^Starting Location$/).length).toBe(0)
   })
 
-  it('hides the Destination fill/clear buttons for an Errand', async () => {
+  it('hides "Use member\'s home" on the Destination for an Errand', async () => {
     const vm = await mountAndExpose()
     vm.form.villageId = '1'
     vm.form.memberPersonId = '7'
@@ -137,9 +140,29 @@ describe('ServiceRequestCreateEdit start section', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/^Destination$/).length).toBeGreaterThan(0)
     })
-    // Errands match production: plain address fields, no fill/clear helpers.
+    // An Errand's destination is a shop, not the member's house — so the
+    // home-fill helper stays Rides-only. Clear fields is NOT gated: the
+    // lookup can populate the fields for an Errand, so it must be undoable.
     expect(document.querySelectorAll('.use-home-btn').length).toBe(0)
-    expect(screen.queryByText(/^Clear fields$/)).toBeNull()
+  })
+
+  // An Errand has a destination but no starting location, and no home-fill
+  // helper. The lookup is about the destination, not the ride, so it belongs
+  // here too — it was gated on isRideService by mistake.
+  it('offers the destination lookup for an Errand', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Errand: Shopping'
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Look up destination' })).toBeTruthy()
+    })
+    // Still no starting-location lookup: an Errand has no start leg.
+    expect(screen.queryByRole('button', { name: 'Look up starting location' })).toBeNull()
+    // The home-fill helper stays hidden, as before.
+    expect(document.querySelectorAll('.use-home-btn').length).toBe(0)
+    // But Clear fields is offered: a lookup that can fill must be undoable.
+    expect(screen.getByRole('button', { name: 'Clear destination' })).toBeTruthy()
   })
 
   it('shows a "Use member\'s home" button for a Ride destination', async () => {
@@ -151,6 +174,95 @@ describe('ServiceRequestCreateEdit start section', () => {
       // Ride renders both Start and Destination use-home buttons.
       expect(document.querySelectorAll('.use-home-btn').length).toBe(2)
     })
+  })
+
+  it('shows a "Look up…" button for a Ride destination', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Ride: Medical Appnt'
+    // Accessible name is the aria-label, per the sibling "Clear fields" /
+    // "Clear destination" convention.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Look up destination' })).toBeTruthy())
+  })
+
+  it('shows a "Look up…" button for the Ride starting location too', async () => {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Ride: Medical Appnt'
+    // One per leg: Starting Location and Destination.
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Look up destination' })).toHaveLength(1))
+    expect(screen.getAllByRole('button', { name: 'Look up starting location' })).toHaveLength(1)
+  })
+
+  it('applying a looked-up place fills the start fields and clears start phone', async () => {
+    const vm = await mountAndExpose()
+    vm.form.startPhone = '401-555-0199'
+    vm.applyPlaceToStart({
+      placeId: 'p1',
+      name: 'Newport Hospital',
+      formattedAddress: '20 Powel Ave, Newport, RI 02840, USA',
+      address: '20 Powel Avenue',
+      city: 'Newport',
+      state: 'RI',
+      zip: '02840'
+    })
+    expect(vm.form.start).toBe('Newport Hospital')
+    expect(vm.form.startAddress).toBe('20 Powel Avenue')
+    expect(vm.form.startCity).toBe('Newport')
+    expect(vm.form.startState).toBe('RI')
+    expect(vm.form.startZip).toBe('02840')
+    expect(vm.form.startPhone).toBe('')
+  })
+
+  it('applying a looked-up place fills the destination fields and clears phone', async () => {
+    const vm = await mountAndExpose()
+    vm.form.phone = '401-555-0100'
+    vm.applyPlaceToDestination({
+      placeId: 'ChIJuxtkRqxR5IkRgn0NsxVSiws',
+      name: 'Serra Physical Therapy',
+      formattedAddress: '60 Bay Spring Ave A2, Barrington, RI 02806, USA',
+      address: '60 Bay Spring Avenue, Suite A2',
+      city: 'Barrington',
+      state: 'RI',
+      zip: '02806'
+    })
+    expect(vm.form.destination).toBe('Serra Physical Therapy')
+    expect(vm.form.address).toBe('60 Bay Spring Avenue, Suite A2')
+    expect(vm.form.city).toBe('Barrington')
+    expect(vm.form.state).toBe('RI')
+    expect(vm.form.zip).toBe('02806')
+    expect(vm.form.phone).toBe('')
+  })
+
+  // The sequence that made this matter: "Use member's home" fills all six
+  // fields including the member's home phone, then a lookup replaces the place.
+  // Leaving the phone behind put the member's home number on a hospital, shown
+  // as a tel: link on the detail view. Google's number is not substituted —
+  // it sits behind the Enterprise field mask we chose not to buy — so the
+  // field is emptied for the coordinator to fill if they want it.
+  it('does not leave the member home phone on a looked-up place', async () => {
+    const vm = await mountAndExpose()
+    vm.selectedMemberHome = {
+      address: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150', phone: '555-0100'
+    }
+    vm.applyMemberHomeToDestination()
+    expect(vm.form.phone).toBe('555-0100')
+    vm.applyPlaceToDestination({
+      placeId: 'p2', name: 'Newport Hospital', address: '20 Powel Avenue',
+      city: 'Newport', state: 'RI', zip: '02840'
+    })
+    expect(vm.form.destination).toBe('Newport Hospital')
+    expect(vm.form.phone).toBe('')
+
+    vm.applyMemberHomeToStart()
+    expect(vm.form.startPhone).toBe('555-0100')
+    vm.applyPlaceToStart({
+      placeId: 'p3', name: 'Newport Hospital', address: '20 Powel Avenue',
+      city: 'Newport', state: 'RI', zip: '02840'
+    })
+    expect(vm.form.startPhone).toBe('')
   })
 
   it('auto-populates Start from member home when a Ride is selected and Start is empty', async () => {
@@ -168,6 +280,192 @@ describe('ServiceRequestCreateEdit start section', () => {
     await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
     expect(vm.form.startCity).toBe('Springfield')
     expect(vm.form.startZip).toBe('22150')
+  })
+
+  // The address fields are COPIES — applyMemberHomeTo* writes values into the
+  // form — so nulling selectedMemberHome leaves them untouched. They used to
+  // survive a member change and be submitted against the new member.
+  describe('member-derived addresses follow the member', () => {
+    const OTHER_HOME = {
+      address: '99 Other Rd', city: 'Newport', state: 'RI', zip: '02840', phone: '555-0199'
+    }
+
+    it('clears the start address when the member is cleared', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.form.startAddress).toBe(''))
+      expect(vm.form.start).toBe('')
+      expect(vm.form.startCity).toBe('')
+      expect(vm.form.startZip).toBe('')
+    })
+
+    // The bug as reported: the stale address made startIsEmpty false, so the
+    // refill guard declined to run and the FIRST member's home stayed on the
+    // form under the second member's name.
+    it('replaces the start address when a different member is chosen', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+
+      getPerson.mockResolvedValueOnce(OTHER_HOME)
+      vm.selectedMember = { label: 'Other Member', value: '8' }
+      await waitFor(() => expect(vm.form.startAddress).toBe('99 Other Rd'))
+      expect(vm.form.startCity).toBe('Newport')
+      expect(vm.form.startZip).toBe('02840')
+    })
+
+    it('clears the start address when the village changes', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+
+      vm.form.villageId = '2'
+      await waitFor(() => expect(vm.form.startAddress).toBe(''))
+      expect(vm.selectedMember).toBeNull()
+    })
+
+    // A destination the coordinator typed or looked up has nothing to do with
+    // which member is travelling. Clearing it would destroy real work.
+    it('keeps a real destination when the member changes', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.form.startAddress).toBe('1 Home St'))
+
+      vm.form.destination = 'Newport Hospital'
+      vm.form.address = '11 Friendship St'
+      vm.form.city = 'Newport'
+      vm.form.zip = '02840'
+
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.form.startAddress).toBe(''))
+      // Untouched: it was never the member's home.
+      expect(vm.form.destination).toBe('Newport Hospital')
+      expect(vm.form.address).toBe('11 Friendship St')
+    })
+
+    // ...but a destination holding the member's home (the "Use member's home"
+    // return-trip case) is member-derived and must go with them.
+    it('clears a destination that holds the outgoing member home', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      vm.form.serviceName = 'Ride: Medical Appnt'
+      await waitFor(() => expect(vm.selectedMemberHome?.address).toBe('1 Home St'))
+      vm.applyMemberHomeToDestination()
+      await waitFor(() => expect(vm.form.address).toBe('1 Home St'))
+
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.form.address).toBe(''))
+      expect(vm.form.destination).toBe('')
+    })
+  })
+
+  // The destination lookup ranks results near the member. The coordinates come
+  // from geocoding the member's home on select — nothing is persisted — and the
+  // geocode overlaps with the coordinator choosing a service and a date, so it
+  // costs the search itself no latency.
+  describe('member coordinates for the lookup bias', () => {
+    it('geocodes the member home on select and hands it to the lookup', async () => {
+      const { geocodeTown } = await import('../../PersonList/api/personApi.js')
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(geocodeTown).toHaveBeenCalledWith({
+        street: '1 Home St', city: 'Springfield', state: 'VA', zip: '22150'
+      }))
+      await waitFor(() => expect(vm.selectedMemberCoords).toEqual({ latitude: 38.77, longitude: -77.19 }))
+      expect(vm.memberCoordsStatus).toBe('ok')
+    })
+
+    // Null, not a partial object: the dialog and the API both read absence as
+    // "fall back to the statewide circle".
+    it('leaves the coordinates null when the address does not geocode', async () => {
+      const { geocodeTown } = await import('../../PersonList/api/personApi.js')
+      geocodeTown.mockResolvedValueOnce({ town: null, latitude: null, longitude: null })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('failed'))
+      expect(vm.selectedMemberCoords).toBeNull()
+    })
+
+    it('survives a geocode failure without disturbing the rest of the form', async () => {
+      const { geocodeTown } = await import('../../PersonList/api/personApi.js')
+      geocodeTown.mockRejectedValueOnce(new Error('network'))
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      // The home address still loaded — the geocode is a side errand.
+      await waitFor(() => expect(vm.selectedMemberHome?.address).toBe('1 Home St'))
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('failed'))
+      expect(vm.selectedMemberCoords).toBeNull()
+    })
+
+    // A member with no address on file has nothing to geocode; skip the call
+    // rather than sending Census an empty query.
+    it('does not geocode a member with no usable address', async () => {
+      const { getPerson, geocodeTown } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockResolvedValueOnce({ address: '', city: '', state: '', zip: '', phone: '' })
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('failed'))
+      // Settled, not pending: there is nothing to wait for, so the dialog can
+      // disable the option immediately rather than offering it optimistically.
+      expect(geocodeTown).not.toHaveBeenCalled()
+      expect(vm.selectedMemberCoords).toBeNull()
+    })
+
+    // Coordinates from a previously-selected member must never centre the
+    // circle on the wrong home.
+    it('clears the coordinates when the member is deselected', async () => {
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.selectedMemberCoords).toBeTruthy())
+      vm.selectedMember = null
+      await waitFor(() => expect(vm.selectedMemberCoords).toBeNull())
+      expect(vm.memberCoordsStatus).toBe('idle')
+    })
+
+    // The window this is all about: between member-select and the geocode
+    // landing, the option stays offered rather than flickering disabled.
+    it('reports pending while the geocode is in flight', async () => {
+      const { geocodeTown } = await import('../../PersonList/api/personApi.js')
+      let release
+      geocodeTown.mockReturnValueOnce(new Promise((r) => { release = r }))
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('pending'))
+      release({ town: 'Springfield', latitude: 38.77, longitude: -77.19 })
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('ok'))
+    })
+
+    // The person fetch failing means loadMemberCoords never runs. Left at
+    // 'idle' the dialog would read that as "still coming" and keep offering a
+    // centre that is never going to arrive.
+    it('settles the status when the person fetch itself fails', async () => {
+      const { getPerson } = await import('../../PersonList/api/personApi.js')
+      getPerson.mockRejectedValueOnce(new Error('network'))
+      const vm = await mountAndExpose()
+      vm.form.villageId = '1'
+      vm.selectedMember = { label: 'Mabel Member', value: '7' }
+      await waitFor(() => expect(vm.memberCoordsStatus).toBe('failed'))
+      expect(vm.selectedMemberCoords).toBeNull()
+    })
   })
 
   // Service Coordinator Notes (member.scNotes): rendered only

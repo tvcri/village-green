@@ -597,10 +597,13 @@ paths:
     post:
       tags:
       - Operation
-      summary: Resolve the civic town for an address
+      summary: Resolve the civic town and coordinates for an address
       description: 'Asks the US Census geocoder which municipality governs an
-        address. Writes nothing. Returns null when the address cannot be
-        resolved or when candidate matches disagree.
+        address, and where it is. Writes nothing. The town is null when the
+        address cannot be resolved or when candidate matches disagree.
+        Coordinates come from the first match and are returned whenever the
+        address resolves at all, even when the town is refused — they only
+        centre a map-search bias, where a near miss is harmless.
 
         '
       operationId: geocodeTown
@@ -627,16 +630,115 @@ paths:
                   maxLength: 20
       responses:
         '200':
-          description: The resolved town, or null
+          description: The resolved town and coordinates, each null when unresolved
           content:
             application/json:
               schema:
                 type: object
-                required: [town]
+                required: [town, latitude, longitude]
                 properties:
                   town:
                     type: string
                     nullable: true
+                  latitude:
+                    type: number
+                    nullable: true
+                  longitude:
+                    type: number
+                    nullable: true
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:read
+  /op/places/search:
+    post:
+      tags:
+      - Operation
+      summary: Find places matching a destination name
+      description: 'Asks the Google Places API for places matching free text,
+        optionally narrowed by a town. Returns each match with its address
+        already split into the service-request address fields. Writes
+        nothing. Returns an empty list when nothing matches or the lookup
+        fails.
+
+        '
+      operationId: searchPlaces
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              additionalProperties: false
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                town:
+                  type: string
+                  maxLength: 100
+                state:
+                  type: string
+                  maxLength: 50
+                bias:
+                  description: 'Which geographic bias circle to send. `member`
+                    centres it on the coordinates below, falling back to
+                    `statewide` when they are absent or unusable.
+
+                    '
+                  type: string
+                  enum: [member, statewide]
+                  default: member
+                latitude:
+                  description: 'Bias centre latitude, used only with bias
+                    `member`. Supplied by the client from a geocode of the
+                    member''s home; nothing is persisted.
+
+                    '
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                longitude:
+                  description: Bias centre longitude, used only with bias `member`.
+                  type: number
+                  minimum: -180
+                  maximum: 180
+      responses:
+        '200':
+          description: Matching places, best match first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [places]
+                properties:
+                  places:
+                    type: array
+                    items:
+                      type: object
+                      required: [placeId, name, formattedAddress, address, city, state, zip]
+                      properties:
+                        placeId:
+                          type: string
+                        name:
+                          type: string
+                        formattedAddress:
+                          type: string
+                        address:
+                          type: string
+                        city:
+                          type: string
+                        state:
+                          type: string
+                        zip:
+                          type: string
         default:
           description: unexpected error
           content:

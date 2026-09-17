@@ -19,10 +19,11 @@ import { apiCall, isPrivacyAckError } from '../../../shared/api/apiClient.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
-import { getPerson } from '../../PersonList/api/personApi.js'
+import { getPerson, geocodeTown } from '../../PersonList/api/personApi.js'
 import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
+import DestinationLookupDialog from './DestinationLookupDialog.vue'
 import {
   minutesToTimeString, timeStringToMinutes,
   dateToServiceDate, serviceDateToDate
@@ -212,6 +213,30 @@ const selectedVolunteer = ref(null)
 // omits address fields, so fetch the person to obtain home. "Member's home" is a
 // fill convenience only — never stored as SR state.
 const selectedMemberHome = ref(null)
+// The member's home coordinates, used to centre the destination lookup's bias
+// circle. Nothing is persisted — they are geocoded on member-select and held
+// only for the life of the form.
+//
+// The geocode runs while the coordinator is still choosing a service and a
+// date, so it costs the search itself no latency. When it fails, or the member
+// has no usable address, the lookup falls back to a statewide circle.
+const selectedMemberCoords = ref(null)
+// How the geocode above is getting on. The lookup dialog needs to tell three
+// situations apart that a null `selectedMemberCoords` cannot:
+//
+//   'idle'    — no member selected yet.
+//   'pending' — geocode in flight. Treated as optimistically OK: the option
+//               stays selectable, because it almost always succeeds and a
+//               disabled state that flickers for a fraction of a second is
+//               worse than the narrow window where a search fired right now
+//               falls back to statewide.
+//   'ok'      — coordinates are usable.
+//   'failed'  — no address on file, the geocode failed, or it returned
+//               nothing usable. The dialog disables "Near the member" and
+//               says why, rather than offering a choice it cannot honour.
+const memberCoordsStatus = ref('idle')
+const lookupVisible = ref(false)
+const startLookupVisible = ref(false)
 
 // The selected member's service coordinator notes, from the same fetch as the home
 // address. Rare (a few percent of members) and permission-gated: the `member`
@@ -225,9 +250,43 @@ const selectedMemberScNotes = ref('')
 // left open from a previous member.
 const scNotesCollapsed = ref(true)
 
+// Geocode the member's home to coordinates for the lookup's bias circle. Fire
+// and forget: the result lands in selectedMemberCoords whenever it arrives, and
+// nothing waits on it. A failure leaves the coordinates null, which the API
+// reads as "use the statewide circle".
+//
+// Guarded on the member still being the selected one, so a slow response for a
+// previously-chosen member cannot centre the circle on the wrong home.
+async function loadMemberCoords (personId, home) {
+  // No street or zip is a settled answer, not a pending one: Census cannot
+  // place the member and never will, so the dialog can say so immediately.
+  if (!home?.address || !home?.zip) {
+    memberCoordsStatus.value = 'failed'
+    return
+  }
+  memberCoordsStatus.value = 'pending'
+  try {
+    const { latitude, longitude } = await geocodeTown({
+      street: home.address, city: home.city, state: home.state, zip: home.zip
+    })
+    // A response for a member who is no longer selected must not land: it
+    // would centre the circle on the previous member's home.
+    if (String(form.value.memberPersonId) !== String(personId)) return
+    const usable = typeof latitude === 'number' && typeof longitude === 'number'
+    selectedMemberCoords.value = usable ? { latitude, longitude } : null
+    memberCoordsStatus.value = usable ? 'ok' : 'failed'
+  } catch {
+    if (String(form.value.memberPersonId) !== String(personId)) return
+    selectedMemberCoords.value = null
+    memberCoordsStatus.value = 'failed'
+  }
+}
+
 async function loadMemberHome (personId) {
   // Any change of member starts collapsed, including a change to no member.
   scNotesCollapsed.value = true
+  selectedMemberCoords.value = null
+  memberCoordsStatus.value = 'idle'
   if (!personId) {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
@@ -239,9 +298,16 @@ async function loadMemberHome (personId) {
       ? { address: p.address || '', city: p.city || '', state: p.state || '', zip: p.zip || '', phone: p.phone || '' }
       : null
     selectedMemberScNotes.value = (p?.member?.scNotes || '').trim()
+    // Not awaited: the coordinator carries on choosing a service and a date
+    // while this runs, so it adds no latency to the search itself.
+    loadMemberCoords(personId, selectedMemberHome.value)
   } catch {
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
+    // The person fetch failed, so loadMemberCoords never ran and there is no
+    // address to geocode. Settle the status rather than leaving it 'idle',
+    // which the dialog would read as "still coming".
+    memberCoordsStatus.value = 'failed'
   }
 }
 
@@ -270,6 +336,54 @@ function applyMemberHomeToDestination () {
   form.value.state = h.state
   form.value.zip = h.zip
   form.value.phone = h.phone
+}
+
+// Fill the start leg from a place chosen in the lookup dialog. A ride does not
+// always begin at the member's home — a return trip from a hospital, say.
+//
+// Phone is cleared, not filled: Google's number is behind the Enterprise field
+// mask we deliberately did not buy. Clearing matters because the leg may
+// already hold the member's home phone from "Use member's home" — leaving it
+// would put the member's home number on a hospital, rendered as a tel: link.
+// Replacing a leg replaces all of it, as clearStart/clearDestination do.
+function applyPlaceToStart (place) {
+  if (!place) return
+  form.value.start = place.name
+  form.value.startAddress = place.address
+  form.value.startCity = place.city
+  form.value.startState = place.state
+  form.value.startZip = place.zip
+  form.value.startPhone = ''
+}
+
+// Fill the destination leg from a place chosen in the lookup dialog. Phone is
+// cleared rather than populated — see applyPlaceToStart.
+function applyPlaceToDestination (place) {
+  if (!place) return
+  form.value.destination = place.name
+  form.value.address = place.address
+  form.value.city = place.city
+  form.value.state = place.state
+  form.value.zip = place.zip
+  form.value.phone = ''
+}
+
+// Whether a leg currently holds the given member's home, rather than a real
+// destination. Compares the address fields, not the name: the name is the
+// MEMBER_HOME_LABEL constant when filled by the button, but a coordinator may
+// have typed over it, and the address is what actually identifies the place.
+//
+// `home` is the home being replaced — the OUTGOING member's — so this must be
+// called before selectedMemberHome is overwritten.
+function legHoldsHome (leg, home) {
+  if (!home) return false
+  const same = (a, b) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase()
+  // An address alone is enough; city/zip guard against two members on the
+  // same street number in different towns.
+  return same(leg.address, home.address) &&
+    same(leg.city, home.city) &&
+    same(leg.zip, home.zip) &&
+    Boolean((home.address || '').trim())
 }
 
 function clearStart () {
@@ -308,9 +422,41 @@ const filterVolunteers = (event) => {
   )
 }
 
+// Drop location data that belonged to the member being replaced. The address
+// fields are COPIES — applyMemberHomeTo* writes values into the form — so
+// nulling selectedMemberHome does not disturb them, and they would otherwise
+// survive a member change and be submitted against the new member.
+//
+// The Start leg is member-derived by construction (it auto-fills with the
+// member's home), so it always clears. The Destination usually is not — it is
+// the doctor's office the coordinator typed or looked up — so it clears only
+// when it actually holds the outgoing member's home, the "Use member's home"
+// case for a return trip.
+//
+// Must run BEFORE selectedMemberHome is replaced: it needs the outgoing home
+// to recognise it.
+function clearOutgoingMemberLocations () {
+  const outgoing = selectedMemberHome.value
+  if (!outgoing) return
+  if (legHoldsHome(
+    { address: form.value.startAddress, city: form.value.startCity, zip: form.value.startZip },
+    outgoing
+  )) clearStart()
+  if (legHoldsHome(
+    { address: form.value.address, city: form.value.city, zip: form.value.zip },
+    outgoing
+  )) clearDestination()
+}
+
 watch(selectedMember, (val) => {
   // Only update if it's a complete selected object with both label and value
   if (val && typeof val === 'object' && val.label && val.value) {
+    const changingMember = String(val.value) !== String(form.value.memberPersonId || '')
+    // Drop the previous member's address before fetching the new one, so a
+    // stale Start cannot block the refill below — startIsEmpty was false
+    // because the OLD member's address was still sitting in it, which is why
+    // changing member used to leave the first member's home on the form.
+    if (changingMember) clearOutgoingMemberLocations()
     form.value.memberPersonId = String(val.value)
     // Fetch the member's home. Only fill Start here when the service is already
     // a Ride and Start is empty (covers changing the member on an existing Ride);
@@ -320,9 +466,12 @@ watch(selectedMember, (val) => {
       if (isRideService.value && startIsEmpty.value) applyMemberHomeToStart()
     })
   } else {
+    clearOutgoingMemberLocations()
     form.value.memberPersonId = null
     selectedMemberHome.value = null
     selectedMemberScNotes.value = ''
+    selectedMemberCoords.value = null
+    memberCoordsStatus.value = 'idle'
     scNotesCollapsed.value = true
   }
 })
@@ -340,6 +489,11 @@ watch(() => form.value.villageId, (villageId, oldVillageId) => {
   // Clear member/volunteer when switching from one village to another.
   // Skip on initial population (oldVillageId is empty), so edit-loads keep their values.
   if (oldVillageId && villageId !== oldVillageId) {
+    // Changing village clears the member, so the member's address must go with
+    // it. Done here explicitly rather than leaning on the selectedMember
+    // watcher: that watcher does clear it, but only on the next tick, and the
+    // ordering is not something a later edit should have to know about.
+    clearOutgoingMemberLocations()
     selectedMember.value = null
     selectedVolunteer.value = null
     form.value.memberPersonId = null
@@ -1230,6 +1384,7 @@ const openPersonDialog = (personId) => {
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Starting Location</h3>
               <div style="display: flex; gap: 0.5rem;">
                 <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToStart" />
+                <Button type="button" size="small" outlined icon="pi pi-search" label="Look up…" aria-label="Look up starting location" @click="startLookupVisible = true" />
                 <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear start" @click="clearStart" />
               </div>
             </div>
@@ -1302,8 +1457,14 @@ const openPersonDialog = (personId) => {
             <!-- Destination Section -->
             <div style="display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
               <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
-              <div v-if="isRideService" style="display: flex; gap: 0.5rem;">
-                <Button type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
+              <!-- The lookup is about the destination, not the ride: every
+                   service with a destination gets it, and so does Clear
+                   fields — a lookup that can fill has to be undoable.
+                   "Use member's home" stays Rides-only: an Errand's
+                   destination is a shop, not the member's house. -->
+              <div style="display: flex; gap: 0.5rem;">
+                <Button v-if="isRideService" type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
+                <Button type="button" size="small" outlined icon="pi pi-search" label="Look up…" aria-label="Look up destination" @click="lookupVisible = true" />
                 <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear destination" @click="clearDestination" />
               </div>
             </div>
@@ -1445,6 +1606,19 @@ const openPersonDialog = (personId) => {
     <PersonDetailDialog
       v-model:visible="personDialogVisible"
       :person-id="personDialogPersonId"
+    />
+    <DestinationLookupDialog
+      v-model:visible="startLookupVisible"
+      leg-label="Starting location"
+      :member-coords="selectedMemberCoords"
+      :member-coords-status="memberCoordsStatus"
+      @select="applyPlaceToStart"
+    />
+    <DestinationLookupDialog
+      v-model:visible="lookupVisible"
+      :member-coords="selectedMemberCoords"
+      :member-coords-status="memberCoordsStatus"
+      @select="applyPlaceToDestination"
     />
   </div>
 </template>
