@@ -13,6 +13,10 @@ vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
 vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
   useRequirePermission: () => {}
 }))
+const mockHasPermission = vi.fn(() => true)
+vi.mock('../../../shared/composables/useCurrentUser.js', () => ({
+  useCurrentUser: () => ({ hasPermission: mockHasPermission }),
+}))
 vi.mock('../api/personApi.js', () => ({
   getPerson: vi.fn().mockResolvedValue({
     personId: '5',
@@ -92,5 +96,24 @@ describe('PersonEditForm', () => {
     await waitFor(() => expect(patchPerson).toHaveBeenCalled())
     const [, body] = patchPerson.mock.calls[0]
     expect(body.communities).toEqual(expect.arrayContaining([1, 2]))
+  })
+
+  it('hides the birth date input and never sends birthDate without person:read_birth_date', async () => {
+    mockHasPermission.mockImplementation((key) => key !== 'person:read_birth_date')
+    const { patchPerson } = await import('../api/personApi.js')
+    render(PersonEditForm, { global: globalOpts })
+    await screen.findByDisplayValue('Alice')
+    expect(document.getElementById('birthDate')).toBeNull()
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchPerson).toHaveBeenCalled())
+    const [, body] = patchPerson.mock.calls[0]
+    expect('birthDate' in body).toBe(false)
+    mockHasPermission.mockImplementation(() => true)
+  })
+
+  it('shows the birth date input with the key', async () => {
+    render(PersonEditForm, { global: globalOpts })
+    await screen.findByDisplayValue('Alice')
+    expect(document.getElementById('birthDate')).not.toBeNull()
   })
 })

@@ -12,6 +12,7 @@ const props = defineProps({
   villages: { type: Array, required: true },
   communityNames: { type: Object, required: true },  // Set
   disabilities: { type: Object, required: true },     // Map<name, note>
+  showBirthDate: { type: Boolean, default: true },
 })
 const emit = defineEmits(['edited', 'toggle-community', 'toggle-disability', 'edit-disability-note'])
 
@@ -288,7 +289,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="form-field">
+    <div v-if="showBirthDate" class="form-field">
       <label class="label" for="birthDate">Birth Date
         <i v-if="uncertain.birthDate" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('birthDate')" />
       </label>

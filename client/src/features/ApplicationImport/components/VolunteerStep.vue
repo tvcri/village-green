@@ -16,12 +16,15 @@ import {
 } from '../../PersonList/api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../../PersonList/api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const props = defineProps({
   extraction: { type: Object, required: true },
 })
 const emit = defineEmits(['volunteer-done'])
 const toast = useToast()
+const { hasPermission } = useCurrentUser()
+const showBirthDate = computed(() => hasPermission('person:read_birth_date'))
 
 const form = reactive(mapVolunteerPersonForm(props.extraction))
 const errors = reactive({})
@@ -152,6 +155,7 @@ async function submit () {
     // in flight — settle it before the payload reads form.town.
     await fields.value?.townSettled()
     const payload = buildPersonCreatePayload(form)
+    if (!showBirthDate.value) delete payload.birthDate
     payload.communities = [...communityNames.value]
       .map(n => communityNameToId.value.get(n))
       .filter(Boolean)
@@ -219,6 +223,7 @@ async function submit () {
         v-model:emergency-contact-email="form.emergencyContactEmail"
         :errors="errors" :uncertain="uncertain"
         :villages="villages" :communityNames="communityNames" :disabilities="disabilities"
+        :show-birth-date="showBirthDate"
         @edited="onEdited" @toggle-community="toggleCommunity"
       />
       <VolunteerFormFields
