@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { render, screen, fireEvent, waitFor } from '@testing-library/vue'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import MemberList from '../components/MemberList.vue'
 import { downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -32,14 +32,22 @@ vi.mock('../../../shared/api/analyticsApi.js', () => ({
   postAnalyticsEvents: vi.fn().mockResolvedValue(undefined)
 }))
 
+const mockHasPermission = vi.fn(() => false)
+vi.mock('../../../shared/composables/useCurrentUser.js', () => ({
+  useCurrentUser: () => ({ hasPermission: mockHasPermission })
+}))
+
 vi.mock('../../../shared/lib/csvUtils.js', async (importOriginal) => ({
   ...(await importOriginal()),
   downloadCsv: vi.fn()
 }))
 
 describe('MemberList CSV download', () => {
+  afterEach(cleanup)
+
   beforeEach(() => {
     vi.clearAllMocks()
+    mockHasPermission.mockImplementation(() => false)
     // jsdom has no matchMedia; PrimeVue Select uses it on mount
     window.matchMedia = () => ({
       matches: false,
@@ -68,5 +76,27 @@ describe('MemberList CSV download', () => {
     expect(filename).toBe('Testville-members.csv')
     expect(csv).toContain('Alice Anderson')
     expect(csv).not.toContain('Bob Baker')
+  })
+
+  // person:read_birth_date: the API omits birthDate without it, so the export
+  // drops the column instead of shipping it empty.
+  it('omits the Birth Date column without person:read_birth_date', async () => {
+    render(MemberList, { global: { plugins: [PrimeVue] } })
+    await screen.findAllByText('Alice Anderson')
+    await fireEvent.click(screen.getByText('Download'))
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
+    const [csv] = downloadCsv.mock.calls[0]
+    expect(csv.split('\n')[0]).not.toContain('Birth Date')
+    expect(mockHasPermission).toHaveBeenCalledWith('person:read_birth_date', '42')
+  })
+
+  it('includes the Birth Date column with person:read_birth_date', async () => {
+    mockHasPermission.mockImplementation(perm => perm === 'person:read_birth_date')
+    render(MemberList, { global: { plugins: [PrimeVue] } })
+    await screen.findAllByText('Alice Anderson')
+    await fireEvent.click(screen.getByText('Download'))
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
+    const [csv] = downloadCsv.mock.calls[0]
+    expect(csv.split('\n')[0]).toContain('Birth Date')
   })
 })

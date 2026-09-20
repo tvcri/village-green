@@ -26,6 +26,10 @@ defineOptions({ name: 'PersonList' })
 const router = useRouter()
 const { hasPermission } = useCurrentUser()
 const canWritePerson = computed(() => hasPermission('person:write'))
+// person:read_birth_date: the API omits birthDate for holders without it, so
+// the export drops the column rather than shipping it empty. Hub page, so the
+// federation-scope check.
+const canReadBirthDate = computed(() => hasPermission('person:read_birth_date'))
 const { trackEvent } = useAnalytics()
 
 let toast = null
@@ -116,7 +120,8 @@ const isFetchingExport = ref(false)
 // Fixed export column list (order and headers are the contract, never derived
 // from row keys). Exports carry the full Person shape; the live table stays
 // on summary rows.
-const columnsForCsv = [
+const columnsForCsv = computed(() => (canReadBirthDate.value ? ALL_EXPORT_COLUMNS : ALL_EXPORT_COLUMNS.filter(c => c.key !== 'birthDate')))
+const ALL_EXPORT_COLUMNS = [
   { header: 'Name', key: 'fullName' },
   { header: 'Village', key: 'villageName' },
   { header: 'Roles', key: 'roles' },
@@ -202,7 +207,7 @@ async function fetchRowsForExport() {
 async function handleDownloadCsv() {
   try {
     const rows = await fetchRowsForExport()
-    const csv = toCsv(rows, columnsForCsv)
+    const csv = toCsv(rows, columnsForCsv.value)
     downloadCsv(csv, 'persons.csv')
   } catch (err) {
     if (toast) {
@@ -218,7 +223,7 @@ async function handleCreateSheet() {
     isCreatingSheet.value = true
 
     const rows = await fetchRowsForExport()
-    const result = await createSheet(rows, columnsForCsv, 'Village Green Persons')
+    const result = await createSheet(rows, columnsForCsv.value, 'Village Green Persons')
     const sheetUrl = result.url || result
 
     if (result.popupBlocked) {
