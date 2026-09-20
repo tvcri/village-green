@@ -4,6 +4,16 @@ const PersonService = require('../service/PersonService')
 const SmError = require('../utils/error')
 const { hasPermission } = require('../utils/authz')
 
+// person:read_birth_date also governs WRITES of the column: a caller who
+// cannot see it must not be able to clear it by saving a form that never
+// received it (the client sends null for blank fields on edit). Silently
+// drop the key so every other field still saves.
+function stripBirthDateIfHidden (req, villageIds) {
+  if (!Object.hasOwn(req.body, 'birthDate')) return
+  const allowed = villageIds.every(v => hasPermission(req.userObject, 'person:read_birth_date', { villageId: v }))
+  if (!allowed) delete req.body.birthDate
+}
+
 module.exports.getPersons = async function getPersons (req, res, next) {
   try {
     const { villageId, firstName, lastName, phone, email, projection } = req.query
@@ -41,6 +51,7 @@ module.exports.createPerson = async function createPerson (req, res, next) {
     if (!hasPermission(req.userObject, 'person:write', { villageId: body.villageId })) {
       throw new SmError.PrivilegeError()
     }
+    stripBirthDateIfHidden(req, [body.villageId])
     const personId = await PersonService.createPerson(body, req.userObject.userId)
     const response = await PersonService.getPerson(personId, [], req.userObject)
     res.status(201).json(response)
@@ -89,6 +100,7 @@ module.exports.patchPerson = async function patchPerson (req, res, next) {
         && !hasPermission(req.userObject, 'person:write', { villageId: body.villageId })) {
       throw new SmError.PrivilegeError()
     }
+    stripBirthDateIfHidden(req, [existing.village?.villageId, ...(Object.hasOwn(body, 'villageId') ? [body.villageId] : [])])
 
     await PersonService.patchPerson(personId, body, req.userObject.userId)
     const response = await PersonService.getPerson(personId, [], req.userObject)
