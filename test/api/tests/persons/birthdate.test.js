@@ -5,18 +5,41 @@ import { tokens } from '../../lib/context.js'
 import { persons, villages } from '../../setup/fixtures.js'
 import { withDb } from '../../lib/db.js'
 
-// person:read_birth_date (spec §4.11). Harness roles: only Staff holds it
-// (plus Admin's '*'). The column is OMITTED (absent, never null) without it.
+// person:read_birth_date. Harness roles: only Staff holds it (plus Admin's
+// '*'). The column is OMITTED (absent, never null) without it.
 const quahog = String(villages.quahog.id)
 const pid = persons.quahogMember.id
 const bd = persons.quahogMember.birthDate
 
-const E = { elevate: true }
 const NOGRANTS = 8
+
+// A throwaway federation role with person:read + person:write and NO birth
+// date key, granted to the nogrants persona. There is no role-editing API and
+// the OAS RoleId schema tops out at the seeded 7, so role, permissions, and
+// grant are written directly; effective permissions are read per request, so
+// they take effect at once.
+const WRITER_ROLE = 90
+async function createWriterRole () {
+  await withDb(async conn => {
+    await conn.query(`INSERT INTO role (roleId, name, scope, description, isSystem) VALUES (?, 'Birthdate Writer', 'federation', 'harness', 0)`, [WRITER_ROLE])
+    await conn.query(`INSERT INTO role_permission (roleId, permission) VALUES (?, 'person:read'), (?, 'person:write')`, [WRITER_ROLE, WRITER_ROLE])
+    await conn.query('INSERT INTO role_grant (userId, roleId, villageId) VALUES (?, ?, NULL)', [NOGRANTS, WRITER_ROLE])
+  })
+}
+async function grantBirthDateToWriter () {
+  await withDb(conn => conn.query(`INSERT INTO role_permission (roleId, permission) VALUES (?, 'person:read_birth_date')`, [WRITER_ROLE]))
+}
+async function dropWriterRole () {
+  await withDb(async conn => {
+    await conn.query('DELETE FROM role_grant WHERE roleId = ?', [WRITER_ROLE])
+    await conn.query('DELETE FROM role_permission WHERE roleId = ?', [WRITER_ROLE])
+    await conn.query('DELETE FROM role WHERE roleId = ?', [WRITER_ROLE])
+  })
+}
 
 after(async () => {
   await withDb(conn => conn.query('UPDATE person SET birthDate = ? WHERE id = ?', [bd, pid]))
-  await withDb(conn => conn.query('DELETE FROM role WHERE roleId > 7'))
+  await dropWriterRole()
 })
 
 test('getPerson: staff sees birthDate; board and Village Lead do not', async () => {
@@ -54,12 +77,8 @@ test('getVillagePersons: staff sees birthDate; village lead does not', async () 
 })
 
 test('patchPerson without the key silently ignores birthDate; with the key it clears', async () => {
-  // A federation writer WITHOUT person:read_birth_date: made from a new role.
-  const created = await vgCall('createRole', E, { token: tokens.users.admin, body: { name: `Writer ${Date.now()}`, scope: 'federation', permissions: ['person:read', 'person:write'] } })
-  assert.equal(created.status, 201)
-  const roleId = Number(created.json.roleId)
-  const grant = await vgCall('createUserGrant', { userId: NOGRANTS, ...E }, { token: tokens.users.admin, body: [{ roleId, villageId: null }] })
-  const grantId = grant.json.find(g => String(g.roleId) === String(roleId)).grantId
+  // A federation writer WITHOUT person:read_birth_date.
+  await createWriterRole()
   try {
     const blind = await vgCall('patchPerson', { personId: pid }, { token: tokens.users.nogrants, body: { birthDate: null, nickname: 'Pete' } })
     assert.equal(blind.status, 200)
@@ -68,23 +87,19 @@ test('patchPerson without the key silently ignores birthDate; with the key it cl
     assert.equal(check.json.birthDate, bd, 'stored value untouched')
     assert.equal(check.json.nickname, 'Pete', 'other fields saved')
 
-    const widen = await vgCall('updateRole', { roleId, ...E }, { token: tokens.users.admin, body: { permissions: ['person:read', 'person:write', 'person:read_birth_date'] } })
-    assert.equal(widen.status, 200)
+    await grantBirthDateToWriter()
     const clear = await vgCall('patchPerson', { personId: pid }, { token: tokens.users.nogrants, body: { birthDate: null } })
     assert.equal(clear.status, 200)
     assert.equal(clear.json.birthDate, null, 'now readable and cleared')
   } finally {
-    await vgCall('deleteUserGrant', { userId: NOGRANTS, grantId, ...E }, { token: tokens.users.admin })
+    await dropWriterRole()
     await vgCall('patchPerson', { personId: pid }, { token: tokens.users.staff, body: { nickname: null } })
   }
 })
 
 test('createPerson without the key drops birthDate from the body', async () => {
-  // Service Coordinator holds person:read but no person:write, so use a fresh role again.
-  const created = await vgCall('createRole', E, { token: tokens.users.admin, body: { name: `Creator ${Date.now()}`, scope: 'federation', permissions: ['person:read', 'person:write'] } })
-  const roleId = Number(created.json.roleId)
-  const grant = await vgCall('createUserGrant', { userId: NOGRANTS, ...E }, { token: tokens.users.admin, body: [{ roleId, villageId: null }] })
-  const grantId = grant.json.find(g => String(g.roleId) === String(roleId)).grantId
+  // Service Coordinator holds person:read but no person:write, so use the writer role again.
+  await createWriterRole()
   let newId
   try {
     const res = await vgCall('createPerson', {}, { token: tokens.users.nogrants, body: { villageId: String(villages.scratch.id), firstName: 'No', lastName: 'Birthday', birthDate: '1990-01-01' } })
@@ -94,7 +109,7 @@ test('createPerson without the key drops birthDate from the body', async () => {
     assert.equal(check.json.birthDate, null, 'birthDate was stripped before insert')
   } finally {
     if (newId) await vgCall('deletePerson', { personId: newId }, { token: tokens.users.staff })
-    await vgCall('deleteUserGrant', { userId: NOGRANTS, grantId, ...E }, { token: tokens.users.admin })
+    await dropWriterRole()
   }
 })
 

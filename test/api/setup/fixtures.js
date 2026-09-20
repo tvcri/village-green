@@ -103,13 +103,16 @@ export const users = {
 // `address` (street + unit) and `fullName` ("lastName, firstName") are generated
 // columns, so we seed street/firstName/lastName and precompute `fullName` here in
 // the DB's format so tests can assert against API responses.
-function person (id, villageId, firstName, lastName, street, city, zip) {
+function person (id, villageId, firstName, lastName, street, city, zip, birthDate) {
   return {
     id, villageId, firstName, lastName,
     fullName: `${lastName}, ${firstName}`,
     street, city, state: 'RI', zip,
     email: `${firstName.toLowerCase().replace(/[^a-z]/g, '')}.${lastName.toLowerCase().replace(/[^a-z]/g, '')}@residents.test`,
     phone: '401-555-0101', cell: '401-555-0202',
+    // Every fixture person has one so the person:read_birth_date gate is
+    // observable (present vs absent) on any row a test picks.
+    birthDate,
   }
 }
 
@@ -126,13 +129,13 @@ export const taskUsers = {
 
 export const persons = {
   // Quahog: Family Guy (31 Spooner Street is the Griffins' address)
-  quahogMember: person(1, villages.quahog.id, 'Peter', 'Griffin', '31 Spooner St', 'Quahog', '02860'),
-  quahogVolunteer: person(2, villages.quahog.id, 'Joe', 'Swanson', '33 Spooner St', 'Quahog', '02860'),
+  quahogMember: person(1, villages.quahog.id, 'Peter', 'Griffin', '31 Spooner St', 'Quahog', '02860', '1956-03-15'),
+  quahogVolunteer: person(2, villages.quahog.id, 'Joe', 'Swanson', '33 Spooner St', 'Quahog', '02860', '1960-07-04'),
   // Innsmouth / Miskatonic: low-key fake residents (the village names are the only nod)
-  innsmouthMember: person(3, villages.innsmouth.id, 'Edith', 'Sargent', '7 Water St', 'Innsmouth', '02882'),
-  innsmouthVolunteer: person(4, villages.innsmouth.id, 'Caleb', 'Easton', '12 Harbor Rd', 'Innsmouth', '02882'),
-  miskatonicMember: person(5, villages.miskatonic.id, 'Eleanor', 'Vance', '9 College St', 'Arkham', '02893'),
-  miskatonicVolunteer: person(6, villages.miskatonic.id, 'Walter', 'Brattle', '10 Library Way', 'Arkham', '02893'),
+  innsmouthMember: person(3, villages.innsmouth.id, 'Edith', 'Sargent', '7 Water St', 'Innsmouth', '02882', '1948-11-02'),
+  innsmouthVolunteer: person(4, villages.innsmouth.id, 'Caleb', 'Easton', '12 Harbor Rd', 'Innsmouth', '02882', '1975-01-20'),
+  miskatonicMember: person(5, villages.miskatonic.id, 'Eleanor', 'Vance', '9 College St', 'Arkham', '02893', '1952-09-09'),
+  miskatonicVolunteer: person(6, villages.miskatonic.id, 'Walter', 'Brattle', '10 Library Way', 'Arkham', '02893', '1968-05-30'),
   // VSS household: a SECOND person row sharing quahogVolunteer's email
   // (person() derives it from the name, so the duplicate is automatic — there is
   // an INDEX on person.email, not a unique constraint). sqlResolvedPersonIds
@@ -140,7 +143,7 @@ export const persons = {
   // resolves to BOTH active volunteers and exercises the #68 multi-volunteer
   // household outcomes (selectionRequired / alreadyOwnAccount / account-wide
   // release). Different village on purpose: VSS is village-independent.
-  vssHouseholdSibling: person(7, villages.innsmouth.id, 'Joe', 'Swanson', '5 Marsh St', 'Innsmouth', '02882'),
+  vssHouseholdSibling: person(7, villages.innsmouth.id, 'Joe', 'Swanson', '5 Marsh St', 'Innsmouth', '02882', '1962-12-12'),
 }
 
 // status 'Active' / active 1 so the active_member / active_volunteer views

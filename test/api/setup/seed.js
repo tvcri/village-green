@@ -24,7 +24,7 @@ const EXPECTED_COLUMNS = {
   role_grant: ['villageId', 'userId', 'roleId'],
   role: ['roleId', 'name', 'scope'],
   role_permission: ['roleId', 'permission'],
-  person: ['id', 'villageId', 'firstName', 'lastName', 'street', 'city', 'state', 'zip', 'email', 'phone', 'cell'],
+  person: ['id', 'villageId', 'firstName', 'lastName', 'street', 'city', 'state', 'zip', 'email', 'phone', 'cell', 'birthDate'],
   member: ['id', 'personId', 'memberNumber', 'status'],
   volunteer: ['id', 'personId', 'active'],
   volunteer_capability: ['volunteerId', 'capabilityId'],
@@ -168,9 +168,9 @@ export async function seed () {
       // person.address (street + unit) and person.fullName ("last, first") are
       // generated columns; seed street/firstName/lastName.
       await conn.query(
-        `INSERT INTO person (id, villageId, firstName, lastName, street, city, state, zip, email, phone, cell)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [p.id, p.villageId, p.firstName, p.lastName, p.street, p.city, p.state, p.zip, p.email, p.phone, p.cell],
+        `INSERT INTO person (id, villageId, firstName, lastName, street, city, state, zip, email, phone, cell, birthDate)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [p.id, p.villageId, p.firstName, p.lastName, p.street, p.city, p.state, p.zip, p.email, p.phone, p.cell, p.birthDate],
       )
     }
 
