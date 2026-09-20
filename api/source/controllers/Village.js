@@ -163,7 +163,7 @@ module.exports.getVillagePersons = async function getVillagePersons (req, res, n
       throw new SmError.NotFoundError()
     }
 
-    const response = await VillageService.getVillagePersons(villageId)
+    const response = await VillageService.getVillagePersons(villageId, req.userObject)
     res.json(response)
   }
   catch (err) {
@@ -184,7 +184,7 @@ module.exports.getVillagePerson = async function getVillagePerson (req, res, nex
       throw new SmError.NotFoundError()
     }
 
-    const response = await VillageService.getVillagePerson(villageId, personId)
+    const response = await VillageService.getVillagePerson(villageId, personId, req.userObject)
     if (!response) {
       throw new SmError.NotFoundError()
     }

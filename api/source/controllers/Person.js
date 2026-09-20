@@ -23,6 +23,7 @@ module.exports.getPersons = async function getPersons (req, res, next) {
         )
     const response = await PersonService.getPersons({
       villageIdsGranted, villageId, firstName, lastName, phone, email, projection,
+      userObject: req.userObject,
     })
     res.json(response)
   }

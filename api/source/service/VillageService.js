@@ -260,12 +260,12 @@ module.exports.getVolunteers = async function ({ villageIdsGranted }) {
   return rows
 }
 
-module.exports.getVillagePersons = async function (villageId) {
-  return await PersonService.getPersonsByVillage(villageId)
+module.exports.getVillagePersons = async function (villageId, userObject) {
+  return await PersonService.getPersonsByVillage(villageId, userObject)
 }
 
-module.exports.getVillagePerson = async function (villageId, personId) {
-  const persons = await PersonService.getPersonsByVillage(villageId)
+module.exports.getVillagePerson = async function (villageId, personId, userObject) {
+  const persons = await PersonService.getPersonsByVillage(villageId, userObject)
   return persons.find(p => p.personId === personId) || null
 }
 

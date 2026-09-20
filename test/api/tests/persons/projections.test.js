@@ -68,7 +68,10 @@ test('getPersons projection=detail adds a same-named object, granted villages on
   assert.ok(peter.detail, 'detail object projected')
   assert.equal(peter.detail.street, persons.quahogMember.street)
   // Unseeded columns are still selected: key present, value null.
-  assert.ok('birthDate' in peter.detail && 'emergencyContactName' in peter.detail, 'full column set present')
+  assert.ok('emergencyContactName' in peter.detail, 'full column set present')
+  // birthDate is gated by person:read_birth_date; full_v1 (Steering
+  // Committee) doesn't hold it, so the key is omitted — see birthdate.test.js.
+  assert.ok(!('birthDate' in peter.detail), 'birthDate hidden without person:read_birth_date')
   assert.ok(Array.isArray(peter.detail.communities) && Array.isArray(peter.detail.disabilities), 'aggregate arrays present')
   // Deliberately NOT part of this projection (multi-village gating — see plan/grades log).
   assert.ok(!('member' in peter) && !('volunteer' in peter), 'no member/volunteer on the list endpoint')

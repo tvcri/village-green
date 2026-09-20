@@ -49,8 +49,11 @@ const DISABILITIES_COLUMN = `${DISABILITIES_SUBQUERY} AS disabilities`
 // The getPersons `detail` projection: summary rows gain a same-named object
 // with the Person columns the summary lacks (projection convention — a
 // projection adds a property, it never reshapes the row). email/phone/cell
-// stay out: the summary root already carries them.
-const DETAIL_COLUMN = `JSON_OBJECT(
+// stay out: the summary root already carries them. birthDate is gated by
+// person:read_birth_date — omitted, never nulled, like memberColumn's
+// financial fields.
+function detailColumn ({ birthDate }) {
+  return `JSON_OBJECT(
       'lastName', p.lastName,
       'firstName', p.firstName,
       'middleInitial', p.middleInitial,
@@ -62,7 +65,7 @@ const DETAIL_COLUMN = `JSON_OBJECT(
       'state', p.state,
       'zip', LPAD(p.zip, 5, '0'),
       'town', p.town,
-      'birthDate', DATE_FORMAT(p.birthDate, '%Y-%m-%d'),
+      ${birthDate ? `'birthDate', DATE_FORMAT(p.birthDate, '%Y-%m-%d'),` : ''}
       'emergencyContactName', p.emergencyContactName,
       'emergencyContactRelationship', p.emergencyContactRelationship,
       'emergencyContactPhone', p.emergencyContactPhone,
@@ -70,6 +73,7 @@ const DETAIL_COLUMN = `JSON_OBJECT(
       'communities', ${COMMUNITIES_SUBQUERY},
       'disabilities', ${DISABILITIES_SUBQUERY}
     ) AS detail`
+}
 
 function memberColumn ({ financial, scNote, inactive }) {
   // Row gating: without member:read_inactive the source is the
@@ -167,8 +171,9 @@ function volunteerColumn ({ inactive }) {
 //   detail            - add the `detail` object to summary rows (getPersons projection)
 //   member            - { financial, scNote, inactive } projection gates
 //   volunteer         - { inactive } projection gates
+//   birthDate         - include p.birthDate (person:read_birth_date)
 async function queryPersons (inPredicates = {}, inOptions = {}) {
-  const { summary = false, detail = false, member = null, volunteer = null } = inOptions
+  const { summary = false, detail = false, member = null, volunteer = null, birthDate = false } = inOptions
 
   const columns = summary
     ? [
@@ -200,14 +205,14 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       'p.emergencyContactRelationship',
       'p.emergencyContactPhone',
       'p.emergencyContactEmail',
-      "DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate",
+      ...(birthDate ? ["DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate"] : []),
       VILLAGE_COLUMN,
       ACTIVE_AS_COLUMN,
       COMMUNITIES_COLUMN,
       DISABILITIES_COLUMN
     ]
 
-  if (detail) columns.push(DETAIL_COLUMN)
+  if (detail) columns.push(detailColumn({ birthDate }))
   if (member) columns.push(memberColumn(member))
   if (volunteer) columns.push(volunteerColumn(volunteer))
 
@@ -265,18 +270,20 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
 module.exports.getPerson = async function (personId, projections = [], userObject = null) {
   // The member/volunteer projections carry village-scoped gated content:
   // sensitive fields (financial/scNote) and inactive-row visibility
-  // (read_inactive). Gates must be evaluated against *this* person's
-  // village. getPerson is single-row (predicated on p.id), so that village
-  // is a query-level constant — a cheap pre-fetch resolves it before the
-  // main query is built. Federation-level grants are covered without the
-  // lookup running at all: hasPermission short-circuits on federation
-  // membership regardless of villageId.
+  // (read_inactive), and birthDate is gated the same way
+  // (person:read_birth_date). Gates must be evaluated against *this*
+  // person's village. getPerson is single-row (predicated on p.id), so that
+  // village is a query-level constant — a cheap pre-fetch resolves it
+  // before the main query is built. Federation-level grants are covered
+  // without the lookup running at all: hasPermission short-circuits on
+  // federation membership regardless of villageId.
   const wantsMember = projections.includes('member')
   const wantsVolunteer = projections.includes('volunteer')
   let financial = false
   let scNote = false
   let memberInactive = false
   let volunteerInactive = false
+  let birthDate = hasPermission(userObject, 'person:read_birth_date')
   if (wantsMember) {
     financial = hasPermission(userObject, 'member:read_financial')
     scNote = hasPermission(userObject, 'member:read_sc_note')
@@ -286,11 +293,13 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     volunteerInactive = hasPermission(userObject, 'volunteer:read_inactive')
   }
   const unresolved =
+    !birthDate ||
     (wantsMember && !(financial && scNote && memberInactive)) ||
     (wantsVolunteer && !volunteerInactive)
   if (unresolved) {
     const [[personVillage]] = await dbUtils.pool.query('SELECT villageId FROM person WHERE id = ?', [personId])
     const villageId = personVillage?.villageId
+    birthDate ||= hasPermission(userObject, 'person:read_birth_date', { villageId })
     if (wantsMember) {
       financial ||= hasPermission(userObject, 'member:read_financial', { villageId })
       scNote ||= hasPermission(userObject, 'member:read_sc_note', { villageId })
@@ -303,6 +312,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   const rows = await queryPersons(
     { personId },
     {
+      birthDate,
       member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
       volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null
     }
@@ -310,19 +320,29 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   return rows[0] ?? null
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, projection }) {
+// Federation holders see birthDate everywhere; a village-scoped caller sees
+// it only when they hold the key for EVERY village in the request's filter
+// (the controller guarantees a village caller always supplies villageId).
+function birthDateForVillages (userObject, villageIds) {
+  if (hasPermission(userObject, 'person:read_birth_date')) return true
+  if (!villageIds?.length) return false
+  return villageIds.every(v => hasPermission(userObject, 'person:read_birth_date', { villageId: v }))
+}
+
+module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, projection, userObject }) {
   // 'detail' adds a same-named object with the full person columns (exports).
   // Deliberately no member/volunteer options here: those projections carry
   // per-village-gated fields, and this endpoint can span villages (see
-  // getPerson's gate logic).
+  // getPerson's gate logic). birthDate IS gated here, per-query, because the
+  // detail object carries it.
   return queryPersons(
     { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email },
-    { summary: true, detail: projection?.includes('detail') }
+    { summary: true, detail: projection?.includes('detail'), birthDate: birthDateForVillages(userObject, villageId) }
   )
 }
 
-module.exports.getPersonsByVillage = async function (villageId) {
-  return await queryPersons({ villageId })
+module.exports.getPersonsByVillage = async function (villageId, userObject) {
+  return await queryPersons({ villageId }, { birthDate: hasPermission(userObject, 'person:read_birth_date', { villageId }) })
 }
 
 module.exports.createPerson = async function (body, userId) {
