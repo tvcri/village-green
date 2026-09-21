@@ -57,6 +57,11 @@ const selectedVillageId = computed(() => {
   if (selectedVillage.value === 'All villages') return undefined
   return (allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId
 })
+// person:read_birth_date: the API omits birthDate for holders without it, so
+// the export drops the column rather than shipping it empty. With a village
+// filter the check is for that village (village-scoped holders); across all
+// villages only a federation grant applies.
+const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', selectedVillageId.value))
 
 const hasFilter = computed(() =>
   firstName.value.trim() || lastName.value.trim() || phone.value.trim() ||
@@ -116,7 +121,8 @@ const isFetchingExport = ref(false)
 // Fixed export column list (order and headers are the contract, never derived
 // from row keys). Exports carry the full Person shape; the live table stays
 // on summary rows.
-const columnsForCsv = [
+const columnsForCsv = computed(() => (canReadBirthDate.value ? ALL_EXPORT_COLUMNS : ALL_EXPORT_COLUMNS.filter(c => c.key !== 'birthDate')))
+const ALL_EXPORT_COLUMNS = [
   { header: 'Name', key: 'fullName' },
   { header: 'Village', key: 'villageName' },
   { header: 'Roles', key: 'roles' },
@@ -202,7 +208,7 @@ async function fetchRowsForExport() {
 async function handleDownloadCsv() {
   try {
     const rows = await fetchRowsForExport()
-    const csv = toCsv(rows, columnsForCsv)
+    const csv = toCsv(rows, columnsForCsv.value)
     downloadCsv(csv, 'persons.csv')
   } catch (err) {
     if (toast) {
@@ -218,7 +224,7 @@ async function handleCreateSheet() {
     isCreatingSheet.value = true
 
     const rows = await fetchRowsForExport()
-    const result = await createSheet(rows, columnsForCsv, 'Village Green Persons')
+    const result = await createSheet(rows, columnsForCsv.value, 'Village Green Persons')
     const sheetUrl = result.url || result
 
     if (result.popupBlocked) {

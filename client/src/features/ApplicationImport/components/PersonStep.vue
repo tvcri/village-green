@@ -10,6 +10,7 @@ import {
 } from '../lib/importMapping.js'
 import { getPersons, createPerson, getCommunities, getDisabilities } from '../../PersonList/api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const props = defineProps({
   extraction: { type: Object, required: true },
@@ -17,8 +18,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['person-done'])
 const toast = useToast()
+const { hasPermission } = useCurrentUser()
 
 const form = reactive(mapPersonForm(props.extraction, props.memberIndex))
+// Checked against the person's village, like PersonEditForm: a village-scoped
+// holder must not have the input hidden and the value dropped on submit.
+const showBirthDate = computed(() => hasPermission('person:read_birth_date', form.villageId))
 const errors = reactive({})
 const fields = ref(null)
 const uncertain = reactive(uncertainMapForPerson(props.extraction, props.memberIndex))
@@ -97,6 +102,7 @@ async function submit () {
     // in flight — settle it before the payload reads form.town.
     await fields.value?.townSettled()
     const payload = buildPersonCreatePayload(form)
+    if (!showBirthDate.value) delete payload.birthDate
     payload.communities = [...communityNames.value]
       .map(n => communityNameToId.value.get(n))
       .filter(Boolean)
@@ -156,6 +162,7 @@ async function submit () {
         v-model:emergency-contact-email="form.emergencyContactEmail"
         :errors="errors" :uncertain="uncertain"
         :villages="villages" :communityNames="communityNames" :disabilities="disabilities"
+        :show-birth-date="showBirthDate"
         @edited="onEdited" @toggle-community="toggleCommunity"
         @toggle-disability="toggleDisability" @edit-disability-note="editDisabilityNote"
       />

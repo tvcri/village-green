@@ -11,6 +11,7 @@ import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageMembers } from '../api/memberApi.js'
@@ -40,6 +41,12 @@ onMounted(() => {
 })
 
 const villageId = computed(() => route.params.villageId)
+const { hasPermission } = useCurrentUser()
+
+// person:read_birth_date: the API omits birthDate for holders without it, so
+// the export drops the column rather than shipping it empty.
+const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', villageId.value))
+const withoutBirthDate = cols => canReadBirthDate.value ? cols : cols.filter(c => c.key !== 'birthDate')
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
 const pageRows = ref(10)
@@ -134,7 +141,7 @@ const navigateToMember = (member) => {
   })
 }
 
-const columnsForCsv = [
+const columnsForCsv = computed(() => withoutBirthDate([
   { header: 'Full Name', key: 'fullName' },
   { header: 'Member #', key: 'memberNumber' },
   { header: 'Member Level', key: 'memberLevel' },
@@ -153,11 +160,11 @@ const columnsForCsv = [
   { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
   { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
   { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
-]
+]))
 
 const handleDownloadCsv = async () => {
   if (!persons.value) await fetchPersons()
-  const csv = toCsv(membersForCsv.value, columnsForCsv)
+  const csv = toCsv(membersForCsv.value, columnsForCsv.value)
   const villageName = persons.value?.[0]?.village?.name || 'village'
   const filename = `${villageName}-members.csv`
   downloadCsv(csv, filename)
@@ -173,7 +180,7 @@ async function handleCreateSheet() {
 
     const result = await createSheet(
       membersForCsv.value,
-      columnsForCsv,
+      columnsForCsv.value,
       sheetName
     )
 

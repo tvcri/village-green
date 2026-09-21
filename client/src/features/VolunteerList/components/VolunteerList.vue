@@ -17,6 +17,7 @@ import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv, buildFlagColumns, withFlagValues } from '../../../shared/lib/csvUtils.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
@@ -35,6 +36,12 @@ onMounted(() => {
 })
 
 const villageId = computed(() => route.params.villageId)
+const { hasPermission } = useCurrentUser()
+
+// person:read_birth_date: the API omits birthDate for holders without it, so
+// the export drops the column rather than shipping it empty.
+const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', villageId.value))
+const withoutBirthDate = cols => canReadBirthDate.value ? cols : cols.filter(c => c.key !== 'birthDate')
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
 const pageRows = ref(10)
@@ -154,7 +161,7 @@ const navigateToVolunteer = (volunteer) => {
   })
 }
 
-const columnsForCsv = computed(() => [
+const columnsForCsv = computed(() => withoutBirthDate([
   { header: 'Full Name', key: 'fullName' },
   { header: 'Capabilities', key: 'capabilities' },
   ...capabilityFlags.value.columns,
@@ -171,7 +178,7 @@ const columnsForCsv = computed(() => [
   { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
   { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
   { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
-])
+]))
 
 const handleDownloadCsv = async () => {
   if (!persons.value) await fetchPersons()

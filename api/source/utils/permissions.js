@@ -8,6 +8,7 @@
 const catalog = {
   'person:read':              { description: 'Read person records', requiresElevation: false },
   'person:write':             { description: 'Create/update person records', requiresElevation: false },
+  'person:read_birth_date':   { description: 'See birth dates on person records', requiresElevation: false },
   'member:read':              { description: 'Read member rosters', requiresElevation: false },
   'member:write':             { description: 'Create/update member records', requiresElevation: false },
   'member:read_financial':    { description: 'See dues/financial columns in projections', requiresElevation: false },

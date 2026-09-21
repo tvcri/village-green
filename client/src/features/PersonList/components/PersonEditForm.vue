@@ -12,11 +12,13 @@ import {
 } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 useRequirePermission('person:write')
+const { hasPermission } = useCurrentUser()
 
 const isEdit = computed(() => !!route.params.personId)
 const personId = computed(() => route.params.personId)
@@ -29,6 +31,10 @@ const form = reactive({
   emergencyContactPhone: '', emergencyContactEmail: '',
   villageId: null,
 })
+
+// person:read_birth_date governs the input too (spec §4.11): a coordinator
+// who cannot see the value must not send null for it on save.
+const showBirthDate = computed(() => hasPermission('person:read_birth_date', form.villageId))
 
 const errors = reactive({})
 const fields = ref(null)
@@ -64,6 +70,7 @@ function buildPayload () {
   const payload = {}
   Object.entries(form).forEach(([k, v]) => {
     if (k === 'villageId') return
+    if (k === 'birthDate' && !showBirthDate.value) return
     if (v === '') {
       // On edit, send null so a cleared field is actually cleared server-side
       // instead of being omitted (and thus left at its prior value).
@@ -166,6 +173,7 @@ function cancel () {
           :villages="villages"
           :communityNames="communityNames"
           :disabilities="disabilities"
+          :show-birth-date="showBirthDate"
           @toggle-community="toggleCommunity"
           @toggle-disability="toggleDisability"
           @edit-disability-note="editDisabilityNote"
