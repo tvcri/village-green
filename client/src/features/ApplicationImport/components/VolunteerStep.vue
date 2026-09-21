@@ -24,9 +24,11 @@ const props = defineProps({
 const emit = defineEmits(['volunteer-done'])
 const toast = useToast()
 const { hasPermission } = useCurrentUser()
-const showBirthDate = computed(() => hasPermission('person:read_birth_date'))
 
 const form = reactive(mapVolunteerPersonForm(props.extraction))
+// Checked against the person's village, like PersonEditForm: a village-scoped
+// holder must not have the input hidden and the value dropped on submit.
+const showBirthDate = computed(() => hasPermission('person:read_birth_date', form.villageId))
 const errors = reactive({})
 const fields = ref(null)
 const uncertain = reactive(uncertainMapForVolunteerPerson(props.extraction))

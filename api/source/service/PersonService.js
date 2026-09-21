@@ -296,7 +296,9 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     !birthDate ||
     (wantsMember && !(financial && scNote && memberInactive)) ||
     (wantsVolunteer && !volunteerInactive)
-  if (unresolved) {
+  // Without a userObject (internal Member/Volunteer controller calls) every
+  // gate stays closed, so the village lookup cannot change anything — skip it.
+  if (unresolved && userObject) {
     const [[personVillage]] = await dbUtils.pool.query('SELECT villageId FROM person WHERE id = ?', [personId])
     const villageId = personVillage?.villageId
     birthDate ||= hasPermission(userObject, 'person:read_birth_date', { villageId })

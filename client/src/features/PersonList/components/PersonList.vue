@@ -26,10 +26,6 @@ defineOptions({ name: 'PersonList' })
 const router = useRouter()
 const { hasPermission } = useCurrentUser()
 const canWritePerson = computed(() => hasPermission('person:write'))
-// person:read_birth_date: the API omits birthDate for holders without it, so
-// the export drops the column rather than shipping it empty. Hub page, so the
-// federation-scope check.
-const canReadBirthDate = computed(() => hasPermission('person:read_birth_date'))
 const { trackEvent } = useAnalytics()
 
 let toast = null
@@ -61,6 +57,11 @@ const selectedVillageId = computed(() => {
   if (selectedVillage.value === 'All villages') return undefined
   return (allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId
 })
+// person:read_birth_date: the API omits birthDate for holders without it, so
+// the export drops the column rather than shipping it empty. With a village
+// filter the check is for that village (village-scoped holders); across all
+// villages only a federation grant applies.
+const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', selectedVillageId.value))
 
 const hasFilter = computed(() =>
   firstName.value.trim() || lastName.value.trim() || phone.value.trim() ||
