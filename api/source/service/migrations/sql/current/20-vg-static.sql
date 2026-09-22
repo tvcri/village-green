@@ -38,7 +38,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `role_permission` WRITE;
 /*!40000 ALTER TABLE `role_permission` DISABLE KEYS */;
-INSERT INTO `role_permission` VALUES (1,'friend:read'),(1,'member:read'),(1,'person:read'),(1,'sr:read'),(1,'village:read'),(1,'volunteer:read'),(2,'friend:read'),(2,'member:read'),(2,'person:read'),(2,'sr:read'),(2,'village:read'),(2,'volunteer:read'),(3,'friend:read'),(3,'member:read'),(3,'member:read_financial'),(3,'person:read'),(3,'sr:read'),(3,'village:read'),(3,'volunteer:read'),(4,'*'),(5,'friend:read'),(5,'friend:write'),(5,'member:read'),(5,'member:read_financial'),(5,'member:read_inactive'),(5,'member:read_sc_note'),(5,'member:write'),(5,'person:read'),(5,'person:read_birth_date'),(5,'person:write'),(5,'sr:read'),(5,'sr:write'),(5,'village:read'),(5,'village:write'),(5,'volunteer:read'),(5,'volunteer:read_inactive'),(5,'volunteer:write'),(6,'friend:read'),(6,'member:read'),(6,'person:read'),(6,'sr:read'),(6,'village:read'),(6,'volunteer:read'),(7,'friend:read'),(7,'member:read'),(7,'member:read_sc_note'),(7,'person:read'),(7,'sr:read'),(7,'sr:write'),(7,'village:read'),(7,'volunteer:read');
+INSERT INTO `role_permission` VALUES (1,'friend:read'),(1,'member:read'),(1,'person:read'),(1,'sr:read'),(1,'village:read'),(1,'volunteer:read'),(2,'friend:read'),(2,'member:read'),(2,'person:read'),(2,'sr:read'),(2,'village:read'),(2,'volunteer:read'),(3,'friend:read'),(3,'member:read'),(3,'member:read_financial'),(3,'person:read'),(3,'sr:read'),(3,'village:read'),(3,'volunteer:read'),(4,'*'),(5,'friend:read'),(5,'friend:write'),(5,'member:read'),(5,'member:read_financial'),(5,'member:read_inactive'),(5,'member:read_sc_note'),(5,'member:write'),(5,'person:read'),(5,'person:read_birth_date'),(5,'person:read_demographics'),(5,'person:write'),(5,'sr:read'),(5,'sr:write'),(5,'village:read'),(5,'village:write'),(5,'volunteer:read'),(5,'volunteer:read_inactive'),(5,'volunteer:write'),(6,'friend:read'),(6,'member:read'),(6,'person:read'),(6,'sr:read'),(6,'village:read'),(6,'volunteer:read'),(7,'friend:read'),(7,'member:read'),(7,'member:read_sc_note'),(7,'person:read'),(7,'sr:read'),(7,'sr:write'),(7,'village:read'),(7,'volunteer:read');
 /*!40000 ALTER TABLE `role_permission` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -48,8 +48,68 @@ UNLOCK TABLES;
 
 LOCK TABLES `_migrations` WRITE;
 /*!40000 ALTER TABLE `_migrations` DISABLE KEYS */;
-INSERT INTO `_migrations` VALUES ('2026-06-16 17:43:42',NULL,'0001-analytics.js'),('2026-06-22 01:13:42',NULL,'0002-fcv-submission.js'),('2026-06-23 06:26:22',NULL,'0003-service-request-times.js'),('2026-06-23 20:15:07',NULL,'0004-service-request-status-not-null.js'),('2026-06-29 01:59:50',NULL,'0005-notification-event.js'),('2026-06-29 17:19:50',NULL,'0006-ce-member-volunteer-fields.js'),('2026-07-02 20:07:56',NULL,'0007-service-request-attribution.js'),('2026-07-04 02:23:43',NULL,'0008-privacy-acknowledgement.js'),('2026-07-05 15:28:31',NULL,'0009-camelcase-columns.js'),('2026-07-06 14:36:41',NULL,'0010-person-management.js'),('2026-07-06 14:36:41',NULL,'0011-person-disability-note.js'),('2026-07-06 14:36:41',NULL,'0012-volunteer-notes.js'),('2026-07-12 17:23:03',NULL,'0013-rbac-roles.js'),('2026-07-13 11:32:58',NULL,'0014-sr-wallclock-times.js'),('2026-07-13 16:44:26',NULL,'0015-sr-village-date-status-index.js'),('2026-07-20 12:40:51',NULL,'0016-vss-identity.js'),('2026-07-20 12:40:52',NULL,'0017-enrollment.js'),('2026-07-23 01:15:24',NULL,'0018-sr-starting-address.js'),('2026-07-26 16:15:58',NULL,'0019-analytics-device-class.js'),('2026-07-27 01:26:03',NULL,'0020-errand-spelling.js'),('2026-07-28 02:12:30',NULL,'0021-service-date-not-null.js'),('2026-08-08 23:10:23',NULL,'0022-person-town.js'),('2026-08-20 21:48:29',NULL,'0023-audit-event.js'),('2026-08-23 00:57:10',NULL,'0024-task-user-attribution.js'),('2026-08-28 20:42:54',NULL,'0025-sc-notes-rename.js'),('2026-09-20 23:03:55',NULL,'0026-birth-date-permission.js');
+INSERT INTO `_migrations` VALUES ('2026-06-16 17:43:42',NULL,'0001-analytics.js'),('2026-06-22 01:13:42',NULL,'0002-fcv-submission.js'),('2026-06-23 06:26:22',NULL,'0003-service-request-times.js'),('2026-06-23 20:15:07',NULL,'0004-service-request-status-not-null.js'),('2026-06-29 01:59:50',NULL,'0005-notification-event.js'),('2026-06-29 17:19:50',NULL,'0006-ce-member-volunteer-fields.js'),('2026-07-02 20:07:56',NULL,'0007-service-request-attribution.js'),('2026-07-04 02:23:43',NULL,'0008-privacy-acknowledgement.js'),('2026-07-05 15:28:31',NULL,'0009-camelcase-columns.js'),('2026-07-06 14:36:41',NULL,'0010-person-management.js'),('2026-07-06 14:36:41',NULL,'0011-person-disability-note.js'),('2026-07-06 14:36:41',NULL,'0012-volunteer-notes.js'),('2026-07-12 17:23:03',NULL,'0013-rbac-roles.js'),('2026-07-13 11:32:58',NULL,'0014-sr-wallclock-times.js'),('2026-07-13 16:44:26',NULL,'0015-sr-village-date-status-index.js'),('2026-07-20 12:40:51',NULL,'0016-vss-identity.js'),('2026-07-20 12:40:52',NULL,'0017-enrollment.js'),('2026-07-23 01:15:24',NULL,'0018-sr-starting-address.js'),('2026-07-26 16:15:58',NULL,'0019-analytics-device-class.js'),('2026-07-27 01:26:03',NULL,'0020-errand-spelling.js'),('2026-07-28 02:12:30',NULL,'0021-service-date-not-null.js'),('2026-08-08 23:10:23',NULL,'0022-person-town.js'),('2026-08-20 21:48:29',NULL,'0023-audit-event.js'),('2026-08-23 00:57:10',NULL,'0024-task-user-attribution.js'),('2026-08-28 20:42:54',NULL,'0025-sc-notes-rename.js'),('2026-09-20 23:03:55',NULL,'0026-birth-date-permission.js'),('2026-09-22 13:01:45',NULL,'0027-person-record.js');
 /*!40000 ALTER TABLE `_migrations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `circle`
+--
+
+LOCK TABLES `circle` WRITE;
+/*!40000 ALTER TABLE `circle` DISABLE KEYS */;
+INSERT INTO `circle` VALUES (1,'Circle of Pride'),(3,'DownCity'),(4,'OakHill'),(2,'Veteran\'s Circle');
+/*!40000 ALTER TABLE `circle` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `gender`
+--
+
+LOCK TABLES `gender` WRITE;
+/*!40000 ALTER TABLE `gender` DISABLE KEYS */;
+INSERT INTO `gender` VALUES (1,'Female'),(2,'Male'),(3,'Other');
+/*!40000 ALTER TABLE `gender` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `ethnicity`
+--
+
+LOCK TABLES `ethnicity` WRITE;
+/*!40000 ALTER TABLE `ethnicity` DISABLE KEYS */;
+INSERT INTO `ethnicity` VALUES (1,'Hispanic or Latino'),(2,'Not Hispanic or Latino');
+/*!40000 ALTER TABLE `ethnicity` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `race`
+--
+
+LOCK TABLES `race` WRITE;
+/*!40000 ALTER TABLE `race` DISABLE KEYS */;
+INSERT INTO `race` VALUES (1,'American Indian or Alaska Native'),(2,'Asian'),(3,'Black or African American'),(4,'Native Hawaiian or Other Pacific Islander'),(5,'White');
+/*!40000 ALTER TABLE `race` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `contact_method`
+--
+
+LOCK TABLES `contact_method` WRITE;
+/*!40000 ALTER TABLE `contact_method` DISABLE KEYS */;
+INSERT INTO `contact_method` VALUES (2,'Cell'),(3,'Email'),(4,'Mail'),(1,'Phone');
+/*!40000 ALTER TABLE `contact_method` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `language`
+--
+
+LOCK TABLES `language` WRITE;
+/*!40000 ALTER TABLE `language` DISABLE KEYS */;
+INSERT INTO `language` VALUES (1,'English','en'),(2,'Spanish','es'),(3,'Portuguese','pt'),(4,'Italian','it');
+/*!40000 ALTER TABLE `language` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -59,6 +119,6 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-20 23:06:50
+-- Dump completed on 2026-09-22 13:04:08
 
 INSERT INTO user_data (username, taskName, status) VALUES ('_task_auto_complete', 'auto_complete', 'unavailable');
