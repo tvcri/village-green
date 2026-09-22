@@ -12,20 +12,20 @@ const ACTIVE_AS_COLUMN = `CASE
 
 const VILLAGE_COLUMN = `JSON_OBJECT('villageId', CAST(v.id AS CHAR), 'name', v.name) AS village`
 
-// communities + disabilities are `required` on the Person schema, so every
+// circles + disabilities are `required` on the Person schema, so every
 // full-row path must emit them. NULL-safe via COALESCE — a person with none
 // yields JSON_ARRAY(), not null. Bare subqueries so they compose as top-level
 // columns (full rows) or JSON_OBJECT values (the detail projection).
-const COMMUNITIES_SUBQUERY = `(
+const CIRCLES_SUBQUERY = `(
       SELECT COALESCE(
         ${dbUtils.jsonArrayAgg({
-          value: `JSON_OBJECT('communityId', CAST(c.id AS CHAR), 'name', c.name)`,
+          value: `JSON_OBJECT('circleId', CAST(c.id AS CHAR), 'name', c.name)`,
           orderBy: 'c.name'
         })},
         JSON_ARRAY()
       )
-      FROM person_community pc
-      JOIN community c ON c.id = pc.communityId
+      FROM person_circle pc
+      JOIN circle c ON c.id = pc.circleId
       WHERE pc.personId = p.id
     )`
 
@@ -43,7 +43,7 @@ const DISABILITIES_SUBQUERY = `(
         AND d.name IN ('Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane')
     )`
 
-const COMMUNITIES_COLUMN = `${COMMUNITIES_SUBQUERY} AS communities`
+const CIRCLES_COLUMN = `${CIRCLES_SUBQUERY} AS circles`
 const DISABILITIES_COLUMN = `${DISABILITIES_SUBQUERY} AS disabilities`
 
 // The getPersons `detail` projection: summary rows gain a same-named object
@@ -70,7 +70,7 @@ function detailColumn ({ birthDate }) {
       'emergencyContactRelationship', p.emergencyContactRelationship,
       'emergencyContactPhone', p.emergencyContactPhone,
       'emergencyContactEmail', p.emergencyContactEmail,
-      'communities', ${COMMUNITIES_SUBQUERY},
+      'circles', ${CIRCLES_SUBQUERY},
       'disabilities', ${DISABILITIES_SUBQUERY}
     ) AS detail`
 }
@@ -155,7 +155,7 @@ function volunteerColumn ({ inactive }) {
 // Single query path for person reads: getPerson, getPersons, and
 // getPersonsByVillage all build here. These column fragments were once
 // copy-diverged across three functions (one copy dropped
-// communities/disabilities and failed response validation) — do not fork
+// circles/disabilities and failed response validation) — do not fork
 // them again.
 //
 // inPredicates:
@@ -208,7 +208,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       ...(birthDate ? ["DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate"] : []),
       VILLAGE_COLUMN,
       ACTIVE_AS_COLUMN,
-      COMMUNITIES_COLUMN,
+      CIRCLES_COLUMN,
       DISABILITIES_COLUMN
     ]
 
@@ -348,15 +348,15 @@ module.exports.getPersonsByVillage = async function (villageId, userObject) {
 }
 
 module.exports.createPerson = async function (body, userId) {
-  const { communities, disabilities, ...personFields } = body
+  const { circles, disabilities, ...personFields } = body
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       return AuditService.auditUpdate(connection, { entityType: 'person', userId }, async () => {
         const [personInsertResult] = await connection.query('INSERT INTO person SET ?', personFields)
         const newPersonId = personInsertResult.insertId
-        if (communities?.length) {
-          const values = communities.map(communityId => [newPersonId, communityId])
-          await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
+        if (circles?.length) {
+          const values = circles.map(circleId => [newPersonId, circleId])
+          await connection.query('INSERT INTO person_circle (personId, circleId) VALUES ?', [values])
         }
         if (disabilities?.length) {
           const values = disabilities.map(d => [newPersonId, d.disabilityId, d.note ?? null])
@@ -371,7 +371,7 @@ module.exports.createPerson = async function (body, userId) {
 }
 
 module.exports.patchPerson = async function (personId, body, userId) {
-  const { communities, disabilities, ...personFields } = body
+  const { circles, disabilities, ...personFields } = body
   // town derives from the address (the client recalculates it and sends it
   // with every address edit). A PATCH that changes address fields without
   // supplying town would otherwise keep the previous municipality against
@@ -386,11 +386,11 @@ module.exports.patchPerson = async function (personId, body, userId) {
           if (Object.keys(personFields).length > 0) {
             await connection.query('UPDATE person SET ? WHERE id = ?', [personFields, personId])
           }
-          if (communities !== undefined) {
-            await connection.query('DELETE FROM person_community WHERE personId = ?', [personId])
-            if (communities.length) {
-              const values = communities.map(communityId => [personId, communityId])
-              await connection.query('INSERT INTO person_community (personId, communityId) VALUES ?', [values])
+          if (circles !== undefined) {
+            await connection.query('DELETE FROM person_circle WHERE personId = ?', [personId])
+            if (circles.length) {
+              const values = circles.map(circleId => [personId, circleId])
+              await connection.query('INSERT INTO person_circle (personId, circleId) VALUES ?', [values])
             }
           }
           if (disabilities !== undefined) {
