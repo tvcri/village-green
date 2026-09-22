@@ -176,11 +176,15 @@ function getPoolConfig() {
     },
     typeCast: function (field, next) {
       if ((field.type === "BIT") && (field.length === 1)) {
-        let bytes = field.buffer() || [0]
-        return( bytes[ 0 ] === 1 )
+        // field.buffer() is null for a SQL NULL. The old `|| [0]` fallback
+        // collapsed NULL to false, so a nullable BIT(1) could never read back
+        // as null even though every such field is `nullable: true` in the OAS
+        // (person.isVeteran, volunteer.active, member.printedNewsletter).
+        const bytes = field.buffer()
+        return bytes === null ? null : bytes[0] === 1
       }
       return next()
-    } 
+    }
   }
   if (config.database.password) {
     poolConfig.password = config.database.password
