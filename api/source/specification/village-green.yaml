@@ -3834,6 +3834,8 @@ components:
       - fullName
       - circles
       - disabilities
+      - languages
+      - contacts
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
@@ -3855,6 +3857,17 @@ components:
         nickname:
           type: string
           maxLength: 100
+          nullable: true
+        suffix:
+          type: string
+          maxLength: 20
+          nullable: true
+        displayName:
+          type: string
+          maxLength: 300
+        pronouns:
+          type: string
+          maxLength: 30
           nullable: true
         street:
           type: string
@@ -3899,6 +3912,31 @@ components:
         birthDate:
           type: string
           format: date
+          nullable: true
+        deceasedDate:
+          type: string
+          format: date
+          nullable: true
+        preferredContactMethod:
+          $ref: '#/components/schemas/ContactMethod'
+          nullable: true
+        languages:
+          type: array
+          items: { $ref: '#/components/schemas/PersonLanguage' }
+        contacts:
+          type: array
+          items: { $ref: '#/components/schemas/PersonContact' }
+        gender:
+          $ref: '#/components/schemas/Gender'
+          nullable: true
+        ethnicity:
+          $ref: '#/components/schemas/Ethnicity'
+          nullable: true
+        races:
+          type: array
+          items: { $ref: '#/components/schemas/Race' }
+        isVeteran:
+          type: boolean
           nullable: true
         emergencyContactName:
           type: string
@@ -3991,6 +4029,8 @@ components:
       required:
       - circles
       - disabilities
+      - languages
+      - contacts
       properties:
         lastName:
           type: string
@@ -4007,6 +4047,17 @@ components:
         nickname:
           type: string
           maxLength: 100
+          nullable: true
+        suffix:
+          type: string
+          maxLength: 20
+          nullable: true
+        displayName:
+          type: string
+          maxLength: 300
+        pronouns:
+          type: string
+          maxLength: 30
           nullable: true
         street:
           type: string
@@ -4039,6 +4090,31 @@ components:
         birthDate:
           type: string
           format: date
+          nullable: true
+        deceasedDate:
+          type: string
+          format: date
+          nullable: true
+        preferredContactMethod:
+          $ref: '#/components/schemas/ContactMethod'
+          nullable: true
+        languages:
+          type: array
+          items: { $ref: '#/components/schemas/PersonLanguage' }
+        contacts:
+          type: array
+          items: { $ref: '#/components/schemas/PersonContact' }
+        gender:
+          $ref: '#/components/schemas/Gender'
+          nullable: true
+        ethnicity:
+          $ref: '#/components/schemas/Ethnicity'
+          nullable: true
+        races:
+          type: array
+          items: { $ref: '#/components/schemas/Race' }
+        isVeteran:
+          type: boolean
           nullable: true
         emergencyContactName:
           type: string

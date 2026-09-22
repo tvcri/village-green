@@ -46,18 +46,99 @@ const DISABILITIES_SUBQUERY = `(
 const CIRCLES_COLUMN = `${CIRCLES_SUBQUERY} AS circles`
 const DISABILITIES_COLUMN = `${DISABILITIES_SUBQUERY} AS disabilities`
 
+// ---- New person columns (Person Working Group, 2026-09-02) ----------------
+// Ungated (Chris Daley's T1/T2 tiers): a volunteer at the door needs
+// pronouns; deceasedDate, contact method, languages and contacts are
+// service-operational. Booleans inside JSON_OBJECT are spelled as JSON
+// true/false — a bare BIT serializes as 0/1 and fails OAS validation
+// (CLAUDE.md, MySQL/OAS traps). Top-level BIT columns rely on the pool's
+// BIT(1) -> boolean typeCast.
+const jsonBool = expr => `CASE WHEN ${expr} IS NULL THEN NULL
+      WHEN ${expr} THEN CAST('true' AS JSON) ELSE CAST('false' AS JSON) END`
+const CONTACT_METHOD_OBJECT = `CASE WHEN cm.id IS NULL THEN NULL
+      ELSE JSON_OBJECT('contactMethodId', CAST(cm.id AS CHAR), 'name', cm.name) END`
+const LANGUAGES_SUBQUERY = `(
+      SELECT COALESCE(
+        ${dbUtils.jsonArrayAgg({
+          value: `JSON_OBJECT('languageId', CAST(l.id AS CHAR), 'name', l.name, 'tag', l.tag,
+                              'isPreferred', ${jsonBool('pl.isPreferred')})`,
+          orderBy: 'pl.isPreferred DESC, l.name'
+        })},
+        JSON_ARRAY()
+      )
+      FROM person_language pl
+      JOIN language l ON l.id = pl.languageId
+      WHERE pl.personId = p.id
+    )`
+const CONTACTS_SUBQUERY = `(
+      SELECT COALESCE(
+        ${dbUtils.jsonArrayAgg({
+          value: `JSON_OBJECT('contactId', CAST(pc2.id AS CHAR), 'name', pc2.name,
+                              'relationship', pc2.relationship, 'phone', pc2.phone, 'email', pc2.email,
+                              'isPrimary', ${jsonBool('pc2.isPrimary')}, 'sequence', pc2.sequence)`,
+          orderBy: 'pc2.isPrimary DESC, pc2.sequence, pc2.id'
+        })},
+        JSON_ARRAY()
+      )
+      FROM person_contact pc2
+      WHERE pc2.personId = p.id
+    )`
+// Ungated columns/joins for the full Person row
+const RECORD_COLUMNS = [
+  'p.suffix',
+  'p.displayName',
+  'p.pronouns',
+  "DATE_FORMAT(p.deceasedDate, '%Y-%m-%d') AS deceasedDate",
+  `${CONTACT_METHOD_OBJECT} AS preferredContactMethod`,
+  `${LANGUAGES_SUBQUERY} AS languages`,
+  `${CONTACTS_SUBQUERY} AS contacts`,
+]
+const RECORD_JOINS = ['LEFT JOIN contact_method cm ON cm.id = p.preferredContactMethodId']
+
+// Gated by person:read_demographics (T3) — omitted, never nulled, like birthDate.
+const RACES_SUBQUERY = `(
+      SELECT COALESCE(
+        ${dbUtils.jsonArrayAgg({
+          value: `JSON_OBJECT('raceId', CAST(r.id AS CHAR), 'name', r.name)`,
+          orderBy: 'r.name'
+        })},
+        JSON_ARRAY()
+      )
+      FROM person_race pr
+      JOIN race r ON r.id = pr.raceId
+      WHERE pr.personId = p.id
+    )`
+const GENDER_OBJECT = `CASE WHEN g.id IS NULL THEN NULL
+      ELSE JSON_OBJECT('genderId', CAST(g.id AS CHAR), 'name', g.name) END`
+const ETHNICITY_OBJECT = `CASE WHEN e.id IS NULL THEN NULL
+      ELSE JSON_OBJECT('ethnicityId', CAST(e.id AS CHAR), 'name', e.name) END`
+const DEMOGRAPHICS_COLUMNS = [
+  `${GENDER_OBJECT} AS gender`,
+  `${ETHNICITY_OBJECT} AS ethnicity`,
+  `${RACES_SUBQUERY} AS races`,
+  'p.isVeteran',
+]
+const DEMOGRAPHICS_JOINS = [
+  'LEFT JOIN gender g ON g.id = p.genderId',
+  'LEFT JOIN ethnicity e ON e.id = p.ethnicityId',
+]
+
 // The getPersons `detail` projection: summary rows gain a same-named object
 // with the Person columns the summary lacks (projection convention — a
 // projection adds a property, it never reshapes the row). email/phone/cell
 // stay out: the summary root already carries them. birthDate is gated by
-// person:read_birth_date — omitted, never nulled, like memberColumn's
+// person:read_birth_date and gender/ethnicity/races/isVeteran by
+// person:read_demographics — omitted, never nulled, like memberColumn's
 // financial fields.
-function detailColumn ({ birthDate }) {
+function detailColumn ({ birthDate, demographics }) {
   return `JSON_OBJECT(
       'lastName', p.lastName,
       'firstName', p.firstName,
       'middleInitial', p.middleInitial,
       'nickname', p.nickname,
+      'suffix', p.suffix,
+      'displayName', p.displayName,
+      'pronouns', p.pronouns,
       'street', p.street,
       'unit', p.unit,
       'address', p.address,
@@ -66,6 +147,14 @@ function detailColumn ({ birthDate }) {
       'zip', LPAD(p.zip, 5, '0'),
       'town', p.town,
       ${birthDate ? `'birthDate', DATE_FORMAT(p.birthDate, '%Y-%m-%d'),` : ''}
+      'deceasedDate', DATE_FORMAT(p.deceasedDate, '%Y-%m-%d'),
+      'preferredContactMethod', ${CONTACT_METHOD_OBJECT},
+      'languages', ${LANGUAGES_SUBQUERY},
+      'contacts', ${CONTACTS_SUBQUERY},
+      ${demographics ? `'gender', ${GENDER_OBJECT},
+      'ethnicity', ${ETHNICITY_OBJECT},
+      'races', ${RACES_SUBQUERY},
+      'isVeteran', ${jsonBool('p.isVeteran')},` : ''}
       'emergencyContactName', p.emergencyContactName,
       'emergencyContactRelationship', p.emergencyContactRelationship,
       'emergencyContactPhone', p.emergencyContactPhone,
@@ -172,8 +261,12 @@ function volunteerColumn ({ inactive }) {
 //   member            - { financial, scNote, inactive } projection gates
 //   volunteer         - { inactive } projection gates
 //   birthDate         - include p.birthDate (person:read_birth_date)
+//   demographics      - include gender/ethnicity/races/isVeteran (person:read_demographics)
 async function queryPersons (inPredicates = {}, inOptions = {}) {
-  const { summary = false, detail = false, member = null, volunteer = null, birthDate = false } = inOptions
+  const {
+    summary = false, detail = false, member = null, volunteer = null,
+    birthDate = false, demographics = false
+  } = inOptions
 
   const columns = summary
     ? [
@@ -206,13 +299,15 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       'p.emergencyContactPhone',
       'p.emergencyContactEmail',
       ...(birthDate ? ["DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate"] : []),
+      ...RECORD_COLUMNS,
+      ...(demographics ? DEMOGRAPHICS_COLUMNS : []),
       VILLAGE_COLUMN,
       ACTIVE_AS_COLUMN,
       CIRCLES_COLUMN,
       DISABILITIES_COLUMN
     ]
 
-  if (detail) columns.push(detailColumn({ birthDate }))
+  if (detail) columns.push(detailColumn({ birthDate, demographics }))
   if (member) columns.push(memberColumn(member))
   if (volunteer) columns.push(volunteerColumn(volunteer))
 
@@ -222,6 +317,10 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
     'LEFT JOIN active_member m ON m.personId = p.id',
     'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
   ])
+  // The cm/g/e aliases are referenced by the detail projection too, so the
+  // joins must be present whenever `detail` is on, not only for full rows.
+  if (!summary || detail) RECORD_JOINS.forEach(j => joins.add(j))
+  if (demographics) DEMOGRAPHICS_JOINS.forEach(j => joins.add(j))
   const predicates = { statements: [], binds: [] }
 
   if (inPredicates.personId) {
@@ -284,6 +383,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   let memberInactive = false
   let volunteerInactive = false
   let birthDate = hasPermission(userObject, 'person:read_birth_date')
+  let demographics = hasPermission(userObject, 'person:read_demographics')
   if (wantsMember) {
     financial = hasPermission(userObject, 'member:read_financial')
     scNote = hasPermission(userObject, 'member:read_sc_note')
@@ -293,7 +393,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     volunteerInactive = hasPermission(userObject, 'volunteer:read_inactive')
   }
   const unresolved =
-    !birthDate ||
+    !birthDate || !demographics ||
     (wantsMember && !(financial && scNote && memberInactive)) ||
     (wantsVolunteer && !volunteerInactive)
   // Without a userObject (internal Member/Volunteer controller calls) every
@@ -302,6 +402,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     const [[personVillage]] = await dbUtils.pool.query('SELECT villageId FROM person WHERE id = ?', [personId])
     const villageId = personVillage?.villageId
     birthDate ||= hasPermission(userObject, 'person:read_birth_date', { villageId })
+    demographics ||= hasPermission(userObject, 'person:read_demographics', { villageId })
     if (wantsMember) {
       financial ||= hasPermission(userObject, 'member:read_financial', { villageId })
       scNote ||= hasPermission(userObject, 'member:read_sc_note', { villageId })
@@ -315,6 +416,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     { personId },
     {
       birthDate,
+      demographics,
       member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
       volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null
     }
@@ -322,13 +424,13 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   return rows[0] ?? null
 }
 
-// Federation holders see birthDate everywhere; a village-scoped caller sees
+// Federation holders see a gated key everywhere; a village-scoped caller sees
 // it only when they hold the key for EVERY village in the request's filter
 // (the controller guarantees a village caller always supplies villageId).
-function birthDateForVillages (userObject, villageIds) {
-  if (hasPermission(userObject, 'person:read_birth_date')) return true
+function keyForVillages (userObject, key, villageIds) {
+  if (hasPermission(userObject, key)) return true
   if (!villageIds?.length) return false
-  return villageIds.every(v => hasPermission(userObject, 'person:read_birth_date', { villageId: v }))
+  return villageIds.every(v => hasPermission(userObject, key, { villageId: v }))
 }
 
 module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, projection, userObject }) {
@@ -339,12 +441,20 @@ module.exports.getPersons = async function ({ villageIdsGranted, villageId, firs
   // detail object carries it.
   return queryPersons(
     { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email },
-    { summary: true, detail: projection?.includes('detail'), birthDate: birthDateForVillages(userObject, villageId) }
+    {
+      summary: true,
+      detail: projection?.includes('detail'),
+      birthDate: keyForVillages(userObject, 'person:read_birth_date', villageId),
+      demographics: keyForVillages(userObject, 'person:read_demographics', villageId),
+    }
   )
 }
 
 module.exports.getPersonsByVillage = async function (villageId, userObject) {
-  return await queryPersons({ villageId }, { birthDate: hasPermission(userObject, 'person:read_birth_date', { villageId }) })
+  return await queryPersons({ villageId }, {
+    birthDate: hasPermission(userObject, 'person:read_birth_date', { villageId }),
+    demographics: hasPermission(userObject, 'person:read_demographics', { villageId }),
+  })
 }
 
 module.exports.createPerson = async function (body, userId) {
