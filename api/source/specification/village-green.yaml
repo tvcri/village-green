@@ -1833,6 +1833,86 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
 
+  /genders:
+    get:
+      summary: List gender values
+      tags: [Gender]
+      operationId: getGenders
+      responses:
+        '200':
+          description: List of gender values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Gender' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /ethnicities:
+    get:
+      summary: List ethnicity values
+      tags: [Ethnicity]
+      operationId: getEthnicities
+      responses:
+        '200':
+          description: List of ethnicity values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Ethnicity' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /races:
+    get:
+      summary: List race values
+      tags: [Race]
+      operationId: getRaces
+      responses:
+        '200':
+          description: List of race values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Race' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /contact-methods:
+    get:
+      summary: List contact method values
+      tags: [ContactMethod]
+      operationId: getContactMethods
+      responses:
+        '200':
+          description: List of contact method values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ContactMethod' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /languages:
+    get:
+      summary: List language values
+      tags: [Language]
+      operationId: getLanguages
+      responses:
+        '200':
+          description: List of language values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Language' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
   /disabilities:
     get:
       summary: List active disabilities
@@ -3031,6 +3111,91 @@ components:
       properties:
         circleId: { $ref: '#/components/schemas/CircleId' }
         name: { type: string, maxLength: 100 }
+    GenderId:
+      $ref: '#/components/schemas/StringIntId'
+    Gender:
+      additionalProperties: false
+      type: object
+      required: [ genderId, name ]
+      properties:
+        genderId: { $ref: '#/components/schemas/GenderId' }
+        name: { type: string, maxLength: 100 }
+    EthnicityId:
+      $ref: '#/components/schemas/StringIntId'
+    Ethnicity:
+      additionalProperties: false
+      type: object
+      required: [ ethnicityId, name ]
+      properties:
+        ethnicityId: { $ref: '#/components/schemas/EthnicityId' }
+        name: { type: string, maxLength: 100 }
+    RaceId:
+      $ref: '#/components/schemas/StringIntId'
+    Race:
+      additionalProperties: false
+      type: object
+      required: [ raceId, name ]
+      properties:
+        raceId: { $ref: '#/components/schemas/RaceId' }
+        name: { type: string, maxLength: 100 }
+    ContactMethodId:
+      $ref: '#/components/schemas/StringIntId'
+    ContactMethod:
+      additionalProperties: false
+      type: object
+      required: [ contactMethodId, name ]
+      properties:
+        contactMethodId: { $ref: '#/components/schemas/ContactMethodId' }
+        name: { type: string, maxLength: 100 }
+    LanguageId:
+      $ref: '#/components/schemas/StringIntId'
+    Language:
+      additionalProperties: false
+      type: object
+      required: [ languageId, name, tag ]
+      properties:
+        languageId: { $ref: '#/components/schemas/LanguageId' }
+        name: { type: string, maxLength: 100 }
+        tag: { type: string, maxLength: 10 }
+    PersonLanguage:
+      additionalProperties: false
+      type: object
+      required: [ languageId, name, tag, isPreferred ]
+      properties:
+        languageId: { $ref: '#/components/schemas/LanguageId' }
+        name: { type: string, maxLength: 100 }
+        tag: { type: string, maxLength: 10 }
+        isPreferred: { type: boolean }
+    PersonLanguagePatch:
+      additionalProperties: false
+      type: object
+      required: [ languageId ]
+      properties:
+        languageId: { $ref: '#/components/schemas/LanguageId' }
+        isPreferred: { type: boolean }
+    PersonContact:
+      additionalProperties: false
+      type: object
+      required: [ contactId, name, isPrimary, sequence ]
+      properties:
+        contactId: { $ref: '#/components/schemas/StringIntId' }
+        name: { type: string, maxLength: 200 }
+        relationship: { type: string, maxLength: 100, nullable: true }
+        phone: { type: string, maxLength: 50, nullable: true }
+        email: { type: string, maxLength: 200, nullable: true }
+        isPrimary: { type: boolean }
+        sequence: { type: integer, minimum: 0, maximum: 127 }
+    PersonContactPatch:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        relationship: { type: string, maxLength: 100, nullable: true }
+        phone: { type: string, maxLength: 50, nullable: true }
+        email: { type: string, maxLength: 200, nullable: true }
+        isPrimary: { type: boolean }
+        sequence: { type: integer, minimum: 0, maximum: 127 }
     DisabilityId:
       $ref: '#/components/schemas/StringIntId'
     Disability:
