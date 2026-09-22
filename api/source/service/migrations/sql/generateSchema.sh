@@ -44,7 +44,7 @@ set -euo pipefail
 db="${VG_SCHEMA_DB_NAME:-vg}"
 
 #List of table names for static data.
-static_data_tables="capability role role_permission _migrations"
+static_data_tables="capability role role_permission _migrations circle gender ethnicity race contact_method language"
 
 # --container: re-exec this script inside a DB container, copy the results back.
 if [ "${1:-}" = "--container" ]; then
