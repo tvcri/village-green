@@ -2,6 +2,45 @@
 const dbUtils = require('./utils')
 const { hasPermission } = require('../utils/authz')
 const AuditService = require('./audit/AuditService')
+const SmError = require('../utils/error')
+
+// One preferred language and one primary contact per person. The junction
+// carries the flag (a per-link attribute, unlike person_race), so the rule
+// is enforced here on the whole replacement set rather than by a constraint.
+function validateSets ({ languages, contacts }) {
+  if (languages && languages.filter(l => l.isPreferred).length > 1) {
+    throw new SmError.ClientError('at most one preferred language')
+  }
+  if (contacts && contacts.filter(c => c.isPrimary).length > 1) {
+    throw new SmError.ClientError('at most one primary contact')
+  }
+}
+
+async function writeSets (connection, personId, { races, languages, contacts }, { replace }) {
+  if (races !== undefined) {
+    if (replace) await connection.query('DELETE FROM person_race WHERE personId = ?', [personId])
+    if (races.length) {
+      await connection.query('INSERT INTO person_race (personId, raceId) VALUES ?',
+        [races.map(raceId => [personId, raceId])])
+    }
+  }
+  if (languages !== undefined) {
+    if (replace) await connection.query('DELETE FROM person_language WHERE personId = ?', [personId])
+    if (languages.length) {
+      await connection.query('INSERT INTO person_language (personId, languageId, isPreferred) VALUES ?',
+        [languages.map(l => [personId, l.languageId, l.isPreferred ? 1 : 0])])
+    }
+  }
+  if (contacts !== undefined) {
+    if (replace) await connection.query('DELETE FROM person_contact WHERE personId = ?', [personId])
+    if (contacts.length) {
+      await connection.query(
+        'INSERT INTO person_contact (personId, name, relationship, phone, email, isPrimary, sequence) VALUES ?',
+        [contacts.map((c, i) => [personId, c.name, c.relationship ?? null, c.phone ?? null, c.email ?? null,
+          c.isPrimary ? 1 : 0, c.sequence ?? i])])
+    }
+  }
+}
 
 const ACTIVE_AS_COLUMN = `CASE
       WHEN m.id IS NOT NULL AND vol.id IS NOT NULL THEN JSON_ARRAY('member','volunteer')
@@ -458,7 +497,8 @@ module.exports.getPersonsByVillage = async function (villageId, userObject) {
 }
 
 module.exports.createPerson = async function (body, userId) {
-  const { circles, disabilities, ...personFields } = body
+  const { circles, disabilities, races, languages, contacts, ...personFields } = body
+  validateSets({ languages, contacts })
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       return AuditService.auditUpdate(connection, { entityType: 'person', userId }, async () => {
@@ -472,6 +512,7 @@ module.exports.createPerson = async function (body, userId) {
           const values = disabilities.map(d => [newPersonId, d.disabilityId, d.note ?? null])
           await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
         }
+        await writeSets(connection, newPersonId, { races, languages, contacts }, { replace: false })
         return newPersonId
       })
     },
@@ -481,7 +522,8 @@ module.exports.createPerson = async function (body, userId) {
 }
 
 module.exports.patchPerson = async function (personId, body, userId) {
-  const { circles, disabilities, ...personFields } = body
+  const { circles, disabilities, races, languages, contacts, ...personFields } = body
+  validateSets({ languages, contacts })
   // town derives from the address (the client recalculates it and sends it
   // with every address edit). A PATCH that changes address fields without
   // supplying town would otherwise keep the previous municipality against
@@ -510,6 +552,7 @@ module.exports.patchPerson = async function (personId, body, userId) {
               await connection.query('INSERT INTO person_disability (personId, disabilityId, note) VALUES ?', [values])
             }
           }
+          await writeSets(connection, personId, { races, languages, contacts }, { replace: true })
         })
     },
     statusObj: undefined

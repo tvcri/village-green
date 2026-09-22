@@ -38,7 +38,8 @@ const shapes = {
     ],
     // enrollment_request/fcv_submission reference person but are their own
     // records, not attributes of the person — deliberately not folded.
-    relatedTables: ['enrollment_request', 'fcv_submission'],
+    // person_image: images carry no history (Chris Daley, Part 4) — deliberately not folded.
+    relatedTables: ['enrollment_request', 'fcv_submission', 'person_image'],
     sets: {
       circles: {
         kind: 'values',
@@ -46,6 +47,32 @@ const shapes = {
         sourceColumns: ['id', 'personId', 'circleId'],
         sql: `SELECT c.name AS label
               FROM person_circle pc JOIN circle c ON c.id = pc.circleId
+              WHERE pc.personId = ?`,
+      },
+      races: {
+        kind: 'values',
+        table: 'person_race',
+        sourceColumns: ['id', 'personId', 'raceId'],
+        sql: `SELECT r.name AS label
+              FROM person_race pr JOIN race r ON r.id = pr.raceId
+              WHERE pr.personId = ?`,
+      },
+      languages: {
+        kind: 'keyed',
+        key: 'k',
+        table: 'person_language',
+        sourceColumns: ['id', 'personId', 'languageId', 'isPreferred'],
+        sql: `SELECT l.name AS k, pl.isPreferred != 0 AS isPreferred
+              FROM person_language pl JOIN language l ON l.id = pl.languageId
+              WHERE pl.personId = ?`,
+      },
+      contacts: {
+        kind: 'keyed',
+        key: 'k',
+        table: 'person_contact',
+        sourceColumns: ['id', 'personId', 'name', 'relationship', 'phone', 'email', 'isPrimary', 'sequence'],
+        sql: `SELECT pc.name AS k, pc.relationship, pc.phone, pc.email, pc.isPrimary != 0 AS isPrimary, pc.sequence
+              FROM person_contact pc
               WHERE pc.personId = ?`,
       },
       disabilities: {
