@@ -25,13 +25,6 @@ export function mapPersonForm (extraction, memberIndex) {
   }
 }
 
-export function personCommunityNames (extraction, memberIndex) {
-  const names = new Set()
-  if (extraction.members[memberIndex].extras.veteran === 'Yes') names.add('Veteran')
-  if (extraction.preferences.circleOfPrideJoin === 'Yes') names.add('Pride')
-  return names
-}
-
 const DISABILITY_NAMES_BY_FIELD = {
   difficultyHearing: 'Hearing',
   visionLimited: 'Vision',
@@ -242,12 +235,6 @@ export function mapVolunteerPersonForm (extraction) {
     emergencyContactEmail: s(ec?.email),
     villageId: extraction.application.village.villageId,
   }
-}
-
-export function volunteerPersonCommunityNames (extraction) {
-  const names = new Set()
-  if (extraction.circleOfPrideJoin === 'Yes') names.add('Pride')
-  return names
 }
 
 export function volunteerCapabilityNames (extraction) {

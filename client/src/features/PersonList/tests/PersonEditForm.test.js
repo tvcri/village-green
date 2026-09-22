@@ -25,12 +25,15 @@ vi.mock('../api/personApi.js', () => ({
     email: 'alice@example.com',
     phone: '555-0100',
     village: { villageId: '1' },
-    communities: [{ name: 'Pride' }],
+    circles: [{ circleId: '1', name: 'Circle of Pride' }],
     disabilities: [{ name: 'Vision', note: 'reading glasses' }]
   }),
   createPerson: vi.fn().mockResolvedValue({ personId: '5' }),
   patchPerson: vi.fn().mockResolvedValue({}),
-  getCommunities: vi.fn().mockResolvedValue([{ communityId: 1, name: 'Pride' }, { communityId: 2, name: 'Veteran' }]),
+  getCircles: vi.fn().mockResolvedValue([
+    { circleId: '1', name: 'Circle of Pride' }, { circleId: '2', name: "Veteran's Circle" },
+    { circleId: '3', name: 'DownCity' }, { circleId: '4', name: 'OakHill' },
+  ]),
   getDisabilities: vi.fn().mockResolvedValue([{ disabilityId: 1, name: 'Vision' }])
 }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({
@@ -82,20 +85,23 @@ describe('PersonEditForm', () => {
     expect(body.email).toBe('alicia@example.com')
   })
 
-  it('toggles the Veteran community checkbox into the saved payload', async () => {
+  it('renders one circle checkbox per catalog row and saves toggles under circles', async () => {
     const { patchPerson } = await import('../api/personApi.js')
     render(PersonEditForm, { global: globalOpts })
-
     await screen.findByDisplayValue('Alice')
-    const veteranLabel = screen.getByText('Veteran').closest('label')
-    const veteranCheckbox = veteranLabel.querySelector('input[type="checkbox"]')
-    await fireEvent.click(veteranCheckbox)
-
+    for (const name of ['Circle of Pride', "Veteran's Circle", 'DownCity', 'OakHill']) {
+      expect(screen.getByText(name)).toBeInTheDocument()
+    }
+    const prideBox = screen.getByText('Circle of Pride').closest('label').querySelector('input[type="checkbox"]')
+    expect(prideBox.checked).toBe(true)
+    const vetBox = screen.getByText("Veteran's Circle").closest('label').querySelector('input[type="checkbox"]')
+    await fireEvent.click(vetBox)
     await fireEvent.click(screen.getByText('Save'))
-
     await waitFor(() => expect(patchPerson).toHaveBeenCalled())
     const [, body] = patchPerson.mock.calls[0]
-    expect(body.communities).toEqual(expect.arrayContaining([1, 2]))
+    expect(body.circles).toEqual(expect.arrayContaining(['1', '2']))
+    expect(body.circles).toHaveLength(2)
+    expect('communities' in body).toBe(false)
   })
 
   it('hides the birth date input and never sends birthDate without person:read_birth_date', async () => {

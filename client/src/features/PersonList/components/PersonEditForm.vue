@@ -8,7 +8,7 @@ import PersonFormFields from './PersonFormFields.vue'
 import { validatePersonForm } from '../lib/personFormValidation.js'
 import {
   getPerson, createPerson, patchPerson,
-  getCommunities, getDisabilities,
+  getCircles, getDisabilities,
 } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
@@ -40,13 +40,13 @@ const errors = reactive({})
 const fields = ref(null)
 
 const villages = ref([])          // [{ villageId, name }]
-const allCommunities = ref([])    // [{ communityId, name }] from getCommunities()
+const allCircles = ref([])        // [{ circleId, name }]
 const allDisabilities = ref([])   // [{ disabilityId, name }] from getDisabilities()
-const communityNameToId = computed(() =>
-  new Map(allCommunities.value.map(c => [c.name, c.communityId])))
+const circleNameToId = computed(() =>
+  new Map(allCircles.value.map(c => [c.name, c.circleId])))
 const disabilityNameToId = computed(() =>
   new Map(allDisabilities.value.map(d => [d.name, d.disabilityId])))
-const communityNames = ref(new Set())     // Set<'Pride'|'Veteran'>
+const circleNames = ref(new Set())        // Set<circle name>
 const disabilities = ref(new Map())       // Map<'Vision'|'Walker'|'Hearing'|'Wheelchair'|'Cane', note>
 
 async function loadVillages () {
@@ -55,13 +55,13 @@ async function loadVillages () {
 
 onMounted(async () => {
   await loadVillages()
-  allCommunities.value = await getCommunities()     // [{ communityId, name }]
+  allCircles.value = await getCircles()             // [{ circleId, name }]
   allDisabilities.value = await getDisabilities()   // [{ disabilityId, name }]
   if (isEdit.value) {
     const p = await getPerson(personId.value, [])
     Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
     form.villageId = p.village?.villageId ?? null
-    communityNames.value = new Set(p.communities.map(c => c.name))
+    circleNames.value = new Set(p.circles.map(c => c.name))
     disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
   }
 })
@@ -79,8 +79,8 @@ function buildPayload () {
     else if (v !== null) payload[k] = v
   })
   payload.villageId = form.villageId ?? null   // explicit null clears home village
-  payload.communities = [...communityNames.value]
-    .map(n => communityNameToId.value.get(n))
+  payload.circles = [...circleNames.value]
+    .map(n => circleNameToId.value.get(n))
     .filter(Boolean)
   payload.disabilities = [...disabilities.value.entries()].map(([n, note]) => ({
     disabilityId: disabilityNameToId.value.get(n),
@@ -115,10 +115,10 @@ async function handleSubmit () {
   }
 }
 
-function toggleCommunity (name, checked) {
-  if (checked) communityNames.value.add(name)
-  else communityNames.value.delete(name)
-  communityNames.value = new Set(communityNames.value)
+function toggleCircle (name, checked) {
+  if (checked) circleNames.value.add(name)
+  else circleNames.value.delete(name)
+  circleNames.value = new Set(circleNames.value)
 }
 
 function toggleDisability (name, checked) {
@@ -171,10 +171,11 @@ function cancel () {
           v-model:emergency-contact-email="form.emergencyContactEmail"
           :errors="errors"
           :villages="villages"
-          :communityNames="communityNames"
+          :circles="allCircles"
+          :circleNames="circleNames"
           :disabilities="disabilities"
           :show-birth-date="showBirthDate"
-          @toggle-community="toggleCommunity"
+          @toggle-circle="toggleCircle"
           @toggle-disability="toggleDisability"
           @edit-disability-note="editDisabilityNote"
         />

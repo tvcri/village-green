@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  mapPersonForm, personCommunityNames, personDisabilities, mapMemberForm, composeNotes,
+  mapPersonForm, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
-  mapVolunteerPersonForm, volunteerPersonCommunityNames, volunteerCapabilityNames, uncertainMapForVolunteerPerson,
+  mapVolunteerPersonForm, volunteerCapabilityNames, uncertainMapForVolunteerPerson,
 } from './importMapping.js'
 
 function extraction () {
@@ -74,13 +74,6 @@ describe('mapPersonForm', () => {
   it('seeds town empty — PersonFormFields calculates it on mount, not the extraction', () => {
     const f = mapPersonForm(extraction(), 0)
     expect(f.town).toBe('')
-  })
-})
-
-describe('personCommunityNames', () => {
-  it('derives Veteran per member and Pride from application', () => {
-    expect(personCommunityNames(extraction(), 0)).toEqual(new Set(['Veteran', 'Pride']))
-    expect(personCommunityNames(extraction(), 1)).toEqual(new Set(['Pride']))
   })
 })
 
@@ -267,7 +260,7 @@ describe('composeNotes', () => {
     expect(notes).toContain('Dues (yearly): 120')
     expect(notes).toContain('Emergency contact home phone: 401-555-9999')
     expect(notes).toContain('Accessibility notes: Hearing: uses hearing aids sometimes.')
-    expect(notes).not.toContain('Veteran')        // mapped to community
+    expect(notes).not.toContain('Veteran')        // not a notes field; isVeteran arrives with the application-JSON work
     expect(notes).not.toContain('Difficulty hearing')  // mapped to structured disabilities
     expect(notes).not.toContain('null')
   })
@@ -360,17 +353,6 @@ describe('mapVolunteerPersonForm', () => {
   it('seeds town empty — PersonFormFields calculates it on mount, not the extraction', () => {
     const f = mapVolunteerPersonForm(volunteerExtraction())
     expect(f.town).toBe('')
-  })
-})
-
-describe('volunteerPersonCommunityNames', () => {
-  it('adds Pride when circleOfPrideJoin is Yes', () => {
-    const e = volunteerExtraction()
-    e.circleOfPrideJoin = 'Yes'
-    expect(volunteerPersonCommunityNames(e)).toEqual(new Set(['Pride']))
-  })
-  it('is empty when circleOfPrideJoin is No', () => {
-    expect(volunteerPersonCommunityNames(volunteerExtraction())).toEqual(new Set())
   })
 })
 

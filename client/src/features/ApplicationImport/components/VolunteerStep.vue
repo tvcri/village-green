@@ -8,11 +8,11 @@ import PersonFormFields from '../../PersonList/components/PersonFormFields.vue'
 import VolunteerFormFields from '../../PersonList/components/VolunteerFormFields.vue'
 import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js'
 import {
-  mapVolunteerPersonForm, volunteerPersonCommunityNames, volunteerCapabilityNames,
+  mapVolunteerPersonForm, volunteerCapabilityNames,
   uncertainMapForVolunteerPerson, buildPersonCreatePayload,
 } from '../lib/importMapping.js'
 import {
-  getPersons, createPerson, patchPerson, getCommunities, getDisabilities, getCapabilities,
+  getPersons, createPerson, patchPerson, getDisabilities, getCapabilities,
 } from '../../PersonList/api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../../PersonList/api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
@@ -32,14 +32,15 @@ const showBirthDate = computed(() => hasPermission('person:read_birth_date', for
 const errors = reactive({})
 const fields = ref(null)
 const uncertain = reactive(uncertainMapForVolunteerPerson(props.extraction))
-const communityNames = ref(volunteerPersonCommunityNames(props.extraction))
 const disabilities = ref(new Map())        // this form has no accessibility section
 const villages = ref([])
-const allCommunities = ref([])
 const allDisabilities = ref([])
 const allCapabilities = ref([])
 const duplicates = ref([])
 const saving = ref(false)
+// The wizard hides the Circles section entirely (a tick must mean a
+// coordinator recorded it), so the person's circle set is always empty here.
+const noCircles = new Set()
 const needsVillage = ref(false)
 const selectedVillageId = ref(null)
 const savingVillage = ref(false)
@@ -49,15 +50,12 @@ const providerType = ref('Non-member Volunteer')
 const active = ref(true)
 const notes = ref(props.extraction.notes ?? '')
 
-const communityNameToId = computed(() =>
-  new Map(allCommunities.value.map(c => [c.name, c.communityId])))
 const capabilityNameToId = computed(() =>
   new Map(allCapabilities.value.map(c => [c.name, c.capabilityId])))
 
 onMounted(async () => {
   try {
     villages.value = await getVillages()
-    allCommunities.value = await getCommunities()
     allDisabilities.value = await getDisabilities()
     allCapabilities.value = await getCapabilities()
     selectedCapabilityIds.value = [...volunteerCapabilityNames(props.extraction)]
@@ -82,13 +80,6 @@ async function findDuplicates () {
 
 function onEdited (field) {
   delete uncertain[field]
-}
-
-function toggleCommunity (name, checked) {
-  const next = new Set(communityNames.value)
-  if (checked) next.add(name)
-  else next.delete(name)
-  communityNames.value = next
 }
 
 async function grantVolunteerRole (personId, { isExisting = false } = {}) {
@@ -158,9 +149,6 @@ async function submit () {
     await fields.value?.townSettled()
     const payload = buildPersonCreatePayload(form)
     if (!showBirthDate.value) delete payload.birthDate
-    payload.communities = [...communityNames.value]
-      .map(n => communityNameToId.value.get(n))
-      .filter(Boolean)
     payload.disabilities = []
     const created = await createPerson(payload)
     createdPersonId = created.personId
@@ -224,9 +212,9 @@ async function submit () {
         v-model:emergency-contact-phone="form.emergencyContactPhone"
         v-model:emergency-contact-email="form.emergencyContactEmail"
         :errors="errors" :uncertain="uncertain"
-        :villages="villages" :communityNames="communityNames" :disabilities="disabilities"
-        :show-birth-date="showBirthDate"
-        @edited="onEdited" @toggle-community="toggleCommunity"
+        :villages="villages" :circle-names="noCircles" :disabilities="disabilities"
+        :show-birth-date="showBirthDate" :show-circles="false"
+        @edited="onEdited"
       />
       <VolunteerFormFields
         v-model:provider-type="providerType"

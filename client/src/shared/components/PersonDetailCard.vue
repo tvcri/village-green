@@ -148,15 +148,15 @@ const copyEmail = async (email) => {
         </div>
       </div>
 
-      <!-- Communities Section -->
-      <div v-if="person.communities?.length" class="section">
-        <h3 class="section-header">Communities</h3>
+      <!-- Circles Section -->
+      <div v-if="person.circles?.length" class="section">
+        <h3 class="section-header">Circles</h3>
         <div class="detail-field capabilities-field">
           <div class="capabilities-list">
             <Tag
-              v-for="community in person.communities"
-              :key="community.communityId"
-              :value="community.name"
+              v-for="circle in person.circles"
+              :key="circle.circleId"
+              :value="circle.name"
               class="capability-badge"
             />
           </div>

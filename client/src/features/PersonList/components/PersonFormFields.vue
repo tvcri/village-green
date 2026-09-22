@@ -10,11 +10,15 @@ const props = defineProps({
   errors: { type: Object, required: true },
   uncertain: { type: Object, default: () => ({}) },
   villages: { type: Array, required: true },
-  communityNames: { type: Object, required: true },  // Set
-  disabilities: { type: Object, required: true },     // Map<name, note>
+  circles: { type: Array, default: () => [] },       // [{ circleId, name }] — the catalog
+  circleNames: { type: Object, required: true },     // Set<name> — the person's circles
+  disabilities: { type: Object, required: true },    // Map<name, note>
   showBirthDate: { type: Boolean, default: true },
+  // The import wizard hides the section: an application form must never tick
+  // a circle — a tick means a coordinator recorded it (Slack, 2026-09-21).
+  showCircles: { type: Boolean, default: true },
 })
-const emit = defineEmits(['edited', 'toggle-community', 'toggle-disability', 'edit-disability-note'])
+const emit = defineEmits(['edited', 'toggle-circle', 'toggle-disability', 'edit-disability-note'])
 
 const firstName = defineModel('firstName')
 const middleInitial = defineModel('middleInitial')
@@ -327,26 +331,17 @@ onMounted(() => {
     </div>
   </div>
 
-  <!-- Communities Section -->
-  <div class="section">
-    <h3 class="section-header">Communities</h3>
-
-    <div class="form-field communities-row">
-      <label class="checkbox-item">
+  <!-- Circles Section — one checkbox per catalog row, so a new circle needs no code change -->
+  <div v-if="showCircles" class="section">
+    <h3 class="section-header">Circles</h3>
+    <div class="form-field circles-row">
+      <label v-for="c in circles" :key="c.circleId" class="checkbox-item">
         <Checkbox
-          :modelValue="communityNames.has('Pride')"
+          :modelValue="circleNames.has(c.name)"
           binary
-          @update:modelValue="v => $emit('toggle-community', 'Pride', v)"
+          @update:modelValue="v => $emit('toggle-circle', c.name, v)"
         />
-        <span class="checkbox-label">Pride</span>
-      </label>
-      <label class="checkbox-item">
-        <Checkbox
-          :modelValue="communityNames.has('Veteran')"
-          binary
-          @update:modelValue="v => $emit('toggle-community', 'Veteran', v)"
-        />
-        <span class="checkbox-label">Veteran</span>
+        <span class="checkbox-label">{{ c.name }}</span>
       </label>
     </div>
   </div>
@@ -455,9 +450,10 @@ onMounted(() => {
   color: var(--color-text-dim);
 }
 
-.communities-row {
+.circles-row {
   grid-column: 1 / -1;
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 1.5rem;
   align-items: center;
   padding-top: 0.25rem;

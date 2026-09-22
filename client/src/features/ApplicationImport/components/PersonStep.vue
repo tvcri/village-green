@@ -6,9 +6,9 @@ import Message from 'primevue/message'
 import PersonFormFields from '../../PersonList/components/PersonFormFields.vue'
 import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js'
 import {
-  mapPersonForm, personCommunityNames, personDisabilities, uncertainMapForPerson, buildPersonCreatePayload,
+  mapPersonForm, personDisabilities, uncertainMapForPerson, buildPersonCreatePayload,
 } from '../lib/importMapping.js'
-import { getPersons, createPerson, getCommunities, getDisabilities } from '../../PersonList/api/personApi.js'
+import { getPersons, createPerson, getDisabilities } from '../../PersonList/api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
@@ -27,23 +27,21 @@ const showBirthDate = computed(() => hasPermission('person:read_birth_date', for
 const errors = reactive({})
 const fields = ref(null)
 const uncertain = reactive(uncertainMapForPerson(props.extraction, props.memberIndex))
-const communityNames = ref(personCommunityNames(props.extraction, props.memberIndex))
 const disabilities = ref(personDisabilities(props.extraction, props.memberIndex))
 const villages = ref([])
-const allCommunities = ref([])
 const allDisabilities = ref([])
 const duplicates = ref([])
 const saving = ref(false)
+// The wizard hides the Circles section entirely (a tick must mean a
+// coordinator recorded it), so the person's circle set is always empty here.
+const noCircles = new Set()
 
-const communityNameToId = computed(() =>
-  new Map(allCommunities.value.map(c => [c.name, c.communityId])))
 const disabilityNameToId = computed(() =>
   new Map(allDisabilities.value.map(d => [d.name, d.disabilityId])))
 
 onMounted(async () => {
   try {
     villages.value = await getVillages()
-    allCommunities.value = await getCommunities()
     allDisabilities.value = await getDisabilities()
     await findDuplicates()
   }
@@ -64,13 +62,6 @@ async function findDuplicates () {
 
 function onEdited (field) {
   delete uncertain[field]
-}
-
-function toggleCommunity (name, checked) {
-  const next = new Set(communityNames.value)
-  if (checked) next.add(name)
-  else next.delete(name)
-  communityNames.value = next
 }
 
 function toggleDisability (name, checked) {
@@ -103,9 +94,6 @@ async function submit () {
     await fields.value?.townSettled()
     const payload = buildPersonCreatePayload(form)
     if (!showBirthDate.value) delete payload.birthDate
-    payload.communities = [...communityNames.value]
-      .map(n => communityNameToId.value.get(n))
-      .filter(Boolean)
     payload.disabilities = [...disabilities.value.entries()].map(([n, note]) => ({
       disabilityId: disabilityNameToId.value.get(n),
       note: note || null,
@@ -161,9 +149,9 @@ async function submit () {
         v-model:emergency-contact-phone="form.emergencyContactPhone"
         v-model:emergency-contact-email="form.emergencyContactEmail"
         :errors="errors" :uncertain="uncertain"
-        :villages="villages" :communityNames="communityNames" :disabilities="disabilities"
-        :show-birth-date="showBirthDate"
-        @edited="onEdited" @toggle-community="toggleCommunity"
+        :villages="villages" :circle-names="noCircles" :disabilities="disabilities"
+        :show-birth-date="showBirthDate" :show-circles="false"
+        @edited="onEdited"
         @toggle-disability="toggleDisability" @edit-disability-note="editDisabilityNote"
       />
       <div class="step-footer">

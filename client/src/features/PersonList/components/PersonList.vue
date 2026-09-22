@@ -144,7 +144,7 @@ const ALL_EXPORT_COLUMNS = [
   { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
   { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
   { header: 'Emergency Contact Email', key: 'emergencyContactEmail' },
-  { header: 'Communities', key: 'communities' },
+  { header: 'Circles', key: 'circles' },
   { header: 'Disabilities', key: 'disabilities' }
 ]
 
@@ -174,7 +174,7 @@ function detailRowForCsv(p) {
     emergencyContactRelationship: d.emergencyContactRelationship,
     emergencyContactPhone: d.emergencyContactPhone,
     emergencyContactEmail: d.emergencyContactEmail,
-    communities: (d.communities ?? []).map(c => c.name).join(', '),
+    circles: (d.circles ?? []).map(c => c.name).join(', '),
     disabilities: (d.disabilities ?? [])
       .map(dis => dis.note ? `${dis.name} (${dis.note})` : dis.name)
       .join('; ')
@@ -182,7 +182,7 @@ function detailRowForCsv(p) {
 }
 
 // Re-run the current search with projection=detail at export time — full rows
-// (with communities/disabilities subqueries) are paid only here, never on the
+// (with circles/disabilities subqueries) are paid only here, never on the
 // live search page.
 async function fetchRowsForExport() {
   try {
