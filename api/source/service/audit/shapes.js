@@ -40,12 +40,12 @@ const shapes = {
     // records, not attributes of the person — deliberately not folded.
     relatedTables: ['enrollment_request', 'fcv_submission'],
     sets: {
-      communities: {
+      circles: {
         kind: 'values',
-        table: 'person_community',
-        sourceColumns: ['id', 'personId', 'communityId'],
+        table: 'person_circle',
+        sourceColumns: ['id', 'personId', 'circleId'],
         sql: `SELECT c.name AS label
-              FROM person_community pc JOIN community c ON c.id = pc.communityId
+              FROM person_circle pc JOIN circle c ON c.id = pc.circleId
               WHERE pc.personId = ?`,
       },
       disabilities: {

@@ -41,10 +41,10 @@ test('invariants: set declarations carry kind/key/sql/table/sourceColumns; relat
 })
 
 test('setColumnGaps reports both directions: undeclared real columns and stale declared ones', () => {
-  const decl = { kind: 'values', sql: 's?', table: 'j', sourceColumns: ['id', 'personId', 'communityId'] }
-  assert.deepEqual(setColumnGaps(decl, ['id', 'personId', 'communityId']), { undeclared: [], stale: [] })
-  assert.deepEqual(setColumnGaps(decl, ['id', 'personId', 'communityId', 'grantedBy']), { undeclared: ['grantedBy'], stale: [] })
-  assert.deepEqual(setColumnGaps(decl, ['id', 'personId']), { undeclared: [], stale: ['communityId'] })
+  const decl = { kind: 'values', sql: 's?', table: 'j', sourceColumns: ['id', 'personId', 'circleId'] }
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId', 'circleId']), { undeclared: [], stale: [] })
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId', 'circleId', 'grantedBy']), { undeclared: ['grantedBy'], stale: [] })
+  assert.deepEqual(setColumnGaps(decl, ['id', 'personId']), { undeclared: [], stale: ['circleId'] })
 })
 
 test('buildRowSql selects the whole row plus extras, keyed by idColumn', () => {
@@ -60,10 +60,10 @@ test('shadowedAliases flags extras/set names that would hide a real column', () 
   const shape = {
     table: 't', relatedTables: [],
     extras: [{ name: 'village', expr: 'e' }],
-    sets: { communities: { kind: 'values', sql: 's?', table: 'j' } },
+    sets: { circles: { kind: 'values', sql: 's?', table: 'j' } },
   }
   assert.deepEqual(shadowedAliases(shape, ['id', 'villageId', 'name']), [])
-  assert.deepEqual(shadowedAliases(shape, ['id', 'village', 'communities']), ['village', 'communities'])
+  assert.deepEqual(shadowedAliases(shape, ['id', 'village', 'circles']), ['village', 'circles'])
 })
 
 test('requiredSetAlias names exactly the alias the differ reads', () => {
@@ -75,14 +75,14 @@ test('unaccountedReferencingTables buckets FK-referencing tables correctly', () 
   const registry = {
     person: {
       table: 'person', relatedTables: ['fcv'],
-      sets: { communities: { kind: 'values', sql: 's?', table: 'person_community' } },
+      sets: { circles: { kind: 'values', sql: 's?', table: 'person_circle' } },
     },
     member: { table: 'member', relatedTables: [], sets: {} },
   }
   const fk = (t, ref) => ({ TABLE_NAME: t, REFERENCED_TABLE_NAME: ref })
   // set source, audited entity, relatedTables entry, and refs to non-audited tables: all accounted
   assert.deepEqual(unaccountedReferencingTables(registry, [
-    fk('person_community', 'person'), fk('member', 'person'), fk('fcv', 'person'), fk('anything', 'village'),
+    fk('person_circle', 'person'), fk('member', 'person'), fk('fcv', 'person'), fk('anything', 'village'),
   ]), [])
   // an unknown junction is reported once per entity, deduped across multiple FKs
   assert.deepEqual(unaccountedReferencingTables(registry, [

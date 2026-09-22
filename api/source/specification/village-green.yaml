@@ -1817,19 +1817,19 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer ] } ]
 
-  /communities:
+  /circles:
     get:
-      summary: List all communities
-      tags: [Community]
-      operationId: getCommunities
+      summary: List all circles
+      tags: [Circle]
+      operationId: getCircles
       responses:
         '200':
-          description: List of communities
+          description: List of circles
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/Community' }
+                items: { $ref: '#/components/schemas/Circle' }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
 
@@ -3022,14 +3022,14 @@ components:
       properties:
         capabilityId: { $ref: '#/components/schemas/CapabilityId' }
         name: { type: string, maxLength: 100 }
-    CommunityId:
+    CircleId:
       $ref: '#/components/schemas/StringIntId'
-    Community:
+    Circle:
       additionalProperties: false
       type: object
-      required: [ communityId, name ]
+      required: [ circleId, name ]
       properties:
-        communityId: { $ref: '#/components/schemas/CommunityId' }
+        circleId: { $ref: '#/components/schemas/CircleId' }
         name: { type: string, maxLength: 100 }
     DisabilityId:
       $ref: '#/components/schemas/StringIntId'
@@ -3667,7 +3667,7 @@ components:
       required:
       - personId
       - fullName
-      - communities
+      - circles
       - disabilities
       properties:
         personId:
@@ -3770,9 +3770,9 @@ components:
         volunteer:
           $ref: '#/components/schemas/VolunteerDetail'
           nullable: true
-        communities:
+        circles:
           type: array
-          items: { $ref: '#/components/schemas/Community' }
+          items: { $ref: '#/components/schemas/Circle' }
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisability' }
@@ -3824,7 +3824,7 @@ components:
       additionalProperties: false
       type: object
       required:
-      - communities
+      - circles
       - disabilities
       properties:
         lastName:
@@ -3891,9 +3891,9 @@ components:
           type: string
           maxLength: 200
           nullable: true
-        communities:
+        circles:
           type: array
-          items: { $ref: '#/components/schemas/Community' }
+          items: { $ref: '#/components/schemas/Circle' }
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisability' }
@@ -3979,9 +3979,9 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageId'
           nullable: true
-        communities:
+        circles:
           type: array
-          items: { $ref: '#/components/schemas/CommunityId' }
+          items: { $ref: '#/components/schemas/CircleId' }
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisabilityPatch' }
@@ -4052,9 +4052,9 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageId'
           nullable: true
-        communities:
+        circles:
           type: array
-          items: { $ref: '#/components/schemas/CommunityId' }
+          items: { $ref: '#/components/schemas/CircleId' }
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisabilityPatch' }
