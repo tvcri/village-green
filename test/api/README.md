@@ -226,7 +226,7 @@ tests/               the endpoint tests, one directory per topic; each topic's
   persons/           cross-village read leak (#1) + cross-village writes (#5)
   privacy/           rules lifecycle + the acknowledgement gate (order-sensitive:
                      ends by acking every canonical user for the files after it)
-  reference/         /communities /disabilities /capabilities /vetting-types smokes
+  reference/         /circles /disabilities /capabilities /vetting-types smokes
   service-request/   meta roll-up, cross-village authz, lifecycle incl. cancel
   villages/          read grant-gating, grant-mgmt authz (admin), WIP write todos
                      (+ finding #6: the write endpoints have no authz gate)

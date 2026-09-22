@@ -72,7 +72,8 @@ test('getPersons projection=detail adds a same-named object, granted villages on
   // birthDate is gated by person:read_birth_date; full_v1 (Steering
   // Committee) doesn't hold it, so the key is omitted — see birthdate.test.js.
   assert.ok(!('birthDate' in peter.detail), 'birthDate hidden without person:read_birth_date')
-  assert.ok(Array.isArray(peter.detail.communities) && Array.isArray(peter.detail.disabilities), 'aggregate arrays present')
+  assert.ok(Array.isArray(peter.detail.circles) && Array.isArray(peter.detail.disabilities), 'aggregate arrays present')
+  assert.ok(Array.isArray(peter.detail.languages) && Array.isArray(peter.detail.contacts), 'languages/contacts arrays present')
   // Deliberately NOT part of this projection (multi-village gating — see plan/grades log).
   assert.ok(!('member' in peter) && !('volunteer' in peter), 'no member/volunteer on the list endpoint')
   assert.ok(json.every(p => p.village?.villageId === String(villages.quahog.id)), 'rows stay village-clamped')
