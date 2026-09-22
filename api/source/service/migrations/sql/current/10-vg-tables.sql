@@ -376,18 +376,6 @@ CREATE TABLE `person_circle` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Table structure for table `person_circle_snapshot`
---
-
-DROP TABLE IF EXISTS `person_circle_snapshot`;
-CREATE TABLE `person_circle_snapshot` (
-  `id` int NOT NULL DEFAULT '0',
-  `personId` int NOT NULL,
-  `circleName` varchar(100) NOT NULL,
-  `snapshotAt` datetime NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
 -- Table structure for table `person_contact`
 --
 
@@ -891,4 +879,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-22 13:04:08
+-- Dump completed on 2026-09-22 21:16:50

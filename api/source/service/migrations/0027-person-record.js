@@ -5,29 +5,27 @@ const MigrationHandler = require('./lib/MigrationHandler')
 // 2026-09-02) and Slack guidance of 2026-09-21 (Caroline Dillon, Gabriella
 // Laurenzo). See scratch/superpowers/specs/2026-09-21-person-demographics-circles-design.md.
 //
-//  1. Snapshot every person↔community row. Those rows are the ONLY record
-//     that the application-form circle boxes were ticked; the volunteer
-//     form's "support the Circle of Pride" answer exists nowhere else.
-//     Per-install data — never in the scaffold, never dropped by down.
-//  2. Nullify Circle of Pride only. Gabriella re-ticks by hand. Veteran
-//     rows stay (Caroline, 10:43).
-//  3. community -> circle (the group's word) with the settled public names.
+//  1. Nullify Circle of Pride only. Gabriella re-ticks by hand. Veteran
+//     rows stay (Caroline, 10:43). The deleted rows are the only record of
+//     the application-form Pride answers; the pre-merge production dump
+//     keeps them for backfills, so no archive table is created here.
+//  2. community -> circle (the group's word) with the settled public names.
 //     DownCity and OakHill are circles at the same level. INSERT IGNORE so
 //     the test harness (empty community table) ends with the same four rows.
-//  4. Names: suffix (Jr./III polluted lastName), displayName (the natural
+//  3. Names: suffix (Jr./III polluted lastName), displayName (the natural
 //     "First Last Suffix" form beside the "Last, First" sort form), and
 //     firstName optional (mononyms) — NULL, never ''.
-//  5. Vocabularies are lookup tables, never code: gender, ethnicity, race
+//  4. Vocabularies are lookup tables, never code: gender, ethnicity, race
 //     (multi -> junction), contact_method, language (BCP 47 tag, one row
 //     per person flagged preferred). isVeteran is a DEMOGRAPHIC fact, not
 //     Veteran's Circle participation. deceasedDate suppresses mailings
 //     while service history stays intact.
-//  6. person_contact replaces the flat emergencyContact* columns — but NOT
+//  5. person_contact replaces the flat emergencyContact* columns — but NOT
 //     in this migration: the client still writes the flat columns, so this
 //     only creates the table. 0028 (PR two) copies rows in and drops them.
-//  7. person_image is a separate table, not a blob on person: the audit
+//  6. person_image is a separate table, not a blob on person: the audit
 //     service captures every person column on every edit. Schema only.
-//  8. person:read_demographics gates gender/ethnicity/race/isVeteran;
+//  7. person:read_demographics gates gender/ethnicity/race/isVeteran;
 //     seeded to Staff (5) exactly as 0026 seeded person:read_birth_date.
 const LOOKUP = name => `CREATE TABLE ${name} (
      id   int NOT NULL AUTO_INCREMENT,
@@ -37,17 +35,12 @@ const LOOKUP = name => `CREATE TABLE ${name} (
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`
 
 const upMigration = [
-  // 1. snapshot
-  `CREATE TABLE person_circle_snapshot AS
-   SELECT pc.id, pc.personId, c.name AS circleName, NOW() AS snapshotAt
-   FROM person_community pc JOIN community c ON c.id = pc.communityId`,
-
-  // 2. nullify Circle of Pride only
+  // 1. nullify Circle of Pride only
   `DELETE pc FROM person_community pc
    JOIN community c ON c.id = pc.communityId
    WHERE c.name = 'Pride'`,
 
-  // 3. rename
+  // 2. rename
   `RENAME TABLE community TO circle, person_community TO person_circle`,
   `ALTER TABLE person_circle RENAME COLUMN communityId TO circleId`,
   `ALTER TABLE person_circle
@@ -66,7 +59,7 @@ const upMigration = [
   `INSERT IGNORE INTO circle (name) VALUES
      ('Circle of Pride'), ('Veteran''s Circle'), ('DownCity'), ('OakHill')`,
 
-  // 4. names
+  // 3. names
   `ALTER TABLE person
      MODIFY COLUMN firstName varchar(100) NULL,
      DROP CHECK person_names_non_empty,
@@ -76,7 +69,7 @@ const upMigration = [
      ADD COLUMN displayName varchar(300)
        GENERATED ALWAYS AS (CONCAT_WS(' ', firstName, lastName, suffix)) STORED AFTER fullName`,
 
-  // 5. vocabularies
+  // 4. vocabularies
   LOOKUP('gender'),
   LOOKUP('ethnicity'),
   LOOKUP('race'),
@@ -98,7 +91,7 @@ const upMigration = [
   `INSERT INTO language (name, tag) VALUES
      ('English', 'en'), ('Spanish', 'es'), ('Portuguese', 'pt'), ('Italian', 'it')`,
 
-  // 5. person columns
+  // 4. person columns
   `ALTER TABLE person
      ADD COLUMN pronouns varchar(30) NULL AFTER nickname,
      ADD COLUMN genderId int NULL,
@@ -110,7 +103,7 @@ const upMigration = [
      ADD CONSTRAINT person_ethnicity_fk FOREIGN KEY (ethnicityId) REFERENCES ethnicity (id),
      ADD CONSTRAINT person_contact_method_fk FOREIGN KEY (preferredContactMethodId) REFERENCES contact_method (id)`,
 
-  // 5/6/7. child tables
+  // 4/5/6. child tables
   `CREATE TABLE person_race (
      id       int NOT NULL AUTO_INCREMENT,
      personId int NOT NULL,
@@ -158,7 +151,7 @@ const upMigration = [
      CONSTRAINT person_image_person_fk FOREIGN KEY (personId) REFERENCES person (id) ON DELETE CASCADE
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
 
-  // 8. permission
+  // 7. permission
   `INSERT IGNORE INTO role_permission (roleId, permission) VALUES (5, 'person:read_demographics')`,
 ]
 
@@ -209,7 +202,6 @@ const downMigration = [
        REFERENCES circle (id)`,
   `ALTER TABLE person_circle RENAME COLUMN circleId TO communityId`,
   `RENAME TABLE circle TO community, person_circle TO person_community`,
-  // person_circle_snapshot is deliberately kept.
 ]
 
 const migrationHandler = new MigrationHandler(upMigration, downMigration)
