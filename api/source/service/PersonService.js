@@ -4,10 +4,23 @@ const { hasPermission } = require('../utils/authz')
 const AuditService = require('./audit/AuditService')
 const SmError = require('../utils/error')
 
-// One preferred language and one primary contact per person. The junction
-// carries the flag (a per-link attribute, unlike person_race), so the rule
-// is enforced here on the whole replacement set rather than by a constraint.
-function validateSets ({ languages, contacts }) {
+// Replacement-set rules that no constraint can express, checked before the
+// transaction opens so they surface as 400s rather than 500s:
+//   - one preferred language and one primary contact per person. The junction
+//     carries the flag (a per-link attribute, unlike person_race), so the rule
+//     is about the whole set, not any one row.
+//   - no repeated race/language id. Those DO have unique indexes, but reaching
+//     them means a raw ER_DUP_ENTRY.
+function validateSets ({ races, languages, contacts }) {
+  // person_race and person_language carry UNIQUE (personId, raceId) /
+  // (personId, languageId), so a repeated id would surface as a raw
+  // ER_DUP_ENTRY 500. Reject it here as a 400 instead.
+  if (races && new Set(races).size !== races.length) {
+    throw new SmError.ClientError('duplicate race')
+  }
+  if (languages && new Set(languages.map(l => l.languageId)).size !== languages.length) {
+    throw new SmError.ClientError('duplicate language')
+  }
   if (languages && languages.filter(l => l.isPreferred).length > 1) {
     throw new SmError.ClientError('at most one preferred language')
   }
@@ -498,7 +511,7 @@ module.exports.getPersonsByVillage = async function (villageId, userObject) {
 
 module.exports.createPerson = async function (body, userId) {
   const { circles, disabilities, races, languages, contacts, ...personFields } = body
-  validateSets({ languages, contacts })
+  validateSets({ races, languages, contacts })
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       return AuditService.auditUpdate(connection, { entityType: 'person', userId }, async () => {
@@ -523,7 +536,7 @@ module.exports.createPerson = async function (body, userId) {
 
 module.exports.patchPerson = async function (personId, body, userId) {
   const { circles, disabilities, races, languages, contacts, ...personFields } = body
-  validateSets({ languages, contacts })
+  validateSets({ races, languages, contacts })
   // town derives from the address (the client recalculates it and sends it
   // with every address edit). A PATCH that changes address fields without
   // supplying town would otherwise keep the previous municipality against

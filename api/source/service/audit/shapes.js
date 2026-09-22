@@ -67,11 +67,14 @@ const shapes = {
               WHERE pl.personId = ?`,
       },
       contacts: {
-        kind: 'keyed',
-        key: 'k',
+        kind: 'values',
         table: 'person_contact',
         sourceColumns: ['id', 'personId', 'name', 'relationship', 'phone', 'email', 'isPrimary', 'sequence'],
-        sql: `SELECT pc.name AS k, pc.relationship, pc.phone, pc.email, pc.isPrimary != 0 AS isPrimary, pc.sequence
+        // Values, not keyed: name is free text (no uniqueness) and ids regenerate
+        // on PATCH, so a keyed diff would collapse duplicate names. The label
+        // carries the whole row, so any edit reads as remove + add.
+        sql: `SELECT CONCAT_WS(' · ', pc.name, pc.relationship, pc.phone, pc.email,
+                               IF(pc.isPrimary, 'primary', NULL)) AS label
               FROM person_contact pc
               WHERE pc.personId = ?`,
       },
