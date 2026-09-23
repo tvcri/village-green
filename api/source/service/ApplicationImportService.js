@@ -15,6 +15,11 @@ const num = { type: 'string', description: 'Numeric amount as digits, or "" if b
 const yn = { type: 'string', enum: ['Yes', 'No', ''] }
 const ynSometimes = { type: 'string', enum: ['Yes', 'No', 'Sometimes', ''] }
 
+// Bump when the extraction schema changes (the August 2026 form will). Stored
+// in every application envelope so a reader knows which questions it answers.
+// 1 = November 2025 member form / June 2025 volunteer form.
+const EXTRACTION_SCHEMA_VERSION = 1
+
 const memberEntry = {
   type: 'object',
   additionalProperties: false,
@@ -277,6 +282,8 @@ function assembleResponse (data, villages, usage) {
   if (data.applicationType === 'volunteer') {
     return {
       applicationType: 'volunteer',
+      schemaVersion: EXTRACTION_SCHEMA_VERSION,
+      extractedAt: new Date().toISOString(),
       application: {
         applicationDate: data.application.applicationDate,
         village: resolveVillage(data.application.villageName, villages),
@@ -301,6 +308,8 @@ function assembleResponse (data, villages, usage) {
   const { newsletterPrint, duesMonthly, duesYearly, paymentMethod, invoiceMailed, ...preferences } = data.preferences
   return {
     applicationType: 'member',
+    schemaVersion: EXTRACTION_SCHEMA_VERSION,
+    extractedAt: new Date().toISOString(),
     application: {
       applicationDate: data.application.applicationDate,
       village: resolveVillage(data.application.villageName, villages),
@@ -405,6 +414,7 @@ async function extractFromPdf (pdfBuffer) {
 module.exports = {
   EXTRACTION_PROMPT,
   EXTRACTION_SCHEMA,
+  EXTRACTION_SCHEMA_VERSION,
   CLASSIFY_SCHEMA,
   CLASSIFY_PROMPT,
   variantSchemaFor,

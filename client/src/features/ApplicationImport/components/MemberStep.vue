@@ -5,8 +5,10 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import MemberFormFields from '../../PersonList/components/MemberFormFields.vue'
-import { mapMemberForm, uncertainMapForMember, composeNotes } from '../lib/importMapping.js'
-import { getPerson, patchPerson } from '../../PersonList/api/personApi.js'
+import {
+  mapMemberForm, uncertainMapForMember, composeNotes, buildApplicationEnvelope, mergeCirclePreferences,
+} from '../lib/importMapping.js'
+import { getPerson, patchPerson, getCircles } from '../../PersonList/api/personApi.js'
 import { putMember, patchMember } from '../../PersonList/api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { validateMemberForm } from '../../PersonList/lib/memberFormValidation.js'
@@ -38,6 +40,8 @@ const needsVillage = ref(false)
 const villages = ref([])
 const selectedVillageId = ref(null)
 const savingVillage = ref(false)
+const existingPreferences = ref([])
+const prideCircleId = ref(undefined)
 
 onMounted(async () => {
   try {
@@ -54,6 +58,8 @@ onMounted(async () => {
       const dump = composeNotes(props.extraction, props.memberIndex)
       form.miscNotes = form.miscNotes ? `${form.miscNotes}\n\n${dump}` : dump
     }
+    existingPreferences.value = (p.member?.circlePreferences ?? []).map(c => c.circleId)
+    prideCircleId.value = (await getCircles()).find(c => c.name === 'Circle of Pride')?.circleId
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load member data — go back and retry', life: 3000 })
@@ -70,6 +76,10 @@ function payload () {
     if (v === '' || v === null) return
     out[k] = v
   })
+  out.application = buildApplicationEnvelope(props.extraction, props.memberIndex)
+  const prefs = mergeCirclePreferences(existingPreferences.value, prideCircleId.value,
+    props.extraction.preferences?.circleOfPridePreferred)
+  if (prefs) out.circlePreferences = prefs
   return out
 }
 

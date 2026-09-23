@@ -6,7 +6,7 @@ import Message from 'primevue/message'
 import PersonFormFields from '../../PersonList/components/PersonFormFields.vue'
 import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js'
 import {
-  mapPersonForm, personDisabilities, uncertainMapForPerson, buildPersonCreatePayload,
+  mapPersonForm, personDisabilities, uncertainMapForPerson, buildPersonCreatePayload, veteranAnswer,
 } from '../lib/importMapping.js'
 import { getPersons, createPerson, getDisabilities } from '../../PersonList/api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
@@ -98,6 +98,8 @@ async function submit () {
       disabilityId: disabilityNameToId.value.get(n),
       note: note || null,
     })).filter(d => d.disabilityId)
+    const veteran = veteranAnswer(props.extraction.members[props.memberIndex].extras?.veteran)
+    if (veteran !== undefined) payload.isVeteran = veteran
     const created = await createPerson(payload)
     emit('person-done', {
       personId: created.personId,

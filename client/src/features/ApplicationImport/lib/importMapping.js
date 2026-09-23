@@ -266,3 +266,33 @@ function volunteerPersonFieldForPath (path) {
 export function uncertainMapForVolunteerPerson (extraction) {
   return buildUncertainMap(extraction, volunteerPersonFieldForPath)
 }
+
+// The stored record of what the form said: the extract response minus the
+// billing `usage`. A dual household writes the same extraction to both member
+// rows; memberIndex says which person each row is. Volunteers pass null.
+export function buildApplicationEnvelope (extraction, memberIndex) {
+  const rest = { ...extraction }
+  delete rest.usage
+  return {
+    applicationType: extraction.applicationType,
+    schemaVersion: extraction.schemaVersion,
+    extractedAt: extraction.extractedAt,
+    memberIndex,
+    extraction: rest,
+  }
+}
+
+// "Are you a U.S. Veteran?" -> person.isVeteran. Blank or unreadable stays
+// unset (undefined = omit from the payload), never false.
+export function veteranAnswer (value) {
+  if (value === 'Yes') return true
+  if (value === 'No') return false
+  return undefined
+}
+
+// Service preference for a Circle of Pride responder. Only a Yes adds; the
+// wizard never removes a preference a coordinator set. undefined = send nothing.
+export function mergeCirclePreferences (existingIds, prideId, answer) {
+  if (answer !== 'Yes' || !prideId) return undefined
+  return existingIds.includes(prideId) ? [...existingIds] : [...existingIds, prideId]
+}

@@ -10,6 +10,7 @@ import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js
 import {
   mapVolunteerPersonForm, volunteerCapabilityNames,
   uncertainMapForVolunteerPerson, buildPersonCreatePayload,
+  buildApplicationEnvelope, veteranAnswer,
 } from '../lib/importMapping.js'
 import {
   getPersons, createPerson, patchPerson, getDisabilities, getCapabilities,
@@ -89,6 +90,7 @@ async function grantVolunteerRole (personId, { isExisting = false } = {}) {
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
     associateVillageIds: [],
+    application: buildApplicationEnvelope(props.extraction, null),
   }
   try {
     // For an existing person, patch so fields the wizard doesn't collect
@@ -150,6 +152,8 @@ async function submit () {
     const payload = buildPersonCreatePayload(form)
     if (!showBirthDate.value) delete payload.birthDate
     payload.disabilities = []
+    const veteran = veteranAnswer(props.extraction.person?.veteran)
+    if (veteran !== undefined) payload.isVeteran = veteran
     const created = await createPerson(payload)
     createdPersonId = created.personId
     createdPersonIsExisting = false

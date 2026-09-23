@@ -3,6 +3,7 @@ import {
   mapPersonForm, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
   mapVolunteerPersonForm, volunteerCapabilityNames, uncertainMapForVolunteerPerson,
+  buildApplicationEnvelope, veteranAnswer, mergeCirclePreferences,
 } from './importMapping.js'
 
 function extraction () {
@@ -368,5 +369,41 @@ describe('uncertainMapForVolunteerPerson', () => {
     expect(m.zip).toEqual({ reason: 'digit unclear', alternative: '02807' })
     expect(m.villageId).toBeDefined()
     expect(m.emergencyContactPhone).toBeDefined()
+  })
+})
+
+describe('buildApplicationEnvelope', () => {
+  it('wraps the extraction minus usage, with memberIndex per member row', () => {
+    const x = { ...extraction(), schemaVersion: 1, extractedAt: '2026-09-22T14:00:00.000Z', usage: { cost: 1 } }
+    const e1 = buildApplicationEnvelope(x, 1)
+    expect(e1).toMatchObject({ applicationType: 'member', schemaVersion: 1, extractedAt: '2026-09-22T14:00:00.000Z', memberIndex: 1 })
+    expect(e1.extraction.usage).toBeUndefined()
+    expect(e1.extraction.members).toHaveLength(2)
+    expect(buildApplicationEnvelope(x, 0).memberIndex).toBe(0)
+  })
+  it('volunteer envelopes carry memberIndex null', () => {
+    const v = { applicationType: 'volunteer', schemaVersion: 1, extractedAt: '2026-09-22T14:00:00.000Z', person: {}, usage: {} }
+    expect(buildApplicationEnvelope(v, null).memberIndex).toBeNull()
+  })
+})
+
+describe('veteranAnswer', () => {
+  it('maps Yes/No to booleans and anything else to undefined', () => {
+    expect(veteranAnswer('Yes')).toBe(true)
+    expect(veteranAnswer('No')).toBe(false)
+    expect(veteranAnswer('')).toBeUndefined()
+    expect(veteranAnswer(null)).toBeUndefined()
+  })
+})
+
+describe('mergeCirclePreferences', () => {
+  it('adds Pride on Yes and keeps existing preferences', () => {
+    expect(mergeCirclePreferences(['7'], '1', 'Yes')).toEqual(['7', '1'])
+    expect(mergeCirclePreferences(['1'], '1', 'Yes')).toEqual(['1'])
+  })
+  it('returns undefined (send nothing) unless the answer is Yes', () => {
+    expect(mergeCirclePreferences(['7'], '1', 'No')).toBeUndefined()
+    expect(mergeCirclePreferences([], '1', '')).toBeUndefined()
+    expect(mergeCirclePreferences([], undefined, 'Yes')).toBeUndefined()
   })
 })

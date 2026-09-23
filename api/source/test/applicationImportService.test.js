@@ -278,3 +278,10 @@ test('each two-phase schema is far smaller than the combined EXTRACTION_SCHEMA',
   assert.ok(memberPhaseSize < combinedSize, 'member-only phase schema should be smaller than the combined schema')
   assert.ok(volunteerPhaseSize < combinedSize, 'volunteer-only phase schema should be smaller than the combined schema')
 })
+
+test('assembleResponse stamps schemaVersion and extractedAt on member and volunteer variants', () => {
+  const m = svc.assembleResponse(sampleExtraction(), villages, usage)
+  assert.equal(m.schemaVersion, svc.EXTRACTION_SCHEMA_VERSION)
+  assert.equal(svc.EXTRACTION_SCHEMA_VERSION, 1)
+  assert.ok(!Number.isNaN(Date.parse(m.extractedAt)))
+})
