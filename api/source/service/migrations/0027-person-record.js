@@ -13,7 +13,7 @@ const MigrationHandler = require('./lib/MigrationHandler')
 //     DownCity and OakHill are circles at the same level. INSERT IGNORE so
 //     the test harness (empty community table) ends with the same four rows.
 //  3. Names: suffix (Jr./III polluted lastName), displayName (the natural
-//     "First Last Suffix" form beside the "Last, First" sort form), and
+//     "First Last Suffix" form beside the "Last, First, Suffix" sort form), and
 //     firstName optional (mononyms) — NULL, never ''. Existing suffixes are
 //     moved out of lastName ("Hanley, Jr" -> Hanley + "Jr."), spelled one way:
 //     Jr. / Sr. / roman numerals upper-case.
@@ -91,6 +91,12 @@ const upMigration = [
      ADD COLUMN suffix varchar(20) NULL AFTER middleInitial,
      ADD COLUMN displayName varchar(300)
        GENERATED ALWAYS AS (CONCAT_WS(' ', firstName, lastName, suffix)) STORED AFTER fullName`,
+  // The inverted "Last, First" form keeps the suffix after the first name
+  // ("Currie, Robert, Jr."), as Chicago/MLA invert it; otherwise moving
+  // suffixes out of lastName below would drop them from every table.
+  `ALTER TABLE person
+     MODIFY COLUMN fullName varchar(200)
+       GENERATED ALWAYS AS (CONCAT_WS(', ', lastName, firstName, suffix)) STORED`,
   // Move a trailing Jr/Sr/II/III/IV (space- or comma-separated, optional
   // period) out of lastName. suffix is assigned first: MySQL evaluates
   // single-table SET assignments left to right, so lastName must still hold
@@ -256,6 +262,10 @@ const downMigration = [
   // fold suffixes back into lastName before the column goes (original comma
   // spellings like "Hanley, Jr" come back as "Hanley Jr.")
   `UPDATE person SET lastName = CONCAT(lastName, ' ', suffix) WHERE suffix IS NOT NULL`,
+  // fullName must stop referencing suffix before the column can be dropped
+  `ALTER TABLE person
+     MODIFY COLUMN fullName varchar(200)
+       GENERATED ALWAYS AS (CONCAT_WS(', ', lastName, firstName)) STORED`,
   `ALTER TABLE person
      DROP COLUMN displayName,
      DROP COLUMN suffix,

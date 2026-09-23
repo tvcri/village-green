@@ -31,12 +31,14 @@ test('a person may have no first name; fullName and displayName degrade cleanly'
   assert.equal(blank.status, 400, 'empty-string firstName is rejected (NULL, never "")')
 })
 
-test('suffix lands in displayName, not in lastName; sort form unchanged', async () => {
+test('suffix lands in displayName and trails the inverted fullName, never in lastName', async () => {
   const p = await create({ firstName: 'John', lastName: 'Astor', suffix: 'III' })
+  assert.equal(p.lastName, 'Astor')
   assert.equal(p.displayName, 'John Astor III')
-  assert.equal(p.fullName, 'Astor, John')
+  assert.equal(p.fullName, 'Astor, John, III', 'inverted form keeps the suffix after the first name (Chicago/MLA)')
   const patched = await vgCall('patchPerson', { personId: p.personId }, { token: staff, body: { suffix: null } })
   assert.equal(patched.json.displayName, 'John Astor')
+  assert.equal(patched.json.fullName, 'Astor, John')
 })
 
 test('deceasedDate and preferredContactMethod round-trip', async () => {

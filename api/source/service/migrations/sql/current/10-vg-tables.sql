@@ -330,7 +330,7 @@ DROP TABLE IF EXISTS `person`;
 CREATE TABLE `person` (
   `id` int NOT NULL AUTO_INCREMENT,
   `villageId` int DEFAULT NULL,
-  `fullName` varchar(200) GENERATED ALWAYS AS (concat_ws(_utf8mb4', ',`lastName`,`firstName`)) STORED,
+  `fullName` varchar(200) GENERATED ALWAYS AS (concat_ws(_utf8mb4', ',`lastName`,`firstName`,`suffix`)) STORED,
   `displayName` varchar(300) GENERATED ALWAYS AS (concat_ws(_utf8mb4' ',`firstName`,`lastName`,`suffix`)) STORED,
   `lastName` varchar(100) NOT NULL,
   `firstName` varchar(100) DEFAULT NULL,
@@ -898,4 +898,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-23  0:01:12
+-- Dump completed on 2026-09-23  2:49:34
