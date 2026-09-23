@@ -242,7 +242,19 @@ function memberColumn ({ financial, scNote, inactive }) {
       'printedNewsletter', m2.printedNewsletter != 0,
       ${scNote ? `'scNotes', m2.scNotes,` : ''}
       'statusChangeNotes', m2.statusChangeNotes,
-      'miscNotes', m2.miscNotes
+      'miscNotes', m2.miscNotes,
+      'circlePreferences', (
+        SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('circleId', CAST(c.id AS CHAR), 'name', c.name)`,
+            orderBy: 'c.name'
+          })},
+          JSON_ARRAY()
+        )
+        FROM member_circle_preference mcp
+        JOIN circle c ON c.id = mcp.circleId
+        WHERE mcp.memberId = m2.id
+      )
     ) FROM ${memberSource} m2 WHERE m2.personId = p.id) AS \`member\``
 }
 

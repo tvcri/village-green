@@ -92,10 +92,17 @@ const shapes = {
 
   member: {
     table: 'member',
-    // member_circle_preference: a service preference, not member history —
-    // deliberately not folded (0027-person-record.js item 9).
-    relatedTables: ['member_circle_preference'],
-    sets: {},
+    relatedTables: [],
+    sets: {
+      circlePreferences: {
+        kind: 'values',
+        table: 'member_circle_preference',
+        sourceColumns: ['id', 'memberId', 'circleId'],
+        sql: `SELECT c.name AS label
+              FROM member_circle_preference mcp JOIN circle c ON c.id = mcp.circleId
+              WHERE mcp.memberId = ?`,
+      },
+    },
   },
 
   volunteer: {

@@ -3707,6 +3707,9 @@ components:
         householdSize:
           type: integer
           nullable: true
+        circlePreferences:
+          type: array
+          items: { $ref: '#/components/schemas/CircleId' }
         householdDues:
           type: number
           nullable: true
@@ -3743,6 +3746,9 @@ components:
         status:          { type: string, maxLength: 50 }
         dropReason:      { type: string, maxLength: 100 }
         householdSize:   { type: integer }
+        circlePreferences:
+          type: array
+          items: { $ref: '#/components/schemas/CircleId' }
         householdDues:   { type: number }
         quickbooksKey:   { type: string, maxLength: 50 }
         printedNewsletter: { type: boolean }
@@ -3755,6 +3761,7 @@ components:
       required:
       - memberId
       - personId
+      - circlePreferences
       properties:
         memberId:
           $ref: '#/components/schemas/MemberId'
@@ -3807,6 +3814,9 @@ components:
         householdSize:
           type: integer
           nullable: true
+        circlePreferences:
+          type: array
+          items: { $ref: '#/components/schemas/Circle' }
         householdDues:
           type: number
           nullable: true
