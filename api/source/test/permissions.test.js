@@ -24,6 +24,7 @@ test('expected non-elevated permissions exist', () => {
   for (const key of [
     'person:read', 'person:write',
     'member:read', 'member:write', 'member:read_financial',
+    'member:read_application', 'volunteer:read_application',
     'volunteer:read', 'volunteer:write',
     'sr:read', 'sr:write', 'friend:read', 'friend:write',
     'village:read', 'village:write',

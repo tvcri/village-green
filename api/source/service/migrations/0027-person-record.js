@@ -27,6 +27,21 @@ const MigrationHandler = require('./lib/MigrationHandler')
 //     service captures every person column on every edit. Schema only.
 //  7. person:read_demographics gates gender/ethnicity/race/isVeteran;
 //     seeded to Staff (5) exactly as 0026 seeded person:read_birth_date.
+//  8. Application answers survive the circle clear (spec
+//     2026-09-22-0027-application-answers-design.md). member.application /
+//     volunteer.application hold the wizard's extraction envelope — the
+//     only record of the member's Pride-join and the volunteer's
+//     support-CoP answers. member:/volunteer:read_application gate reads;
+//     seeded to Staff, the only role holding every gate the extraction
+//     crosses.
+//  9. member_circle_preference: "when requesting services, prefer a
+//     responder from this circle". Backfilled from the CE-era miscNotes
+//     sentence (the wizard's own "Circle of Pride preferred" lines were
+//     all No). Deliberately NOT person_circle — a preference is not
+//     participation.
+// 10. isVeteran is seeded ONCE from Veteran's Circle membership: those rows
+//     came from the application's veteran question. A one-time seed, NOT a
+//     rule that circle membership implies veteran status (see 4).
 const LOOKUP = name => `CREATE TABLE ${name} (
      id   int NOT NULL AUTO_INCREMENT,
      name varchar(100) NOT NULL,
@@ -151,12 +166,49 @@ const upMigration = [
      CONSTRAINT person_image_person_fk FOREIGN KEY (personId) REFERENCES person (id) ON DELETE CASCADE
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
 
-  // 7. permission
-  `INSERT IGNORE INTO role_permission (roleId, permission) VALUES (5, 'person:read_demographics')`,
+  // 8. application envelopes
+  `ALTER TABLE member ADD COLUMN application JSON NULL`,
+  `ALTER TABLE volunteer ADD COLUMN application JSON NULL`,
+  // active_member is SELECT * and MySQL expands * at creation time — rebuild
+  // it or the new column reads NULL through the view. active_volunteer has
+  // an explicit column list (0013) and does not need the column.
+  `CREATE OR REPLACE VIEW active_member AS SELECT * FROM member WHERE status = 'Active'`,
+
+  // 9. circle service preferences + CE-era backfill
+  `CREATE TABLE member_circle_preference (
+     id       int NOT NULL AUTO_INCREMENT,
+     memberId int NOT NULL,
+     circleId int NOT NULL,
+     PRIMARY KEY (id),
+     UNIQUE KEY member_circle_preference (memberId, circleId),
+     CONSTRAINT mcp_member_fk FOREIGN KEY (memberId) REFERENCES member (id) ON DELETE CASCADE,
+     CONSTRAINT mcp_circle_fk FOREIGN KEY (circleId) REFERENCES circle (id)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+  `INSERT INTO member_circle_preference (memberId, circleId)
+   SELECT m.id, c.id FROM member m JOIN circle c ON c.name = 'Circle of Pride'
+   WHERE m.miscNotes LIKE '%prefer to have a member of the Circle of Pride to respond%'`,
+
+  // 10. one-time isVeteran seed
+  `UPDATE person p
+     JOIN person_circle pc ON pc.personId = p.id
+     JOIN circle c ON c.id = pc.circleId
+   SET p.isVeteran = 1
+   WHERE c.name = 'Veteran''s Circle' AND p.isVeteran IS NULL`,
+
+  // 7. permissions
+  `INSERT IGNORE INTO role_permission (roleId, permission) VALUES
+     (5, 'person:read_demographics'),
+     (5, 'member:read_application'),
+     (5, 'volunteer:read_application')`,
 ]
 
 const downMigration = [
-  `DELETE FROM role_permission WHERE permission = 'person:read_demographics'`,
+  `DELETE FROM role_permission WHERE permission IN
+     ('person:read_demographics', 'member:read_application', 'volunteer:read_application')`,
+  `DROP TABLE IF EXISTS member_circle_preference`,
+  `ALTER TABLE volunteer DROP COLUMN application`,
+  `ALTER TABLE member DROP COLUMN application`,
+  `CREATE OR REPLACE VIEW active_member AS SELECT * FROM member WHERE status = 'Active'`,
   `DROP TABLE IF EXISTS person_image`,
   `DROP TABLE IF EXISTS person_contact`,
   `DROP TABLE IF EXISTS person_language`,

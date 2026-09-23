@@ -48,7 +48,8 @@ DROP TABLE IF EXISTS `active_member`;
  1 AS `printedNewsletter`,
  1 AS `scNotes`,
  1 AS `statusChangeNotes`,
- 1 AS `miscNotes`*/;
+ 1 AS `miscNotes`,
+ 1 AS `application`*/;
 
 --
 -- Temporary view structure for view `active_volunteer`
@@ -277,11 +278,28 @@ CREATE TABLE `member` (
   `scNotes` text,
   `statusChangeNotes` text,
   `miscNotes` text,
+  `application` json DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `person_id` (`personId`),
   KEY `member_primary_person_fk` (`primaryPersonId`),
   CONSTRAINT `member_ibfk_1` FOREIGN KEY (`personId`) REFERENCES `person` (`id`),
   CONSTRAINT `member_primary_person_fk` FOREIGN KEY (`primaryPersonId`) REFERENCES `person` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `member_circle_preference`
+--
+
+DROP TABLE IF EXISTS `member_circle_preference`;
+CREATE TABLE `member_circle_preference` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `memberId` int NOT NULL,
+  `circleId` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `member_circle_preference` (`memberId`,`circleId`),
+  KEY `mcp_circle_fk` (`circleId`),
+  CONSTRAINT `mcp_circle_fk` FOREIGN KEY (`circleId`) REFERENCES `circle` (`id`),
+  CONSTRAINT `mcp_member_fk` FOREIGN KEY (`memberId`) REFERENCES `member` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -708,6 +726,7 @@ CREATE TABLE `volunteer` (
   `providerType` varchar(50) DEFAULT NULL,
   `active` bit(1) DEFAULT NULL,
   `notes` text,
+  `application` json DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `person_id` (`personId`),
   CONSTRAINT `volunteer_ibfk_1` FOREIGN KEY (`personId`) REFERENCES `person` (`id`)
@@ -858,7 +877,7 @@ DELIMITER ;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50001 VIEW `active_member` AS select `member`.`id` AS `id`,`member`.`personId` AS `personId`,`member`.`memberNumber` AS `memberNumber`,`member`.`memberLevel` AS `memberLevel`,`member`.`memberType` AS `memberType`,`member`.`primaryPersonId` AS `primaryPersonId`,`member`.`secondaryType` AS `secondaryType`,`member`.`serviceNotes` AS `serviceNotes`,`member`.`joinDate` AS `joinDate`,`member`.`createdDate` AS `createdDate`,`member`.`status` AS `status`,`member`.`dropReason` AS `dropReason`,`member`.`householdSize` AS `householdSize`,`member`.`householdDues` AS `householdDues`,`member`.`quickbooksKey` AS `quickbooksKey`,`member`.`printedNewsletter` AS `printedNewsletter`,`member`.`scNotes` AS `scNotes`,`member`.`statusChangeNotes` AS `statusChangeNotes`,`member`.`miscNotes` AS `miscNotes` from `member` where (`member`.`status` = 'Active') */;
+/*!50001 VIEW `active_member` AS select `member`.`id` AS `id`,`member`.`personId` AS `personId`,`member`.`memberNumber` AS `memberNumber`,`member`.`memberLevel` AS `memberLevel`,`member`.`memberType` AS `memberType`,`member`.`primaryPersonId` AS `primaryPersonId`,`member`.`secondaryType` AS `secondaryType`,`member`.`serviceNotes` AS `serviceNotes`,`member`.`joinDate` AS `joinDate`,`member`.`createdDate` AS `createdDate`,`member`.`status` AS `status`,`member`.`dropReason` AS `dropReason`,`member`.`householdSize` AS `householdSize`,`member`.`householdDues` AS `householdDues`,`member`.`quickbooksKey` AS `quickbooksKey`,`member`.`printedNewsletter` AS `printedNewsletter`,`member`.`scNotes` AS `scNotes`,`member`.`statusChangeNotes` AS `statusChangeNotes`,`member`.`miscNotes` AS `miscNotes`,`member`.`application` AS `application` from `member` where (`member`.`status` = 'Active') */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 
 --
@@ -879,4 +898,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-22 21:16:50
+-- Dump completed on 2026-09-23  0:01:12

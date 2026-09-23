@@ -92,7 +92,9 @@ const shapes = {
 
   member: {
     table: 'member',
-    relatedTables: [],
+    // member_circle_preference: a service preference, not member history —
+    // deliberately not folded (0027-person-record.js item 9).
+    relatedTables: ['member_circle_preference'],
     sets: {},
   },
 
