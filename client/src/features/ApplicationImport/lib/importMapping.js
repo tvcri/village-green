@@ -270,16 +270,12 @@ export function uncertainMapForVolunteerPerson (extraction) {
 // The stored record of what the form said: the extract response minus the
 // billing `usage`. A dual household writes the same extraction to both member
 // rows; memberIndex says which person each row is. Volunteers pass null.
+// The server-stamped keys live only at the envelope's top level, never also
+// inside `extraction`.
 export function buildApplicationEnvelope (extraction, memberIndex) {
-  const rest = { ...extraction }
+  const { applicationType, schemaVersion, extractedAt, ...rest } = extraction
   delete rest.usage
-  return {
-    applicationType: extraction.applicationType,
-    schemaVersion: extraction.schemaVersion,
-    extractedAt: extraction.extractedAt,
-    memberIndex,
-    extraction: rest,
-  }
+  return { applicationType, schemaVersion, extractedAt, memberIndex, extraction: rest }
 }
 
 // "Are you a U.S. Veteran?" -> person.isVeteran. Blank or unreadable stays
