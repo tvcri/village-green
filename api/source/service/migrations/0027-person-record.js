@@ -14,7 +14,9 @@ const MigrationHandler = require('./lib/MigrationHandler')
 //     the test harness (empty community table) ends with the same four rows.
 //  3. Names: suffix (Jr./III polluted lastName), displayName (the natural
 //     "First Last Suffix" form beside the "Last, First" sort form), and
-//     firstName optional (mononyms) — NULL, never ''.
+//     firstName optional (mononyms) — NULL, never ''. Existing suffixes are
+//     moved out of lastName ("Hanley, Jr" -> Hanley + "Jr."), spelled one way:
+//     Jr. / Sr. / roman numerals upper-case.
 //  4. Vocabularies are lookup tables, never code: gender, ethnicity, race
 //     (multi -> junction), contact_method, language (BCP 47 tag, one row
 //     per person flagged preferred). isVeteran is a DEMOGRAPHIC fact, not
@@ -43,6 +45,11 @@ const MigrationHandler = require('./lib/MigrationHandler')
 // 10. isVeteran is seeded ONCE from Veteran's Circle membership: those rows
 //     came from the application's veteran question. A one-time seed, NOT a
 //     rule that circle membership implies veteran status (see 4).
+// "Currie Jr." / "Hanley, Jr" / "Flaherty III": base name, then the suffix.
+// [.] rather than \. keeps the pattern free of escapes through both the JS
+// template literal and the MySQL string literal.
+const SUFFIX_RE = '^(.+?)[ ,]+(jr|sr|ii|iii|iv)[.]?$'
+
 const LOOKUP = name => `CREATE TABLE ${name} (
      id   int NOT NULL AUTO_INCREMENT,
      name varchar(100) NOT NULL,
@@ -84,6 +91,18 @@ const upMigration = [
      ADD COLUMN suffix varchar(20) NULL AFTER middleInitial,
      ADD COLUMN displayName varchar(300)
        GENERATED ALWAYS AS (CONCAT_WS(' ', firstName, lastName, suffix)) STORED AFTER fullName`,
+  // Move a trailing Jr/Sr/II/III/IV (space- or comma-separated, optional
+  // period) out of lastName. suffix is assigned first: MySQL evaluates
+  // single-table SET assignments left to right, so lastName must still hold
+  // the original value when suffix reads it. fullName/displayName follow.
+  `UPDATE person SET
+     suffix = CASE LOWER(REGEXP_REPLACE(lastName, '${SUFFIX_RE}', '$2', 1, 0, 'i'))
+       WHEN 'jr' THEN 'Jr.'
+       WHEN 'sr' THEN 'Sr.'
+       ELSE UPPER(REGEXP_REPLACE(lastName, '${SUFFIX_RE}', '$2', 1, 0, 'i'))
+     END,
+     lastName = REGEXP_REPLACE(lastName, '${SUFFIX_RE}', '$1', 1, 0, 'i')
+   WHERE suffix IS NULL AND REGEXP_LIKE(lastName, '${SUFFIX_RE}', 'i')`,
 
   // 4. vocabularies
   LOOKUP('gender'),
@@ -234,6 +253,9 @@ const downMigration = [
   `DROP TABLE IF EXISTS gender`,
   // a NULL firstName cannot be restored faithfully; down is a safety net
   `UPDATE person SET firstName = '-' WHERE firstName IS NULL`,
+  // fold suffixes back into lastName before the column goes (original comma
+  // spellings like "Hanley, Jr" come back as "Hanley Jr.")
+  `UPDATE person SET lastName = CONCAT(lastName, ' ', suffix) WHERE suffix IS NOT NULL`,
   `ALTER TABLE person
      DROP COLUMN displayName,
      DROP COLUMN suffix,
