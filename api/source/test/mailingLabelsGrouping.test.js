@@ -48,6 +48,16 @@ test('composeName: surname match is case-insensitive', () => {
   assert.equal(out, 'Jane and John smith')
 })
 
+test('composeName: a suffix follows the surname', () => {
+  assert.equal(composeName([at('Robert', 'Currie', 'x', { suffix: 'Jr.' })]), 'Robert Currie Jr.')
+})
+
+test('composeName: shared surname with a suffix is not compressed', () => {
+  // "Jane and John Smith Jr." would give Jane the suffix; spell both out.
+  const out = composeName([at('John', 'Smith', 'x', { suffix: 'Jr.' }), at('Jane', 'Smith', 'x')])
+  assert.equal(out, 'Jane Smith and John Smith Jr.')
+})
+
 test('composeName: three or more collapses to "and others"', () => {
   const out = composeName([
     at('John', 'Smith', 'x'), at('Jane', 'Smith', 'x'), at('Kim', 'Smith', 'x'),

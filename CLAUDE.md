@@ -226,12 +226,12 @@ Inside running text (sentences, dialogs, toasts) a name reads
 **"First Last"**; tables and labeled card fields keep **"Last, First"**
 (exactly `person.fullName`, the stored generated column
 `CONCAT_WS(', ', lastName, firstName, suffix)`: "Currie, Robert, Jr.").
-Never string-unparse `fullName` to get the informal form — serve
-`firstName`/`lastName` alongside it and compose client-side. Since 0027,
-`suffix` is its own column and no longer part of `lastName`, so a
-first-plus-last composition drops it. `displayName` is the stored
-"First Last Suffix" form ("Robert Currie Jr."). Emergency-contact names
-are free-text and exempt.
+Never string-unparse `fullName` to get the informal form. Serve
+`displayName` alongside it: the stored "First Last Suffix" form ("Robert
+Currie Jr."). Since 0027, `suffix` is its own column and no longer part of
+`lastName`, so composing `firstName` + `lastName` drops it; don't. Mailing
+labels compose from the name parts and include `suffix`. Emergency-contact
+names are free-text and exempt.
 
 ## Who's who — coordinator vs volunteer vs member
 

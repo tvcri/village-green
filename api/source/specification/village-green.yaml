@@ -5288,9 +5288,12 @@ components:
               personId:
                 $ref: '#/components/schemas/StringIntId'
               name:
-                description: Tabular display form ("Last, First" fullName)
+                description: Tabular display form ("Last, First, Suffix" fullName)
                 type: string
                 nullable: true
+              displayName:
+                description: Running-text form ("First Last Suffix")
+                type: string
               firstName:
                 type: string
               lastName:
@@ -5894,7 +5897,11 @@ components:
       type: object
       properties:
         fullName:
-          description: Tabular display form ("Last, First")
+          description: Tabular display form ("Last, First, Suffix")
+          type: string
+          nullable: true
+        displayName:
+          description: Running-text form ("First Last Suffix")
           type: string
           nullable: true
         firstName:
