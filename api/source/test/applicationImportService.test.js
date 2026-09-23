@@ -43,7 +43,7 @@ test('resolveVillage returns no match when substring is ambiguous', () => {
 function sampleExtraction () {
   return {
     applicationType: 'member',
-    application: { applicationDate: '2026-06-12', villageName: 'Westside', ambassador: 'Pat Smith', householdType: 'Dual' },
+    application: { applicationDate: '2026-06-12', formDate: '2025-11', villageName: 'Westside', ambassador: 'Pat Smith', householdType: 'Dual' },
     members: [
       {
         firstName: 'Marge', middleInitial: 'A', lastName: 'Innovera', nickname: '',
@@ -164,7 +164,7 @@ test('EXTRACTION_SCHEMA objects all forbid additional properties', () => {
 function sampleVolunteerExtraction () {
   return {
     applicationType: 'volunteer',
-    application: { applicationDate: '2026-05-30', villageName: 'Barrington Village', ambassador: '' },
+    application: { applicationDate: '2026-05-30', formDate: '2025-06', villageName: 'Barrington Village', ambassador: '' },
     person: {
       firstName: 'Nicole', middleInitial: 'K', lastName: 'Brown', nickname: '',
       pronouns: 'she/her', birthDate: '1999-07-10', gender: 'Female', veteran: 'No',
@@ -284,4 +284,12 @@ test('assembleResponse stamps schemaVersion and extractedAt on member and volunt
   assert.equal(m.schemaVersion, svc.EXTRACTION_SCHEMA_VERSION)
   assert.equal(svc.EXTRACTION_SCHEMA_VERSION, 1)
   assert.ok(!Number.isNaN(Date.parse(m.extractedAt)))
+})
+
+test('assembleResponse carries the printed formDate on both variants; an unprinted one is null', () => {
+  assert.equal(svc.assembleResponse(sampleExtraction(), villages, usage).application.formDate, '2025-11')
+  assert.equal(svc.assembleResponse(sampleVolunteerExtraction(), villages, usage).application.formDate, '2025-06')
+  const blank = sampleExtraction()
+  blank.application.formDate = ''
+  assert.equal(svc.assembleResponse(blank, villages, usage).application.formDate, null)
 })

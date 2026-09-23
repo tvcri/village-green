@@ -15,9 +15,10 @@ const num = { type: 'string', description: 'Numeric amount as digits, or "" if b
 const yn = { type: 'string', enum: ['Yes', 'No', ''] }
 const ynSometimes = { type: 'string', enum: ['Yes', 'No', 'Sometimes', ''] }
 
-// Bump when the extraction schema changes (the August 2026 form will). Stored
-// in every application envelope so a reader knows which questions it answers.
-// 1 = November 2025 member form / June 2025 volunteer form.
+// The version of this extraction's output shape, not of the paper form: bump it
+// when EXTRACTION_SCHEMA changes (the August 2026 form will). Stored in every
+// application envelope so a reader knows how to parse it. Which form edition
+// the applicant filled in is application.formDate.
 const EXTRACTION_SCHEMA_VERSION = 1
 
 const memberEntry = {
@@ -58,6 +59,11 @@ const volunteerPerson = {
   },
 }
 
+// The form's edition: the month and year printed under the masthead. Editions
+// ask different questions (June 2024 has no veteran question), so the stored
+// envelope records which one the applicant filled in.
+const formDateField = { ...str, description: 'Month and year printed under the masthead, as YYYY-MM' }
+
 const CAPABILITY_NAME_ENUM = ['Rides', 'Errands', 'Home Help', 'Steering Committee', 'Tech Support', 'Friends']
 
 const EXTRACTION_SCHEMA = {
@@ -71,9 +77,10 @@ const EXTRACTION_SCHEMA = {
         application: {
           type: 'object',
           additionalProperties: false,
-          required: ['applicationDate', 'villageName', 'ambassador', 'householdType'],
+          required: ['applicationDate', 'formDate', 'villageName', 'ambassador', 'householdType'],
           properties: {
             applicationDate: { ...str, description: 'YYYY-MM-DD' },
+            formDate: formDateField,
             villageName: str,
             ambassador: str,
             householdType: { type: 'string', enum: ['Single', 'Dual', ''] },
@@ -123,9 +130,10 @@ const EXTRACTION_SCHEMA = {
         application: {
           type: 'object',
           additionalProperties: false,
-          required: ['applicationDate', 'villageName', 'ambassador'],
+          required: ['applicationDate', 'formDate', 'villageName', 'ambassador'],
           properties: {
             applicationDate: { ...str, description: 'YYYY-MM-DD' },
+            formDate: formDateField,
             villageName: str,
             ambassador: str,
           },
@@ -286,6 +294,7 @@ function assembleResponse (data, villages, usage) {
       extractedAt: new Date().toISOString(),
       application: {
         applicationDate: data.application.applicationDate,
+        formDate: data.application.formDate,
         village: resolveVillage(data.application.villageName, villages),
         ambassador: data.application.ambassador,
       },
@@ -312,6 +321,7 @@ function assembleResponse (data, villages, usage) {
     extractedAt: new Date().toISOString(),
     application: {
       applicationDate: data.application.applicationDate,
+      formDate: data.application.formDate,
       village: resolveVillage(data.application.villageName, villages),
       ambassador: data.application.ambassador,
       householdType: data.application.householdType,

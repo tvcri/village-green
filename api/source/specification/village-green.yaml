@@ -3676,8 +3676,9 @@ components:
       description: >-
         The import wizard's extraction of one application form, as the form
         said it (coordinator corrections land in ordinary columns).
-        schemaVersion identifies which form revision's questions the
-        extraction answers.
+        schemaVersion is the version of the extraction's JSON shape, not of
+        the paper form; the form edition the applicant filled in is
+        extraction.application.formDate (YYYY-MM).
       type: object
       additionalProperties: false
       required: [applicationType, schemaVersion, extractedAt, memberIndex, extraction]
