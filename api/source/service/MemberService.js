@@ -48,7 +48,10 @@ module.exports.memberExists = async function (personId) {
 
 // Grant or fully replace the member role.
 module.exports.putMember = async function (personId, body, userObject) {
-  const { circlePreferences, ...fields } = body
+  const { circlePreferences, application, ...fields } = body
+  // JSON column: mysql2 would expand an object into `key = val` pairs, so the
+  // envelope is stringified. Only written when the key was sent.
+  if (application !== undefined) fields.application = application === null ? null : JSON.stringify(application)
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       // status comes back alongside id: it is the before-state the welcome
@@ -90,7 +93,10 @@ module.exports.putMember = async function (personId, body, userObject) {
 
 // Partially update an existing member role.
 module.exports.patchMember = async function (personId, body, userObject) {
-  const { circlePreferences, ...fields } = body
+  const { circlePreferences, application, ...fields } = body
+  // JSON column: mysql2 would expand an object into `key = val` pairs, so the
+  // envelope is stringified. Only written when the key was sent.
+  if (application !== undefined) fields.application = application === null ? null : JSON.stringify(application)
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       // Read the before-state inside the transaction: this is the path a

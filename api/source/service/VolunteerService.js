@@ -62,7 +62,7 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [] } = {}, userObject) {
+module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], application } = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
@@ -74,6 +74,12 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
           await connection.query(
             'UPDATE volunteer SET providerType = ?, active = ?, notes = ? WHERE id = ?', [providerType, active, notes, volunteerId]
           )
+          // Written only when sent: a PUT from the volunteer form (which never
+          // carries it) must not null the stored application.
+          if (application !== undefined) {
+            await connection.query('UPDATE volunteer SET application = ? WHERE id = ?',
+              [application === null ? null : JSON.stringify(application), volunteerId])
+          }
           await replaceCapabilities(connection, volunteerId, capabilityIds)
           await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
           await replaceVettings(connection, volunteerId, vettings)
@@ -99,6 +105,7 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
           if (body.providerType !== undefined) fields.providerType = body.providerType
           if (body.active !== undefined) fields.active = body.active
           if (body.notes !== undefined) fields.notes = body.notes
+          if (body.application !== undefined) fields.application = body.application === null ? null : JSON.stringify(body.application)
           if (Object.keys(fields).length) {
             await connection.query('UPDATE volunteer SET ? WHERE id = ?', [fields, volunteerId])
           }

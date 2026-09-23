@@ -305,6 +305,16 @@ function volunteerColumn ({ inactive }) {
     ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``
 }
 
+// ?projection=application: a root object whose keys appear only with their
+// read_application gate. Base tables, never the active_* views — a dropped
+// member's application must stay readable to those allowed to read it.
+function applicationColumn ({ member, volunteer }) {
+  const parts = []
+  if (member) parts.push(`'member', (SELECT ma.application FROM member ma WHERE ma.personId = p.id)`)
+  if (volunteer) parts.push(`'volunteer', (SELECT va.application FROM volunteer va WHERE va.personId = p.id)`)
+  return `JSON_OBJECT(${parts.join(', ')}) AS application`
+}
+
 // Single query path for person reads: getPerson, getPersons, and
 // getPersonsByVillage all build here. These column fragments were once
 // copy-diverged across three functions (one copy dropped
@@ -324,11 +334,12 @@ function volunteerColumn ({ inactive }) {
 //   detail            - add the `detail` object to summary rows (getPersons projection)
 //   member            - { financial, scNote, inactive } projection gates
 //   volunteer         - { inactive } projection gates
+//   application       - { member, volunteer } read_application gates (root object; base tables, never active_* views)
 //   birthDate         - include p.birthDate (person:read_birth_date)
 //   demographics      - include gender/ethnicity/races/isVeteran (person:read_demographics)
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const {
-    summary = false, detail = false, member = null, volunteer = null,
+    summary = false, detail = false, member = null, volunteer = null, application = null,
     birthDate = false, demographics = false
   } = inOptions
 
@@ -374,6 +385,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
   if (detail) columns.push(detailColumn({ birthDate, demographics }))
   if (member) columns.push(memberColumn(member))
   if (volunteer) columns.push(volunteerColumn(volunteer))
+  if (application) columns.push(applicationColumn(application))
 
   const joins = new Set([
     'person p',
@@ -442,10 +454,12 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   // federation membership regardless of villageId.
   const wantsMember = projections.includes('member')
   const wantsVolunteer = projections.includes('volunteer')
+  const wantsApplication = projections.includes('application')
   let financial = false
   let scNote = false
   let memberInactive = false
   let volunteerInactive = false
+  let memberApplication = false, volunteerApplication = false
   let birthDate = hasPermission(userObject, 'person:read_birth_date')
   let demographics = hasPermission(userObject, 'person:read_demographics')
   if (wantsMember) {
@@ -456,10 +470,15 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   if (wantsVolunteer) {
     volunteerInactive = hasPermission(userObject, 'volunteer:read_inactive')
   }
+  if (wantsApplication) {
+    memberApplication = hasPermission(userObject, 'member:read_application')
+    volunteerApplication = hasPermission(userObject, 'volunteer:read_application')
+  }
   const unresolved =
     !birthDate || !demographics ||
     (wantsMember && !(financial && scNote && memberInactive)) ||
-    (wantsVolunteer && !volunteerInactive)
+    (wantsVolunteer && !volunteerInactive) ||
+    (wantsApplication && !(memberApplication && volunteerApplication))
   // Without a userObject (internal Member/Volunteer controller calls) every
   // gate stays closed, so the village lookup cannot change anything — skip it.
   if (unresolved && userObject) {
@@ -475,6 +494,10 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     if (wantsVolunteer) {
       volunteerInactive ||= hasPermission(userObject, 'volunteer:read_inactive', { villageId })
     }
+    if (wantsApplication) {
+      memberApplication ||= hasPermission(userObject, 'member:read_application', { villageId })
+      volunteerApplication ||= hasPermission(userObject, 'volunteer:read_application', { villageId })
+    }
   }
   const rows = await queryPersons(
     { personId },
@@ -482,7 +505,8 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       birthDate,
       demographics,
       member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
-      volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null
+      volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null,
+      application: wantsApplication ? { member: memberApplication, volunteer: volunteerApplication } : null
     }
   )
   return rows[0] ?? null

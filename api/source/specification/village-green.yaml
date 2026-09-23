@@ -3666,6 +3666,21 @@ components:
           nullable: true
     MemberId:
       $ref: '#/components/schemas/StringIntId'
+    ApplicationEnvelope:
+      description: >-
+        The import wizard's extraction of one application form, as the form
+        said it (coordinator corrections land in ordinary columns).
+        schemaVersion identifies which form revision's questions the
+        extraction answers.
+      type: object
+      additionalProperties: false
+      required: [applicationType, schemaVersion, extractedAt, memberIndex, extraction]
+      properties:
+        applicationType: { type: string, enum: [member, volunteer] }
+        schemaVersion: { type: integer, minimum: 1 }
+        extractedAt: { type: string, format: date-time }
+        memberIndex: { type: integer, minimum: 0, maximum: 1, nullable: true }
+        extraction: { type: object, additionalProperties: true }
     MemberPatch:
       additionalProperties: false
       type: object
@@ -3729,6 +3744,9 @@ components:
         miscNotes:
           type: string
           nullable: true
+        application:
+          $ref: '#/components/schemas/ApplicationEnvelope'
+          nullable: true
     MemberPut:
       additionalProperties: false
       type: object
@@ -3755,6 +3773,9 @@ components:
         scNotes: { type: string }
         statusChangeNotes: { type: string }
         miscNotes:         { type: string }
+        application:
+          $ref: '#/components/schemas/ApplicationEnvelope'
+          nullable: true
     MemberDetail:
       additionalProperties: false
       type: object
@@ -3989,6 +4010,13 @@ components:
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisability' }
+        application:
+          description: Present only with ?projection=application; each key only with its read_application permission.
+          type: object
+          additionalProperties: false
+          properties:
+            member: { $ref: '#/components/schemas/ApplicationEnvelope', nullable: true }
+            volunteer: { $ref: '#/components/schemas/ApplicationEnvelope', nullable: true }
     PersonSummary:
       additionalProperties: false
       type: object
@@ -5822,6 +5850,9 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+        application:
+          $ref: '#/components/schemas/ApplicationEnvelope'
+          nullable: true
     VolunteerPatch:
       additionalProperties: false
       type: object
@@ -5846,6 +5877,9 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+        application:
+          $ref: '#/components/schemas/ApplicationEnvelope'
+          nullable: true
     VolunteerMemberContact:
       nullable: true
       additionalProperties: false
@@ -6259,6 +6293,7 @@ components:
           enum:
           - member
           - volunteer
+          - application
     RunSequenceQuery:
       name: after-seq
       in: query
