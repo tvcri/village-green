@@ -290,6 +290,19 @@ export function veteranAnswer (value) {
   return undefined
 }
 
+// Same as veteranAnswer, but stays unset when the model itself flagged the
+// veteran read as uncertain — uncertainFields carries the model's own
+// pre-transform paths (members[i].veteran / person.veteran), not the
+// extras.veteran path the response nests it under after assembleResponse.
+// An uncertain answer must not be silently written as true/false; the
+// coordinator has no uncertainty UI for this field, so the only safe
+// outcome is to leave isVeteran NULL (unknown) for them to fill in by hand.
+export function veteranForPayload (extraction, path, value) {
+  const flagged = (extraction.uncertainFields ?? []).some(u => u.path === path)
+  if (flagged) return undefined
+  return veteranAnswer(value)
+}
+
 // Service preference for a Circle of Pride responder. Only a Yes adds; the
 // wizard never removes a preference a coordinator set. undefined = send nothing.
 export function mergeCirclePreferences (existingIds, prideId, answer) {

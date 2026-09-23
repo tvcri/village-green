@@ -43,3 +43,11 @@ test('unknown circleId is rejected by the FK, not silently ignored', async () =>
   const r = await vgCall('patchPersonMember', { personId: pid }, { token: tokens.users.staff, body: { circlePreferences: ['999999'] } })
   assert.ok(r.status >= 400, `expected an error status, got ${r.status}`)
 })
+
+test('duplicate circleId in the body is a 400, not a UNIQUE-constraint 500', async () => {
+  const c = await circleIds()
+  const r = await vgCall('patchPersonMember', { personId: pid }, {
+    token: tokens.users.staff, body: { circlePreferences: [c['Circle of Pride'], c['Circle of Pride']] },
+  })
+  assert.equal(r.status, 400)
+})

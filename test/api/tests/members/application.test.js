@@ -82,3 +82,34 @@ test('an envelope missing schemaVersion is rejected', async () => {
   const r = await vgCall('patchPersonMember', { personId: mid }, { ...staff, body: { application: bad } })
   assert.equal(r.status, 400)
 })
+
+test('PATCHing application: null clears an already-stored member envelope', async () => {
+  await vgCall('patchPersonMember', { personId: mid }, { ...staff, body: { application: envelope('member', 0) } })
+  assert.deepEqual((await readApp(mid)).json.application.member, envelope('member', 0))
+  const cleared = await vgCall('patchPersonMember', { personId: mid }, { ...staff, body: { application: null } })
+  assert.equal(cleared.status, 200)
+  assert.equal((await readApp(mid)).json.application.member, null)
+})
+
+test('the wizard path: PUT a new member with both application and circlePreferences in one body', async () => {
+  const circles = await vgCall('getCircles', {}, staff)
+  const prideId = circles.json.find(c => c.name === 'Circle of Pride').circleId
+  const p = await vgCall('createPerson', {}, { ...staff, body: { villageId: scratch, firstName: 'Wizard', lastName: 'Path' } })
+  const wid = p.json.personId
+  try {
+    const app = envelope('member', 0)
+    const put = await vgCall('putPersonMember', { personId: wid }, {
+      ...staff,
+      body: { memberLevel: 'Household', joinDate: '2026-01-15', application: app, circlePreferences: [prideId] },
+    })
+    assert.equal(put.status, 200)
+
+    const memberView = await vgCall('getPerson', { personId: wid, projection: ['member'] }, staff)
+    assert.deepEqual(memberView.json.member.circlePreferences.map(c => c.name), ['Circle of Pride'])
+
+    const appView = await readApp(wid)
+    assert.deepEqual(appView.json.application.member, app)
+  } finally {
+    await vgCall('deletePerson', { personId: wid }, staff)
+  }
+})

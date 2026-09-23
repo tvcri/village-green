@@ -3029,6 +3029,12 @@ components:
         applicationType:
           type: string
           enum: [member, volunteer, unknown]
+        schemaVersion:
+          type: integer
+          minimum: 1
+        extractedAt:
+          type: string
+          format: date-time
         usage:
           type: object
           properties:
@@ -3725,6 +3731,7 @@ components:
         circlePreferences:
           type: array
           items: { $ref: '#/components/schemas/CircleId' }
+          uniqueItems: true
         householdDues:
           type: number
           nullable: true
@@ -3767,6 +3774,7 @@ components:
         circlePreferences:
           type: array
           items: { $ref: '#/components/schemas/CircleId' }
+          uniqueItems: true
         householdDues:   { type: number }
         quickbooksKey:   { type: string, maxLength: 50 }
         printedNewsletter: { type: boolean }

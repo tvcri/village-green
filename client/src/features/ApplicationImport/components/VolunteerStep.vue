@@ -10,7 +10,7 @@ import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js
 import {
   mapVolunteerPersonForm, volunteerCapabilityNames,
   uncertainMapForVolunteerPerson, buildPersonCreatePayload,
-  buildApplicationEnvelope, veteranAnswer,
+  buildApplicationEnvelope, veteranForPayload,
 } from '../lib/importMapping.js'
 import {
   getPersons, createPerson, patchPerson, getDisabilities, getCapabilities,
@@ -152,7 +152,7 @@ async function submit () {
     const payload = buildPersonCreatePayload(form)
     if (!showBirthDate.value) delete payload.birthDate
     payload.disabilities = []
-    const veteran = veteranAnswer(props.extraction.person?.veteran)
+    const veteran = veteranForPayload(props.extraction, 'person.veteran', props.extraction.person?.veteran)
     if (veteran !== undefined) payload.isVeteran = veteran
     const created = await createPerson(payload)
     createdPersonId = created.personId

@@ -3,7 +3,7 @@ import {
   mapPersonForm, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
   mapVolunteerPersonForm, volunteerCapabilityNames, uncertainMapForVolunteerPerson,
-  buildApplicationEnvelope, veteranAnswer, mergeCirclePreferences,
+  buildApplicationEnvelope, veteranAnswer, veteranForPayload, mergeCirclePreferences,
 } from './importMapping.js'
 
 function extraction () {
@@ -393,6 +393,28 @@ describe('veteranAnswer', () => {
     expect(veteranAnswer('No')).toBe(false)
     expect(veteranAnswer('')).toBeUndefined()
     expect(veteranAnswer(null)).toBeUndefined()
+  })
+})
+
+describe('veteranForPayload', () => {
+  it('omits the answer when uncertainFields flags the veteran path', () => {
+    const extraction = { uncertainFields: [{ path: 'members[0].veteran', reason: 'illegible', alternative: null }] }
+    expect(veteranForPayload(extraction, 'members[0].veteran', 'Yes')).toBeUndefined()
+  })
+
+  it('maps an unflagged Yes to true', () => {
+    const extraction = { uncertainFields: [] }
+    expect(veteranForPayload(extraction, 'members[0].veteran', 'Yes')).toBe(true)
+  })
+
+  it('maps an unflagged No to false', () => {
+    const extraction = { uncertainFields: [] }
+    expect(veteranForPayload(extraction, 'members[0].veteran', 'No')).toBe(false)
+  })
+
+  it('does not flag on an unrelated uncertain path', () => {
+    const extraction = { uncertainFields: [{ path: 'members[0].zip', reason: 'ambiguous', alternative: '02907' }] }
+    expect(veteranForPayload(extraction, 'members[0].veteran', 'Yes')).toBe(true)
   })
 })
 

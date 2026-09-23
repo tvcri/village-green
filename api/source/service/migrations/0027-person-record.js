@@ -35,10 +35,11 @@ const MigrationHandler = require('./lib/MigrationHandler')
 //     seeded to Staff, the only role holding every gate the extraction
 //     crosses.
 //  9. member_circle_preference: "when requesting services, prefer a
-//     responder from this circle". Backfilled from the CE-era miscNotes
-//     sentence (the wizard's own "Circle of Pride preferred" lines were
-//     all No). Deliberately NOT person_circle — a preference is not
-//     participation.
+//     responder from this circle". Backfilled from both the CE-era
+//     miscNotes sentence and the wizard's own "Circle of Pride preferred:
+//     Yes" line (composeNotes in importMapping.js — the wizard is live
+//     until merge and keeps writing this line). Deliberately NOT
+//     person_circle — a preference is not participation.
 // 10. isVeteran is seeded ONCE from Veteran's Circle membership: those rows
 //     came from the application's veteran question. A one-time seed, NOT a
 //     rule that circle membership implies veteran status (see 4).
@@ -174,7 +175,8 @@ const upMigration = [
   // an explicit column list (0013) and does not need the column.
   `CREATE OR REPLACE VIEW active_member AS SELECT * FROM member WHERE status = 'Active'`,
 
-  // 9. circle service preferences + CE-era backfill
+  // 9. circle service preferences + backfill from both the CE-era sentence
+  // and the wizard's own "Circle of Pride preferred: Yes" line
   `CREATE TABLE member_circle_preference (
      id       int NOT NULL AUTO_INCREMENT,
      memberId int NOT NULL,
@@ -186,7 +188,8 @@ const upMigration = [
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
   `INSERT INTO member_circle_preference (memberId, circleId)
    SELECT m.id, c.id FROM member m JOIN circle c ON c.name = 'Circle of Pride'
-   WHERE m.miscNotes LIKE '%prefer to have a member of the Circle of Pride to respond%'`,
+   WHERE m.miscNotes LIKE '%prefer to have a member of the Circle of Pride to respond%'
+      OR m.miscNotes LIKE '%Circle of Pride preferred: Yes%'`,
 
   // 10. one-time isVeteran seed
   `UPDATE person p
