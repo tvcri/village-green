@@ -6,9 +6,12 @@ import Message from 'primevue/message'
 import PersonFormFields from '../../PersonList/components/PersonFormFields.vue'
 import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js'
 import {
-  mapPersonForm, personDisabilities, uncertainMapForPerson, buildPersonCreatePayload, veteranForPayload,
+  mapPersonForm, personDisabilities, uncertainMapForPerson, buildPersonCreatePayload,
+  personExtrasFields, matchGender, initialCircleNames,
 } from '../lib/importMapping.js'
-import { getPersons, createPerson, getDisabilities } from '../../PersonList/api/personApi.js'
+import { getPersons, createPerson, getDisabilities, getCircles } from '../../PersonList/api/personApi.js'
+import { usePersonLookups } from '../../PersonList/composables/usePersonLookups.js'
+import { emptyPersonFields, addPersonFields } from '../../PersonList/lib/personPayload.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
@@ -32,9 +35,15 @@ const villages = ref([])
 const allDisabilities = ref([])
 const duplicates = ref([])
 const saving = ref(false)
-// The wizard hides the Circles section entirely (a tick must mean a
-// coordinator recorded it), so the person's circle set is always empty here.
-const noCircles = new Set()
+const showDemographics = computed(() => hasPermission('person:read_demographics', form.villageId))
+const extras = props.extraction.members[props.memberIndex].extras ?? {}
+const personFields = reactive({ ...emptyPersonFields(), ...personExtrasFields(extras) })
+const { lookups, ready: lookupsReady } = usePersonLookups()
+// Circles are shown again: a Yes to "join the Circle of Pride?" pre-ticks it
+// (for every person on the application); the coordinator confirms.
+const allCircles = ref([])
+const circleNames = ref(initialCircleNames(props.extraction))
+const circleNameToId = computed(() => new Map(allCircles.value.map(c => [c.name, c.circleId])))
 
 const disabilityNameToId = computed(() =>
   new Map(allDisabilities.value.map(d => [d.name, d.disabilityId])))
@@ -43,6 +52,11 @@ onMounted(async () => {
   try {
     villages.value = await getVillages()
     allDisabilities.value = await getDisabilities()
+    allCircles.value = await getCircles()
+    await lookupsReady
+    const g = matchGender(extras.gender, lookups.genders)
+    personFields.genderId = g.genderId
+    if (g.uncertain && !uncertain.genderId) uncertain.genderId = g.uncertain
     await findDuplicates()
   }
   catch {
@@ -64,6 +78,13 @@ function onEdited (field) {
   delete uncertain[field]
 }
 
+function toggleCircle (name, checked) {
+  const next = new Set(circleNames.value)
+  if (checked) next.add(name)
+  else next.delete(name)
+  circleNames.value = next
+}
+
 function toggleDisability (name, checked) {
   const next = new Map(disabilities.value)
   if (checked) next.set(name, next.get(name) ?? '')
@@ -83,7 +104,7 @@ function useExisting (person) {
 }
 
 async function submit () {
-  if (!validatePersonForm(form, errors)) {
+  if (!validatePersonForm(form, errors, { deceasedDate: personFields.deceasedDate })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
@@ -98,11 +119,8 @@ async function submit () {
       disabilityId: disabilityNameToId.value.get(n),
       note: note || null,
     })).filter(d => d.disabilityId)
-    const veteran = veteranForPayload(
-      props.extraction, `members[${props.memberIndex}].veteran`,
-      props.extraction.members[props.memberIndex].extras?.veteran,
-    )
-    if (veteran !== undefined) payload.isVeteran = veteran
+    payload.circles = [...circleNames.value].map(n => circleNameToId.value.get(n)).filter(Boolean)
+    addPersonFields(payload, personFields, { isEdit: false, showDemographics: showDemographics.value })
     const created = await createPerson(payload)
     emit('person-done', {
       personId: created.personId,
@@ -154,8 +172,19 @@ async function submit () {
         v-model:emergency-contact-phone="form.emergencyContactPhone"
         v-model:emergency-contact-email="form.emergencyContactEmail"
         :errors="errors" :uncertain="uncertain"
-        :villages="villages" :circle-names="noCircles" :disabilities="disabilities"
-        :show-birth-date="showBirthDate" :show-circles="false"
+        :villages="villages" :circles="allCircles" :circle-names="circleNames" :disabilities="disabilities"
+        :show-birth-date="showBirthDate" :show-demographics="showDemographics" :lookups="lookups"
+        v-model:suffix="personFields.suffix"
+        v-model:pronouns="personFields.pronouns"
+        v-model:deceased-date="personFields.deceasedDate"
+        v-model:preferred-contact-method-id="personFields.preferredContactMethodId"
+        v-model:gender-id="personFields.genderId"
+        v-model:ethnicity-id="personFields.ethnicityId"
+        v-model:is-veteran="personFields.isVeteran"
+        v-model:race-ids="personFields.raceIds"
+        v-model:language-ids="personFields.languageIds"
+        v-model:preferred-language-id="personFields.preferredLanguageId"
+        @toggle-circle="toggleCircle"
         @edited="onEdited"
         @toggle-disability="toggleDisability" @edit-disability-note="editDisabilityNote"
       />

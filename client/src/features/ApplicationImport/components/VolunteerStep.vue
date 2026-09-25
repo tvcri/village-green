@@ -10,8 +10,10 @@ import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js
 import {
   mapVolunteerPersonForm, volunteerCapabilityNames,
   uncertainMapForVolunteerPerson, buildPersonCreatePayload,
-  buildApplicationEnvelope, veteranForPayload,
+  buildApplicationEnvelope, personExtrasFields, matchGender,
 } from '../lib/importMapping.js'
+import { usePersonLookups } from '../../PersonList/composables/usePersonLookups.js'
+import { emptyPersonFields, addPersonFields } from '../../PersonList/lib/personPayload.js'
 import {
   getPersons, createPerson, patchPerson, getDisabilities, getCapabilities,
 } from '../../PersonList/api/personApi.js'
@@ -39,9 +41,12 @@ const allDisabilities = ref([])
 const allCapabilities = ref([])
 const duplicates = ref([])
 const saving = ref(false)
-// The wizard hides the Circles section entirely (a tick must mean a
-// coordinator recorded it), so the person's circle set is always empty here.
+// The volunteer form has no join question, so the Circles section stays
+// hidden and nothing is pre-ticked.
 const noCircles = new Set()
+const showDemographics = computed(() => hasPermission('person:read_demographics', form.villageId))
+const personFields = reactive({ ...emptyPersonFields(), ...personExtrasFields(props.extraction.person) })
+const { lookups, ready: lookupsReady } = usePersonLookups()
 const needsVillage = ref(false)
 const selectedVillageId = ref(null)
 const savingVillage = ref(false)
@@ -59,6 +64,10 @@ onMounted(async () => {
     villages.value = await getVillages()
     allDisabilities.value = await getDisabilities()
     allCapabilities.value = await getCapabilities()
+    await lookupsReady
+    const g = matchGender(props.extraction.person?.gender, lookups.genders)
+    personFields.genderId = g.genderId
+    if (g.uncertain && !uncertain.genderId) uncertain.genderId = g.uncertain
     selectedCapabilityIds.value = [...volunteerCapabilityNames(props.extraction)]
       .map(n => capabilityNameToId.value.get(n))
       .filter(Boolean)
@@ -140,7 +149,7 @@ async function saveVillageAndRetry () {
 }
 
 async function submit () {
-  if (!validatePersonForm(form, errors)) {
+  if (!validatePersonForm(form, errors, { deceasedDate: personFields.deceasedDate })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
@@ -152,8 +161,7 @@ async function submit () {
     const payload = buildPersonCreatePayload(form)
     if (!showBirthDate.value) delete payload.birthDate
     payload.disabilities = []
-    const veteran = veteranForPayload(props.extraction, 'person.veteran', props.extraction.person?.veteran)
-    if (veteran !== undefined) payload.isVeteran = veteran
+    addPersonFields(payload, personFields, { isEdit: false, showDemographics: showDemographics.value })
     const created = await createPerson(payload)
     createdPersonId = created.personId
     createdPersonIsExisting = false
@@ -218,6 +226,17 @@ async function submit () {
         :errors="errors" :uncertain="uncertain"
         :villages="villages" :circle-names="noCircles" :disabilities="disabilities"
         :show-birth-date="showBirthDate" :show-circles="false"
+        :show-demographics="showDemographics" :lookups="lookups"
+        v-model:suffix="personFields.suffix"
+        v-model:pronouns="personFields.pronouns"
+        v-model:deceased-date="personFields.deceasedDate"
+        v-model:preferred-contact-method-id="personFields.preferredContactMethodId"
+        v-model:gender-id="personFields.genderId"
+        v-model:ethnicity-id="personFields.ethnicityId"
+        v-model:is-veteran="personFields.isVeteran"
+        v-model:race-ids="personFields.raceIds"
+        v-model:language-ids="personFields.languageIds"
+        v-model:preferred-language-id="personFields.preferredLanguageId"
         @edited="onEdited"
       />
       <VolunteerFormFields
