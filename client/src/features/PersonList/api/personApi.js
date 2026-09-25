@@ -28,3 +28,10 @@ export const getCircles      = () => apiCall('getCircles')
 export const getCapabilities = () => apiCall('getCapabilities')
 export const getDisabilities = () => apiCall('getDisabilities')
 export const getVettingTypes = () => apiCall('getVettingTypes')
+
+// Person catalogs added by 0027.
+export const getGenders        = () => apiCall('getGenders')
+export const getEthnicities    = () => apiCall('getEthnicities')
+export const getRaces          = () => apiCall('getRaces')
+export const getContactMethods = () => apiCall('getContactMethods')
+export const getLanguages      = () => apiCall('getLanguages')
