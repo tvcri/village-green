@@ -4,6 +4,9 @@ import { todayCivilDate } from '../../../shared/lib/civilDate.js'
 
 const s = v => v ?? ''
 
+// Extraction extras that now have person-form fields (0027).
+const EXTRA_FIELD_FOR = { pronouns: 'pronouns', gender: 'genderId', veteran: 'isVeteran' }
+
 export function mapPersonForm (extraction, memberIndex) {
   const m = extraction.members[memberIndex]
   const p1 = memberIndex > 0 ? extraction.members[0] : {}
@@ -125,8 +128,6 @@ export function composeNotes (extraction, memberIndex) {
   const push = (label, value) => { if (value !== null && value !== undefined && value !== '') lines.push(`${label}: ${value}`) }
   push('Application date', app.applicationDate)
   push('Ambassador', app.ambassador)
-  push('Pronouns', extras.pronouns)
-  push('Gender', extras.gender)
   push('Accessibility notes', extras.accessibilityNotes)
   // Cell was preferred for the emergencyContactPhone form field; keep the home
   // number on record when both were extracted.
@@ -147,11 +148,12 @@ function personFieldForPath (path, memberIndex) {
   if (memberMatch) {
     if (Number(memberMatch[1]) !== memberIndex) return null
     const field = memberMatch[2]
-    // extras (pronouns/gender/veteran/accessibility.*) have no form field
+    // accessibility.* extras have no form field; pronouns/gender/veteran do.
     // Keep in sync with the keys returned by mapPersonForm / the PersonFormFields
     // form shape — a person field missing here silently loses its uncertainty flag.
     const personFields = ['firstName', 'middleInitial', 'lastName', 'nickname', 'street', 'unit',
       'city', 'state', 'zip', 'email', 'phone', 'cell', 'birthDate']
+    if (EXTRA_FIELD_FOR[field]) return EXTRA_FIELD_FOR[field]
     return personFields.includes(field) ? field : null
   }
   if (path === 'application.villageName') return 'villageId'
@@ -248,6 +250,7 @@ function volunteerPersonFieldForPath (path) {
   if (personMatch) {
     const personFields = ['firstName', 'middleInitial', 'lastName', 'nickname', 'street', 'unit',
       'city', 'state', 'zip', 'email', 'phone', 'cell', 'birthDate']
+    if (EXTRA_FIELD_FOR[personMatch[1]]) return EXTRA_FIELD_FOR[personMatch[1]]
     return personFields.includes(personMatch[1]) ? personMatch[1] : null
   }
   if (path === 'application.villageName') return 'villageId'
@@ -286,17 +289,30 @@ export function veteranAnswer (value) {
   return undefined
 }
 
-// Same as veteranAnswer, but stays unset when the model itself flagged the
-// veteran read as uncertain — uncertainFields carries the model's own
-// pre-transform paths (members[i].veteran / person.veteran), not the
-// extras.veteran path the response nests it under after assembleResponse.
-// An uncertain answer must not be silently written as true/false; the
-// coordinator has no uncertainty UI for this field, so the only safe
-// outcome is to leave isVeteran NULL (unknown) for them to fill in by hand.
-export function veteranForPayload (extraction, path, value) {
-  const flagged = (extraction.uncertainFields ?? []).some(u => u.path === path)
-  if (flagged) return undefined
-  return veteranAnswer(value)
+// Pronouns and veteran prefill person fields directly; gender needs the
+// catalog (matchGender). A blank or unreadable veteran answer stays null
+// (unknown), never false. An uncertain veteran read is prefilled too — the
+// field is visible now, and its warning icon lets the coordinator decide.
+export function personExtrasFields ({ pronouns, veteran } = {}) {
+  return { pronouns: s(pronouns), isVeteran: veteranAnswer(veteran) ?? null }
+}
+
+// The extraction reads gender as free text. Only an exact (case-insensitive)
+// catalog name fills the field; anything else stays blank and is flagged so
+// the coordinator chooses — "F" is never guessed to mean Female.
+export function matchGender (text, genders) {
+  const t = (text ?? '').trim()
+  if (!t) return { genderId: null, uncertain: null }
+  const hit = genders.find(g => g.name.toLowerCase() === t.toLowerCase())
+  if (hit) return { genderId: hit.genderId, uncertain: null }
+  return { genderId: null, uncertain: { reason: `form said "${t}"; no matching option`, alternative: null } }
+}
+
+// Member applications only: a Yes to "join the Circle of Pride?" pre-ticks the
+// circle for every person on the application (the question is asked once per
+// application). The coordinator confirms or unticks before saving.
+export function initialCircleNames (extraction) {
+  return new Set(extraction.preferences?.circleOfPrideJoin === 'Yes' ? ['Circle of Pride'] : [])
 }
 
 // Service preference for a Circle of Pride responder. Only a Yes adds; the

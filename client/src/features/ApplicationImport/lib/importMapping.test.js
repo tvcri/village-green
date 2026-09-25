@@ -3,7 +3,8 @@ import {
   mapPersonForm, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
   mapVolunteerPersonForm, volunteerCapabilityNames, uncertainMapForVolunteerPerson,
-  buildApplicationEnvelope, veteranAnswer, veteranForPayload, mergeCirclePreferences,
+  buildApplicationEnvelope, veteranAnswer, mergeCirclePreferences,
+  personExtrasFields, matchGender, initialCircleNames,
 } from './importMapping.js'
 
 function extraction () {
@@ -191,7 +192,7 @@ describe('mapMemberForm', () => {
     expect(f.printedNewsletter).toBe(true)
     expect(f.householdSize).toBe(2)
     expect(f.primaryPersonId).toBe('')
-    expect(f.miscNotes).toContain('Pronouns: she/her')
+    expect(f.miscNotes).not.toContain('Pronouns')
   })
   it('sets primaryPersonId for the second member', () => {
     const f = mapMemberForm(extraction(), 1, 42)
@@ -255,7 +256,8 @@ describe('composeNotes', () => {
     const notes = composeNotes(extraction(), 0)
     expect(notes).toContain('Imported from application PDF')
     expect(notes).toContain('Ambassador: Pat Smith')
-    expect(notes).toContain('Gender: F')
+    expect(notes).not.toContain('Gender')      // now a person field (genderId)
+    expect(notes).not.toContain('Pronouns')    // now a person field
     expect(notes).toContain('Circle of Pride preferred: Yes')
     expect(notes).toContain('Payment method: Personal Check')
     expect(notes).toContain('Dues (yearly): 120')
@@ -399,28 +401,6 @@ describe('veteranAnswer', () => {
   })
 })
 
-describe('veteranForPayload', () => {
-  it('omits the answer when uncertainFields flags the veteran path', () => {
-    const extraction = { uncertainFields: [{ path: 'members[0].veteran', reason: 'illegible', alternative: null }] }
-    expect(veteranForPayload(extraction, 'members[0].veteran', 'Yes')).toBeUndefined()
-  })
-
-  it('maps an unflagged Yes to true', () => {
-    const extraction = { uncertainFields: [] }
-    expect(veteranForPayload(extraction, 'members[0].veteran', 'Yes')).toBe(true)
-  })
-
-  it('maps an unflagged No to false', () => {
-    const extraction = { uncertainFields: [] }
-    expect(veteranForPayload(extraction, 'members[0].veteran', 'No')).toBe(false)
-  })
-
-  it('does not flag on an unrelated uncertain path', () => {
-    const extraction = { uncertainFields: [{ path: 'members[0].zip', reason: 'ambiguous', alternative: '02907' }] }
-    expect(veteranForPayload(extraction, 'members[0].veteran', 'Yes')).toBe(true)
-  })
-})
-
 describe('mergeCirclePreferences', () => {
   it('adds Pride on Yes and keeps existing preferences', () => {
     expect(mergeCirclePreferences(['7'], '1', 'Yes')).toEqual(['7', '1'])
@@ -430,5 +410,62 @@ describe('mergeCirclePreferences', () => {
     expect(mergeCirclePreferences(['7'], '1', 'No')).toBeUndefined()
     expect(mergeCirclePreferences([], '1', '')).toBeUndefined()
     expect(mergeCirclePreferences([], undefined, 'Yes')).toBeUndefined()
+  })
+})
+
+describe('personExtrasFields', () => {
+  it('maps pronouns and a Yes/No veteran answer', () => {
+    expect(personExtrasFields({ pronouns: 'she/her', veteran: 'Yes' })).toEqual({ pronouns: 'she/her', isVeteran: true })
+    expect(personExtrasFields({ pronouns: null, veteran: 'No' })).toEqual({ pronouns: '', isVeteran: false })
+  })
+  it('keeps a blank veteran answer unknown (null), never false', () => {
+    expect(personExtrasFields({ veteran: '' }).isVeteran).toBeNull()
+    expect(personExtrasFields(undefined).isVeteran).toBeNull()
+  })
+})
+
+describe('matchGender', () => {
+  const genders = [{ genderId: '1', name: 'Female' }, { genderId: '2', name: 'Male' }, { genderId: '3', name: 'Other' }]
+  it('matches a catalog name case-insensitively', () => {
+    expect(matchGender('female', genders)).toEqual({ genderId: '1', uncertain: null })
+    expect(matchGender(' Male ', genders)).toEqual({ genderId: '2', uncertain: null })
+  })
+  it('leaves an abbreviation blank and flags it rather than guessing', () => {
+    const r = matchGender('F', genders)
+    expect(r.genderId).toBeNull()
+    expect(r.uncertain.reason).toBe('form said "F"; no matching option')
+  })
+  it('returns nothing to flag for a blank answer', () => {
+    expect(matchGender('', genders)).toEqual({ genderId: null, uncertain: null })
+    expect(matchGender(null, genders)).toEqual({ genderId: null, uncertain: null })
+  })
+})
+
+describe('initialCircleNames', () => {
+  it('pre-ticks Circle of Pride when the application answered Yes to joining', () => {
+    expect([...initialCircleNames(extraction())]).toEqual(['Circle of Pride'])
+  })
+  it('pre-ticks nothing otherwise', () => {
+    const x = extraction()
+    x.preferences.circleOfPrideJoin = 'No'
+    expect(initialCircleNames(x).size).toBe(0)
+  })
+})
+
+describe('uncertain extras map onto person-form keys', () => {
+  it('member: veteran → isVeteran, gender → genderId, pronouns → pronouns', () => {
+    const x = extraction()
+    x.uncertainFields = [
+      { path: 'members[0].veteran', reason: 'illegible', alternative: null },
+      { path: 'members[0].gender', reason: 'smudged', alternative: null },
+      { path: 'members[0].pronouns', reason: 'faint', alternative: null },
+    ]
+    const m = uncertainMapForPerson(x, 0)
+    expect(Object.keys(m)).toEqual(expect.arrayContaining(['isVeteran', 'genderId', 'pronouns']))
+    expect(uncertainMapForPerson(x, 1).isVeteran).toBeUndefined()
+  })
+  it('volunteer: person.veteran → isVeteran', () => {
+    const x = { application: { village: { villageId: 1, villageName: 'X' } }, uncertainFields: [{ path: 'person.veteran', reason: 'illegible', alternative: null }] }
+    expect(uncertainMapForVolunteerPerson(x).isVeteran).toBeDefined()
   })
 })
