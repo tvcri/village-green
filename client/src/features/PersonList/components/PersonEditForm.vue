@@ -6,6 +6,8 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import PersonFormFields from './PersonFormFields.vue'
 import { validatePersonForm } from '../lib/personFormValidation.js'
+import { usePersonLookups } from '../composables/usePersonLookups.js'
+import { emptyPersonFields, personFormFromApi, addPersonFields } from '../lib/personPayload.js'
 import {
   getPerson, createPerson, patchPerson,
   getCircles, getDisabilities,
@@ -35,6 +37,12 @@ const form = reactive({
 // person:read_birth_date governs the input too (spec §4.11): a coordinator
 // who cannot see the value must not send null for it on save.
 const showBirthDate = computed(() => hasPermission('person:read_birth_date', form.villageId))
+// person:read_demographics governs the section and the save, like birthDate.
+const showDemographics = computed(() => hasPermission('person:read_demographics', form.villageId))
+// The 0027 fields live apart from `form` so buildPayload's generic loop
+// never sees them; personPayload.js loads and saves them.
+const personFields = reactive(emptyPersonFields())
+const { lookups, ready: lookupsReady } = usePersonLookups()
 
 const errors = reactive({})
 const fields = ref(null)
@@ -57,12 +65,14 @@ onMounted(async () => {
   await loadVillages()
   allCircles.value = await getCircles()             // [{ circleId, name }]
   allDisabilities.value = await getDisabilities()   // [{ disabilityId, name }]
+  await lookupsReady
   if (isEdit.value) {
     const p = await getPerson(personId.value, [])
     Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
     form.villageId = p.village?.villageId ?? null
     circleNames.value = new Set(p.circles.map(c => c.name))
     disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
+    Object.assign(personFields, personFormFromApi(p))
   }
 })
 
@@ -86,11 +96,12 @@ function buildPayload () {
     disabilityId: disabilityNameToId.value.get(n),
     note: note || null,
   }))
+  addPersonFields(payload, personFields, { isEdit: isEdit.value, showDemographics: showDemographics.value })
   return payload
 }
 
 async function handleSubmit () {
-  if (!validatePersonForm(form, errors)) {
+  if (!validatePersonForm(form, errors, { deceasedDate: personFields.deceasedDate })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
@@ -169,6 +180,18 @@ function cancel () {
           v-model:emergency-contact-relationship="form.emergencyContactRelationship"
           v-model:emergency-contact-phone="form.emergencyContactPhone"
           v-model:emergency-contact-email="form.emergencyContactEmail"
+          v-model:suffix="personFields.suffix"
+          v-model:pronouns="personFields.pronouns"
+          v-model:deceased-date="personFields.deceasedDate"
+          v-model:preferred-contact-method-id="personFields.preferredContactMethodId"
+          v-model:gender-id="personFields.genderId"
+          v-model:ethnicity-id="personFields.ethnicityId"
+          v-model:is-veteran="personFields.isVeteran"
+          v-model:race-ids="personFields.raceIds"
+          v-model:language-ids="personFields.languageIds"
+          v-model:preferred-language-id="personFields.preferredLanguageId"
+          :lookups="lookups"
+          :show-demographics="showDemographics"
           :errors="errors"
           :villages="villages"
           :circles="allCircles"
