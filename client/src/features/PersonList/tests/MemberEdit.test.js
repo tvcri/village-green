@@ -75,6 +75,21 @@ describe('MemberEdit', () => {
     expect(patchMember.mock.calls[0][1].circlePreferences).toEqual(['2', '1'])
   })
 
+  it('a failed circle catalog still edits the existing member, never a PUT replace', async () => {
+    const { getCircles } = await import('../api/personApi.js')
+    const { patchMember, putMember } = await import('../api/roleApi.js')
+    getCircles.mockRejectedValueOnce(new Error('down'))
+    render(MemberEdit, { global: globalOpts })
+    await screen.findByDisplayValue('M100')
+    expect(screen.getByText('Save')).toBeInTheDocument()
+    const input = screen.getByDisplayValue('M100')
+    await fireEvent.update(input, 'M101')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchMember).toHaveBeenCalled())
+    expect(putMember).not.toHaveBeenCalled()
+    expect('circlePreferences' in patchMember.mock.calls[0][1]).toBe(false)
+  })
+
   it('sends no PATCH when nothing, including preferences, changed', async () => {
     const { patchMember } = await import('../api/roleApi.js')
     render(MemberEdit, { global: globalOpts })

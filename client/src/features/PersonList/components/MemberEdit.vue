@@ -41,7 +41,6 @@ const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x))
 onMounted(async () => {
   try {
     const p = await getPerson(personId.value, ['member'])
-    allCircles.value = await getCircles()
     person.value = p
     if (p.member) {
       hasMember.value = true
@@ -65,6 +64,15 @@ onMounted(async () => {
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load person', life: 3000 })
+  }
+  // The circle catalog loads last and on its own: a failure only hides the
+  // preferences section. It must never leave an existing member looking like
+  // a new grant, whose PUT would replace the stored role.
+  try {
+    allCircles.value = await getCircles()
+  }
+  catch {
+    toast.add({ severity: 'warn', summary: 'Circles unavailable', detail: 'Service preferences cannot be edited right now', life: 3000 })
   }
 })
 
