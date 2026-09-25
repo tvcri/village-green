@@ -51,6 +51,16 @@ const mapAddress = computed(() => {
 const isMember = computed(() => props.hasMemberDetail ?? (props.personType === 'member' || props.personType === 'member, volunteer'))
 const isVolunteer = computed(() => props.hasVolunteerDetail ?? (props.personType === 'volunteer' || props.personType === 'member, volunteer'))
 
+const languagesText = computed(() => (props.person.languages ?? [])
+  .map(l => l.isPreferred ? `${l.name} (preferred)` : l.name)
+  .join(', '))
+const racesText = computed(() => (props.person.races ?? []).map(r => r.name).join(', '))
+// The API omits these for a viewer without person:read_demographics, so
+// "present" already encodes the permission. Veteran unknown (null) is hidden;
+// an explicit No is shown.
+const hasDemographics = computed(() => !!(props.person.gender || props.person.ethnicity
+  || racesText.value || props.person.isVeteran != null))
+
 const serviceNotesSpan = computed(() => Math.min(props.columnCount, 2))
 
 const copyEmail = async (email) => {
@@ -72,6 +82,7 @@ const copyEmail = async (email) => {
       <div class="title-row">
         <span>{{ person.fullName }}</span>
         <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
+        <Tag v-if="person.deceasedDate" value="Deceased" severity="secondary" class="village-tag" />
       </div>
     </template>
     <template #content>
@@ -93,9 +104,19 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.lastName }}</span>
         </div>
 
+        <div v-if="person.suffix" class="detail-field">
+          <span class="label">Suffix:</span>
+          <span class="value">{{ person.suffix }}</span>
+        </div>
+
         <div v-if="person.nickname" class="detail-field">
           <span class="label">Nickname:</span>
           <span class="value">{{ person.nickname }}</span>
+        </div>
+
+        <div v-if="person.pronouns" class="detail-field">
+          <span class="label">Pronouns:</span>
+          <span class="value">{{ person.pronouns }}</span>
         </div>
 
         <div v-if="person.email" class="detail-field email-field">
@@ -127,6 +148,16 @@ const copyEmail = async (email) => {
           </div>
         </div>
 
+        <div v-if="person.preferredContactMethod" class="detail-field">
+          <span class="label">Preferred Contact:</span>
+          <span class="value">{{ person.preferredContactMethod.name }}</span>
+        </div>
+
+        <div v-if="languagesText" class="detail-field">
+          <span class="label">Languages:</span>
+          <span class="value">{{ languagesText }}</span>
+        </div>
+
         <div v-if="person.address" class="detail-field">
           <span class="label">Address:</span>
           <span class="value">{{ person.address }}</span>
@@ -145,6 +176,32 @@ const copyEmail = async (email) => {
         <div v-if="person.birthDate" class="detail-field">
           <span class="label">Birth Date:</span>
           <span class="value">{{ person.birthDate }}</span>
+        </div>
+
+        <div v-if="person.deceasedDate" class="detail-field">
+          <span class="label">Deceased Date:</span>
+          <span class="value">{{ person.deceasedDate }}</span>
+        </div>
+      </div>
+
+      <!-- Demographics Section (fields absent without person:read_demographics) -->
+      <div v-if="hasDemographics" class="section">
+        <h3 class="section-header">Demographics</h3>
+        <div v-if="person.gender" class="detail-field">
+          <span class="label">Gender:</span>
+          <span class="value">{{ person.gender.name }}</span>
+        </div>
+        <div v-if="person.ethnicity" class="detail-field">
+          <span class="label">Ethnicity:</span>
+          <span class="value">{{ person.ethnicity.name }}</span>
+        </div>
+        <div v-if="racesText" class="detail-field">
+          <span class="label">Race:</span>
+          <span class="value">{{ racesText }}</span>
+        </div>
+        <div v-if="person.isVeteran != null" class="detail-field">
+          <span class="label">Veteran:</span>
+          <span class="value">{{ person.isVeteran ? 'Yes' : 'No' }}</span>
         </div>
       </div>
 
@@ -224,6 +281,11 @@ const copyEmail = async (email) => {
         <div v-if="person.printedNewsletter != null" class="detail-field">
           <span class="label">Printed Newsletter:</span>
           <span class="value">{{ person.printedNewsletter ? 'Yes' : 'No' }}</span>
+        </div>
+
+        <div v-if="person.circlePreferences?.length" class="detail-field">
+          <span class="label">Prefers a volunteer from:</span>
+          <span class="value">{{ person.circlePreferences.map(c => c.name).join(', ') }}</span>
         </div>
       </div>
 
