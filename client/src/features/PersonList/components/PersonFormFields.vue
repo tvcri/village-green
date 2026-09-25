@@ -5,6 +5,8 @@ import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 import { geocodeTown } from '../api/personApi.js'
+import PersonDemographicsFields from './PersonDemographicsFields.vue'
+import PersonLanguagesFields from './PersonLanguagesFields.vue'
 
 const props = defineProps({
   errors: { type: Object, required: true },
@@ -14,8 +16,17 @@ const props = defineProps({
   circleNames: { type: Object, required: true },     // Set<name> — the person's circles
   disabilities: { type: Object, required: true },    // Map<name, note>
   showBirthDate: { type: Boolean, default: true },
-  // The import wizard hides the section: an application form must never tick
-  // a circle — a tick means a coordinator recorded it (Slack, 2026-09-21).
+  // person:read_demographics governs the Demographics section, like
+  // showBirthDate governs Birth Date.
+  showDemographics: { type: Boolean, default: true },
+  // The five 0027 catalogs (usePersonLookups().lookups).
+  lookups: {
+    type: Object,
+    default: () => ({ genders: [], ethnicities: [], races: [], contactMethods: [], languages: [] }),
+  },
+  // The import wizard may *suggest* a circle tick (member application: "join
+  // the Circle of Pride?" = Yes pre-ticks it); a coordinator confirms or
+  // unticks before anything is saved. VolunteerStep still hides the section.
   showCircles: { type: Boolean, default: true },
 })
 const emit = defineEmits(['edited', 'toggle-circle', 'toggle-disability', 'edit-disability-note'])
@@ -39,6 +50,16 @@ const emergencyContactName = defineModel('emergencyContactName')
 const emergencyContactRelationship = defineModel('emergencyContactRelationship')
 const emergencyContactPhone = defineModel('emergencyContactPhone')
 const emergencyContactEmail = defineModel('emergencyContactEmail')
+const suffix = defineModel('suffix')
+const pronouns = defineModel('pronouns')
+const deceasedDate = defineModel('deceasedDate')
+const preferredContactMethodId = defineModel('preferredContactMethodId')
+const genderId = defineModel('genderId')
+const ethnicityId = defineModel('ethnicityId')
+const isVeteran = defineModel('isVeteran')
+const raceIds = defineModel('raceIds', { default: () => [] })
+const languageIds = defineModel('languageIds', { default: () => [] })
+const preferredLanguageId = defineModel('preferredLanguageId')
 
 function edited (field) {
   delete props.errors[field]
@@ -146,7 +167,7 @@ onMounted(() => {
     <h3 class="section-header">Personal Information</h3>
 
     <div class="form-field">
-      <label class="label" for="firstName">First Name <span class="required">*</span>
+      <label class="label" for="firstName">First Name
         <i v-if="uncertain.firstName" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('firstName')" />
       </label>
       <InputText
@@ -188,10 +209,22 @@ onMounted(() => {
     </div>
 
     <div class="form-field">
+      <label class="label" for="suffix">Suffix</label>
+      <InputText id="suffix" v-model="suffix" maxlength="20" placeholder="Jr., III" class="w-full" @input="edited('suffix')" />
+    </div>
+
+    <div class="form-field">
       <label class="label" for="nickname">Nickname
         <i v-if="uncertain.nickname" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('nickname')" />
       </label>
       <InputText id="nickname" v-model="nickname" class="w-full" @input="edited('nickname')" />
+    </div>
+
+    <div class="form-field">
+      <label class="label" for="pronouns">Pronouns
+        <i v-if="uncertain.pronouns" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('pronouns')" />
+      </label>
+      <InputText id="pronouns" v-model="pronouns" maxlength="30" class="w-full" @input="edited('pronouns')" />
     </div>
 
     <div class="form-field">
@@ -234,6 +267,16 @@ onMounted(() => {
         @input="edited('cell')"
       />
       <small class="field-error" v-if="errors.cell">{{ errors.cell }}</small>
+    </div>
+
+    <div class="form-field">
+      <label class="label" for="preferredContactMethodId">Preferred Contact</label>
+      <Select
+        id="preferredContactMethodId" v-model="preferredContactMethodId"
+        :options="lookups.contactMethods" optionLabel="name" optionValue="contactMethodId"
+        placeholder="(none)" showClear class="w-full"
+        @update:modelValue="edited('preferredContactMethodId')"
+      />
     </div>
 
     <div class="form-field">
@@ -307,7 +350,38 @@ onMounted(() => {
       />
       <small class="field-error" v-if="errors.birthDate">{{ errors.birthDate }}</small>
     </div>
+
+    <div class="form-field">
+      <label class="label" for="deceasedDate">Deceased Date</label>
+      <InputText
+        id="deceasedDate"
+        v-model="deceasedDate"
+        placeholder="YYYY-MM-DD"
+        class="w-full"
+        :class="{ 'p-invalid': errors.deceasedDate }"
+        @input="edited('deceasedDate')"
+      />
+      <small class="field-error" v-if="errors.deceasedDate">{{ errors.deceasedDate }}</small>
+    </div>
   </div>
+
+  <PersonDemographicsFields
+    v-if="showDemographics"
+    v-model:gender-id="genderId"
+    v-model:ethnicity-id="ethnicityId"
+    v-model:is-veteran="isVeteran"
+    v-model:race-ids="raceIds"
+    :lookups="lookups"
+    :uncertain="uncertain"
+    @edited="edited"
+  />
+
+  <PersonLanguagesFields
+    v-model:language-ids="languageIds"
+    v-model:preferred-language-id="preferredLanguageId"
+    :languages="lookups.languages"
+    @edited="edited"
+  />
 
   <!-- Home Village Section -->
   <div class="section">
