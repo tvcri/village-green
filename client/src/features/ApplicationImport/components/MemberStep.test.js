@@ -1,0 +1,75 @@
+// @vitest-environment jsdom
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import '@testing-library/jest-dom/vitest'
+import PrimeVue from 'primevue/config'
+import MemberStep from './MemberStep.vue'
+
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
+vi.mock('../../PersonList/api/personApi.js', () => ({
+  getPerson: vi.fn(),
+  patchPerson: vi.fn(),
+  getCircles: vi.fn(),
+}))
+vi.mock('../../PersonList/api/roleApi.js', () => ({
+  putMember: vi.fn().mockResolvedValue({}),
+  patchMember: vi.fn().mockResolvedValue({}),
+}))
+vi.mock('../../VillageList/api/villageApi.js', () => ({ getVillages: vi.fn().mockResolvedValue([]) }))
+vi.mock('../../MemberList/api/memberApi.js', () => ({ getVillageMembers: vi.fn().mockResolvedValue([]) }))
+
+import { getPerson, getCircles } from '../../PersonList/api/personApi.js'
+import { patchMember } from '../../PersonList/api/roleApi.js'
+
+const extraction = () => ({
+  applicationType: 'member', schemaVersion: 1, extractedAt: '2026-09-25T00:00:00.000Z',
+  application: { applicationDate: '2026-06-12', village: { villageId: '1', villageName: 'Westside' }, ambassador: '', householdType: 'Single' },
+  members: [{ firstName: 'Marge', lastName: 'Innovera', extras: { pronouns: null, gender: null, veteran: null, accessibility: null, accessibilityNotes: null } }],
+  emergencyContact: null,
+  preferences: { wantsVolunteerInfo: 'No', circleOfPrideJoin: 'No', circlePreferred: null, circleOfPridePreferred: 'No' },
+  memberDefaults: { printedNewsletter: false, duesMonthly: null, duesYearly: null, paymentMethod: null, invoiceMailed: null },
+  uncertainFields: [],
+})
+
+beforeEach(() => {
+  window.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })
+  getPerson.mockResolvedValue({
+    personId: '5',
+    member: {
+      memberNumber: 'M100', memberLevel: 'Primary', status: 'Active', joinDate: '2024-01-01',
+      circlePreferences: [{ circleId: '2', name: "Veteran's Circle" }],
+    },
+  })
+})
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
+
+describe('MemberStep — existing member', () => {
+  it('a failed circle catalog never wipes stored preferences', async () => {
+    getCircles.mockRejectedValue(new Error('down'))
+    render(MemberStep, {
+      props: { extraction: extraction(), memberIndex: 0, personId: '5' },
+      global: { plugins: [PrimeVue], directives: { tooltip: {} } },
+    })
+    await screen.findByText(/already has a member role/)
+    await fireEvent.click(screen.getByText('Update Member & Continue'))
+    await waitFor(() => expect(patchMember).toHaveBeenCalled())
+    expect('circlePreferences' in patchMember.mock.calls[0][1]).toBe(false)
+  })
+
+  it('sends preferences unchanged-when-untouched as nothing, changed as the new set', async () => {
+    getCircles.mockResolvedValue([{ circleId: '1', name: 'Circle of Pride' }, { circleId: '2', name: "Veteran's Circle" }])
+    render(MemberStep, {
+      props: { extraction: extraction(), memberIndex: 0, personId: '5' },
+      global: { plugins: [PrimeVue], directives: { tooltip: {} } },
+    })
+    await screen.findByText('Circle of Pride')
+    const pride = screen.getByText('Circle of Pride').closest('label').querySelector('input[type="checkbox"]')
+    await fireEvent.click(pride)
+    await fireEvent.click(screen.getByText('Update Member & Continue'))
+    await waitFor(() => expect(patchMember).toHaveBeenCalled())
+    expect(patchMember.mock.calls[0][1].circlePreferences).toEqual(['2', '1'])
+  })
+})

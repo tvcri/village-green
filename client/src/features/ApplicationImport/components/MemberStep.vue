@@ -42,6 +42,11 @@ const selectedVillageId = ref(null)
 const savingVillage = ref(false)
 const allCircles = ref([])
 const circlePreferences = ref([])
+// The stored set, known before the catalog loads: an existing member's PATCH
+// sends preferences only when they differ from it, so a catalog failure (the
+// section hidden, the set never pre-ticked) can never wipe stored rows.
+let storedPreferences = []
+const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x))
 
 onMounted(async () => {
   try {
@@ -58,8 +63,10 @@ onMounted(async () => {
       const dump = composeNotes(props.extraction, props.memberIndex)
       form.miscNotes = form.miscNotes ? `${form.miscNotes}\n\n${dump}` : dump
     }
-    allCircles.value = await getCircles()
     const existing = (p.member?.circlePreferences ?? []).map(c => c.circleId)
+    storedPreferences = existing
+    circlePreferences.value = [...existing]
+    allCircles.value = await getCircles()
     const prideId = allCircles.value.find(c => c.name === 'Circle of Pride')?.circleId
     // A Yes to "prefer a Circle of Pride volunteer" pre-ticks the preference;
     // the coordinator sees and can change what is saved.
@@ -82,7 +89,9 @@ function payload () {
     out[k] = v
   })
   out.application = buildApplicationEnvelope(props.extraction, props.memberIndex)
-  out.circlePreferences = [...circlePreferences.value]
+  if (!hasMember.value || !sameSet(circlePreferences.value, storedPreferences)) {
+    out.circlePreferences = [...circlePreferences.value]
+  }
   return out
 }
 
