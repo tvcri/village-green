@@ -40,8 +40,8 @@ const needsVillage = ref(false)
 const villages = ref([])
 const selectedVillageId = ref(null)
 const savingVillage = ref(false)
-const existingPreferences = ref([])
-const prideCircleId = ref(undefined)
+const allCircles = ref([])
+const circlePreferences = ref([])
 
 onMounted(async () => {
   try {
@@ -58,8 +58,13 @@ onMounted(async () => {
       const dump = composeNotes(props.extraction, props.memberIndex)
       form.miscNotes = form.miscNotes ? `${form.miscNotes}\n\n${dump}` : dump
     }
-    existingPreferences.value = (p.member?.circlePreferences ?? []).map(c => c.circleId)
-    prideCircleId.value = (await getCircles()).find(c => c.name === 'Circle of Pride')?.circleId
+    allCircles.value = await getCircles()
+    const existing = (p.member?.circlePreferences ?? []).map(c => c.circleId)
+    const prideId = allCircles.value.find(c => c.name === 'Circle of Pride')?.circleId
+    // A Yes to "prefer a Circle of Pride volunteer" pre-ticks the preference;
+    // the coordinator sees and can change what is saved.
+    circlePreferences.value = mergeCirclePreferences(existing, prideId,
+      props.extraction.preferences?.circleOfPridePreferred) ?? existing
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load member data — go back and retry', life: 3000 })
@@ -77,9 +82,7 @@ function payload () {
     out[k] = v
   })
   out.application = buildApplicationEnvelope(props.extraction, props.memberIndex)
-  const prefs = mergeCirclePreferences(existingPreferences.value, prideCircleId.value,
-    props.extraction.preferences?.circleOfPridePreferred)
-  if (prefs) out.circlePreferences = prefs
+  out.circlePreferences = [...circlePreferences.value]
   return out
 }
 
@@ -165,6 +168,8 @@ async function saveVillageAndRetry () {
         :errors="errors"
         :uncertain="uncertain"
         :primary-person-name="primaryPersonName"
+        v-model:circle-preferences="circlePreferences"
+        :circles="allCircles"
         @edited="onEdited"
       />
       <div class="step-footer">

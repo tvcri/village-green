@@ -27,8 +27,12 @@ vi.mock('../api/personApi.js', () => ({
       householdDues: 100,
       printedNewsletter: false,
       createdDate: '2023-06-15',
+      circlePreferences: [{ circleId: '2', name: "Veteran's Circle" }],
     }
-  })
+  }),
+  getCircles: vi.fn().mockResolvedValue([
+    { circleId: '1', name: 'Circle of Pride' }, { circleId: '2', name: "Veteran's Circle" },
+  ]),
 }))
 vi.mock('../api/roleApi.js', () => ({
   putMember: vi.fn().mockResolvedValue({}),
@@ -58,6 +62,27 @@ const globalOpts = {
 }
 
 describe('MemberEdit', () => {
+  it('shows service preferences and saves a toggle', async () => {
+    const { patchMember } = await import('../api/roleApi.js')
+    render(MemberEdit, { global: globalOpts })
+    await screen.findByDisplayValue('M100')
+    const vet = screen.getByText("Veteran's Circle").closest('label').querySelector('input[type="checkbox"]')
+    expect(vet.checked).toBe(true)
+    const pride = screen.getByText('Circle of Pride').closest('label').querySelector('input[type="checkbox"]')
+    await fireEvent.click(pride)
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchMember).toHaveBeenCalled())
+    expect(patchMember.mock.calls[0][1].circlePreferences).toEqual(['2', '1'])
+  })
+
+  it('sends no PATCH when nothing, including preferences, changed', async () => {
+    const { patchMember } = await import('../api/roleApi.js')
+    render(MemberEdit, { global: globalOpts })
+    await screen.findByDisplayValue('M100')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchMember).not.toHaveBeenCalled())
+  })
+
   it('loads and displays the existing member values', async () => {
     render(MemberEdit, { global: globalOpts })
     await waitFor(() => expect(screen.getByDisplayValue('M100')).toBeInTheDocument())

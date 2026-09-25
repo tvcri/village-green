@@ -17,6 +17,7 @@ const props = defineProps({
   villageId: { type: [Number, String], default: null },
   createdDate: { type: String, default: '' },
   showCreatedDate: { type: Boolean, default: false },
+  circles: { type: Array, default: () => [] },   // [{ circleId, name }] — the catalog
 })
 const emit = defineEmits(['edited'])
 
@@ -34,6 +35,16 @@ const serviceNotes = defineModel('serviceNotes')
 const scNotes = defineModel('scNotes')
 const statusChangeNotes = defineModel('statusChangeNotes')
 const miscNotes = defineModel('miscNotes')
+// Service preference, not membership: "when this member requests a service,
+// prefer a volunteer from these circles" (member_circle_preference).
+const circlePreferences = defineModel('circlePreferences', { default: () => [] })
+
+function togglePreference (id, checked) {
+  circlePreferences.value = checked
+    ? [...circlePreferences.value, id]
+    : circlePreferences.value.filter(x => x !== id)
+  emit('edited', 'circlePreferences')
+}
 
 const statusOptions = ['Active', 'Pending', 'Dropped'].map(s => ({ label: s, value: s }))
 const memberLevelOptions = ['Primary', 'Secondary'].map(s => ({ label: s, value: s }))
@@ -175,6 +186,20 @@ watch(memberLevel, (level) => {
 
   </div>
 
+  <div v-if="circles.length" class="section">
+    <h3 class="section-header">Service preferences — prefer a volunteer from these circles</h3>
+    <div class="form-field preferences-row">
+      <label v-for="c in circles" :key="c.circleId" class="checkbox-item">
+        <Checkbox
+          :modelValue="circlePreferences.includes(c.circleId)"
+          binary
+          @update:modelValue="v => togglePreference(c.circleId, v)"
+        />
+        <span class="checkbox-label">{{ c.name }}</span>
+      </label>
+    </div>
+  </div>
+
   <div class="section notes-section">
     <h3 class="section-header">Notes</h3>
 
@@ -216,6 +241,15 @@ watch(memberLevel, (level) => {
 
 <style scoped src="./formFields.css"></style>
 <style scoped>
+.preferences-row {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  padding-top: 0.25rem;
+}
+
 .section {
   grid-template-columns: repeat(4, 1fr);
 }

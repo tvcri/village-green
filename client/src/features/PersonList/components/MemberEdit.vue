@@ -5,7 +5,7 @@ import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import MemberFormFields from './MemberFormFields.vue'
-import { getPerson } from '../api/personApi.js'
+import { getPerson, getCircles } from '../api/personApi.js'
 import { putMember, patchMember, deleteMember } from '../api/roleApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 import { validateMemberForm } from '../lib/memberFormValidation.js'
@@ -33,10 +33,15 @@ const createdDate = ref('')
 const primaryPersonName = ref('')
 const original = ref({ ...form })
 const errors = reactive({})
+const allCircles = ref([])
+const circlePreferences = ref([])
+let originalPreferences = []
+const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x))
 
 onMounted(async () => {
   try {
     const p = await getPerson(personId.value, ['member'])
+    allCircles.value = await getCircles()
     person.value = p
     if (p.member) {
       hasMember.value = true
@@ -53,6 +58,8 @@ onMounted(async () => {
       })
       primaryPersonName.value = d.primaryPerson?.fullName ?? ''
       createdDate.value = d.createdDate ?? ''
+      circlePreferences.value = (d.circlePreferences ?? []).map(c => c.circleId)
+      originalPreferences = [...circlePreferences.value]
       original.value = { ...form }
     }
   }
@@ -93,9 +100,10 @@ async function save () {
   try {
     if (hasMember.value) {
       const body = patchPayload()
+      if (!sameSet(circlePreferences.value, originalPreferences)) body.circlePreferences = [...circlePreferences.value]
       if (Object.keys(body).length) await patchMember(personId.value, body)
     }
-    else await putMember(personId.value, putPayload())
+    else await putMember(personId.value, { ...putPayload(), circlePreferences: [...circlePreferences.value] })
     toast.add({ severity: 'success', summary: 'Saved', detail: 'Member role saved', life: 2000 })
     back()
   }
@@ -149,6 +157,8 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           :village-id="person?.village?.villageId"
           :created-date="createdDate"
           :show-created-date="hasMember"
+          v-model:circle-preferences="circlePreferences"
+          :circles="allCircles"
         />
 
         <div class="form-footer">
