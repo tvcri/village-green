@@ -61,6 +61,23 @@ const racesText = computed(() => (props.person.races ?? []).map(r => r.name).joi
 const hasDemographics = computed(() => !!(props.person.gender || props.person.ethnicity
   || racesText.value || props.person.isVeteran != null))
 
+// The title carries the whole name, so the card needs no Name subgroup. Built
+// from the parts, not fullName: the stored fullName (lastName, firstName,
+// suffix) has no middle initial. Stored initials are bare letters, hence the
+// added period. A missing part is skipped, never left as a stray comma.
+const titleName = computed(() => {
+  const p = props.person
+  const first = [p.firstName, p.middleInitial ? `${p.middleInitial}.` : null].filter(Boolean).join(' ')
+  const name = [p.lastName, first, p.suffix].filter(Boolean).join(', ')
+  return name || p.fullName
+})
+const titleAside = computed(() => [
+  props.person.nickname ? `“${props.person.nickname}”` : null,
+  props.person.pronouns,
+].filter(Boolean).join(' · '))
+const hasContact = computed(() => !!(props.person.email || props.person.phone || props.person.cell
+  || props.person.preferredContactMethod))
+
 const serviceNotesSpan = computed(() => Math.min(props.columnCount, 2))
 
 const copyEmail = async (email) => {
@@ -80,147 +97,128 @@ const copyEmail = async (email) => {
   <Card v-if="person" class="detail-card">
     <template #title>
       <div class="title-row">
-        <span>{{ person.fullName }}</span>
-        <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
-        <Tag v-if="person.deceasedDate" value="Deceased" severity="secondary" class="village-tag" />
+        <div class="title-name">
+          <span>{{ titleName }}</span>
+          <span v-if="titleAside" class="title-aside">{{ titleAside }}</span>
+        </div>
+        <!-- The two ways persons are grouped, as on the edit form: village,
+             then circles. -->
+        <div class="title-tags">
+          <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
+          <Tag v-for="circle in person.circles ?? []" :key="circle.circleId" :value="circle.name" severity="secondary" class="village-tag" />
+          <Tag v-if="person.deceasedDate" value="Deceased" severity="contrast" class="village-tag" />
+        </div>
       </div>
     </template>
     <template #content>
-      <!-- Personal Information Section -->
+      <!-- Personal Information: the edit form's subgroups. A subgroup with
+           nothing to show is omitted, heading and all. -->
       <div class="section">
         <h3 class="section-header">Personal Information</h3>
-        <div v-if="person.firstName" class="detail-field">
-          <span class="label">First Name:</span>
-          <span class="value">{{ person.firstName }}</span>
-        </div>
 
-        <div v-if="person.middleInitial" class="detail-field">
-          <span class="label">Middle Initial:</span>
-          <span class="value">{{ person.middleInitial }}</span>
-        </div>
-
-        <div v-if="person.lastName" class="detail-field">
-          <span class="label">Last Name:</span>
-          <span class="value">{{ person.lastName }}</span>
-        </div>
-
-        <div v-if="person.suffix" class="detail-field">
-          <span class="label">Suffix:</span>
-          <span class="value">{{ person.suffix }}</span>
-        </div>
-
-        <div v-if="person.nickname" class="detail-field">
-          <span class="label">Nickname:</span>
-          <span class="value">{{ person.nickname }}</span>
-        </div>
-
-        <div v-if="person.pronouns" class="detail-field">
-          <span class="label">Pronouns:</span>
-          <span class="value">{{ person.pronouns }}</span>
-        </div>
-
-        <div v-if="person.email" class="detail-field email-field">
-          <span class="label">Email:</span>
-          <div class="email-value-wrapper">
-            <span class="value">{{ person.email }}</span>
-            <button
-              class="copy-button"
-              :class="{ copied: copiedEmail }"
-              @click="copyEmail(person.email)"
-              :title="copiedEmail ? 'Copied!' : 'Copy email'"
-            >
-              <i :class="copiedEmail ? 'pi pi-check' : 'pi pi-copy'"></i>
-            </button>
+        <div v-if="hasContact" class="subgroup">
+          <h4 class="subsection-header">Contact</h4>
+          <div v-if="person.email" class="detail-field email-field span-2">
+            <span class="label">Email</span>
+            <div class="email-value-wrapper">
+              <span class="value">{{ person.email }}</span>
+              <button
+                class="copy-button"
+                :class="{ copied: copiedEmail }"
+                @click="copyEmail(person.email)"
+                :title="copiedEmail ? 'Copied!' : 'Copy email'"
+                :aria-label="copiedEmail ? 'Copied' : 'Copy email'"
+              >
+                <i :class="copiedEmail ? 'pi pi-check' : 'pi pi-copy'"></i>
+              </button>
+            </div>
+          </div>
+          <div v-if="person.phone || person.cell" class="detail-field">
+            <span class="label">Phone</span>
+            <div class="phone-numbers">
+              <a v-if="person.phone" :href="`tel:${person.phone}`" class="phone-item">
+                <i class="pi pi-phone"></i>
+                <span class="phone-number">{{ person.phone }}</span>
+              </a>
+              <a v-if="person.cell" :href="`tel:${person.cell}`" class="phone-item">
+                <i class="pi pi-mobile"></i>
+                <span class="phone-number">{{ person.cell }}</span>
+              </a>
+            </div>
+          </div>
+          <div v-if="person.preferredContactMethod" class="detail-field">
+            <span class="label">Preferred Contact</span>
+            <span class="value">{{ person.preferredContactMethod.name }}</span>
           </div>
         </div>
 
-        <div v-if="person.phone || person.cell" class="detail-field">
-          <span class="label">Phone:</span>
-          <div class="phone-numbers">
-            <a v-if="person.phone" :href="`tel:${person.phone}`" class="phone-item">
-              <i class="pi pi-phone"></i>
-              <span class="phone-number">{{ person.phone }}</span>
-            </a>
-            <a v-if="person.cell" :href="`tel:${person.cell}`" class="phone-item">
-              <i class="pi pi-mobile"></i>
-              <span class="phone-number">{{ person.cell }}</span>
-            </a>
+        <div v-if="person.address || person.city || person.state || person.zip" class="subgroup">
+          <h4 class="subsection-header">Address</h4>
+          <div v-if="person.address" class="detail-field span-2">
+            <span class="label">Street</span>
+            <span class="value">{{ person.address }}</span>
+          </div>
+          <div v-if="person.city || person.state || person.zip" class="detail-field span-2">
+            <span class="label">City, State, Zip</span>
+            <span class="value">{{ person.city }}{{ person.state ? ', ' + person.state : '' }}{{ person.zip ? ' ' + person.zip : '' }}</span>
           </div>
         </div>
 
-        <div v-if="person.preferredContactMethod" class="detail-field">
-          <span class="label">Preferred Contact:</span>
-          <span class="value">{{ person.preferredContactMethod.name }}</span>
+        <div v-if="person.town" class="subgroup span-2">
+          <h4 class="subsection-header">Civic information</h4>
+          <div class="detail-field span-2">
+            <span class="label">Municipality</span>
+            <span class="value">{{ person.town }}</span>
+          </div>
         </div>
 
-        <div v-if="person.address" class="detail-field">
-          <span class="label">Address:</span>
-          <span class="value">{{ person.address }}</span>
+        <div v-if="person.birthDate || person.deceasedDate" class="subgroup span-2">
+          <h4 class="subsection-header">Dates</h4>
+          <div v-if="person.birthDate" class="detail-field">
+            <span class="label">Birth Date</span>
+            <span class="value">{{ person.birthDate }}</span>
+          </div>
+          <div v-if="person.deceasedDate" class="detail-field">
+            <span class="label">Deceased Date</span>
+            <span class="value">{{ person.deceasedDate }}</span>
+          </div>
         </div>
 
-        <div v-if="person.city || person.state || person.zip" class="detail-field">
-          <span class="label">City, State, Zip:</span>
-          <span class="value">{{ person.city }}{{ person.state ? ', ' + person.state : '' }}{{ person.zip ? ' ' + person.zip : '' }}</span>
+        <div v-if="languagesText" class="subgroup span-2 row-start">
+          <h4 class="subsection-header">Languages</h4>
+          <span class="value span-2">{{ languagesText }}</span>
         </div>
 
-        <div v-if="person.town" class="detail-field">
-          <span class="label">Municipality:</span>
-          <span class="value">{{ person.town }}</span>
-        </div>
-
-        <div v-if="person.birthDate" class="detail-field">
-          <span class="label">Birth Date:</span>
-          <span class="value">{{ person.birthDate }}</span>
-        </div>
-
-        <div v-if="person.deceasedDate" class="detail-field">
-          <span class="label">Deceased Date:</span>
-          <span class="value">{{ person.deceasedDate }}</span>
+        <!-- The card never showed disabilities before; the API always returned them. -->
+        <div v-if="person.disabilities?.length" class="subgroup span-2">
+          <h4 class="subsection-header">Disabilities</h4>
+          <ul class="disability-list span-2">
+            <li v-for="d in person.disabilities" :key="d.disabilityId">
+              <span class="value">{{ d.name }}</span>
+              <span v-if="d.note" class="disability-note"> — {{ d.note }}</span>
+            </li>
+          </ul>
         </div>
       </div>
 
-      <!-- Demographics Section (fields absent without person:read_demographics) -->
+      <!-- Demographics (fields absent without person:read_demographics) -->
       <div v-if="hasDemographics" class="section">
         <h3 class="section-header">Demographics</h3>
         <div v-if="person.gender" class="detail-field">
-          <span class="label">Gender:</span>
+          <span class="label">Gender</span>
           <span class="value">{{ person.gender.name }}</span>
         </div>
         <div v-if="person.ethnicity" class="detail-field">
-          <span class="label">Ethnicity:</span>
+          <span class="label">Ethnicity</span>
           <span class="value">{{ person.ethnicity.name }}</span>
         </div>
         <div v-if="racesText" class="detail-field">
-          <span class="label">Race:</span>
+          <span class="label">Race</span>
           <span class="value">{{ racesText }}</span>
         </div>
         <div v-if="person.isVeteran != null" class="detail-field">
-          <span class="label">Veteran:</span>
+          <span class="label">Veteran</span>
           <span class="value">{{ person.isVeteran ? 'Yes' : 'No' }}</span>
-        </div>
-      </div>
-
-      <!-- Languages Section (interim home until the card is reorganized) -->
-      <div v-if="languagesText" class="section">
-        <h3 class="section-header">Languages</h3>
-        <div class="detail-field">
-          <span class="label">Languages:</span>
-          <span class="value">{{ languagesText }}</span>
-        </div>
-      </div>
-
-      <!-- Circles Section -->
-      <div v-if="person.circles?.length" class="section">
-        <h3 class="section-header">Circles</h3>
-        <div class="detail-field capabilities-field">
-          <div class="capabilities-list">
-            <Tag
-              v-for="circle in person.circles"
-              :key="circle.circleId"
-              :value="circle.name"
-              class="capability-badge"
-            />
-          </div>
         </div>
       </div>
 
@@ -228,67 +226,67 @@ const copyEmail = async (email) => {
       <div v-if="isMember" class="section">
         <h3 class="section-header">Member Information</h3>
         <div v-if="person.memberNumber" class="detail-field">
-          <span class="label">Member #:</span>
+          <span class="label">Member #</span>
           <span class="value">{{ person.memberNumber }}</span>
         </div>
 
         <div v-if="person.memberLevel" class="detail-field">
-          <span class="label">Member Level:</span>
+          <span class="label">Member Level</span>
           <span class="value">{{ person.memberLevel }}</span>
         </div>
 
         <div v-if="person.primaryPerson?.fullName" class="detail-field">
-          <span class="label">Primary Member:</span>
+          <span class="label">Primary Member</span>
           <span class="value">{{ person.primaryPerson.fullName }}</span>
         </div>
 
         <div v-if="person.joinDate" class="detail-field">
-          <span class="label">Join Date:</span>
+          <span class="label">Join Date</span>
           <span class="value">{{ person.joinDate }}</span>
         </div>
 
         <div v-if="person.memberType" class="detail-field">
-          <span class="label">Member Type:</span>
+          <span class="label">Member Type</span>
           <span class="value">{{ person.memberType }}</span>
         </div>
 
         <div v-if="person.secondaryType" class="detail-field">
-          <span class="label">Secondary Type:</span>
+          <span class="label">Secondary Type</span>
           <span class="value">{{ person.secondaryType }}</span>
         </div>
 
         <div v-if="person.status" class="detail-field">
-          <span class="label">Status:</span>
+          <span class="label">Status</span>
           <span class="value">{{ person.status }}</span>
         </div>
 
         <div v-if="person.status === 'Dropped' && person.dropReason" class="detail-field">
-          <span class="label">Drop Reason:</span>
+          <span class="label">Drop Reason</span>
           <span class="value">{{ person.dropReason }}</span>
         </div>
 
         <div v-if="person.householdSize != null" class="detail-field">
-          <span class="label">Household Size:</span>
+          <span class="label">Household Size</span>
           <span class="value">{{ person.householdSize }}</span>
         </div>
 
         <div v-if="person.householdDues != null" class="detail-field">
-          <span class="label">Household Dues:</span>
+          <span class="label">Household Dues</span>
           <span class="value">{{ Number(person.householdDues).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) }}</span>
         </div>
 
         <div v-if="person.quickbooksKey" class="detail-field">
-          <span class="label">Quickbooks Key:</span>
+          <span class="label">Quickbooks Key</span>
           <span class="value">{{ person.quickbooksKey }}</span>
         </div>
 
         <div v-if="person.printedNewsletter != null" class="detail-field">
-          <span class="label">Printed Newsletter:</span>
+          <span class="label">Printed Newsletter</span>
           <span class="value">{{ person.printedNewsletter ? 'Yes' : 'No' }}</span>
         </div>
 
         <div v-if="person.circlePreferences?.length" class="detail-field">
-          <span class="label">Prefers a volunteer from:</span>
+          <span class="label">Prefers a volunteer from</span>
           <span class="value">{{ person.circlePreferences.map(c => c.name).join(', ') }}</span>
         </div>
       </div>
@@ -297,17 +295,17 @@ const copyEmail = async (email) => {
       <div v-if="person.scNotes || person.statusChangeNotes || person.miscNotes" class="section">
         <h3 class="section-header">Member Notes</h3>
         <div v-if="person.scNotes" class="detail-field notes-field">
-          <span class="label">Service Coordinator Notes:</span>
+          <span class="label">Service Coordinator Notes</span>
           <span class="value">{{ person.scNotes }}</span>
         </div>
 
         <div v-if="person.statusChangeNotes" class="detail-field notes-field">
-          <span class="label">Status Change Notes:</span>
+          <span class="label">Status Change Notes</span>
           <span class="value">{{ person.statusChangeNotes }}</span>
         </div>
 
         <div v-if="person.miscNotes" class="detail-field notes-field">
-          <span class="label">Misc Notes:</span>
+          <span class="label">Misc Notes</span>
           <span class="value">{{ person.miscNotes }}</span>
         </div>
       </div>
@@ -324,7 +322,7 @@ const copyEmail = async (email) => {
       <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.active != null)" class="section">
         <h3 class="section-header">Volunteer Information</h3>
         <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
-          <span class="label">Capabilities:</span>
+          <span class="label">Capabilities</span>
           <div class="capabilities-list">
             <Tag
               v-for="cap in person.capabilities"
@@ -336,7 +334,7 @@ const copyEmail = async (email) => {
         </div>
 
         <div v-if="person.associateVillages?.length" class="detail-field capabilities-field">
-          <span class="label">Associate Villages:</span>
+          <span class="label">Associate Villages</span>
           <div class="capabilities-list">
             <Tag
               v-for="village in person.associateVillages"
@@ -348,12 +346,12 @@ const copyEmail = async (email) => {
         </div>
 
         <div v-if="person.active != null" class="detail-field">
-          <span class="label">Active:</span>
+          <span class="label">Active</span>
           <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
         </div>
         <template v-if="person.vettings?.length">
           <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
-            <span class="label">{{ vetting.name }}:</span>
+            <span class="label">{{ vetting.name }}</span>
             <span class="value">
               {{ vetting.dateEntered || 'Unknown' }}<template v-if="vetting.dateExpired"> – {{ vetting.dateExpired }}</template>
             </span>
@@ -366,17 +364,17 @@ const copyEmail = async (email) => {
       <div v-if="person.emergencyContactName || person.emergencyContactRelationship || person.emergencyContactPhone || person.emergencyContactEmail" class="section">
         <h3 class="section-header">Emergency Contact</h3>
         <div v-if="person.emergencyContactName" class="detail-field">
-          <span class="label">Name:</span>
+          <span class="label">Name</span>
           <span class="value">{{ person.emergencyContactName }}</span>
         </div>
 
         <div v-if="person.emergencyContactRelationship" class="detail-field">
-          <span class="label">Relationship:</span>
+          <span class="label">Relationship</span>
           <span class="value">{{ person.emergencyContactRelationship }}</span>
         </div>
 
         <div v-if="person.emergencyContactPhone" class="detail-field">
-          <span class="label">Phone:</span>
+          <span class="label">Phone</span>
           <div class="phone-numbers">
             <a :href="`tel:${person.emergencyContactPhone}`" class="phone-item">
               <i class="pi pi-phone"></i>
@@ -386,7 +384,7 @@ const copyEmail = async (email) => {
         </div>
 
         <div v-if="person.emergencyContactEmail" class="detail-field">
-          <span class="label">Email:</span>
+          <span class="label">Email</span>
           <span class="value">{{ person.emergencyContactEmail }}</span>
         </div>
       </div>
@@ -408,6 +406,8 @@ const copyEmail = async (email) => {
 @import '../styles/phone-link.css';
 
 .detail-card {
+  /* The one place to set how heavy every value on the card reads. */
+  --detail-value-weight: 600;
   max-width: 1100px;
   border: 1px solid var(--color-border-default);
   box-shadow: var(--box-shadow-card);
@@ -425,6 +425,26 @@ const copyEmail = async (email) => {
   gap: 1rem;
 }
 
+.title-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.title-aside {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text-dim);
+}
+
+.title-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
 .village-tag {
   font-size: 0.9rem;
   flex-shrink: 0;
@@ -434,57 +454,93 @@ const copyEmail = async (email) => {
   display: block;
 }
 
+/* The edit form's visual language, tightened for reading: shaded section
+   panels, a blue eyebrow per subgroup, and a small sentence-case label above
+   each value (the same size as the form's in-field labels). */
 .detail-field {
   display: flex;
   flex-direction: column;
-  padding-bottom: 0;
-  margin-bottom: 0;
-  border-bottom: none;
+  gap: 0.15rem;
+  min-width: 0;
 }
 
 .detail-field .label {
-  font-weight: 600;
+  font-size: 0.75rem;
   color: var(--color-text-dim);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.5rem;
 }
 
-.detail-field .value {
+.value {
   color: var(--color-text-primary);
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: var(--detail-value-weight);
   word-break: break-word;
 }
 
-
 .section {
   display: grid;
-  grid-template-columns: repeat(v-bind(columnCount), 1fr);
-  gap: 1rem 1.5rem;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(v-bind(columnCount), minmax(0, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin: 1rem 0;
+  padding: 1rem 1.25rem 1.25rem 1.25rem;
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 12px;
 }
 
 .section:first-of-type {
-  margin-top: 1rem;
-}
-
-.section:last-child {
-  margin-bottom: 0;
+  margin-top: 0.5rem;
 }
 
 .section-header {
   grid-column: 1 / -1;
-  margin: 0 0 0.75rem 0;
-  font-size: 0.95rem;
+  margin: 0;
+  font-size: 1.15rem;
   font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.subgroup {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  row-gap: 0.5rem;
+  align-content: start;
+}
+
+.subgroup.span-2 {
+  grid-column: span 2;
+}
+
+/* Languages opens its own row, pairing with Disabilities. */
+.subgroup.row-start {
+  grid-column: 1 / span 2;
+}
+
+.subsection-header {
+  grid-column: 1 / -1;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--p-primary-600);
-  border-bottom: 2px solid var(--color-border-default);
-  padding-bottom: 0.75rem;
+  letter-spacing: 0.8px;
+  color: var(--p-primary-color);
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.disability-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.disability-note {
+  color: var(--color-text-dim);
 }
 
 .email-field {
@@ -526,9 +582,10 @@ const copyEmail = async (email) => {
 
 .phone-numbers {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
   align-items: center;
-  font-weight: 600
+  font-weight: var(--detail-value-weight);
 }
 .phone_number {
   white-space: nowrap;
@@ -598,12 +655,22 @@ const copyEmail = async (email) => {
   .section {
     grid-template-columns: 1fr 1fr;
   }
+
+  .subgroup.span-2,
+  .subgroup.row-start {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 600px) {
   .section {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 0.75rem;
+  }
+
+  /* A span wider than a one-column grid would add an implicit column. */
+  .span-2 {
+    grid-column: auto;
   }
 
   /* Side-by-side, the village tag holds its width (flex-shrink: 0) and the
