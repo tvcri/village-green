@@ -10,15 +10,22 @@
    selectors win on any property collision (e.g. .section's
    grid-template-columns is overridden locally per component). */
 
+/* Each section is a shaded panel: the panel itself, not a rule or a heading
+   style, is what marks a section. Three levels, three distinct treatments:
+   panel title (.section-header), blue uppercase eyebrow (.subsection-header),
+   field label. */
 .section {
   display: grid;
   gap: 1rem 1.5rem;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
+  margin: 1.25rem 0;
+  padding: 1.25rem 1.5rem 1.5rem 1.5rem;
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-panel-border);
+  border-radius: 12px;
 }
 
 .section:first-of-type {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
 }
 
 .section:last-child {
@@ -27,14 +34,70 @@
 
 .section-header {
   grid-column: 1 / -1;
-  margin: 0 0 0.75rem 0;
-  font-size: 0.95rem;
+  margin: 0;
+  font-size: 1.3rem;
   font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* A subgroup within a section: starts its own grid row. */
+.subsection-header {
+  grid-column: 1 / -1;
+  margin: 0.5rem 0 -0.25rem 0;
+  font-size: 0.85rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--p-primary-600);
-  border-bottom: 2px solid var(--color-border-default);
-  padding-bottom: 0.75rem;
+  letter-spacing: 0.8px;
+  color: var(--p-primary-color);
+}
+
+/* A subgroup (subheader + its fields) inside a section. Full width by
+   default; add .span-2 to set two subgroups side by side. subgrid keeps the
+   fields on the section's own columns. */
+.subgroup {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  row-gap: 1rem;
+  align-content: start;
+}
+
+.subgroup .subsection-header {
+  margin-top: 0.5rem;
+}
+
+.section-header + .subgroup .subsection-header {
+  margin-top: 0;
+}
+
+.span-2,
+.subgroup.span-2 {
+  grid-column: span 2;
+}
+
+.span-4,
+.subgroup.span-4 {
+  grid-column: span 4;
+}
+
+/* A span wider than a one-column grid would add an implicit column. */
+@media (max-width: 900px) {
+  .subgroup.span-2,
+  .span-4,
+  .subgroup.span-4 {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .span-2 {
+    grid-column: auto;
+  }
+  .subgroup.span-2,
+  .span-4,
+  .subgroup.span-4 {
+    grid-column: 1 / -1;
+  }
 }
 
 .form-field {
@@ -65,6 +128,34 @@
 .checkbox-label {
   font-size: 1rem;
   color: var(--color-text-primary);
+}
+
+/* IftaLabel draws its label over the input with pointer-events: none, so a
+   click on the label reaches the input. Icons inside it (the import wizard's
+   uncertain flags, info tooltips) need hover back, or their tooltips never
+   fire. */
+.p-iftalabel label .pi {
+  pointer-events: auto;
+}
+
+/* With the label inside the box, a placeholder sits where a value would.
+   Dim, italic and label-sized so "Jr., III" or "YYYY-MM-DD" never reads as
+   data. */
+.p-iftalabel :deep(input::placeholder),
+.p-iftalabel :deep(textarea::placeholder),
+.p-iftalabel :deep(.p-placeholder),
+.disability-note::placeholder {
+  color: var(--color-text-dim);
+  font-style: italic;
+  font-size: 0.75rem;
+  opacity: 1;
+}
+
+/* A Select's placeholder is its label box, so the smaller text would make the
+   whole field shorter than its neighbors: keep the full-size line height
+   (Open Sans's normal line height at 1rem). */
+.p-iftalabel :deep(.p-placeholder) {
+  line-height: 1.362rem;
 }
 
 .uncertain-icon {

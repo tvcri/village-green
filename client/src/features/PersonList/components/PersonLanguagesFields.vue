@@ -25,48 +25,58 @@ function prefer (id) {
 </script>
 
 <template>
-  <div class="section">
-    <h3 class="section-header">Languages</h3>
-    <!-- One radio group: at most one preferred language, structurally. -->
-    <div class="form-field languages-list">
-      <div v-for="l in languages" :key="l.languageId" class="language-row">
-        <label class="checkbox-item">
-          <Checkbox
-            :modelValue="languageIds.includes(l.languageId)"
-            binary
-            @update:modelValue="v => toggle(l.languageId, v)"
-          />
-          <span class="checkbox-label">{{ l.name }}</span>
-        </label>
-        <label v-if="languageIds.includes(l.languageId)" class="checkbox-item">
-          <RadioButton
-            :modelValue="preferredLanguageId"
-            :value="l.languageId"
-            name="preferredLanguage"
-            @update:modelValue="prefer"
-          />
-          <span class="checkbox-label">Preferred</span>
-        </label>
-      </div>
+  <!-- A subgroup of Personal Information: the parent's grid places it and
+       supplies the "Languages" subheader. One radio group: at most one
+       preferred language, structurally. No .form-field class: the parent's
+       scoped copy of that rule loads after this one and its display: flex
+       would override the grid below. -->
+  <div class="languages-list">
+    <div v-for="l in languages" :key="l.languageId" class="language-row">
+      <label class="checkbox-item">
+        <Checkbox
+          :modelValue="languageIds.includes(l.languageId)"
+          binary
+          @update:modelValue="v => toggle(l.languageId, v)"
+        />
+        <span class="checkbox-label">{{ l.name }}</span>
+      </label>
+      <label v-if="languageIds.includes(l.languageId)" class="checkbox-item">
+        <RadioButton
+          :modelValue="preferredLanguageId"
+          :value="l.languageId"
+          name="preferredLanguage"
+          @update:modelValue="prefer"
+        />
+        <span class="checkbox-label">Preferred</span>
+      </label>
     </div>
   </div>
 </template>
 
 <style scoped src="./formFields.css"></style>
 <style scoped>
-.section {
-  grid-template-columns: 1fr;
-}
-
+/* Names in one column, Preferred radios in the next, so the radios line up
+   whatever the name lengths. Rows are display: contents so their two labels
+   become grid items; the explicit columns keep an unchecked row (no radio)
+   from pulling the next name up into column 2. */
 .languages-list {
-  flex-direction: column;
-  gap: 0.75rem;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 0.75rem 2rem;
+  align-items: center;
   padding-top: 0.25rem;
 }
 
 .language-row {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
+  display: contents;
+}
+
+.language-row > :first-child {
+  grid-column: 1;
+}
+
+.language-row > :nth-child(2) {
+  grid-column: 2;
 }
 </style>

@@ -36,6 +36,10 @@
   /* Shadow Colors */
   --box-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.15);
 
+  /* Form section panels (person/member/volunteer edit forms) */
+  --color-panel-bg: #f7f7f8;
+  --color-panel-border: #e4e4e7;
+
   /* Error Colors */
   --color-text-error: #f16969;
 }
@@ -186,6 +190,10 @@ textarea:focus {
 
   /* Shadow Colors */
   --box-shadow-card: 0 2px 8px rgb(225 225 225 / 10%);
+
+  /* Form section panels */
+  --color-panel-bg: #1f1f23;
+  --color-panel-border: #34343a;
 
   --color-bg-hover: rgba(255, 255, 255, 0.05);
   --color-bg-hover-light: #252525;

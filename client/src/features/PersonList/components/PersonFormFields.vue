@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import IftaLabel from 'primevue/iftalabel'
 import Checkbox from 'primevue/checkbox'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 import { geocodeTown } from '../api/personApi.js'
@@ -141,7 +142,8 @@ async function runLookup (key) {
 }
 
 // For parents to await before building a payload: starts a lookup if the
-// address changed without a settling blur (an Enter-key submit fires none)
+// address changed without a settling blur (a click on Save straight from an
+// address field can land before its blur settles)
 // and resolves when any in-flight lookup lands, so the payload never carries
 // a municipality the address has outrun.
 function townSettled () {
@@ -162,232 +164,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Personal Information Section -->
-  <div class="section">
-    <h3 class="section-header">Personal Information</h3>
-
-    <div class="form-field">
-      <label class="label" for="firstName">First Name
-        <i v-if="uncertain.firstName" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('firstName')" />
-      </label>
-      <InputText
-        id="firstName"
-        v-model="firstName"
-        class="w-full"
-        :class="{ 'p-invalid': errors.firstName }"
-        @input="edited('firstName')"
-      />
-      <small class="field-error" v-if="errors.firstName">{{ errors.firstName }}</small>
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="middleInitial">Middle Initial
-        <i v-if="uncertain.middleInitial" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('middleInitial')" />
-      </label>
-      <InputText
-        id="middleInitial"
-        v-model="middleInitial"
-        class="w-full"
-        :class="{ 'p-invalid': errors.middleInitial }"
-        @input="edited('middleInitial')"
-      />
-      <small class="field-error" v-if="errors.middleInitial">{{ errors.middleInitial }}</small>
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="lastName">Last Name <span class="required">*</span>
-        <i v-if="uncertain.lastName" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('lastName')" />
-      </label>
-      <InputText
-        id="lastName"
-        v-model="lastName"
-        class="w-full"
-        :class="{ 'p-invalid': errors.lastName }"
-        @input="edited('lastName')"
-      />
-      <small class="field-error" v-if="errors.lastName">{{ errors.lastName }}</small>
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="suffix">Suffix</label>
-      <InputText id="suffix" v-model="suffix" maxlength="20" placeholder="Jr., III" class="w-full" @input="edited('suffix')" />
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="nickname">Nickname
-        <i v-if="uncertain.nickname" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('nickname')" />
-      </label>
-      <InputText id="nickname" v-model="nickname" class="w-full" @input="edited('nickname')" />
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="pronouns">Pronouns
-        <i v-if="uncertain.pronouns" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('pronouns')" />
-      </label>
-      <InputText id="pronouns" v-model="pronouns" maxlength="30" class="w-full" @input="edited('pronouns')" />
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="email">Email
-        <i v-if="uncertain.email" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('email')" />
-      </label>
-      <InputText
-        id="email"
-        v-model="email"
-        class="w-full"
-        :class="{ 'p-invalid': errors.email }"
-        @input="edited('email')"
-      />
-      <small class="field-error" v-if="errors.email">{{ errors.email }}</small>
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="phone">Phone
-        <i v-if="uncertain.phone" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('phone')" />
-      </label>
-      <InputText
-        id="phone"
-        v-model="phone"
-        class="w-full"
-        :class="{ 'p-invalid': errors.phone }"
-        @input="edited('phone')"
-      />
-      <small class="field-error" v-if="errors.phone">{{ errors.phone }}</small>
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="cell">Cell
-        <i v-if="uncertain.cell" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('cell')" />
-      </label>
-      <InputText
-        id="cell"
-        v-model="cell"
-        class="w-full"
-        :class="{ 'p-invalid': errors.cell }"
-        @input="edited('cell')"
-      />
-      <small class="field-error" v-if="errors.cell">{{ errors.cell }}</small>
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="preferredContactMethodId">Preferred Contact</label>
-      <Select
-        id="preferredContactMethodId" v-model="preferredContactMethodId"
-        :options="lookups.contactMethods" optionLabel="name" optionValue="contactMethodId"
-        placeholder="(none)" showClear class="w-full"
-        @update:modelValue="edited('preferredContactMethodId')"
-      />
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="street">Street
-        <i v-if="uncertain.street" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('street')" />
-      </label>
-      <InputText id="street" v-model="street" class="w-full" @input="editedAddress('street')" @blur="lookupTown()" />
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="unit">Unit
-        <i v-if="uncertain.unit" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('unit')" />
-      </label>
-      <InputText id="unit" v-model="unit" class="w-full" @input="edited('unit')" />
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="city">City
-        <i v-if="uncertain.city" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('city')" />
-      </label>
-      <InputText id="city" v-model="city" class="w-full" @input="editedAddress('city')" @blur="lookupTown()" />
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="state">State
-        <i v-if="uncertain.state" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('state')" />
-      </label>
-      <InputText id="state" v-model="state" class="w-full" @input="editedAddress('state')" @blur="lookupTown()" />
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="zip">Zip
-        <i v-if="uncertain.zip" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('zip')" />
-      </label>
-      <InputText
-        id="zip"
-        v-model="zip"
-        class="w-full"
-        :class="{ 'p-invalid': errors.zip }"
-        @input="editedAddress('zip')"
-        @blur="lookupTown()"
-      />
-      <small class="field-error" v-if="errors.zip">{{ errors.zip }}</small>
-    </div>
-
-    <div class="form-field">
-      <!-- A div is not a labelable element, so label[for] would associate with
-           nothing; a span plus aria-labelledby carries the name instead. -->
-      <span class="label" id="town-label">Municipality
-        <i class="pi pi-info-circle" v-tooltip.top="'The city or town that governs this address, from the US Census. Mailing addresses often use a village or postal name instead — Wood River Junction is in Hopkinton.'" />
-      </span>
-      <div id="town" class="calculated-value" role="status" aria-labelledby="town-label">
-        <span v-if="townPending" class="pi pi-spin pi-spinner" aria-label="Looking up municipality" />
-        <span v-else-if="townFailed" class="muted">Couldn't determine automatically</span>
-        <span v-else-if="town">{{ town }}</span>
-        <span v-else class="muted">&mdash;</span>
-      </div>
-    </div>
-
-    <div v-if="showBirthDate" class="form-field">
-      <label class="label" for="birthDate">Birth Date
-        <i v-if="uncertain.birthDate" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('birthDate')" />
-      </label>
-      <InputText
-        id="birthDate"
-        v-model="birthDate"
-        placeholder="YYYY-MM-DD"
-        class="w-full"
-        :class="{ 'p-invalid': errors.birthDate }"
-        @input="edited('birthDate')"
-      />
-      <small class="field-error" v-if="errors.birthDate">{{ errors.birthDate }}</small>
-    </div>
-
-    <div class="form-field">
-      <label class="label" for="deceasedDate">Deceased Date</label>
-      <InputText
-        id="deceasedDate"
-        v-model="deceasedDate"
-        placeholder="YYYY-MM-DD"
-        class="w-full"
-        :class="{ 'p-invalid': errors.deceasedDate }"
-        @input="edited('deceasedDate')"
-      />
-      <small class="field-error" v-if="errors.deceasedDate">{{ errors.deceasedDate }}</small>
-    </div>
-  </div>
-
-  <PersonDemographicsFields
-    v-if="showDemographics"
-    v-model:gender-id="genderId"
-    v-model:ethnicity-id="ethnicityId"
-    v-model:is-veteran="isVeteran"
-    v-model:race-ids="raceIds"
-    :lookups="lookups"
-    :uncertain="uncertain"
-    @edited="edited"
-  />
-
-  <PersonLanguagesFields
-    v-model:language-ids="languageIds"
-    v-model:preferred-language-id="preferredLanguageId"
-    :languages="lookups.languages"
-    @edited="edited"
-  />
-
-  <!-- Home Village Section -->
-  <div class="section">
-    <h3 class="section-header">Home Village</h3>
-
-    <div class="form-field">
+  <!-- The two ways persons are grouped lead the form, unpaneled: Village, then
+       Circles (one checkbox per catalog row, so a new circle needs no code change).
+       Village keeps an outside label, matching Circles beside it. -->
+  <div class="section village-row">
+    <div class="form-field span-2">
       <label class="label" for="villageId">Village
         <i v-if="uncertain.villageId" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('villageId')" />
       </label>
@@ -403,91 +184,385 @@ onMounted(() => {
         @update:modelValue="edited('villageId')"
       />
     </div>
-  </div>
 
-  <!-- Circles Section — one checkbox per catalog row, so a new circle needs no code change -->
-  <div v-if="showCircles" class="section">
-    <h3 class="section-header">Circles</h3>
-    <div class="form-field circles-row">
-      <label v-for="c in circles" :key="c.circleId" class="checkbox-item">
-        <Checkbox
-          :modelValue="circleNames.has(c.name)"
-          binary
-          @update:modelValue="v => $emit('toggle-circle', c.name, v)"
-        />
-        <span class="checkbox-label">{{ c.name }}</span>
-      </label>
-    </div>
-  </div>
-
-  <!-- Disabilities Section -->
-  <div class="section">
-    <h3 class="section-header">Disabilities</h3>
-
-    <div class="form-field disabilities-list">
-      <div v-for="name in ['Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane']" :key="name" class="disability-row">
-        <label class="checkbox-item">
+    <div v-if="showCircles" class="form-field span-4">
+      <span class="label" id="circles-label">Circles</span>
+      <div class="circles-options" role="group" aria-labelledby="circles-label">
+        <label v-for="c in circles" :key="c.circleId" class="checkbox-item">
           <Checkbox
-            :modelValue="disabilities.has(name)"
+            :modelValue="circleNames.has(c.name)"
             binary
-            @update:modelValue="v => $emit('toggle-disability', name, v)"
+            @update:modelValue="v => $emit('toggle-circle', c.name, v)"
           />
-          <span class="checkbox-label">{{ name }}</span>
+          <span class="checkbox-label">{{ c.name }}</span>
         </label>
-        <InputText
-          v-if="disabilities.has(name)"
-          :modelValue="disabilities.get(name) ?? ''"
-          placeholder="Optional note"
-          class="disability-note"
-          @update:modelValue="v => $emit('edit-disability-note', name, v)"
-        />
       </div>
     </div>
   </div>
+
+  <!-- Personal Information: each subgroup is a subgrid on the section's six
+       columns, so its fields line up with every other subgroup's. -->
+  <div class="section">
+    <h3 class="section-header">Personal Information</h3>
+
+    <div class="subgroup">
+      <h4 class="subsection-header">Name</h4>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText
+            id="firstName"
+            v-model="firstName"
+            class="w-full"
+            :class="{ 'p-invalid': errors.firstName }"
+            @input="edited('firstName')"
+          />
+          <label for="firstName">First Name
+            <i v-if="uncertain.firstName" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('firstName')" />
+          </label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.firstName">{{ errors.firstName }}</small>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText
+            id="middleInitial"
+            v-model="middleInitial"
+            class="w-full"
+            :class="{ 'p-invalid': errors.middleInitial }"
+            @input="edited('middleInitial')"
+          />
+          <label for="middleInitial">Middle Initial
+            <i v-if="uncertain.middleInitial" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('middleInitial')" />
+          </label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.middleInitial">{{ errors.middleInitial }}</small>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText
+            id="lastName"
+            v-model="lastName"
+            class="w-full"
+            :class="{ 'p-invalid': errors.lastName }"
+            @input="edited('lastName')"
+          />
+          <label for="lastName">Last Name <span class="required">*</span>
+            <i v-if="uncertain.lastName" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('lastName')" />
+          </label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.lastName">{{ errors.lastName }}</small>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText id="suffix" v-model="suffix" maxlength="20" placeholder="Jr., III" class="w-full" @input="edited('suffix')" />
+          <label for="suffix">Suffix</label>
+        </IftaLabel>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText id="nickname" v-model="nickname" class="w-full" @input="edited('nickname')" />
+          <label for="nickname">Nickname
+            <i v-if="uncertain.nickname" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('nickname')" />
+          </label>
+        </IftaLabel>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText id="pronouns" v-model="pronouns" maxlength="30" class="w-full" @input="edited('pronouns')" />
+          <label for="pronouns">Pronouns
+            <i v-if="uncertain.pronouns" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('pronouns')" />
+          </label>
+        </IftaLabel>
+      </div>
+    </div>
+
+    <div class="subgroup">
+      <h4 class="subsection-header">Contact</h4>
+
+      <div class="form-field span-2">
+        <IftaLabel>
+          <InputText
+            id="email"
+            v-model="email"
+            class="w-full"
+            :class="{ 'p-invalid': errors.email }"
+            @input="edited('email')"
+          />
+          <label for="email">Email
+            <i v-if="uncertain.email" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('email')" />
+          </label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.email">{{ errors.email }}</small>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText
+            id="phone"
+            v-model="phone"
+            class="w-full"
+            :class="{ 'p-invalid': errors.phone }"
+            @input="edited('phone')"
+          />
+          <label for="phone">Phone
+            <i v-if="uncertain.phone" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('phone')" />
+          </label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.phone">{{ errors.phone }}</small>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText
+            id="cell"
+            v-model="cell"
+            class="w-full"
+            :class="{ 'p-invalid': errors.cell }"
+            @input="edited('cell')"
+          />
+          <label for="cell">Cell
+            <i v-if="uncertain.cell" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('cell')" />
+          </label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.cell">{{ errors.cell }}</small>
+      </div>
+
+      <div class="form-field span-2">
+        <IftaLabel>
+          <Select
+            id="preferredContactMethodId" v-model="preferredContactMethodId"
+            :options="lookups.contactMethods" optionLabel="name" optionValue="contactMethodId"
+            placeholder="(none)" showClear class="w-full"
+            @update:modelValue="edited('preferredContactMethodId')"
+          />
+          <label for="preferredContactMethodId">Preferred Contact</label>
+        </IftaLabel>
+      </div>
+    </div>
+
+    <div class="subgroup">
+      <h4 class="subsection-header">Address</h4>
+
+      <div class="form-field span-2">
+        <IftaLabel>
+          <InputText id="street" v-model="street" class="w-full" @input="editedAddress('street')" @blur="lookupTown()" />
+          <label for="street">Street
+            <i v-if="uncertain.street" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('street')" />
+          </label>
+        </IftaLabel>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText id="unit" v-model="unit" class="w-full" @input="edited('unit')" />
+          <label for="unit">Unit
+            <i v-if="uncertain.unit" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('unit')" />
+          </label>
+        </IftaLabel>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText id="city" v-model="city" class="w-full" @input="editedAddress('city')" @blur="lookupTown()" />
+          <label for="city">City
+            <i v-if="uncertain.city" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('city')" />
+          </label>
+        </IftaLabel>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText id="state" v-model="state" class="w-full" @input="editedAddress('state')" @blur="lookupTown()" />
+          <label for="state">State
+            <i v-if="uncertain.state" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('state')" />
+          </label>
+        </IftaLabel>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText
+            id="zip"
+            v-model="zip"
+            class="w-full"
+            :class="{ 'p-invalid': errors.zip }"
+            @input="editedAddress('zip')"
+            @blur="lookupTown()"
+          />
+          <label for="zip">Zip
+            <i v-if="uncertain.zip" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('zip')" />
+          </label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.zip">{{ errors.zip }}</small>
+      </div>
+    </div>
+
+    <!-- Values calculated from the address. Two columns today (Municipality);
+         widens to four when legislative districts arrive (legislative-districts
+         branch), and Dates moves over to the last two. -->
+    <div class="subgroup span-2">
+      <h4 class="subsection-header">Civic information</h4>
+
+      <!-- Read-only, so no input for IftaLabel to wrap: this box copies its look,
+           label inside at the top. A div is not a labelable element, so a span
+           plus aria-labelledby carries the name. -->
+      <div class="form-field span-2">
+        <div class="calculated-value">
+          <span class="calculated-label" id="town-label">Municipality
+            <i class="pi pi-info-circle" v-tooltip.top="'The city or town that governs this address, from the US Census. Mailing addresses often use a village or postal name instead — Wood River Junction is in Hopkinton.'" />
+          </span>
+          <div id="town" role="status" aria-labelledby="town-label">
+            <span v-if="townPending" class="pi pi-spin pi-spinner" aria-label="Looking up municipality" />
+            <span v-else-if="townFailed" class="muted">Couldn't determine automatically</span>
+            <span v-else-if="town">{{ town }}</span>
+            <span v-else class="muted">&mdash;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="subgroup span-2">
+      <h4 class="subsection-header">Dates</h4>
+
+      <div v-if="showBirthDate" class="form-field">
+        <IftaLabel>
+          <InputText
+            id="birthDate"
+            v-model="birthDate"
+            placeholder="YYYY-MM-DD"
+            class="w-full"
+            :class="{ 'p-invalid': errors.birthDate }"
+            @input="edited('birthDate')"
+          />
+          <label for="birthDate">Birth Date
+            <i v-if="uncertain.birthDate" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('birthDate')" />
+          </label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.birthDate">{{ errors.birthDate }}</small>
+      </div>
+
+      <div class="form-field">
+        <IftaLabel>
+          <InputText
+            id="deceasedDate"
+            v-model="deceasedDate"
+            placeholder="YYYY-MM-DD"
+            class="w-full"
+            :class="{ 'p-invalid': errors.deceasedDate }"
+            @input="edited('deceasedDate')"
+          />
+          <label for="deceasedDate">Deceased Date</label>
+        </IftaLabel>
+        <small class="field-error" v-if="errors.deceasedDate">{{ errors.deceasedDate }}</small>
+      </div>
+    </div>
+
+    <div class="subgroup span-2 row-start">
+      <h4 class="subsection-header">Languages</h4>
+
+      <PersonLanguagesFields
+        v-model:language-ids="languageIds"
+        v-model:preferred-language-id="preferredLanguageId"
+        :languages="lookups.languages"
+        @edited="edited"
+      />
+    </div>
+
+    <div class="subgroup span-4">
+      <h4 class="subsection-header">Disabilities</h4>
+      <!-- Names in one column, notes in the next, so the note boxes line up. -->
+      <div class="disabilities-list">
+        <div v-for="name in ['Vision', 'Walker', 'Hearing', 'Wheelchair', 'Cane']" :key="name" class="disability-row">
+          <label class="checkbox-item">
+            <Checkbox
+              :modelValue="disabilities.has(name)"
+              binary
+              @update:modelValue="v => $emit('toggle-disability', name, v)"
+            />
+            <span class="checkbox-label">{{ name }}</span>
+          </label>
+          <InputText
+            v-if="disabilities.has(name)"
+            :modelValue="disabilities.get(name) ?? ''"
+            placeholder="Optional note"
+            size="small"
+            :aria-label="`${name} note`"
+            class="disability-note"
+            @update:modelValue="v => $emit('edit-disability-note', name, v)"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <PersonDemographicsFields
+    v-if="showDemographics"
+    v-model:gender-id="genderId"
+    v-model:ethnicity-id="ethnicityId"
+    v-model:is-veteran="isVeteran"
+    v-model:race-ids="raceIds"
+    :lookups="lookups"
+    :uncertain="uncertain"
+    @edited="edited"
+  />
 
   <!-- Emergency Contact Section -->
   <div class="section">
     <h3 class="section-header">Emergency Contact</h3>
 
-    <div class="form-field">
-      <label class="label" for="emergencyContactName">Name
-        <i v-if="uncertain.emergencyContactName" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactName')" />
-      </label>
-      <InputText id="emergencyContactName" v-model="emergencyContactName" class="w-full" @input="edited('emergencyContactName')" />
+    <div class="form-field span-2">
+      <IftaLabel>
+        <InputText id="emergencyContactName" v-model="emergencyContactName" class="w-full" @input="edited('emergencyContactName')" />
+        <label for="emergencyContactName">Name
+          <i v-if="uncertain.emergencyContactName" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactName')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field">
-      <label class="label" for="emergencyContactRelationship">Relationship
-        <i v-if="uncertain.emergencyContactRelationship" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactRelationship')" />
-      </label>
-      <InputText id="emergencyContactRelationship" v-model="emergencyContactRelationship" class="w-full" @input="edited('emergencyContactRelationship')" />
+      <IftaLabel>
+        <InputText id="emergencyContactRelationship" v-model="emergencyContactRelationship" class="w-full" @input="edited('emergencyContactRelationship')" />
+        <label for="emergencyContactRelationship">Relationship
+          <i v-if="uncertain.emergencyContactRelationship" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactRelationship')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field">
-      <label class="label" for="emergencyContactPhone">Phone
-        <i v-if="uncertain.emergencyContactPhone" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactPhone')" />
-      </label>
-      <InputText
-        id="emergencyContactPhone"
-        v-model="emergencyContactPhone"
-        class="w-full"
-        :class="{ 'p-invalid': errors.emergencyContactPhone }"
-        @input="edited('emergencyContactPhone')"
-      />
+      <IftaLabel>
+        <InputText
+          id="emergencyContactPhone"
+          v-model="emergencyContactPhone"
+          class="w-full"
+          :class="{ 'p-invalid': errors.emergencyContactPhone }"
+          @input="edited('emergencyContactPhone')"
+        />
+        <label for="emergencyContactPhone">Phone
+          <i v-if="uncertain.emergencyContactPhone" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactPhone')" />
+        </label>
+      </IftaLabel>
       <small class="field-error" v-if="errors.emergencyContactPhone">{{ errors.emergencyContactPhone }}</small>
     </div>
 
-    <div class="form-field">
-      <label class="label" for="emergencyContactEmail">Email
-        <i v-if="uncertain.emergencyContactEmail" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactEmail')" />
-      </label>
-      <InputText
-        id="emergencyContactEmail"
-        v-model="emergencyContactEmail"
-        class="w-full"
-        :class="{ 'p-invalid': errors.emergencyContactEmail }"
-        @input="edited('emergencyContactEmail')"
-      />
+    <div class="form-field span-2">
+      <IftaLabel>
+        <InputText
+          id="emergencyContactEmail"
+          v-model="emergencyContactEmail"
+          class="w-full"
+          :class="{ 'p-invalid': errors.emergencyContactEmail }"
+          @input="edited('emergencyContactEmail')"
+        />
+        <label for="emergencyContactEmail">Email
+          <i v-if="uncertain.emergencyContactEmail" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('emergencyContactEmail')" />
+        </label>
+      </IftaLabel>
       <small class="field-error" v-if="errors.emergencyContactEmail">{{ errors.emergencyContactEmail }}</small>
     </div>
   </div>
@@ -496,7 +571,13 @@ onMounted(() => {
 <style scoped src="./formFields.css"></style>
 <style scoped>
 .section {
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.village-row {
+  padding: 0;
+  background: none;
+  border: none;
 }
 
 .required {
@@ -511,49 +592,78 @@ onMounted(() => {
 
 .calculated-value {
   display: flex;
-  align-items: center;
-  min-height: 2.5rem;
-  padding: 0.75rem 0.75rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 3.5rem;
+  padding: 0.4rem 0.75rem;
   background-color: var(--color-bg-hover-light);
   border: 1px solid var(--color-border-default);
   border-radius: 6px;
   color: var(--color-text-primary);
 }
 
+.calculated-label {
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+}
+
 .calculated-value .muted {
   color: var(--color-text-dim);
 }
 
-.circles-row {
-  grid-column: 1 / -1;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  align-items: center;
-  padding-top: 0.25rem;
+/* Languages opens its own row so it pairs with Disabilities, not with the
+   Civic information and Dates pair above (2 + 2 + 2 would fill that row). */
+.subgroup.row-start {
+  grid-column: 1 / span 2;
 }
 
+.circles-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  min-height: 2.6rem;
+}
+
+/* display: contents puts each row's two parts on the list's grid; explicit
+   columns keep an unticked row (no note) from pulling the next name into
+   column 2. */
 .disabilities-list {
   grid-column: 1 / -1;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 20rem);
+  /* Every row as tall as a small note box, ticked or not: ticking a
+     disability fills space that was already there instead of pushing the
+     rows below it down. */
+  grid-auto-rows: 2.25rem;
+  gap: 0.5rem 1.25rem;
+  align-items: center;
   padding-top: 0.25rem;
 }
 
 .disability-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+  display: contents;
+}
+
+.disability-row > .checkbox-item {
+  grid-column: 1;
 }
 
 .disability-note {
-  flex: 1;
-  max-width: 20rem;
+  grid-column: 2;
+  width: 100%;
 }
 
 @media (max-width: 900px) {
   .section {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .subgroup.row-start {
+    grid-column: 1 / -1;
   }
 }
 

@@ -1,5 +1,6 @@
 <script setup>
 import Select from 'primevue/select'
+import IftaLabel from 'primevue/iftalabel'
 import Checkbox from 'primevue/checkbox'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 
@@ -29,38 +30,44 @@ function toggleRace (id, checked) {
   <div class="section">
     <h3 class="section-header">Demographics</h3>
 
-    <div class="form-field">
-      <label class="label" for="genderId">Gender
-        <i v-if="uncertain.genderId" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('genderId')" />
-      </label>
-      <Select
-        id="genderId" v-model="genderId"
-        :options="lookups.genders" optionLabel="name" optionValue="genderId"
-        placeholder="Not recorded" showClear class="w-full"
-        @update:modelValue="emit('edited', 'genderId')"
-      />
+    <div class="form-field span-2">
+      <IftaLabel>
+        <Select
+          id="genderId" v-model="genderId"
+          :options="lookups.genders" optionLabel="name" optionValue="genderId"
+          placeholder="Not recorded" showClear class="w-full"
+          @update:modelValue="emit('edited', 'genderId')"
+        />
+        <label for="genderId">Gender
+          <i v-if="uncertain.genderId" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('genderId')" />
+        </label>
+      </IftaLabel>
     </div>
 
-    <div class="form-field">
-      <label class="label" for="ethnicityId">Ethnicity</label>
-      <Select
-        id="ethnicityId" v-model="ethnicityId"
-        :options="lookups.ethnicities" optionLabel="name" optionValue="ethnicityId"
-        placeholder="Not recorded" showClear class="w-full"
-        @update:modelValue="emit('edited', 'ethnicityId')"
-      />
+    <div class="form-field span-2">
+      <IftaLabel>
+        <Select
+          id="ethnicityId" v-model="ethnicityId"
+          :options="lookups.ethnicities" optionLabel="name" optionValue="ethnicityId"
+          placeholder="Not recorded" showClear class="w-full"
+          @update:modelValue="emit('edited', 'ethnicityId')"
+        />
+        <label for="ethnicityId">Ethnicity</label>
+      </IftaLabel>
     </div>
 
-    <div class="form-field">
-      <label class="label" for="isVeteran">Veteran
-        <i v-if="uncertain.isVeteran" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('isVeteran')" />
-      </label>
-      <Select
-        id="isVeteran" v-model="isVeteran"
-        :options="veteranOptions" optionLabel="label" optionValue="value"
-        placeholder="Unknown" showClear class="w-full"
-        @update:modelValue="emit('edited', 'isVeteran')"
-      />
+    <div class="form-field span-2">
+      <IftaLabel>
+        <Select
+          id="isVeteran" v-model="isVeteran"
+          :options="veteranOptions" optionLabel="label" optionValue="value"
+          placeholder="Unknown" showClear class="w-full"
+          @update:modelValue="emit('edited', 'isVeteran')"
+        />
+        <label for="isVeteran">Veteran
+          <i v-if="uncertain.isVeteran" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('isVeteran')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field races-row">
@@ -82,7 +89,7 @@ function toggleRace (id, checked) {
 <style scoped src="./formFields.css"></style>
 <style scoped>
 .section {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(6, 1fr);
 }
 
 .races-row {
@@ -93,6 +100,12 @@ function toggleRace (id, checked) {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .section {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 600px) {

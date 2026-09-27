@@ -5,6 +5,7 @@ import InputNumber from 'primevue/inputnumber'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
+import IftaLabel from 'primevue/iftalabel'
 import AutoComplete from 'primevue/autocomplete'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
@@ -93,62 +94,74 @@ watch(memberLevel, (level) => {
     <h3 class="section-header">Membership</h3>
 
     <div class="form-field status-row">
-      <label class="label" for="status">Status
-        <i v-if="uncertain.status" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('status')" />
-      </label>
-      <Select id="status" v-model="status" :options="statusOptions"
-              optionLabel="label" optionValue="value" placeholder="Select status" class="w-full" @update:modelValue="edited('status')" />
+      <IftaLabel>
+        <Select id="status" v-model="status" :options="statusOptions"
+                optionLabel="label" optionValue="value" placeholder="Select status" class="w-full" @update:modelValue="edited('status')" />
+        <label for="status">Status
+          <i v-if="uncertain.status" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('status')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div v-if="showCreatedDate" class="form-field">
-      <label class="label" for="memberNumber">Member #
-        <i v-if="uncertain.memberNumber" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('memberNumber')" />
-      </label>
-      <InputText id="memberNumber" v-model="memberNumber" class="w-full" @input="edited('memberNumber')" />
+      <IftaLabel>
+        <InputText id="memberNumber" v-model="memberNumber" class="w-full" @input="edited('memberNumber')" />
+        <label for="memberNumber">Member #
+          <i v-if="uncertain.memberNumber" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('memberNumber')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field">
-      <label class="label" for="memberLevel">Member Level
-        <i v-if="uncertain.memberLevel" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('memberLevel')" />
-      </label>
-      <Select id="memberLevel" v-model="memberLevel" :options="memberLevelOptions"
-              optionLabel="label" optionValue="value" placeholder="Select level" class="w-full"
-              :class="{ 'p-invalid': errors.memberLevel }" @update:modelValue="edited('memberLevel')" />
+      <IftaLabel>
+        <Select id="memberLevel" v-model="memberLevel" :options="memberLevelOptions"
+                optionLabel="label" optionValue="value" placeholder="Select level" class="w-full"
+                :class="{ 'p-invalid': errors.memberLevel }" @update:modelValue="edited('memberLevel')" />
+        <label for="memberLevel">Member Level
+          <i v-if="uncertain.memberLevel" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('memberLevel')" />
+        </label>
+      </IftaLabel>
       <small class="field-error" v-if="errors.memberLevel">{{ errors.memberLevel }}</small>
     </div>
 
     <div v-if="memberLevel === 'Secondary'" class="form-field">
-      <label class="label" for="primaryPersonId">Primary Person</label>
-      <AutoComplete
-        v-if="primaryPersonEditable"
-        id="primaryPersonId"
-        v-model="selectedPrimaryPerson"
-        option-label="fullName"
-        :suggestions="primaryPersonSuggestions"
-        force-selection
-        class="w-full"
-        input-class="w-full"
-        @complete="searchPrimaryPerson"
-        @item-select="onPrimaryPersonSelect"
-      />
-      <InputText v-else id="primaryPersonId" :model-value="primaryPersonName" class="w-full" disabled />
+      <IftaLabel>
+        <AutoComplete
+          v-if="primaryPersonEditable"
+          id="primaryPersonId"
+          v-model="selectedPrimaryPerson"
+          option-label="fullName"
+          :suggestions="primaryPersonSuggestions"
+          force-selection
+          class="w-full"
+          input-class="w-full"
+          @complete="searchPrimaryPerson"
+          @item-select="onPrimaryPersonSelect"
+        />
+        <InputText v-else id="primaryPersonId" :model-value="primaryPersonName" class="w-full" disabled />
+        <label for="primaryPersonId">Primary Person</label>
+      </IftaLabel>
       <small class="field-error" v-if="errors.primaryPersonId">{{ errors.primaryPersonId }}</small>
     </div>
 
     <div class="form-field">
-      <label class="label" for="joinDate">Join Date
-        <i v-if="uncertain.joinDate" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('joinDate')" />
-      </label>
-      <InputText id="joinDate" v-model="joinDate" placeholder="YYYY-MM-DD" class="w-full"
-                 :class="{ 'p-invalid': errors.joinDate }" @input="edited('joinDate')" />
+      <IftaLabel>
+        <InputText id="joinDate" v-model="joinDate" placeholder="YYYY-MM-DD" class="w-full"
+                   :class="{ 'p-invalid': errors.joinDate }" @input="edited('joinDate')" />
+        <label for="joinDate">Join Date
+          <i v-if="uncertain.joinDate" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('joinDate')" />
+        </label>
+      </IftaLabel>
       <small class="field-error" v-if="errors.joinDate">{{ errors.joinDate }}</small>
     </div>
 
     <div v-if="status === 'Dropped'" class="form-field">
-      <label class="label" for="dropReason">Drop Reason
-        <i v-if="uncertain.dropReason" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('dropReason')" />
-      </label>
-      <InputText id="dropReason" v-model="dropReason" class="w-full" @input="edited('dropReason')" />
+      <IftaLabel>
+        <InputText id="dropReason" v-model="dropReason" class="w-full" @input="edited('dropReason')" />
+        <label for="dropReason">Drop Reason
+          <i v-if="uncertain.dropReason" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('dropReason')" />
+        </label>
+      </IftaLabel>
     </div>
   </div>
 
@@ -156,24 +169,30 @@ watch(memberLevel, (level) => {
     <h3 class="section-header">Household &amp; Billing</h3>
 
     <div class="form-field">
-      <label class="label" for="householdSize">Household Size
-        <i v-if="uncertain.householdSize" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('householdSize')" />
-      </label>
-      <InputNumber id="householdSize" v-model="householdSize" :min="0" show-buttons class="w-full" @update:modelValue="edited('householdSize')" />
+      <IftaLabel>
+        <InputNumber id="householdSize" v-model="householdSize" :min="0" show-buttons class="w-full" @update:modelValue="edited('householdSize')" />
+        <label for="householdSize">Household Size
+          <i v-if="uncertain.householdSize" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('householdSize')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field">
-      <label class="label" for="householdDues">Household Dues
-        <i v-if="uncertain.householdDues" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('householdDues')" />
-      </label>
-      <InputNumber id="householdDues" v-model="householdDues" mode="currency" currency="USD" class="w-full" @update:modelValue="edited('householdDues')" />
+      <IftaLabel>
+        <InputNumber id="householdDues" v-model="householdDues" mode="currency" currency="USD" class="w-full" @update:modelValue="edited('householdDues')" />
+        <label for="householdDues">Household Dues
+          <i v-if="uncertain.householdDues" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('householdDues')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field">
-      <label class="label" for="quickbooksKey">Quickbooks Key
-        <i v-if="uncertain.quickbooksKey" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('quickbooksKey')" />
-      </label>
-      <InputText id="quickbooksKey" v-model="quickbooksKey" class="w-full" @input="edited('quickbooksKey')" />
+      <IftaLabel>
+        <InputText id="quickbooksKey" v-model="quickbooksKey" class="w-full" @input="edited('quickbooksKey')" />
+        <label for="quickbooksKey">Quickbooks Key
+          <i v-if="uncertain.quickbooksKey" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('quickbooksKey')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field checkbox-field">
@@ -204,36 +223,46 @@ watch(memberLevel, (level) => {
     <h3 class="section-header">Notes</h3>
 
     <div class="form-field">
-      <label class="label" for="serviceNotes">Service Notes
-        <i v-if="uncertain.serviceNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('serviceNotes')" />
-      </label>
-      <Textarea id="serviceNotes" v-model="serviceNotes" rows="3" class="w-full" @input="edited('serviceNotes')" />
+      <IftaLabel>
+        <Textarea id="serviceNotes" v-model="serviceNotes" rows="3" class="w-full" @input="edited('serviceNotes')" />
+        <label for="serviceNotes">Service Notes
+          <i v-if="uncertain.serviceNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('serviceNotes')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field">
-      <label class="label" for="scNotes">Service Coordinator Notes
-        <i v-if="uncertain.scNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('scNotes')" />
-      </label>
-      <Textarea id="scNotes" v-model="scNotes" rows="3" class="w-full" @input="edited('scNotes')" />
+      <IftaLabel>
+        <Textarea id="scNotes" v-model="scNotes" rows="3" class="w-full" @input="edited('scNotes')" />
+        <label for="scNotes">Service Coordinator Notes
+          <i v-if="uncertain.scNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('scNotes')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field">
-      <label class="label" for="statusChangeNotes">Status Change Notes
-        <i v-if="uncertain.statusChangeNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('statusChangeNotes')" />
-      </label>
-      <Textarea id="statusChangeNotes" v-model="statusChangeNotes" rows="3" class="w-full" @input="edited('statusChangeNotes')" />
+      <IftaLabel>
+        <Textarea id="statusChangeNotes" v-model="statusChangeNotes" rows="3" class="w-full" @input="edited('statusChangeNotes')" />
+        <label for="statusChangeNotes">Status Change Notes
+          <i v-if="uncertain.statusChangeNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('statusChangeNotes')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field">
-      <label class="label" for="miscNotes">Misc Notes
-        <i v-if="uncertain.miscNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('miscNotes')" />
-      </label>
-      <Textarea id="miscNotes" v-model="miscNotes" rows="3" class="w-full" @input="edited('miscNotes')" />
+      <IftaLabel>
+        <Textarea id="miscNotes" v-model="miscNotes" rows="3" class="w-full" @input="edited('miscNotes')" />
+        <label for="miscNotes">Misc Notes
+          <i v-if="uncertain.miscNotes" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('miscNotes')" />
+        </label>
+      </IftaLabel>
     </div>
     
     <div v-if="showCreatedDate" class="form-field">
-      <label class="label" for="createdDate">Created Date</label>
-      <InputText id="createdDate" :model-value="createdDate" class="w-full" disabled />
+      <IftaLabel>
+        <InputText id="createdDate" :model-value="createdDate" class="w-full" disabled />
+        <label for="createdDate">Created Date</label>
+      </IftaLabel>
     </div>
 
   </div>
