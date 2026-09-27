@@ -153,11 +153,6 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.preferredContactMethod.name }}</span>
         </div>
 
-        <div v-if="languagesText" class="detail-field">
-          <span class="label">Languages:</span>
-          <span class="value">{{ languagesText }}</span>
-        </div>
-
         <div v-if="person.address" class="detail-field">
           <span class="label">Address:</span>
           <span class="value">{{ person.address }}</span>
@@ -202,6 +197,15 @@ const copyEmail = async (email) => {
         <div v-if="person.isVeteran != null" class="detail-field">
           <span class="label">Veteran:</span>
           <span class="value">{{ person.isVeteran ? 'Yes' : 'No' }}</span>
+        </div>
+      </div>
+
+      <!-- Languages Section (interim home until the card is reorganized) -->
+      <div v-if="languagesText" class="section">
+        <h3 class="section-header">Languages</h3>
+        <div class="detail-field">
+          <span class="label">Languages:</span>
+          <span class="value">{{ languagesText }}</span>
         </div>
       </div>
 

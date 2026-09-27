@@ -39,6 +39,19 @@ describe('PersonDetailCard — 0027 fields', () => {
     expect(screen.getByText('English (preferred), Spanish')).toBeInTheDocument()
   })
 
+  it('shows languages in their own section after Demographics', () => {
+    mount({ ...base, gender: { genderId: '1', name: 'Female' }, languages: [
+      { languageId: '1', name: 'English', tag: 'en', isPreferred: true },
+    ] })
+    const headers = [...document.querySelectorAll('.section-header')].map(h => h.textContent.trim())
+    expect(headers.indexOf('Languages')).toBe(headers.indexOf('Demographics') + 1)
+  })
+
+  it('omits the Languages section when the person has none', () => {
+    mount({ ...base, languages: [] })
+    expect(screen.queryByText('Languages')).toBeNull()
+  })
+
   it('shows Demographics with an explicit No veteran answer', () => {
     mount({ ...base, gender: { genderId: '1', name: 'Female' }, races: [{ raceId: '1', name: 'Asian' }, { raceId: '5', name: 'White' }], isVeteran: false })
     expect(screen.getByText('Demographics')).toBeInTheDocument()
