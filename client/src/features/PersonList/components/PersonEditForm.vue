@@ -157,7 +157,10 @@ function cancel () {
   <Card class="detail-card">
     <template #title>{{ isEdit ? 'Edit Person' : 'Create Person' }}</template>
     <template #content>
-      <form @submit.prevent="handleSubmit">
+      <!-- No submit button, so Enter in a text box never saves (browsers only
+           submit implicitly when a form has one); @submit.prevent stays as a
+           backstop. Save is an ordinary button. -->
+      <form @submit.prevent>
 
         <PersonFormFields
           ref="fields"
@@ -206,7 +209,7 @@ function cancel () {
         <!-- Footer: Save / Cancel buttons -->
         <div class="form-footer">
           <Button type="button" label="Cancel" severity="secondary" @click="cancel" />
-          <Button type="submit" label="Save" />
+          <Button type="button" label="Save" @click="handleSubmit" />
         </div>
 
       </form>
@@ -217,6 +220,7 @@ function cancel () {
 <style scoped>
 .detail-card {
   max-width: 1100px;
+  margin: 2rem auto;
   border: 1px solid var(--color-border-default);
   box-shadow: var(--box-shadow-card);
 }
@@ -226,12 +230,18 @@ function cancel () {
   font-size: 2rem;
 }
 
+/* Pinned to the bottom of the viewport while the form scrolls, so Save is
+   reachable from anywhere on a long form. */
 .form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 1.5rem;
-  padding-top: 1rem;
+  padding: 0.75rem 0;
+  background: var(--p-card-background);
   border-top: 1px solid var(--color-border-default);
 }
 </style>
