@@ -6,7 +6,7 @@ import ServiceRequestCreateEdit from '../components/ServiceRequestCreateEdit.vue
 
 const routeParams = { value: {} }
 // Shared spy (vi.hoisted, same reasoning as toastAdd below) so tests can
-// assert on navigation the component triggers, e.g. the Unmatched redirect.
+// assert on navigation the component triggers (or, for Unmatched, does not).
 const routerPush = vi.hoisted(() => vi.fn())
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush, afterEach: () => () => {} }),
@@ -962,10 +962,8 @@ describe('a rejected save explains itself', () => {
   // "Failed to update service request" — e.g. rule 1's refusal to reassign the
   // volunteer on a cancelled row.
   //
-  // Uses a CANCELLED row, not an Unmatched one: the edit route redirects away
-  // from Unmatched without populating the form, so a save there never reaches
-  // the API at all — validation stops it first. Cancelled rows are editable and
-  // are where these 422s actually surface to a user.
+  // Uses a CANCELLED row: on an Unmatched row the form's own volunteer guard
+  // stops this save before it reaches the API.
   const rejectedRequest = {
     serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
     serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
@@ -1010,58 +1008,101 @@ describe('a rejected save explains itself', () => {
   })
 })
 
-describe('editing an Unmatched request is disallowed', () => {
-  // The rules for editing an Unmatched request are unsettled, so the edit
-  // route refuses to present the form for one even when reached directly
-  // (bookmark, back button, hand-typed URL) — the list already hides the
-  // pencil, but the route itself must independently refuse to render.
+describe('editing an Unmatched request', () => {
+  // The nightly auto-complete event marks a request Unmatched when nobody was
+  // assigned. A coordinator then records what actually happened: a volunteer
+  // did it after all (Completed), it was really a cancellation, or just a
+  // correction that leaves it Unmatched. Unmatched is not writable through the
+  // API, so staying Unmatched means sending no status at all.
   const unmatchedRequest = {
     serviceRequestId: 5, requestNumber: 5, villageId: '1', memberPersonId: '7',
     serviceName: 'Errand: Shopping', serviceDate: '2026-08-01',
     status: 'Unmatched', volunteerPersonId: null
   }
 
-  it('redirects to the detail view instead of rendering an editable form', async () => {
-    await mountEditAndExpose(unmatchedRequest)
-
-    await waitFor(() => expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'service-request-detail',
-        params: { villageId: '1', id: '5' }
-      })
-    ))
-    // No editable form should ever appear for an Unmatched request.
-    expect(screen.queryByRole('form')).toBeNull()
-    expect(document.querySelector('form')).toBeNull()
-  })
-
-  it('does not populate the form for a component that is navigating away', async () => {
-    // The watcher returns after redirecting. Populating would fire the
-    // villageId and isRideService watchers, issuing member/volunteer fetches
-    // for a component on its way out.
-    const { getVillageMembers } = await import('../../MemberList/api/memberApi.js')
+  it('renders the editable form, with no redirect', async () => {
     const vm = await mountEditAndExpose(unmatchedRequest)
-
-    await waitFor(() => expect(routerPush).toHaveBeenCalled())
-    expect(vm.form.memberPersonId).toBe('')
-    expect(vm.form.serviceName).toBe('')
-    expect(getVillageMembers).not.toHaveBeenCalled()
-  })
-
-  it('warns the user why they were redirected', async () => {
-    await mountEditAndExpose(unmatchedRequest)
-
-    await waitFor(() => expect(toastAdd).toHaveBeenCalled())
-    const warnToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'warn')
-    expect(warnToast?.detail).toMatch(/cannot be edited/i)
-  })
-
-  it('still renders an editable form for a non-Unmatched request', async () => {
-    const vm = await mountEditAndExpose({ ...unmatchedRequest, status: 'Open' })
 
     await waitFor(() => expect(document.querySelector('form')).not.toBeNull())
     expect(routerPush).not.toHaveBeenCalled()
-    expect(vm.form.villageId).toBe('1')
+    expect(vm.form.memberPersonId).toBe('7')
+  })
+
+  it('shows Unmatched in the header Tag, not the volunteer-presence fallback', async () => {
+    const vm = await mountEditAndExpose(unmatchedRequest)
+    expect(unref(vm.computedStatus)).toBe('Unmatched')
+  })
+
+  it('offers Unmatched first, then the cancel reasons and Completed', async () => {
+    const vm = await mountEditAndExpose(unmatchedRequest)
+    expect(unref(vm.isTerminal)).toBe(true)
+    expect(unref(vm.statusOptions)).toEqual([
+      'Unmatched', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed'
+    ])
+  })
+
+  it('offers a plain Save, never Save and Notify', async () => {
+    const vm = await mountEditAndExpose(unmatchedRequest)
+    expect(unref(vm.notifyOnPrimarySave)).toBe(false)
+    await waitFor(() => expect(screen.getByText('Save')).toBeTruthy())
+    expect(screen.queryByText('Save and Notify')).toBeNull()
+  })
+
+  it('sends no status on a save that leaves it Unmatched', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(unmatchedRequest)
+
+    vm.form.description = 'corrected'
+    await vm.handleSubmit(false)
+
+    const [operationId, , payload] = apiCall.mock.calls.at(-1)
+    expect(operationId).toBe('patchServiceRequest')
+    expect(payload).not.toHaveProperty('status')
+    expect(payload.notify).toBe(false)
+    expect(payload.description).toBe('corrected')
+  })
+
+  it('sends Completed with the volunteer when the service happened after all', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(unmatchedRequest)
+
+    vm.form.status = 'Completed'
+    vm.form.volunteerPersonId = '9'
+    await vm.handleSubmit(false)
+
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.status).toBe('Completed')
+    expect(payload.volunteerPersonId).toBe('9')
+  })
+
+  it('sends the chosen cancel reason', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(unmatchedRequest)
+
+    vm.form.status = 'Member cancelled'
+    await vm.handleSubmit(false)
+
+    const [, , payload] = apiCall.mock.calls.at(-1)
+    expect(payload.status).toBe('Member cancelled')
+  })
+
+  it('refuses a volunteer without Completed, and says how to record one', async () => {
+    // Mirrors API rule 1, which would refuse the same save with a sentence
+    // that does not tell the coordinator what to do instead.
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountEditAndExpose(unmatchedRequest)
+
+    vm.form.volunteerPersonId = '9'
+    await vm.handleSubmit(false)
+
+    expect(apiCall).not.toHaveBeenCalled()
+    const errorToast = toastAdd.mock.calls.map(c => c[0]).find(t => t.severity === 'error')
+    expect(errorToast?.detail).toMatch(/set its status to Completed/)
+  })
+
+  it('never offers Unmatched on a request that is not already Unmatched', async () => {
+    const vm = await mountEditAndExpose({ ...unmatchedRequest, status: 'Member cancelled' })
+    expect(unref(vm.statusOptions)).not.toContain('Unmatched')
   })
 })
 

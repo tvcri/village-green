@@ -66,12 +66,6 @@ const { state: existingRequest, isLoading: isLoadingRequest } = useAsyncState(
   { immediate: true }
 )
 
-// Drives both the redirect-away watcher (below) and the template's form gate
-// — the form must not render editable while the redirect is in flight, and
-// this doubles as a defensive gate if the redirect is ever a no-op (e.g. a
-// test/harness that stubs router.push without actually navigating).
-const isUnmatched = computed(() => isEdit.value && existingRequest.value?.status === 'Unmatched')
-
 const form = ref({
   villageId: '',
   memberPersonId: '',
@@ -111,31 +105,7 @@ const cancelPopover = ref(null)
 // Starts true in create mode (no load needed); starts false in edit mode.
 const formLoaded = ref(!isEdit.value)
 
-// Editing an Unmatched request is disallowed for now — the rules around what
-// may change on one are unsettled. A direct/bookmarked/stale URL can still
-// reach this route (the list already hides the pencil, see
-// MetaServiceRequestList.vue), so the guard has to live here too. Redirect to
-// the read-only detail view rather than rendering the form. Uses router.push,
-// like every other navigation in this component (handleCancel, handleSubmit,
-// handleComplete) — this route has no back-history worth suppressing the way
-// useRequirePermission's replace() does for a forbidden page.
-//
-// Returning here matters: populating the form would fire the villageId and
-// isRideService watchers, issuing member/volunteer fetches for a component
-// that is on its way out. formLoaded and the form ref are read only by this
-// component's own watchers, so leaving them untouched is invisible to the
-// detail view we redirect to — it fetches its own copy.
 watch(existingRequest, async (val) => {
-  if (val && isEdit.value && val.status === 'Unmatched') {
-    toast.add({
-      severity: 'warn',
-      summary: 'Editing unavailable',
-      detail: 'Unmatched requests cannot be edited yet.',
-      life: 4000
-    })
-    router.push({ name: 'service-request-detail', params: { villageId: val.villageId, id: serviceRequestId.value }, query: { from: 'meta' } })
-    return
-  }
   if (val && isEdit.value) {
     formLoaded.value = false
     const extractDate = (dateStr) => {
@@ -535,26 +505,33 @@ const statusOverride = ref(null)
 
 const CLIENT_STATUSES = ['Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
 
+// The five end states. Unmatched is one, but not a CLIENT_STATUS: only the
+// nightly auto-complete event writes it, and the OAS writable enum excludes
+// it. So an Unmatched row keeps its status by sending none (handleSubmit).
+const END_STATES = [...CLIENT_STATUSES, 'Unmatched']
+
 const computedStatus = computed(() => {
   if (statusOverride.value) return statusOverride.value
   // Terminal statuses are asserted by the user through the status droplist and
   // held in form.status; Open/Confirmed remain derived from volunteer presence.
-  if (CLIENT_STATUSES.includes(form.value.status)) return form.value.status
+  if (END_STATES.includes(form.value.status)) return form.value.status
   return form.value.volunteerPersonId ? 'Confirmed' : 'Open'
 })
 
-// The four editable end states. Terminal rows assert their status through the
-// droplist; Open/Confirmed derive it, so they get no droplist.
-const END_STATES = ['Completed', 'Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
-
+// Terminal rows assert their status through the droplist; Open/Confirmed
+// derive it, so they get no droplist.
 const isTerminal = computed(() => END_STATES.includes(existingRequest.value?.status))
 
-// These four are the statuses staff may assert through the droplist.
-// Open/Confirmed are derived from volunteer presence, so they are never
-// offered. Every terminal row gets the same four: staff move a request
-// between end states in either direction, including Completed back to a
-// cancellation reason.
+const isUnmatchedRequest = computed(() => existingRequest.value?.status === 'Unmatched')
+
+// The statuses staff may assert through the droplist. Open/Confirmed are
+// derived from volunteer presence, so they are never offered. Staff move a
+// request between end states in either direction, including Completed back
+// to a cancellation reason. Unmatched is offered only on a row that is
+// already Unmatched, as the "leave it as it is" choice: nothing can be moved
+// to Unmatched.
 const statusOptions = computed(() => [
+  ...(isUnmatchedRequest.value ? ['Unmatched'] : []),
   'Member cancelled', 'Volunteer cancelled', 'Hub cancelled', 'Completed'
 ])
 
@@ -883,6 +860,20 @@ const handleSubmit = async (notify = false) => {
       return
     }
 
+    // Mirrors API rule 1 on an Unmatched row: a volunteer can only be recorded
+    // as part of completing it. The API's own refusal names the rule but not
+    // the way through, so the form says it here.
+    if (isUnmatchedRequest.value && computedStatus.value !== 'Completed' &&
+        String(form.value.volunteerPersonId || '') !== String(existingRequest.value.volunteerPersonId || '')) {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'To record a volunteer on an unmatched request, set its status to Completed',
+        life: 5000
+      })
+      return
+    }
+
     isSubmitting.value = true
 
     const payload = {
@@ -974,7 +965,7 @@ const handleSubmit = async (notify = false) => {
 // belongs to the act of cancelling (doCancelRequest sends it) — saving an
 // edit to an already-terminal request announces nothing, so Completed and
 // the cancel reasons all get a plain Save. The API refuses Completed and
-// Unmatched outright; this keeps the button honest for the rest.
+// Unmatched outright; END_STATES includes both, so the button stays honest.
 const notifyOnPrimarySave = computed(() => !END_STATES.includes(computedStatus.value))
 
 const primarySaveAction = computed(() => notifyOnPrimarySave.value
@@ -1084,6 +1075,7 @@ const openPersonDialog = (personId) => {
                 computedStatus === 'Confirmed' ? 'info'
                 : computedStatus === 'Completed' ? 'success'
                 : computedStatus.includes('cancelled') ? 'danger'
+                : computedStatus === 'Unmatched' ? 'secondary'
                 : 'warn'
               "
             />
@@ -1101,8 +1093,6 @@ const openPersonDialog = (personId) => {
 
       <template #content>
         <div v-if="isLoadingRequest && isEdit" class="loading">Loading...</div>
-
-        <div v-else-if="isUnmatched" class="loading">Unmatched requests cannot be edited yet. Redirecting…</div>
 
         <!-- Enter-to-save must match the primary button exactly. Passing the
              method by name would hand handleSubmit the SubmitEvent as its
