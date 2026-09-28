@@ -2,7 +2,7 @@ import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
-import { persons } from '../../setup/fixtures.js'
+import { persons, villages } from '../../setup/fixtures.js'
 
 // member_circle_preference: "when requesting services, prefer a responder
 // from this circle". Replaced as a set when circlePreferences is present;
@@ -50,4 +50,14 @@ test('duplicate circleId in the body is a 400, not a UNIQUE-constraint 500', asy
     token: tokens.users.staff, body: { circlePreferences: [c['Circle of Pride'], c['Circle of Pride']] },
   })
   assert.equal(r.status, 400)
+})
+
+test('the village members list carries circlePreferences (the Members export column)', async () => {
+  const c = await circleIds()
+  await vgCall('patchPersonMember', { personId: pid }, { token: tokens.users.staff, body: { circlePreferences: [c['Circle of Pride']] } })
+  const r = await vgCall('getVillageMembers', { villageId: villages.quahog.id }, { token: tokens.users.staff })
+  assert.equal(r.status, 200)
+  assert.ok(r.json.every(m => Array.isArray(m.circlePreferences)), 'every row has the array, [] when none')
+  const row = r.json.find(m => m.personId === String(pid))  // ids serialize as strings
+  assert.deepEqual(row.circlePreferences.map(x => x.name), ['Circle of Pride'])
 })

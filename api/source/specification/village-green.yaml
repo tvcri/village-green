@@ -3670,6 +3670,10 @@ components:
           type: string
           format: date
           nullable: true
+        circlePreferences:
+          description: Circles this member prefers a volunteer from (member_circle_preference).
+          type: array
+          items: { $ref: '#/components/schemas/Circle' }
     MemberId:
       $ref: '#/components/schemas/StringIntId'
     ApplicationEnvelope:

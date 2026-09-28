@@ -192,7 +192,18 @@ module.exports.getVillageMembers = async function (villageId) {
     'm.memberNumber',
     'm.memberLevel',
     'm.serviceNotes',
-    'DATE_FORMAT(m.joinDate, "%Y-%m-%d") AS joinDate'
+    'DATE_FORMAT(m.joinDate, "%Y-%m-%d") AS joinDate',
+    // Always included: the Members CSV/Sheets export needs it ("prefers a
+    // volunteer from"), and it is one small indexed subquery per member.
+    `(SELECT COALESCE(
+        ${dbUtils.jsonArrayAgg({
+          value: `JSON_OBJECT('circleId', CAST(c.id AS CHAR), 'name', c.name)`,
+          orderBy: 'c.name'
+        })},
+        JSON_ARRAY())
+      FROM member_circle_preference mcp
+      JOIN circle c ON c.id = mcp.circleId
+      WHERE mcp.memberId = m.id) AS circlePreferences`
   ]
   const joins = new Set([
     'active_member m',
