@@ -9,9 +9,9 @@ const MigrationHandler = require('./lib/MigrationHandler')
 //     members: members keep the tick (Gabriella, Slack 2026-09-28 9:15 —
 //     "only uncheck Circle of Pride for volunteers ... not members"). In
 //     the 2026-09-28 production data that clears 13 volunteer-only rows and
-//     keeps 3 (1 member, 2 member+volunteer — whether those two stay was
-//     asked back of Gabriella; kept pending her answer). Any member row,
-//     even an inactive one, keeps the tick. Gabriella re-ticks volunteers by
+//     keeps 3 (1 member, 2 member+volunteer). A member who is also a
+//     volunteer is treated as a member (Gabriella, 2026-09-28). Any member
+//     row, even an inactive one, keeps the tick. Gabriella re-ticks volunteers by
 //     hand. Veteran rows stay (Caroline, 10:43). The deleted rows are the
 //     only record of the application-form Pride answers; the pre-merge
 //     production dump keeps them for backfills, so no archive table is
