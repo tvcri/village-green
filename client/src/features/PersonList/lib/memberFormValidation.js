@@ -1,14 +1,4 @@
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-
-// joinDate is a civil date string — validate the calendar parts directly
-// rather than via Date.parse, which accepts '2026-02-31' by rolling over.
-function isRealCivilDate (s) {
-  if (!DATE_RE.test(s)) return false
-  const [y, m, d] = s.split('-').map(Number)
-  if (m < 1 || m > 12) return false
-  const date = new Date(y, m - 1, d)
-  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
-}
+import { isRealCivilDate } from '../../../shared/lib/civilDate.js'
 
 // memberLevel and joinDate are required by the API (MemberPut). Validate them
 // here so the form never sends a body the server will reject.

@@ -1,6 +1,7 @@
+import { isRealCivilDate } from '../../../shared/lib/civilDate.js'
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_RE = /^[\d\s\-()+]{7,}$/
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const ZIP_RE = /^\d{5}$/
 
 export function validatePersonForm (form, errors, extra = {}) {
@@ -21,9 +22,9 @@ export function validatePersonForm (form, errors, extra = {}) {
   if (form.emergencyContactPhone && !PHONE_RE.test(form.emergencyContactPhone))
     errors.emergencyContactPhone = 'Enter a valid phone number'
 
-  if (form.birthDate && (!DATE_RE.test(form.birthDate) || isNaN(Date.parse(form.birthDate))))
+  if (form.birthDate && !isRealCivilDate(form.birthDate))
     errors.birthDate = 'Enter a valid date (YYYY-MM-DD)'
-  if (extra.deceasedDate && (!DATE_RE.test(extra.deceasedDate) || isNaN(Date.parse(extra.deceasedDate))))
+  if (extra.deceasedDate && !isRealCivilDate(extra.deceasedDate))
     errors.deceasedDate = 'Enter a valid date (YYYY-MM-DD)'
 
   if (form.zip && !ZIP_RE.test(form.zip))

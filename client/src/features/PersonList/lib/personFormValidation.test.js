@@ -30,4 +30,12 @@ describe('validatePersonForm', () => {
     expect(errors.deceasedDate).toBe('Enter a valid date (YYYY-MM-DD)')
     expect(validatePersonForm(base(), {}, { deceasedDate: '2026-02-01' })).toBe(true)
   })
+
+  it('rejects impossible calendar dates that Date.parse rolls over', () => {
+    const errors = {}
+    expect(validatePersonForm({ ...base(), birthDate: '1950-02-31' }, errors, { deceasedDate: '2026-02-29' })).toBe(false)
+    expect(errors.birthDate).toBe('Enter a valid date (YYYY-MM-DD)')
+    expect(errors.deceasedDate).toBe('Enter a valid date (YYYY-MM-DD)')
+    expect(validatePersonForm({ ...base(), birthDate: '1952-02-29' }, {}, { deceasedDate: '2026-04-30' })).toBe(true)
+  })
 })
