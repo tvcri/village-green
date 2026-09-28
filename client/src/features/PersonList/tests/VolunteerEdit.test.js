@@ -42,6 +42,9 @@ vi.mock('../../VillageList/api/villageApi.js', () => ({
   getVillages: vi.fn().mockResolvedValue([{ villageId: '1', name: 'Testville' }])
 }))
 
+import { getPerson } from '../api/personApi.js'
+import { putVolunteer, patchVolunteer } from '../api/roleApi.js'
+
 beforeEach(() => {
   window.matchMedia = () => ({
     matches: false,
@@ -67,6 +70,19 @@ const globalOpts = {
 }
 
 describe('VolunteerEdit', () => {
+  // A failed load leaves person null, so the no-home-village notice replaces
+  // the form: no Save or Grant button exists to PUT a new role over the stored one.
+  it('a failed person load renders no save button, so it can never PUT a role', async () => {
+    getPerson.mockRejectedValueOnce(new Error('down'))
+    render(VolunteerEdit, { global: globalOpts })
+    await waitFor(() => expect(getPerson).toHaveBeenCalled())
+    await new Promise(r => setTimeout(r, 0))
+    expect(screen.queryByText('Grant Volunteer Role')).toBeNull()
+    expect(screen.queryByText('Save')).toBeNull()
+    expect(putVolunteer).not.toHaveBeenCalled()
+    expect(patchVolunteer).not.toHaveBeenCalled()
+  })
+
   it('loads and displays the existing volunteer values', async () => {
     render(VolunteerEdit, { global: globalOpts })
     await waitFor(() => expect(screen.getByDisplayValue('Existing notes')).toBeInTheDocument())

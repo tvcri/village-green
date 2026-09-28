@@ -43,6 +43,9 @@ vi.mock('../../MemberList/api/memberApi.js', () => ({
   getVillageMembers: vi.fn().mockResolvedValue([])
 }))
 
+import { getPerson } from '../api/personApi.js'
+import { putMember, patchMember } from '../api/roleApi.js'
+
 beforeEach(() => {
   window.matchMedia = () => ({
     matches: false,
@@ -62,6 +65,19 @@ const globalOpts = {
 }
 
 describe('MemberEdit', () => {
+  // A failed load leaves person null, so the no-home-village notice replaces
+  // the form: no Save or Grant button exists to PUT a new role over the stored one.
+  it('a failed person load renders no save button, so it can never PUT a role', async () => {
+    getPerson.mockRejectedValueOnce(new Error('down'))
+    render(MemberEdit, { global: globalOpts })
+    await waitFor(() => expect(getPerson).toHaveBeenCalled())
+    await new Promise(r => setTimeout(r, 0))
+    expect(screen.queryByText('Grant Member Role')).toBeNull()
+    expect(screen.queryByText('Save')).toBeNull()
+    expect(putMember).not.toHaveBeenCalled()
+    expect(patchMember).not.toHaveBeenCalled()
+  })
+
   it('shows service preferences and saves a toggle', async () => {
     const { patchMember } = await import('../api/roleApi.js')
     render(MemberEdit, { global: globalOpts })
