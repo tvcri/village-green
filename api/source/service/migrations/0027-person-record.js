@@ -5,10 +5,17 @@ const MigrationHandler = require('./lib/MigrationHandler')
 // 2026-09-02) and Slack guidance of 2026-09-21 (Caroline Dillon, Gabriella
 // Laurenzo). See scratch/superpowers/specs/2026-09-21-person-demographics-circles-design.md.
 //
-//  1. Nullify Circle of Pride only. Gabriella re-ticks by hand. Veteran
-//     rows stay (Caroline, 10:43). The deleted rows are the only record of
-//     the application-form Pride answers; the pre-merge production dump
-//     keeps them for backfills, so no archive table is created here.
+//  1. Nullify Circle of Pride only, and only for people who are not
+//     members: members keep the tick (Gabriella, Slack 2026-09-28 9:15 —
+//     "only uncheck Circle of Pride for volunteers ... not members"). In
+//     the 2026-09-28 production data that clears 13 volunteer-only rows and
+//     keeps 3 (1 member, 2 member+volunteer — whether those two stay was
+//     asked back of Gabriella; kept pending her answer). Any member row,
+//     even an inactive one, keeps the tick. Gabriella re-ticks volunteers by
+//     hand. Veteran rows stay (Caroline, 10:43). The deleted rows are the
+//     only record of the application-form Pride answers; the pre-merge
+//     production dump keeps them for backfills, so no archive table is
+//     created here.
 //  2. community -> circle (the group's word) with the settled public names.
 //     DownCity and OakHill are circles at the same level. INSERT IGNORE so
 //     the test harness (empty community table) ends with the same four rows.
@@ -58,10 +65,11 @@ const LOOKUP = name => `CREATE TABLE ${name} (
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`
 
 const upMigration = [
-  // 1. nullify Circle of Pride only
+  // 1. nullify Circle of Pride for non-members only
   `DELETE pc FROM person_community pc
    JOIN community c ON c.id = pc.communityId
-   WHERE c.name = 'Pride'`,
+   WHERE c.name = 'Pride'
+     AND NOT EXISTS (SELECT 1 FROM member m WHERE m.personId = pc.personId)`,
 
   // 2. rename
   `RENAME TABLE community TO circle, person_community TO person_circle`,
