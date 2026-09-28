@@ -124,7 +124,7 @@ async function submit () {
     const created = await createPerson(payload)
     emit('person-done', {
       personId: created.personId,
-      fullName: [form.firstName, form.lastName].filter(Boolean).join(' '),
+      fullName: created.fullName,   // the stored form, suffix included
       existing: false,
     })
   }

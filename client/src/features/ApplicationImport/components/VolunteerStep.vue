@@ -108,7 +108,7 @@ async function grantVolunteerRole (personId, { isExisting = false } = {}) {
     else await putVolunteer(personId, body)
     emit('volunteer-done', {
       personId: createdPersonId,
-      fullName: [form.firstName, form.lastName].filter(Boolean).join(' '),
+      fullName: createdPersonName,
     })
   }
   catch (err) {
@@ -123,10 +123,12 @@ async function grantVolunteerRole (personId, { isExisting = false } = {}) {
 
 let createdPersonId = null
 let createdPersonIsExisting = false
+let createdPersonName = ''   // the stored fullName, suffix included
 
 async function useExisting (person) {
   createdPersonId = person.personId
   createdPersonIsExisting = true
+  createdPersonName = person.fullName
   saving.value = true
   await grantVolunteerRole(person.personId, { isExisting: true })
   saving.value = false
@@ -165,6 +167,7 @@ async function submit () {
     const created = await createPerson(payload)
     createdPersonId = created.personId
     createdPersonIsExisting = false
+    createdPersonName = created.fullName
     await grantVolunteerRole(created.personId)
   }
   catch {
