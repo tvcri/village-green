@@ -35,6 +35,20 @@ describe('PersonDemographicsFields', () => {
     expect(screen.getByText('Unknown')).toBeInTheDocument()
   })
 
+  it('clearing a Yes veteran answer emits null (unknown), never false', async () => {
+    const emitted = []
+    const { container } = render(PersonDemographicsFields, {
+      props: {
+        lookups, genderId: null, ethnicityId: null, isVeteran: true, raceIds: [],
+        'onUpdate:isVeteran': v => emitted.push(v),
+      },
+      global: { plugins: [PrimeVue], directives: { tooltip: {} } },
+    })
+    expect(screen.getByText('Yes')).toBeInTheDocument()
+    await fireEvent.click(container.querySelector('[data-pc-section="clearicon"]'))
+    expect(emitted).toEqual([null])
+  })
+
   it('shows a No veteran answer as No', () => {
     mount({ isVeteran: false })
     expect(screen.getByText('No')).toBeInTheDocument()
