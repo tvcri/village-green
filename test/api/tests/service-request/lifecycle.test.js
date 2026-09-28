@@ -503,3 +503,65 @@ test('a single-field patch on a terminal request leaves its status alone', async
   assert.equal(res.json.serviceName, 'Errand')
   assert.equal(res.json.status, 'Completed', 'omitting status must not re-derive a terminal row')
 })
+
+// Editing an Unmatched request from the Vue form. Unmatched is seeded directly
+// for the reason given in the rule-1 Unmatched test above. These pin the three
+// things a coordinator does with such a row: record that the service happened,
+// reclassify it as a cancellation, or correct details and leave it Unmatched.
+async function createUnmatched () {
+  const { json } = await create({
+    villageId: quahog, memberPersonId: member, serviceDate: '2026-08-01'
+  })
+  await withDb(c =>
+    c.query('UPDATE service_request SET status = ? WHERE id = ?', ['Unmatched', json.serviceRequestId]))
+  return json.serviceRequestId
+}
+
+test('Unmatched to Completed with a volunteer is allowed — the service happened after all', async () => {
+  const serviceRequestId = await createUnmatched()
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: { volunteerPersonId: volunteer, status: 'Completed' }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Completed')
+  assert.equal(String(res.json.volunteerPersonId), volunteer)
+})
+
+test('Unmatched to Completed without a volunteer is refused by rule 3', async () => {
+  const serviceRequestId = await createUnmatched()
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { status: 'Completed' } })
+  assert.equal(res.status, 422)
+
+  const after = await vgCall('getServiceRequest', { serviceRequestId }, { token: tokens.users.sc })
+  assert.equal(after.json.status, 'Unmatched')
+})
+
+test('Unmatched may be reclassified as a cancellation', async () => {
+  const serviceRequestId = await createUnmatched()
+  const res = await vgCall('patchServiceRequest', { serviceRequestId },
+    { token: tokens.users.sc, body: { volunteerPersonId: null, status: 'Member cancelled' } })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Member cancelled')
+  assert.equal((await notificationEvents(serviceRequestId)).length, 0)
+})
+
+test('the full form payload with no status leaves an Unmatched request Unmatched', async () => {
+  // The Vue form's shape on an ordinary save: every field, volunteerPersonId
+  // re-sent as null, and no status key because Unmatched is not writable.
+  const serviceRequestId = await createUnmatched()
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, {
+    token: tokens.users.sc,
+    body: {
+      villageId: quahog, memberPersonId: member, volunteerPersonId: null, notify: false,
+      serviceName: 'Errand', transportationType: 'None', serviceDate: '2026-08-02',
+      timesFlexible: true, startTime: null, finishTime: null, apptTime: null, returnTime: null,
+      description: 'corrected'
+    }
+  })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Unmatched')
+  assert.equal(res.json.serviceDate, '2026-08-02')
+  assert.equal(res.json.description, 'corrected')
+})
