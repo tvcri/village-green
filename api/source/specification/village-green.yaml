@@ -3038,9 +3038,13 @@ components:
         usage:
           type: object
           properties:
+            model: { type: string }
             inputTokens: { type: integer }
             outputTokens: { type: integer }
-            cost: { type: number }
+            cost:
+              type: number
+              nullable: true
+              description: USD; null when the model has no known price
     AppDataFormat:
       type: string
       default: gzip

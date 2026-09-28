@@ -160,6 +160,10 @@ const config = {
     anthropic: {
         // Server-side only. Never expose via getClientEnv().
         apiKey: process.env.VG_ANTHROPIC_API_KEY,
+        // The application-import extraction model. A setting rather than a
+        // constant so production can move models with an app-setting change
+        // instead of a rebuild; ApplicationImportService prices it.
+        model: process.env.VG_ANTHROPIC_MODEL || 'claude-opus-4-8',
         toJSON: function () {
             const {apiKey, ...props} = this
             props.apiKey = !!apiKey

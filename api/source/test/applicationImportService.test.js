@@ -144,8 +144,50 @@ test('assembleResponse passes unknown variant through with usage', () => {
 })
 
 test('computeCost prices opus-4-8 tokens', () => {
-  const c = svc.computeCost({ input_tokens: 1_000_000, output_tokens: 1_000_000 })
-  assert.deepEqual(c, { inputTokens: 1_000_000, outputTokens: 1_000_000, cost: 30 })
+  const c = svc.computeCost({ input_tokens: 1_000_000, output_tokens: 1_000_000 }, 'claude-opus-4-8')
+  assert.deepEqual(c, { model: 'claude-opus-4-8', inputTokens: 1_000_000, outputTokens: 1_000_000, cost: 30 })
+})
+
+test('computeCost prices sonnet-5-5 tokens', () => {
+  const c = svc.computeCost({ input_tokens: 1_000_000, output_tokens: 1_000_000 }, 'claude-sonnet-5-5')
+  assert.deepEqual(c, { model: 'claude-sonnet-5-5', inputTokens: 1_000_000, outputTokens: 1_000_000, cost: 12 })
+})
+
+test('computeCost reports a null cost, not a wrong one, for a model it has no price for', () => {
+  const c = svc.computeCost({ input_tokens: 10, output_tokens: 20 }, 'claude-future-9')
+  assert.deepEqual(c, { model: 'claude-future-9', inputTokens: 10, outputTokens: 20, cost: null })
+})
+
+// A stand-in for the Anthropic client: records the request, returns `reply`.
+function fakeClient (reply) {
+  const calls = []
+  return {
+    calls,
+    messages: { create: async (params) => { calls.push(params); return reply } },
+  }
+}
+const okReply = {
+  stop_reason: 'end_turn',
+  content: [{ type: 'text', text: '{"applicationType":"member"}' }],
+  usage: { input_tokens: 1, output_tokens: 2 },
+}
+
+test('callClaude sends the model it is given, with room for thinking plus the JSON', async () => {
+  const client = fakeClient(okReply)
+  const res = await svc.callClaude(client, 'claude-sonnet-5-5', Buffer.from('%PDF'), { type: 'object' }, 'prompt')
+  assert.equal(client.calls[0].model, 'claude-sonnet-5-5')
+  assert.equal(client.calls[0].max_tokens, 16000)
+  assert.deepEqual(res.data, { applicationType: 'member' })
+})
+
+test('callClaude fails clearly when the response is cut off at max_tokens', async () => {
+  // A truncated structured output is not valid JSON; without this check it
+  // surfaced as a JSON.parse error or "empty response".
+  const client = fakeClient({ ...okReply, stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"applicationType":"mem' }] })
+  await assert.rejects(
+    svc.callClaude(client, 'claude-sonnet-5-5', Buffer.from('%PDF'), { type: 'object' }, 'prompt'),
+    (err) => err.status === 502 && /output limit/.test(err.message)
+  )
 })
 
 test('EXTRACTION_SCHEMA objects all forbid additional properties', () => {

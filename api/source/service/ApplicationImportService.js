@@ -340,21 +340,38 @@ function assembleResponse (data, villages, usage) {
   }
 }
 
-// claude-opus-4-8: $5/MTok input, $25/MTok output
-function computeCost ({ input_tokens, output_tokens }) {
+// USD per million tokens, input and output. A model missing here still runs;
+// its cost is reported as null rather than priced as some other model.
+const MODEL_PRICES = {
+  'claude-opus-4-8': { input: 5, output: 25 },
+  'claude-opus-5-5': { input: 4, output: 20 },
+  'claude-sonnet-5': { input: 2, output: 10 },
+  'claude-sonnet-5-5': { input: 2, output: 10 },
+}
+
+function computeCost ({ input_tokens, output_tokens }, model) {
+  const price = MODEL_PRICES[model]
   return {
+    model,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
-    cost: (input_tokens / 1_000_000 * 5) + (output_tokens / 1_000_000 * 25),
+    cost: price
+      ? (input_tokens / 1_000_000 * price.input) + (output_tokens / 1_000_000 * price.output)
+      : null,
   }
 }
 
-async function callClaude (client, pdfBuffer, schema, prompt) {
+// max_tokens is a ceiling, billed only as used. 16000 leaves room for adaptive
+// thinking (on by default from Sonnet 5 on) plus one application's JSON, and
+// stays within what a non-streaming request should ask for.
+const MAX_TOKENS = 16000
+
+async function callClaude (client, model, pdfBuffer, schema, prompt) {
   let message
   try {
     message = await client.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 4096,
+      model,
+      max_tokens: MAX_TOKENS,
       output_config: { format: { type: 'json_schema', schema } },
       messages: [{
         role: 'user',
@@ -377,6 +394,13 @@ async function callClaude (client, pdfBuffer, schema, prompt) {
     err.status = 502
     throw err
   }
+  // A structured output cut off at the limit is truncated JSON; say so rather
+  // than let it surface as a parse failure or an empty response.
+  if (message.stop_reason === 'max_tokens') {
+    const err = new Error(`The extraction hit the model's output limit (${MAX_TOKENS} tokens) before finishing.`)
+    err.status = 502
+    throw err
+  }
   if (message.stop_reason === 'refusal') {
     const err = new Error('The extraction request was declined by the model. Verify the document is an application form.')
     err.status = 400
@@ -392,12 +416,12 @@ async function callClaude (client, pdfBuffer, schema, prompt) {
   return { data: JSON.parse(text), usage: message.usage }
 }
 
-function combineCost (usages) {
+function combineCost (usages, model) {
   const totals = usages.reduce((acc, u) => ({
     input_tokens: acc.input_tokens + u.input_tokens,
     output_tokens: acc.output_tokens + u.output_tokens,
   }), { input_tokens: 0, output_tokens: 0 })
-  return computeCost(totals)
+  return computeCost(totals, model)
 }
 
 async function extractFromPdf (pdfBuffer) {
@@ -407,18 +431,19 @@ async function extractFromPdf (pdfBuffer) {
     throw err
   }
   const client = new Anthropic({ apiKey: config.anthropic.apiKey })
+  const model = config.anthropic.model
 
   const page1 = await extractPage1(pdfBuffer)
-  const classified = await callClaude(client, page1, CLASSIFY_SCHEMA, CLASSIFY_PROMPT)
+  const classified = await callClaude(client, model, page1, CLASSIFY_SCHEMA, CLASSIFY_PROMPT)
   if (classified.data.applicationType === 'unknown') {
     return {
       data: { applicationType: 'unknown', reason: classified.data.reason },
-      usage: combineCost([classified.usage]),
+      usage: combineCost([classified.usage], model),
     }
   }
 
-  const extracted = await callClaude(client, pdfBuffer, variantSchemaFor(classified.data.applicationType), EXTRACTION_PROMPT)
-  return { data: extracted.data, usage: combineCost([classified.usage, extracted.usage]) }
+  const extracted = await callClaude(client, model, pdfBuffer, variantSchemaFor(classified.data.applicationType), EXTRACTION_PROMPT)
+  return { data: extracted.data, usage: combineCost([classified.usage, extracted.usage], model) }
 }
 
 module.exports = {
@@ -432,5 +457,6 @@ module.exports = {
   resolveVillage,
   assembleResponse,
   computeCost,
+  callClaude,
   extractFromPdf,
 }
