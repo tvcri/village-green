@@ -4,12 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import PrimeVue from 'primevue/config'
 import PersonEditForm from '../components/PersonEditForm.vue'
+import { _resetPersonLookups } from '../composables/usePersonLookups.js'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({ params: { personId: '5' } })
 }))
-vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
+const mockToastAdd = vi.fn()
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: mockToastAdd }) }))
 vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
   useRequirePermission: () => {}
 }))
@@ -70,6 +72,27 @@ const globalOpts = {
 }
 
 describe('PersonEditForm', () => {
+  it('a failed load toasts and keeps Save disabled, so a blank form never PATCHes nulls', async () => {
+    const { getGenders, patchPerson } = await import('../api/personApi.js')
+    _resetPersonLookups()
+    getGenders.mockRejectedValueOnce(new Error('catalog down'))
+    render(PersonEditForm, { global: globalOpts })
+
+    await waitFor(() => expect(mockToastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'error', detail: 'Failed to load person' })))
+    const save = screen.getByText('Save').closest('button')
+    expect(save).toBeDisabled()
+    await fireEvent.click(save)
+    expect(patchPerson).not.toHaveBeenCalled()
+    _resetPersonLookups()
+  })
+
+  it('enables Save once the person has loaded', async () => {
+    render(PersonEditForm, { global: globalOpts })
+    await screen.findByDisplayValue('Alice')
+    expect(screen.getByText('Save').closest('button')).toBeEnabled()
+  })
+
   it('loads and displays the existing person values', async () => {
     render(PersonEditForm, { global: globalOpts })
     await waitFor(() => expect(screen.getByDisplayValue('Alice')).toBeInTheDocument())

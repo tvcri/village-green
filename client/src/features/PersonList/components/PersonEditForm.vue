@@ -61,18 +61,28 @@ async function loadVillages () {
   villages.value = await getVillages()
 }
 
+// Save stays disabled until everything has loaded: an edit form left blank by
+// a failed load would otherwise PATCH null over every field.
+const loaded = ref(false)
+
 onMounted(async () => {
-  await loadVillages()
-  allCircles.value = await getCircles()             // [{ circleId, name }]
-  allDisabilities.value = await getDisabilities()   // [{ disabilityId, name }]
-  await lookupsReady
-  if (isEdit.value) {
-    const p = await getPerson(personId.value, [])
-    Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
-    form.villageId = p.village?.villageId ?? null
-    circleNames.value = new Set(p.circles.map(c => c.name))
-    disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
-    Object.assign(personFields, personFormFromApi(p))
+  try {
+    await loadVillages()
+    allCircles.value = await getCircles()             // [{ circleId, name }]
+    allDisabilities.value = await getDisabilities()   // [{ disabilityId, name }]
+    await lookupsReady
+    if (isEdit.value) {
+      const p = await getPerson(personId.value, [])
+      Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
+      form.villageId = p.village?.villageId ?? null
+      circleNames.value = new Set(p.circles.map(c => c.name))
+      disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
+      Object.assign(personFields, personFormFromApi(p))
+    }
+    loaded.value = true
+  }
+  catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: isEdit.value ? 'Failed to load person' : 'Failed to load the form', life: 3000 })
   }
 })
 
@@ -101,6 +111,7 @@ function buildPayload () {
 }
 
 async function handleSubmit () {
+  if (!loaded.value) return
   if (!validatePersonForm(form, errors, { deceasedDate: personFields.deceasedDate })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
@@ -209,7 +220,7 @@ function cancel () {
         <!-- Footer: Save / Cancel buttons -->
         <div class="form-footer">
           <Button type="button" label="Cancel" severity="secondary" @click="cancel" />
-          <Button type="button" label="Save" @click="handleSubmit" />
+          <Button type="button" label="Save" :disabled="!loaded" @click="handleSubmit" />
         </div>
 
       </form>
