@@ -18,6 +18,7 @@ import ExportButton from '../../../components/ExportButton.vue'
 import { getPersons } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { personExportColumns, personExportValues } from '../../../shared/lib/personExport.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
@@ -62,6 +63,8 @@ const selectedVillageId = computed(() => {
 // filter the check is for that village (village-scoped holders); across all
 // villages only a federation grant applies.
 const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', selectedVillageId.value))
+// person:read_demographics, the same way, for gender/ethnicity/race/veteran.
+const canReadDemographics = computed(() => hasPermission('person:read_demographics', selectedVillageId.value))
 
 const hasFilter = computed(() =>
   firstName.value.trim() || lastName.value.trim() || phone.value.trim() ||
@@ -121,63 +124,22 @@ const isFetchingExport = ref(false)
 // Fixed export column list (order and headers are the contract, never derived
 // from row keys). Exports carry the full Person shape; the live table stays
 // on summary rows.
-const columnsForCsv = computed(() => (canReadBirthDate.value ? ALL_EXPORT_COLUMNS : ALL_EXPORT_COLUMNS.filter(c => c.key !== 'birthDate')))
-const ALL_EXPORT_COLUMNS = [
+const columnsForCsv = computed(() => [
   { header: 'Name', key: 'fullName' },
   { header: 'Village', key: 'villageName' },
   { header: 'Roles', key: 'roles' },
-  { header: 'First Name', key: 'firstName' },
-  { header: 'Middle Initial', key: 'middleInitial' },
-  { header: 'Last Name', key: 'lastName' },
-  { header: 'Nickname', key: 'nickname' },
-  { header: 'Street', key: 'street' },
-  { header: 'Unit', key: 'unit' },
-  { header: 'City', key: 'city' },
-  { header: 'State', key: 'state' },
-  { header: 'Zip', key: 'zip' },
-  { header: 'Municipality', key: 'town' },
-  { header: 'Email', key: 'email' },
-  { header: 'Phone', key: 'phone' },
-  { header: 'Cell', key: 'cell' },
-  { header: 'Birth Date', key: 'birthDate' },
-  { header: 'Emergency Contact Name', key: 'emergencyContactName' },
-  { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
-  { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
-  { header: 'Emergency Contact Email', key: 'emergencyContactEmail' },
-  { header: 'Circles', key: 'circles' },
-  { header: 'Disabilities', key: 'disabilities' }
-]
+  ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
+])
 
 // Rows are summary shape plus the projected `detail` object; email/phone/cell
 // come from the summary root (detail deliberately omits them).
 function detailRowForCsv(p) {
-  const d = p.detail ?? {}
+  const { phone, cell } = parsePhoneObj(p.phone)
   return {
     fullName: p.fullName,
     villageName: p.village?.name ?? '',
     roles: parseJson(p.activeAs).join(', '),
-    firstName: d.firstName,
-    middleInitial: d.middleInitial,
-    lastName: d.lastName,
-    nickname: d.nickname,
-    street: d.street,
-    unit: d.unit,
-    city: d.city,
-    state: d.state,
-    zip: d.zip,
-    town: d.town,
-    email: p.email,
-    phone: parsePhoneObj(p.phone).phone,
-    cell: parsePhoneObj(p.phone).cell,
-    birthDate: d.birthDate,
-    emergencyContactName: d.emergencyContactName,
-    emergencyContactRelationship: d.emergencyContactRelationship,
-    emergencyContactPhone: d.emergencyContactPhone,
-    emergencyContactEmail: d.emergencyContactEmail,
-    circles: (d.circles ?? []).map(c => c.name).join(', '),
-    disabilities: (d.disabilities ?? [])
-      .map(dis => dis.note ? `${dis.name} (${dis.note})` : dis.name)
-      .join('; ')
+    ...personExportValues({ ...(p.detail ?? {}), email: p.email, phone, cell }),
   }
 }
 

@@ -20,6 +20,7 @@ import { toCsv, downloadCsv, buildFlagColumns, withFlagValues } from '../../../s
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
+import { personExportColumns, personExportValues } from '../../../shared/lib/personExport.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
 defineOptions({ name: 'VolunteerList' })
@@ -41,7 +42,8 @@ const { hasPermission } = useCurrentUser()
 // person:read_birth_date: the API omits birthDate for holders without it, so
 // the export drops the column rather than shipping it empty.
 const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', villageId.value))
-const withoutBirthDate = cols => canReadBirthDate.value ? cols : cols.filter(c => c.key !== 'birthDate')
+// person:read_demographics, the same way, for gender/ethnicity/race/veteran.
+const canReadDemographics = computed(() => hasPermission('person:read_demographics', villageId.value))
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
 const pageRows = ref(10)
@@ -141,10 +143,10 @@ const volunteersForCsv = computed(() => {
   return filteredVolunteers.value.map(v => {
     const p = persons.value?.find(p => p.personId === v.personId) ?? {}
     return {
-      ...p,
-      ...v,
+      fullName: v.fullName,
       ...withFlagValues(v, 'capabilities', values),
-      capabilities: v.capabilities?.join('; ') ?? ''
+      capabilities: v.capabilities?.join('; ') ?? '',
+      ...personExportValues(p),
     }
   })
 })
@@ -161,24 +163,13 @@ const navigateToVolunteer = (volunteer) => {
   })
 }
 
-const columnsForCsv = computed(() => withoutBirthDate([
+// Volunteer columns first, then the person block every roster download shares.
+const columnsForCsv = computed(() => [
   { header: 'Full Name', key: 'fullName' },
   { header: 'Capabilities', key: 'capabilities' },
   ...capabilityFlags.value.columns,
-  { header: 'Email', key: 'email' },
-  { header: 'Phone', key: 'phone' },
-  { header: 'Cell', key: 'cell' },
-  { header: 'Address', key: 'address' },
-  { header: 'City', key: 'city' },
-  { header: 'State', key: 'state' },
-  { header: 'Zip', key: 'zip' },
-  { header: 'Municipality', key: 'town' },
-  { header: 'Birth Date', key: 'birthDate' },
-  { header: 'Emergency Contact Name', key: 'emergencyContactName' },
-  { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
-  { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
-  { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
-]))
+  ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
+])
 
 const handleDownloadCsv = async () => {
   if (!persons.value) await fetchPersons()
