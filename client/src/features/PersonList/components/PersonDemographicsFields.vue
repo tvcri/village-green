@@ -9,10 +9,10 @@ const props = defineProps({
   uncertain: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['edited'])
-const genderId = defineModel('genderId', { default: null })
-const ethnicityId = defineModel('ethnicityId', { default: null })
-const isVeteran = defineModel('isVeteran', { default: null })
-const raceIds = defineModel('raceIds', { default: () => [] })
+const genderId = defineModel('genderId', { type: String, default: null })
+const ethnicityId = defineModel('ethnicityId', { type: String, default: null })
+const isVeteran = defineModel('isVeteran', { type: Boolean, default: null })
+const raceIds = defineModel('raceIds', { type: Array, default: () => [] })
 
 // Veteran is three-valued. A Select (cleared = unknown) rather than a checkbox,
 // which would turn an unknown answer into No on the next save.

@@ -6,8 +6,8 @@ defineProps({
   languages: { type: Array, default: () => [] },   // [{ languageId, name, tag }] — the catalog
 })
 const emit = defineEmits(['edited'])
-const languageIds = defineModel('languageIds', { default: () => [] })
-const preferredLanguageId = defineModel('preferredLanguageId', { default: null })
+const languageIds = defineModel('languageIds', { type: Array, default: () => [] })
+const preferredLanguageId = defineModel('preferredLanguageId', { type: String, default: null })
 
 function toggle (id, checked) {
   languageIds.value = checked

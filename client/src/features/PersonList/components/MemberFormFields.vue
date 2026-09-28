@@ -38,7 +38,7 @@ const statusChangeNotes = defineModel('statusChangeNotes')
 const miscNotes = defineModel('miscNotes')
 // Service preference, not membership: "when this member requests a service,
 // prefer a volunteer from these circles" (member_circle_preference).
-const circlePreferences = defineModel('circlePreferences', { default: () => [] })
+const circlePreferences = defineModel('circlePreferences', { type: Array, default: () => [] })
 
 function togglePreference (id, checked) {
   circlePreferences.value = checked
