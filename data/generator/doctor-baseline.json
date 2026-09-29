@@ -20,5 +20,11 @@
   "notification_event.failedAt": "demo data has no failed sends",
   "fcv_submission.fuzzyVolunteerName": "populated by the app's FCV fuzzy-match intake",
   "fcv_submission.fuzzyMemberName": "populated by the app's FCV fuzzy-match intake",
-  "notification_event.payload": "app-populated notification payload; seeded rows predate real sends — intentionally NULL (matches prod rows)"
+  "notification_event.payload": "app-populated notification payload; seeded rows predate real sends — intentionally NULL (matches prod rows)",
+  "person.pronouns": "demo figures carry no gender data; random pronouns would misgender recognizable historical figures",
+  "person.genderId": "demo figures carry no gender data; random values would misgender recognizable historical figures",
+  "person.ethnicityId": "demo figures carry no ethnicity data; invented values on real historical figures would misrepresent them",
+  "person.deceasedDate": "the demo roster is all living people",
+  "member.application": "set only by the PDF import wizard; hand-entered members have none (as in prod)",
+  "volunteer.application": "set only by the PDF import wizard; hand-entered volunteers have none (as in prod)"
 }

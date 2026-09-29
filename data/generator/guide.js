@@ -82,10 +82,10 @@ export function buildGuide (ds) {
     `- **Standing series:** ${w(p.standingSeries.member)} — ${p.standingSeries.serviceName} ×${p.standingSeries.count}`,
     `- **Privacy-ack modal:** sign in as ${p.ackModalUsername}`,
   )
-  lines.push('', '### Community participants')
+  lines.push('', '### Circle participants')
   const personById = Object.fromEntries(ds.person.map(x => [x.id, x]))
-  for (const c of ds.community) {
-    const names = ds.person_community.filter(pc => pc.communityId === c.id)
+  for (const c of ds.circle) {
+    const names = ds.person_circle.filter(pc => pc.circleId === c.id)
       .map(pc => `${personById[pc.personId].firstName} ${personById[pc.personId].lastName} (${villageName[personById[pc.personId].villageId]})`)
     lines.push(`- **${c.name}** (${names.length}): ${names.slice(0, 12).join(', ')}${names.length > 12 ? ', …' : ''}`)
   }
