@@ -164,6 +164,11 @@ const config = {
         // constant so production can move models with an app-setting change
         // instead of a rebuild; ApplicationImportService prices it.
         model: process.env.VG_ANTHROPIC_MODEL || 'claude-opus-4-8',
+        // Optional; unset sends neither, so the model's own defaults apply.
+        // thinking is a thinking.type ("between_tools" turns off up-front
+        // thinking on Sonnet 5.5); effort is output_config.effort.
+        thinking: process.env.VG_ANTHROPIC_THINKING,
+        effort: process.env.VG_ANTHROPIC_EFFORT,
         toJSON: function () {
             const {apiKey, ...props} = this
             props.apiKey = !!apiKey

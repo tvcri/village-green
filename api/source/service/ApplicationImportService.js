@@ -368,13 +368,16 @@ function computeCost ({ input_tokens, output_tokens }, model) {
 // stays within what a non-streaming request should ask for.
 const MAX_TOKENS = 16000
 
-async function callClaude (client, model, pdfBuffer, schema, prompt) {
+// `thinking` and `effort` are optional; omitting them leaves the model's
+// defaults in place (Opus 4.8: no thinking; Sonnet 5.5: adaptive at high).
+async function callClaude (client, model, pdfBuffer, schema, prompt, { thinking, effort } = {}) {
   let message
   try {
     message = await client.messages.create({
       model,
       max_tokens: MAX_TOKENS,
-      output_config: { format: { type: 'json_schema', schema } },
+      ...(thinking && { thinking: { type: thinking } }),
+      output_config: { format: { type: 'json_schema', schema }, ...(effort && { effort }) },
       messages: [{
         role: 'user',
         content: [
@@ -433,10 +436,11 @@ async function extractFromPdf (pdfBuffer) {
     throw err
   }
   const client = new Anthropic({ apiKey: config.anthropic.apiKey })
-  const model = config.anthropic.model
+  const { model, thinking, effort } = config.anthropic
+  const options = { thinking, effort }
 
   const page1 = await extractPage1(pdfBuffer)
-  const classified = await callClaude(client, model, page1, CLASSIFY_SCHEMA, CLASSIFY_PROMPT)
+  const classified = await callClaude(client, model, page1, CLASSIFY_SCHEMA, CLASSIFY_PROMPT, options)
   if (classified.data.applicationType === 'unknown') {
     return {
       data: { applicationType: 'unknown', reason: classified.data.reason },
@@ -444,7 +448,7 @@ async function extractFromPdf (pdfBuffer) {
     }
   }
 
-  const extracted = await callClaude(client, model, pdfBuffer, variantSchemaFor(classified.data.applicationType), EXTRACTION_PROMPT)
+  const extracted = await callClaude(client, model, pdfBuffer, variantSchemaFor(classified.data.applicationType), EXTRACTION_PROMPT, options)
   return { data: extracted.data, usage: combineCost([classified.usage, extracted.usage], model) }
 }
 

@@ -180,6 +180,24 @@ test('callClaude sends the model it is given, with room for thinking plus the JS
   assert.deepEqual(res.data, { applicationType: 'member' })
 })
 
+test('callClaude sends no thinking or effort unless asked, so the model defaults apply', async () => {
+  const client = fakeClient(okReply)
+  await svc.callClaude(client, 'claude-opus-4-8', Buffer.from('%PDF'), { type: 'object' }, 'prompt')
+  assert.equal(client.calls[0].thinking, undefined)
+  assert.deepEqual(client.calls[0].output_config, { format: { type: 'json_schema', schema: { type: 'object' } } })
+})
+
+test('callClaude sends the thinking type and effort it is given, beside the output format', async () => {
+  const client = fakeClient(okReply)
+  await svc.callClaude(client, 'claude-sonnet-5-5', Buffer.from('%PDF'), { type: 'object' }, 'prompt',
+    { thinking: 'between_tools', effort: 'low' })
+  assert.deepEqual(client.calls[0].thinking, { type: 'between_tools' })
+  assert.deepEqual(client.calls[0].output_config, {
+    format: { type: 'json_schema', schema: { type: 'object' } },
+    effort: 'low',
+  })
+})
+
 test('callClaude fails clearly when the response is cut off at max_tokens', async () => {
   // A truncated structured output is not valid JSON; without this check it
   // surfaced as a JSON.parse error or "empty response".
