@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  mapPersonForm, personCommunityNames, personDisabilities, mapMemberForm, composeNotes,
+  mapPersonForm, personDisabilities, mapMemberForm, composeNotes,
   uncertainMapForPerson, uncertainMapForMember, buildPersonCreatePayload,
-  mapVolunteerPersonForm, volunteerPersonCommunityNames, volunteerCapabilityNames, uncertainMapForVolunteerPerson,
+  mapVolunteerPersonForm, volunteerCapabilityNames, uncertainMapForVolunteerPerson,
+  buildApplicationEnvelope, veteranAnswer, mergeCirclePreferences,
+  personExtrasFields, matchGender, initialCircleNames,
 } from './importMapping.js'
 
 function extraction () {
@@ -74,13 +76,6 @@ describe('mapPersonForm', () => {
   it('seeds town empty — PersonFormFields calculates it on mount, not the extraction', () => {
     const f = mapPersonForm(extraction(), 0)
     expect(f.town).toBe('')
-  })
-})
-
-describe('personCommunityNames', () => {
-  it('derives Veteran per member and Pride from application', () => {
-    expect(personCommunityNames(extraction(), 0)).toEqual(new Set(['Veteran', 'Pride']))
-    expect(personCommunityNames(extraction(), 1)).toEqual(new Set(['Pride']))
   })
 })
 
@@ -197,7 +192,7 @@ describe('mapMemberForm', () => {
     expect(f.printedNewsletter).toBe(true)
     expect(f.householdSize).toBe(2)
     expect(f.primaryPersonId).toBe('')
-    expect(f.miscNotes).toContain('Pronouns: she/her')
+    expect(f.miscNotes).not.toContain('Pronouns')
   })
   it('sets primaryPersonId for the second member', () => {
     const f = mapMemberForm(extraction(), 1, 42)
@@ -261,13 +256,14 @@ describe('composeNotes', () => {
     const notes = composeNotes(extraction(), 0)
     expect(notes).toContain('Imported from application PDF')
     expect(notes).toContain('Ambassador: Pat Smith')
-    expect(notes).toContain('Gender: F')
+    expect(notes).not.toContain('Gender')      // now a person field (genderId)
+    expect(notes).not.toContain('Pronouns')    // now a person field
     expect(notes).toContain('Circle of Pride preferred: Yes')
     expect(notes).toContain('Payment method: Personal Check')
     expect(notes).toContain('Dues (yearly): 120')
     expect(notes).toContain('Emergency contact home phone: 401-555-9999')
     expect(notes).toContain('Accessibility notes: Hearing: uses hearing aids sometimes.')
-    expect(notes).not.toContain('Veteran')        // mapped to community
+    expect(notes).not.toContain('Veteran')        // not a notes field; isVeteran arrives with the application-JSON work
     expect(notes).not.toContain('Difficulty hearing')  // mapped to structured disabilities
     expect(notes).not.toContain('null')
   })
@@ -363,17 +359,6 @@ describe('mapVolunteerPersonForm', () => {
   })
 })
 
-describe('volunteerPersonCommunityNames', () => {
-  it('adds Pride when circleOfPrideJoin is Yes', () => {
-    const e = volunteerExtraction()
-    e.circleOfPrideJoin = 'Yes'
-    expect(volunteerPersonCommunityNames(e)).toEqual(new Set(['Pride']))
-  })
-  it('is empty when circleOfPrideJoin is No', () => {
-    expect(volunteerPersonCommunityNames(volunteerExtraction())).toEqual(new Set())
-  })
-})
-
 describe('volunteerCapabilityNames', () => {
   it('wraps capabilityNames in a Set', () => {
     expect(volunteerCapabilityNames(volunteerExtraction())).toEqual(new Set(['Errands']))
@@ -386,5 +371,101 @@ describe('uncertainMapForVolunteerPerson', () => {
     expect(m.zip).toEqual({ reason: 'digit unclear', alternative: '02807' })
     expect(m.villageId).toBeDefined()
     expect(m.emergencyContactPhone).toBeDefined()
+  })
+})
+
+describe('buildApplicationEnvelope', () => {
+  it('wraps the extraction minus usage, with memberIndex per member row', () => {
+    const x = { ...extraction(), schemaVersion: 1, extractedAt: '2026-09-22T14:00:00.000Z', usage: { cost: 1 } }
+    const e1 = buildApplicationEnvelope(x, 1)
+    expect(e1).toMatchObject({ applicationType: 'member', schemaVersion: 1, extractedAt: '2026-09-22T14:00:00.000Z', memberIndex: 1 })
+    expect(e1.extraction.usage).toBeUndefined()
+    expect(e1.extraction).not.toHaveProperty('applicationType')
+    expect(e1.extraction).not.toHaveProperty('schemaVersion')
+    expect(e1.extraction).not.toHaveProperty('extractedAt')
+    expect(e1.extraction.members).toHaveLength(2)
+    expect(buildApplicationEnvelope(x, 0).memberIndex).toBe(0)
+  })
+  it('volunteer envelopes carry memberIndex null', () => {
+    const v = { applicationType: 'volunteer', schemaVersion: 1, extractedAt: '2026-09-22T14:00:00.000Z', person: {}, usage: {} }
+    expect(buildApplicationEnvelope(v, null).memberIndex).toBeNull()
+  })
+})
+
+describe('veteranAnswer', () => {
+  it('maps Yes/No to booleans and anything else to undefined', () => {
+    expect(veteranAnswer('Yes')).toBe(true)
+    expect(veteranAnswer('No')).toBe(false)
+    expect(veteranAnswer('')).toBeUndefined()
+    expect(veteranAnswer(null)).toBeUndefined()
+  })
+})
+
+describe('mergeCirclePreferences', () => {
+  it('adds Pride on Yes and keeps existing preferences', () => {
+    expect(mergeCirclePreferences(['7'], '1', 'Yes')).toEqual(['7', '1'])
+    expect(mergeCirclePreferences(['1'], '1', 'Yes')).toEqual(['1'])
+  })
+  it('returns undefined (send nothing) unless the answer is Yes', () => {
+    expect(mergeCirclePreferences(['7'], '1', 'No')).toBeUndefined()
+    expect(mergeCirclePreferences([], '1', '')).toBeUndefined()
+    expect(mergeCirclePreferences([], undefined, 'Yes')).toBeUndefined()
+  })
+})
+
+describe('personExtrasFields', () => {
+  it('maps pronouns and a Yes/No veteran answer', () => {
+    expect(personExtrasFields({ pronouns: 'she/her', veteran: 'Yes' })).toEqual({ pronouns: 'she/her', isVeteran: true })
+    expect(personExtrasFields({ pronouns: null, veteran: 'No' })).toEqual({ pronouns: '', isVeteran: false })
+  })
+  it('keeps a blank veteran answer unknown (null), never false', () => {
+    expect(personExtrasFields({ veteran: '' }).isVeteran).toBeNull()
+    expect(personExtrasFields(undefined).isVeteran).toBeNull()
+  })
+})
+
+describe('matchGender', () => {
+  const genders = [{ genderId: '1', name: 'Female' }, { genderId: '2', name: 'Male' }, { genderId: '3', name: 'Other' }]
+  it('matches a catalog name case-insensitively', () => {
+    expect(matchGender('female', genders)).toEqual({ genderId: '1', uncertain: null })
+    expect(matchGender(' Male ', genders)).toEqual({ genderId: '2', uncertain: null })
+  })
+  it('leaves an abbreviation blank and flags it rather than guessing', () => {
+    const r = matchGender('F', genders)
+    expect(r.genderId).toBeNull()
+    expect(r.uncertain.reason).toBe('form said "F"; no matching option')
+  })
+  it('returns nothing to flag for a blank answer', () => {
+    expect(matchGender('', genders)).toEqual({ genderId: null, uncertain: null })
+    expect(matchGender(null, genders)).toEqual({ genderId: null, uncertain: null })
+  })
+})
+
+describe('initialCircleNames', () => {
+  it('pre-ticks Circle of Pride when the application answered Yes to joining', () => {
+    expect([...initialCircleNames(extraction())]).toEqual(['Circle of Pride'])
+  })
+  it('pre-ticks nothing otherwise', () => {
+    const x = extraction()
+    x.preferences.circleOfPrideJoin = 'No'
+    expect(initialCircleNames(x).size).toBe(0)
+  })
+})
+
+describe('uncertain extras map onto person-form keys', () => {
+  it('member: veteran → isVeteran, gender → genderId, pronouns → pronouns', () => {
+    const x = extraction()
+    x.uncertainFields = [
+      { path: 'members[0].veteran', reason: 'illegible', alternative: null },
+      { path: 'members[0].gender', reason: 'smudged', alternative: null },
+      { path: 'members[0].pronouns', reason: 'faint', alternative: null },
+    ]
+    const m = uncertainMapForPerson(x, 0)
+    expect(Object.keys(m)).toEqual(expect.arrayContaining(['isVeteran', 'genderId', 'pronouns']))
+    expect(uncertainMapForPerson(x, 1).isVeteran).toBeUndefined()
+  })
+  it('volunteer: person.veteran → isVeteran', () => {
+    const x = { application: { village: { villageId: 1, villageName: 'X' } }, uncertainFields: [{ path: 'person.veteran', reason: 'illegible', alternative: null }] }
+    expect(uncertainMapForVolunteerPerson(x).isVeteran).toBeDefined()
   })
 })

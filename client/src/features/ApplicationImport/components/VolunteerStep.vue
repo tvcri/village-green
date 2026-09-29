@@ -8,11 +8,14 @@ import PersonFormFields from '../../PersonList/components/PersonFormFields.vue'
 import VolunteerFormFields from '../../PersonList/components/VolunteerFormFields.vue'
 import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js'
 import {
-  mapVolunteerPersonForm, volunteerPersonCommunityNames, volunteerCapabilityNames,
+  mapVolunteerPersonForm, volunteerCapabilityNames,
   uncertainMapForVolunteerPerson, buildPersonCreatePayload,
+  buildApplicationEnvelope, personExtrasFields, matchGender,
 } from '../lib/importMapping.js'
+import { usePersonLookups } from '../../PersonList/composables/usePersonLookups.js'
+import { emptyPersonFields, addPersonFields } from '../../PersonList/lib/personPayload.js'
 import {
-  getPersons, createPerson, patchPerson, getCommunities, getDisabilities, getCapabilities,
+  getPersons, createPerson, patchPerson, getDisabilities, getCapabilities,
 } from '../../PersonList/api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../../PersonList/api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
@@ -32,14 +35,18 @@ const showBirthDate = computed(() => hasPermission('person:read_birth_date', for
 const errors = reactive({})
 const fields = ref(null)
 const uncertain = reactive(uncertainMapForVolunteerPerson(props.extraction))
-const communityNames = ref(volunteerPersonCommunityNames(props.extraction))
 const disabilities = ref(new Map())        // this form has no accessibility section
 const villages = ref([])
-const allCommunities = ref([])
 const allDisabilities = ref([])
 const allCapabilities = ref([])
 const duplicates = ref([])
 const saving = ref(false)
+// The volunteer form has no join question, so the Circles section stays
+// hidden and nothing is pre-ticked.
+const noCircles = new Set()
+const showDemographics = computed(() => hasPermission('person:read_demographics', form.villageId))
+const personFields = reactive({ ...emptyPersonFields(), ...personExtrasFields(props.extraction.person) })
+const { lookups, ready: lookupsReady } = usePersonLookups()
 const needsVillage = ref(false)
 const selectedVillageId = ref(null)
 const savingVillage = ref(false)
@@ -49,17 +56,18 @@ const providerType = ref('Non-member Volunteer')
 const active = ref(true)
 const notes = ref(props.extraction.notes ?? '')
 
-const communityNameToId = computed(() =>
-  new Map(allCommunities.value.map(c => [c.name, c.communityId])))
 const capabilityNameToId = computed(() =>
   new Map(allCapabilities.value.map(c => [c.name, c.capabilityId])))
 
 onMounted(async () => {
   try {
     villages.value = await getVillages()
-    allCommunities.value = await getCommunities()
     allDisabilities.value = await getDisabilities()
     allCapabilities.value = await getCapabilities()
+    await lookupsReady
+    const g = matchGender(props.extraction.person?.gender, lookups.genders)
+    personFields.genderId = g.genderId
+    if (g.uncertain && !uncertain.genderId) uncertain.genderId = g.uncertain
     selectedCapabilityIds.value = [...volunteerCapabilityNames(props.extraction)]
       .map(n => capabilityNameToId.value.get(n))
       .filter(Boolean)
@@ -84,13 +92,6 @@ function onEdited (field) {
   delete uncertain[field]
 }
 
-function toggleCommunity (name, checked) {
-  const next = new Set(communityNames.value)
-  if (checked) next.add(name)
-  else next.delete(name)
-  communityNames.value = next
-}
-
 async function grantVolunteerRole (personId, { isExisting = false } = {}) {
   const body = {
     providerType: providerType.value || null,
@@ -98,6 +99,7 @@ async function grantVolunteerRole (personId, { isExisting = false } = {}) {
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
     associateVillageIds: [],
+    application: buildApplicationEnvelope(props.extraction, null),
   }
   try {
     // For an existing person, patch so fields the wizard doesn't collect
@@ -106,7 +108,7 @@ async function grantVolunteerRole (personId, { isExisting = false } = {}) {
     else await putVolunteer(personId, body)
     emit('volunteer-done', {
       personId: createdPersonId,
-      fullName: [form.firstName, form.lastName].filter(Boolean).join(' '),
+      fullName: createdPersonName,
     })
   }
   catch (err) {
@@ -121,10 +123,12 @@ async function grantVolunteerRole (personId, { isExisting = false } = {}) {
 
 let createdPersonId = null
 let createdPersonIsExisting = false
+let createdPersonName = ''   // the stored fullName, suffix included
 
 async function useExisting (person) {
   createdPersonId = person.personId
   createdPersonIsExisting = true
+  createdPersonName = person.fullName
   saving.value = true
   await grantVolunteerRole(person.personId, { isExisting: true })
   saving.value = false
@@ -147,7 +151,7 @@ async function saveVillageAndRetry () {
 }
 
 async function submit () {
-  if (!validatePersonForm(form, errors)) {
+  if (!validatePersonForm(form, errors, { deceasedDate: personFields.deceasedDate })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
@@ -158,13 +162,12 @@ async function submit () {
     await fields.value?.townSettled()
     const payload = buildPersonCreatePayload(form)
     if (!showBirthDate.value) delete payload.birthDate
-    payload.communities = [...communityNames.value]
-      .map(n => communityNameToId.value.get(n))
-      .filter(Boolean)
     payload.disabilities = []
+    addPersonFields(payload, personFields, { isEdit: false, showDemographics: showDemographics.value })
     const created = await createPerson(payload)
     createdPersonId = created.personId
     createdPersonIsExisting = false
+    createdPersonName = created.fullName
     await grantVolunteerRole(created.personId)
   }
   catch {
@@ -224,9 +227,20 @@ async function submit () {
         v-model:emergency-contact-phone="form.emergencyContactPhone"
         v-model:emergency-contact-email="form.emergencyContactEmail"
         :errors="errors" :uncertain="uncertain"
-        :villages="villages" :communityNames="communityNames" :disabilities="disabilities"
-        :show-birth-date="showBirthDate"
-        @edited="onEdited" @toggle-community="toggleCommunity"
+        :villages="villages" :circle-names="noCircles" :disabilities="disabilities"
+        :show-birth-date="showBirthDate" :show-circles="false"
+        :show-demographics="showDemographics" :lookups="lookups"
+        v-model:suffix="personFields.suffix"
+        v-model:pronouns="personFields.pronouns"
+        v-model:deceased-date="personFields.deceasedDate"
+        v-model:preferred-contact-method-id="personFields.preferredContactMethodId"
+        v-model:gender-id="personFields.genderId"
+        v-model:ethnicity-id="personFields.ethnicityId"
+        v-model:is-veteran="personFields.isVeteran"
+        v-model:race-ids="personFields.raceIds"
+        v-model:language-ids="personFields.languageIds"
+        v-model:preferred-language-id="personFields.preferredLanguageId"
+        @edited="onEdited"
       />
       <VolunteerFormFields
         v-model:provider-type="providerType"

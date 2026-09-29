@@ -84,17 +84,25 @@ They are **not** regenerated automatically. After adding a migration:
 
 ### Verifying a new migration
 
-Use the **`test/api` harness**, which brings up its own MySQL (port 3307,
-database `vg_test`) and its own API from `test/api/docker-compose.yml`. Its
-scaffold marks `0001`–`00NN` executed, so a *new* migration runs its real
-`up()` there. `npm run test:keep` leaves the DB container up afterward, so
-the scaffold can be regenerated from it.
+A new migration gets **two** runs before review, and both are agent work:
+
+1. **The `test/api` harness.** It brings up its own MySQL (port 3307,
+   database `vg_test`) and its own API from `test/api/docker-compose.yml`.
+   Its scaffold marks `0001`–`00NN` executed, so a *new* migration runs its
+   real `up()` there against fixture data. `npm run test:keep` leaves the DB
+   container up afterward, so the scaffold can be regenerated from it. Run
+   `docker compose -f test/api/docker-compose.yml down -v` first: a reused
+   container with stale `_migrations` silently skips the migration.
+2. **Production data.** Load the newest production dump into a side
+   database in the orch container (see the next section) and call the
+   migration's `up(pool)` on it. Check what it did: row counts, backfills,
+   seeds and views, against what the spec expects. The harness's fixtures
+   cannot tell you how the migration treats real rows. The same applies
+   after an already-applied (unmerged) migration is edited in place: re-run
+   it end to end on a fresh load, not just the edited statements.
 
 **Never ask the user to restore a dump, restart the dev API, or migrate the
-dev stack for migration work.** The harness is self-contained and needs
-nothing from the dev environment. (Editing an *already-applied* migration in
-place is the one case that still needs a pre-migration dump restore — that
-is the user's call, not something to assume.)
+dev stack for migration work.** Both runs above are self-serve.
 
 If the migration seeds **catalog rows**, also add its table(s) to
 `static_data_tables` in `generateSchema.sh`. Otherwise the dump marks the
@@ -104,6 +112,49 @@ went missing until PR #69 (every `role_grant` insert hit
 `fk_role_grant_role`). Per-install *data migrations* (e.g. 0013's
 `role_grant` / `village_grant` backfill) stay out of the list: dumping them
 would ship one deployment's rows to every other.
+
+### The orch database container and production dumps
+
+Terms: `village-green-orch-db-1` is one MySQL **server** (host port 60001;
+root password from `docker exec village-green-orch-db-1 printenv
+MYSQL_ROOT_PASSWORD`). It holds several **databases** (MySQL's word; also
+"schemas"):
+
+- `vg` is the database the user's dev API points at, run from a VS Code
+  debug session.
+- `kc` is the dev Keycloak's database.
+- `vg_*` side copies such as `vg_sep01` and `vg_mig_verify`.
+
+Production `vg` dumps land in `~/vg-backups` every 15 minutes as
+`vg_<date>_<time>.sql`, pulled by `pull-vg-backup.sh`. Use the newest
+unless a specific point in time is needed. Its `_migrations` table shows
+which migrations production has run. The dumps contain no `USE` statement,
+so a dump loads under any database name.
+
+- **Side databases are yours.** Create, load, migrate and drop them freely,
+  without asking:
+  ```bash
+  C=village-green-orch-db-1; P=$(docker exec $C printenv MYSQL_ROOT_PASSWORD)
+  docker exec $C mysql -uroot -p"$P" -e "DROP DATABASE IF EXISTS vg_mig_verify; CREATE DATABASE vg_mig_verify"
+  docker exec -i $C mysql -uroot -p"$P" vg_mig_verify < "$(ls -t ~/vg-backups/vg_*.sql | head -1)"
+  ```
+  Then run the migration from `api/source` with a `mysql2/promise` pool on
+  `127.0.0.1:60001`, database `vg_mig_verify`:
+  `await require('./service/migrations/<file>').up(pool)`. Drop the side
+  database when done.
+- **You may also reload `vg` itself** when the user's dev data should be
+  refreshed: `yes | /home/csmig/dev/tvcri/vg-utils/mysql-dump/mysql-apply-dump
+  <dumpfile>`. It drops and recreates the database named in the dump
+  header. Nothing in `vg` is precious; a new dump arrives every 15 minutes.
+  What it breaks is the user's **running** debug API. That API is on the
+  current branch's code, while a production dump sits at production's
+  migration level, so the API errors until the user restarts it and its
+  startup runs the pending migrations. Always tell the user you reloaded
+  `vg`, which dump you used, and that their dev API needs a restart. For
+  migration validation, use a side database instead.
+- **Leave `kc` and the `kc_*` dumps alone.** Reloading them breaks dev
+  login.
+- **Agents never restart the user's dev API.** Nothing above needs it.
 
 ## Service request statuses — the seven
 
@@ -174,9 +225,13 @@ services.
 Inside running text (sentences, dialogs, toasts) a name reads
 **"First Last"**; tables and labeled card fields keep **"Last, First"**
 (exactly `person.fullName`, the stored generated column
-`CONCAT_WS(', ', lastName, firstName)`). Never string-unparse `fullName`
-to get the informal form — serve `firstName`/`lastName` alongside it and
-compose client-side. Emergency-contact names are free-text and exempt.
+`CONCAT_WS(', ', lastName, firstName, suffix)`: "Currie, Robert, Jr.").
+Never string-unparse `fullName` to get the informal form. Serve
+`displayName` alongside it: the stored "First Last Suffix" form ("Robert
+Currie Jr."). Since 0027, `suffix` is its own column and no longer part of
+`lastName`, so composing `firstName` + `lastName` drops it; don't. Mailing
+labels compose from the name parts and include `suffix`. Emergency-contact
+names are free-text and exempt.
 
 ## Who's who — coordinator vs volunteer vs member
 

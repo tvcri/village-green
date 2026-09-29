@@ -151,11 +151,9 @@ exports.getAppData = async function (res, format) {
       sql: `select ${tableMetadata[table].columns} from ${table}`,
       rowsAsArray: true,
       typeCast: function (field, next) {
-         // BIT fields returned as boolean
-        if ((field.type === "BIT") && (field.length === 1)) {
-          let bytes = field.buffer() || [0]
-          return (bytes[0] === 1)
-        }
+         // BIT(1) fields returned as boolean, NULL kept as null
+        const bit = dbUtils.castBit(field)
+        if (bit !== undefined) return bit
          // Designated fields returned as original MySQL strings
         if (field.type === 'JSON' || field.type === 'DATETIME' || field.type === 'DATE' || field.type === 'TIMESTAMP' || field.type === 'TIME' || field.type === 'YEAR') {
           return (field.string("utf8"))

@@ -6,9 +6,11 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import PersonFormFields from './PersonFormFields.vue'
 import { validatePersonForm } from '../lib/personFormValidation.js'
+import { usePersonLookups } from '../composables/usePersonLookups.js'
+import { emptyPersonFields, personFormFromApi, addPersonFields } from '../lib/personPayload.js'
 import {
   getPerson, createPerson, patchPerson,
-  getCommunities, getDisabilities,
+  getCircles, getDisabilities,
 } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
@@ -35,34 +37,52 @@ const form = reactive({
 // person:read_birth_date governs the input too (spec §4.11): a coordinator
 // who cannot see the value must not send null for it on save.
 const showBirthDate = computed(() => hasPermission('person:read_birth_date', form.villageId))
+// person:read_demographics governs the section and the save, like birthDate.
+const showDemographics = computed(() => hasPermission('person:read_demographics', form.villageId))
+// The 0027 fields live apart from `form` so buildPayload's generic loop
+// never sees them; personPayload.js loads and saves them.
+const personFields = reactive(emptyPersonFields())
+const { lookups, ready: lookupsReady } = usePersonLookups()
 
 const errors = reactive({})
 const fields = ref(null)
 
 const villages = ref([])          // [{ villageId, name }]
-const allCommunities = ref([])    // [{ communityId, name }] from getCommunities()
+const allCircles = ref([])        // [{ circleId, name }]
 const allDisabilities = ref([])   // [{ disabilityId, name }] from getDisabilities()
-const communityNameToId = computed(() =>
-  new Map(allCommunities.value.map(c => [c.name, c.communityId])))
+const circleNameToId = computed(() =>
+  new Map(allCircles.value.map(c => [c.name, c.circleId])))
 const disabilityNameToId = computed(() =>
   new Map(allDisabilities.value.map(d => [d.name, d.disabilityId])))
-const communityNames = ref(new Set())     // Set<'Pride'|'Veteran'>
+const circleNames = ref(new Set())        // Set<circle name>
 const disabilities = ref(new Map())       // Map<'Vision'|'Walker'|'Hearing'|'Wheelchair'|'Cane', note>
 
 async function loadVillages () {
   villages.value = await getVillages()
 }
 
+// Save stays disabled until everything has loaded: an edit form left blank by
+// a failed load would otherwise PATCH null over every field.
+const loaded = ref(false)
+
 onMounted(async () => {
-  await loadVillages()
-  allCommunities.value = await getCommunities()     // [{ communityId, name }]
-  allDisabilities.value = await getDisabilities()   // [{ disabilityId, name }]
-  if (isEdit.value) {
-    const p = await getPerson(personId.value, [])
-    Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
-    form.villageId = p.village?.villageId ?? null
-    communityNames.value = new Set(p.communities.map(c => c.name))
-    disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
+  try {
+    await loadVillages()
+    allCircles.value = await getCircles()             // [{ circleId, name }]
+    allDisabilities.value = await getDisabilities()   // [{ disabilityId, name }]
+    await lookupsReady
+    if (isEdit.value) {
+      const p = await getPerson(personId.value, [])
+      Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
+      form.villageId = p.village?.villageId ?? null
+      circleNames.value = new Set(p.circles.map(c => c.name))
+      disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
+      Object.assign(personFields, personFormFromApi(p))
+    }
+    loaded.value = true
+  }
+  catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: isEdit.value ? 'Failed to load person' : 'Failed to load the form', life: 3000 })
   }
 })
 
@@ -79,18 +99,20 @@ function buildPayload () {
     else if (v !== null) payload[k] = v
   })
   payload.villageId = form.villageId ?? null   // explicit null clears home village
-  payload.communities = [...communityNames.value]
-    .map(n => communityNameToId.value.get(n))
+  payload.circles = [...circleNames.value]
+    .map(n => circleNameToId.value.get(n))
     .filter(Boolean)
   payload.disabilities = [...disabilities.value.entries()].map(([n, note]) => ({
     disabilityId: disabilityNameToId.value.get(n),
     note: note || null,
   }))
+  addPersonFields(payload, personFields, { isEdit: isEdit.value, showDemographics: showDemographics.value })
   return payload
 }
 
 async function handleSubmit () {
-  if (!validatePersonForm(form, errors)) {
+  if (!loaded.value) return
+  if (!validatePersonForm(form, errors, { deceasedDate: personFields.deceasedDate })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
@@ -115,10 +137,10 @@ async function handleSubmit () {
   }
 }
 
-function toggleCommunity (name, checked) {
-  if (checked) communityNames.value.add(name)
-  else communityNames.value.delete(name)
-  communityNames.value = new Set(communityNames.value)
+function toggleCircle (name, checked) {
+  if (checked) circleNames.value.add(name)
+  else circleNames.value.delete(name)
+  circleNames.value = new Set(circleNames.value)
 }
 
 function toggleDisability (name, checked) {
@@ -146,7 +168,10 @@ function cancel () {
   <Card class="detail-card">
     <template #title>{{ isEdit ? 'Edit Person' : 'Create Person' }}</template>
     <template #content>
-      <form @submit.prevent="handleSubmit">
+      <!-- No submit button, so Enter in a text box never saves (browsers only
+           submit implicitly when a form has one); @submit.prevent stays as a
+           backstop. Save is an ordinary button. -->
+      <form @submit.prevent>
 
         <PersonFormFields
           ref="fields"
@@ -169,12 +194,25 @@ function cancel () {
           v-model:emergency-contact-relationship="form.emergencyContactRelationship"
           v-model:emergency-contact-phone="form.emergencyContactPhone"
           v-model:emergency-contact-email="form.emergencyContactEmail"
+          v-model:suffix="personFields.suffix"
+          v-model:pronouns="personFields.pronouns"
+          v-model:deceased-date="personFields.deceasedDate"
+          v-model:preferred-contact-method-id="personFields.preferredContactMethodId"
+          v-model:gender-id="personFields.genderId"
+          v-model:ethnicity-id="personFields.ethnicityId"
+          v-model:is-veteran="personFields.isVeteran"
+          v-model:race-ids="personFields.raceIds"
+          v-model:language-ids="personFields.languageIds"
+          v-model:preferred-language-id="personFields.preferredLanguageId"
+          :lookups="lookups"
+          :show-demographics="showDemographics"
           :errors="errors"
           :villages="villages"
-          :communityNames="communityNames"
+          :circles="allCircles"
+          :circleNames="circleNames"
           :disabilities="disabilities"
           :show-birth-date="showBirthDate"
-          @toggle-community="toggleCommunity"
+          @toggle-circle="toggleCircle"
           @toggle-disability="toggleDisability"
           @edit-disability-note="editDisabilityNote"
         />
@@ -182,7 +220,7 @@ function cancel () {
         <!-- Footer: Save / Cancel buttons -->
         <div class="form-footer">
           <Button type="button" label="Cancel" severity="secondary" @click="cancel" />
-          <Button type="submit" label="Save" />
+          <Button type="button" label="Save" :disabled="!loaded" @click="handleSubmit" />
         </div>
 
       </form>
@@ -193,6 +231,7 @@ function cancel () {
 <style scoped>
 .detail-card {
   max-width: 1100px;
+  margin: 2rem auto;
   border: 1px solid var(--color-border-default);
   box-shadow: var(--box-shadow-card);
 }
@@ -202,12 +241,18 @@ function cancel () {
   font-size: 2rem;
 }
 
+/* Pinned to the bottom of the viewport while the form scrolls, so Save is
+   reachable from anywhere on a long form. */
 .form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 1.5rem;
-  padding-top: 1rem;
+  padding: 0.75rem 0;
+  background: var(--p-card-background);
   border-top: 1px solid var(--color-border-default);
 }
 </style>

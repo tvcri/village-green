@@ -43,7 +43,7 @@ test('resolveVillage returns no match when substring is ambiguous', () => {
 function sampleExtraction () {
   return {
     applicationType: 'member',
-    application: { applicationDate: '2026-06-12', villageName: 'Westside', ambassador: 'Pat Smith', householdType: 'Dual' },
+    application: { applicationDate: '2026-06-12', formDate: '2025-11', villageName: 'Westside', ambassador: 'Pat Smith', householdType: 'Dual' },
     members: [
       {
         firstName: 'Marge', middleInitial: 'A', lastName: 'Innovera', nickname: '',
@@ -144,8 +144,68 @@ test('assembleResponse passes unknown variant through with usage', () => {
 })
 
 test('computeCost prices opus-4-8 tokens', () => {
-  const c = svc.computeCost({ input_tokens: 1_000_000, output_tokens: 1_000_000 })
-  assert.deepEqual(c, { inputTokens: 1_000_000, outputTokens: 1_000_000, cost: 30 })
+  const c = svc.computeCost({ input_tokens: 1_000_000, output_tokens: 1_000_000 }, 'claude-opus-4-8')
+  assert.deepEqual(c, { model: 'claude-opus-4-8', inputTokens: 1_000_000, outputTokens: 1_000_000, cost: 30 })
+})
+
+test('computeCost prices sonnet-5-5 tokens', () => {
+  const c = svc.computeCost({ input_tokens: 1_000_000, output_tokens: 1_000_000 }, 'claude-sonnet-5-5')
+  assert.deepEqual(c, { model: 'claude-sonnet-5-5', inputTokens: 1_000_000, outputTokens: 1_000_000, cost: 12 })
+})
+
+test('computeCost reports a null cost, not a wrong one, for a model it has no price for', () => {
+  const c = svc.computeCost({ input_tokens: 10, output_tokens: 20 }, 'claude-future-9')
+  assert.deepEqual(c, { model: 'claude-future-9', inputTokens: 10, outputTokens: 20, cost: null })
+})
+
+// A stand-in for the Anthropic client: records the request, returns `reply`.
+function fakeClient (reply) {
+  const calls = []
+  return {
+    calls,
+    messages: { create: async (params) => { calls.push(params); return reply } },
+  }
+}
+const okReply = {
+  stop_reason: 'end_turn',
+  content: [{ type: 'text', text: '{"applicationType":"member"}' }],
+  usage: { input_tokens: 1, output_tokens: 2 },
+}
+
+test('callClaude sends the model it is given, with room for thinking plus the JSON', async () => {
+  const client = fakeClient(okReply)
+  const res = await svc.callClaude(client, 'claude-sonnet-5-5', Buffer.from('%PDF'), { type: 'object' }, 'prompt')
+  assert.equal(client.calls[0].model, 'claude-sonnet-5-5')
+  assert.equal(client.calls[0].max_tokens, 16000)
+  assert.deepEqual(res.data, { applicationType: 'member' })
+})
+
+test('callClaude sends no thinking or effort unless asked, so the model defaults apply', async () => {
+  const client = fakeClient(okReply)
+  await svc.callClaude(client, 'claude-opus-4-8', Buffer.from('%PDF'), { type: 'object' }, 'prompt')
+  assert.equal(client.calls[0].thinking, undefined)
+  assert.deepEqual(client.calls[0].output_config, { format: { type: 'json_schema', schema: { type: 'object' } } })
+})
+
+test('callClaude sends the thinking type and effort it is given, beside the output format', async () => {
+  const client = fakeClient(okReply)
+  await svc.callClaude(client, 'claude-sonnet-5-5', Buffer.from('%PDF'), { type: 'object' }, 'prompt',
+    { thinking: 'between_tools', effort: 'low' })
+  assert.deepEqual(client.calls[0].thinking, { type: 'between_tools' })
+  assert.deepEqual(client.calls[0].output_config, {
+    format: { type: 'json_schema', schema: { type: 'object' } },
+    effort: 'low',
+  })
+})
+
+test('callClaude fails clearly when the response is cut off at max_tokens', async () => {
+  // A truncated structured output is not valid JSON; without this check it
+  // surfaced as a JSON.parse error or "empty response".
+  const client = fakeClient({ ...okReply, stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"applicationType":"mem' }] })
+  await assert.rejects(
+    svc.callClaude(client, 'claude-sonnet-5-5', Buffer.from('%PDF'), { type: 'object' }, 'prompt'),
+    (err) => err.status === 502 && /output limit/.test(err.message)
+  )
 })
 
 test('EXTRACTION_SCHEMA objects all forbid additional properties', () => {
@@ -164,7 +224,7 @@ test('EXTRACTION_SCHEMA objects all forbid additional properties', () => {
 function sampleVolunteerExtraction () {
   return {
     applicationType: 'volunteer',
-    application: { applicationDate: '2026-05-30', villageName: 'Barrington Village', ambassador: '' },
+    application: { applicationDate: '2026-05-30', formDate: '2025-06', villageName: 'Barrington Village', ambassador: '' },
     person: {
       firstName: 'Nicole', middleInitial: 'K', lastName: 'Brown', nickname: '',
       pronouns: 'she/her', birthDate: '1999-07-10', gender: 'Female', veteran: 'No',
@@ -277,4 +337,19 @@ test('each two-phase schema is far smaller than the combined EXTRACTION_SCHEMA',
   assert.ok(classifySize < combinedSize / 4, 'classify schema should be much smaller than the combined schema')
   assert.ok(memberPhaseSize < combinedSize, 'member-only phase schema should be smaller than the combined schema')
   assert.ok(volunteerPhaseSize < combinedSize, 'volunteer-only phase schema should be smaller than the combined schema')
+})
+
+test('assembleResponse stamps schemaVersion and extractedAt on member and volunteer variants', () => {
+  const m = svc.assembleResponse(sampleExtraction(), villages, usage)
+  assert.equal(m.schemaVersion, svc.EXTRACTION_SCHEMA_VERSION)
+  assert.equal(svc.EXTRACTION_SCHEMA_VERSION, 1)
+  assert.ok(!Number.isNaN(Date.parse(m.extractedAt)))
+})
+
+test('assembleResponse carries the printed formDate on both variants; an unprinted one is null', () => {
+  assert.equal(svc.assembleResponse(sampleExtraction(), villages, usage).application.formDate, '2025-11')
+  assert.equal(svc.assembleResponse(sampleVolunteerExtraction(), villages, usage).application.formDate, '2025-06')
+  const blank = sampleExtraction()
+  blank.application.formDate = ''
+  assert.equal(svc.assembleResponse(blank, villages, usage).application.formDate, null)
 })

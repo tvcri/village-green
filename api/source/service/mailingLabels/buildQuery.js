@@ -3,11 +3,11 @@ const dbUtils = require('../utils')
 const { AUDIENCE_RULES } = require('./audienceRules')
 
 // Every mailing answers the same question — "who gets an envelope" — and so
-// returns the same seven columns from the same base table. Only the role
+// returns the same eight columns from the same base table. Only the role
 // join/predicate and the audience predicate differ.
 //
-// person.fullName is generated "Last, First" — NOT label order; select the
-// name parts. person.zip is stored unpadded, so LPAD is load-bearing.
+// person.fullName is generated "Last, First, Suffix" — NOT label order;
+// select the name parts (suffix is its own column since 0027). person.zip is stored unpadded, so LPAD is load-bearing.
 //
 // The string below is whitespace-sensitive: the printed-newsletter/member
 // shape reproduces the original hand-written query byte-for-byte, which the
@@ -16,6 +16,7 @@ const SELECT_HEAD = `
     SELECT
       p.firstName,
       p.lastName,
+      p.suffix,
       p.street,
       p.unit,
       p.city,

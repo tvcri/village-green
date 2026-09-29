@@ -175,12 +175,9 @@ function getPoolConfig() {
       program_name: 'village-green'
     },
     typeCast: function (field, next) {
-      if ((field.type === "BIT") && (field.length === 1)) {
-        let bytes = field.buffer() || [0]
-        return( bytes[ 0 ] === 1 )
-      }
-      return next()
-    } 
+      const bit = castBit(field)
+      return bit === undefined ? next() : bit
+    }
   }
   if (config.database.password) {
     poolConfig.password = config.database.password
@@ -284,6 +281,19 @@ function attachPoolEventHandlers(pool) {
     logger.writeInfo('mysql', 'poolEvent', { event: 'remove', socket, remaining: pool.pool._allConnections.toArray().length, authorized: connection.authorized })
   })  
 }
+
+// BIT(1) -> true/false, and SQL NULL -> null; undefined for any other field.
+// field.buffer() is null for a SQL NULL. The old `|| [0]` fallback collapsed
+// NULL to false, so a nullable BIT(1) could never read back as null even
+// though every such field is `nullable: true` in the OAS (person.isVeteran,
+// volunteer.active, member.printedNewsletter). Shared by the pool and the
+// appdata export's own stream, so the two cannot drift apart again.
+function castBit (field) {
+  if (field.type !== 'BIT' || field.length !== 1) return undefined
+  const bytes = field.buffer()
+  return bytes === null ? null : bytes[0] === 1
+}
+module.exports.castBit = castBit
 
 module.exports.initializeDatabase = async function () {
   try {

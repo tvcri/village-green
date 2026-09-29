@@ -191,3 +191,18 @@ test('buildServiceNameCategoryCase maps prefixes and exact names, else NULL', ()
   assert.ok(!sql.includes('Member Added'))
   assert.ok(sql.trim().endsWith('ELSE NULL END'))
 })
+
+// A stand-in for mysql2's typeCast field: a BIT(1) whose buffer() is `bytes`.
+const bitField = (bytes) => ({ type: 'BIT', length: 1, buffer: () => bytes })
+
+test('castBit reads a nullable BIT(1) as true, false, or null', () => {
+  assert.equal(dbUtils.castBit(bitField(Buffer.from([1]))), true)
+  assert.equal(dbUtils.castBit(bitField(Buffer.from([0]))), false)
+  // SQL NULL must stay null: isVeteran's "unknown" is not "No"
+  assert.equal(dbUtils.castBit(bitField(null)), null)
+})
+
+test('castBit leaves every other field type to the next caster', () => {
+  assert.equal(dbUtils.castBit({ type: 'LONG', length: 11, buffer: () => null }), undefined)
+  assert.equal(dbUtils.castBit({ type: 'BIT', length: 8, buffer: () => null }), undefined)
+})

@@ -63,3 +63,30 @@ test('member put(create)/patch/delete audit lifecycle with redaction', async () 
 
   await vgCall('deletePerson', { personId }, { token: tokens.users.staff })
 })
+
+test('circlePreferences is an audited set; member delete cascades and snapshots it', async () => {
+  const circles = await vgCall('getCircles', {}, { token: tokens.users.staff })
+  const pride = circles.json.find(c => c.name === 'Circle of Pride').circleId
+  const person = await vgCall('createPerson', {}, {
+    token: tokens.users.staff, body: { villageId: scratch, firstName: 'Pref', lastName: 'Audit' },
+  })
+  const personId = person.json.personId
+  await vgCall('putPersonMember', { personId }, {
+    token: tokens.users.staff, body: { memberLevel: 'Household', joinDate: '2026-01-15' },
+  })
+  const memberId = await memberIdFor(personId)
+
+  const patch = await vgCall('patchPersonMember', { personId }, { token: tokens.users.staff, body: { circlePreferences: [pride] } })
+  assert.equal(patch.status, 200)
+  let rows = await auditRows('member', memberId)
+  assert.deepEqual(rows.at(-1).changes.diff.circlePreferences.added, ['Circle of Pride'])
+
+  const del = await vgCall('deletePersonMember', { personId }, { token: tokens.users.staff })
+  assert.equal(del.status, 204)
+  rows = await auditRows('member', memberId)
+  assert.deepEqual(rows.at(-1).changes.snapshot.circlePreferences, ['Circle of Pride'])
+  const left = await withDb(async conn => (await conn.query('SELECT COUNT(*) n FROM member_circle_preference WHERE memberId = ?', [memberId]))[0][0].n)
+  assert.equal(Number(left), 0, 'preference rows cascade with the member')
+
+  await vgCall('deletePerson', { personId }, { token: tokens.users.staff })
+})

@@ -62,29 +62,29 @@ test('person junction rewrite audits as a set diff on the parent', async () => {
   assert.equal(created.status, 201)
   const personId = created.json.personId
 
-  // The community catalog is empty on a fresh harness DB (person_community's
+  // The circle catalog may not carry a row this suite owns (person_circle's
   // FK needs a real row) — seed one directly rather than depending on
   // catalog data this suite doesn't own.
-  const communityId = await withDb(async (conn) => {
+  const circleId = await withDb(async (conn) => {
     const [result] = await conn.query(
-      'INSERT INTO community (name) VALUES (?)', [`audit-test-${personId}`]
+      'INSERT INTO circle (name) VALUES (?)', [`audit-test-${personId}`]
     )
     return result.insertId
   })
 
-  // PersonPatch/PersonPost's schema property is `communities` (array of
-  // CommunityId, a StringIntId), not `communityIds` — verified against
+  // PersonPatch/PersonPost's schema property is `circles` (array of
+  // CircleId, a StringIntId), not `circleIds` — verified against
   // api/source/specification/village-green.yaml.
   const patched = await vgCall('patchPerson', { personId }, {
-    token: tokens.users.staff, body: { communities: [String(communityId)] },
+    token: tokens.users.staff, body: { circles: [String(circleId)] },
   })
   assert.equal(patched.status, 200)
   const rows = await auditRows('person', personId)
   const last = rows[rows.length - 1]
   assert.equal(last.action, 'update')
-  assert.equal(last.changes.diff.communities.added.length, 1)
-  assert.ok(!('removed' in last.changes.diff.communities))
+  assert.equal(last.changes.diff.circles.added.length, 1)
+  assert.ok(!('removed' in last.changes.diff.circles))
 
   await vgCall('deletePerson', { personId }, { token: tokens.users.staff })
-  await withDb(conn => conn.query('DELETE FROM community WHERE id = ?', [communityId]))
+  await withDb(conn => conn.query('DELETE FROM circle WHERE id = ?', [circleId]))
 })

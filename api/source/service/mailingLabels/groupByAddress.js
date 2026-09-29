@@ -38,7 +38,7 @@ function hasStreet (row) {
 }
 
 function fullName (row) {
-  return [row.firstName, row.lastName].filter(Boolean).join(' ').trim()
+  return [row.firstName, row.lastName, row.suffix].filter(Boolean).join(' ').trim()
 }
 
 function byName (a, b) {
@@ -55,8 +55,11 @@ function composeName (recipients) {
   if (sorted.length > 2) return `${fullName(sorted[0])} and others`
 
   const [first, second] = sorted
+  // Compress to "Jane and John Smith" only when neither carries a suffix —
+  // "Jane and John Smith Jr." would hand Jane the suffix.
   const sameSurname = normalizePart(first.lastName) === normalizePart(second.lastName)
     && normalizePart(first.lastName).length > 0
+    && !first.suffix && !second.suffix
   return sameSurname
     ? `${first.firstName} and ${second.firstName} ${second.lastName}`
     : `${fullName(first)} and ${fullName(second)}`

@@ -66,13 +66,13 @@ const qualifyingVolunteers = computed(() =>
 )
 
 // General rule: a name inside a sentence (or the sign-up dialogs) reads
-// "First Last"; tables and labeled fields keep the "Last, First" fullName.
-// Works for volunteer entries (`name`) and the request's member (`fullName`);
-// the fallback covers rows from an API that predates first/last in the
-// payload.
+// "First Last Suffix" (the API's displayName); tables and labeled fields keep
+// the "Last, First, Suffix" fullName. Works for volunteer entries (`name`) and
+// the request's member (`fullName`); the fallbacks cover rows from an API that
+// predates displayName or first/last in the payload.
 function informalName(v) {
   if (!v) return ''
-  return [v.firstName, v.lastName].filter(Boolean).join(' ') || v.name || v.fullName || ''
+  return v.displayName || [v.firstName, v.lastName].filter(Boolean).join(' ') || v.name || v.fullName || ''
 }
 
 function informalVolunteerName(personId) {

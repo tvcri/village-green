@@ -37,7 +37,8 @@ const baseProps = {
   errors: {},
   uncertain: {},
   villages: [],
-  communityNames: new Set(),
+  circles: [],
+  circleNames: new Set(),
   disabilities: new Map(),
 }
 

@@ -885,14 +885,14 @@ exports.getVolunteerCapabilities = async function (personId) {
 // DISTINCT guards the out-of-scope person-with-multiple-volunteer-rows case.
 // name is the generated "Last, First" fullName — the tabular display
 // convention (Volunteer column, picker list), matching Member columns.
-// firstName/lastName ride along so the client can compose the informal
-// "First Last" where the name sits inside a sentence (confirm dialog,
-// Confirmed banner, toasts).
+// displayName ("First Last Suffix") is the informal form for names inside a
+// sentence (confirm dialog, Confirmed banner, toasts); firstName/lastName
+// ride along for older clients.
 exports.getVolunteers = async function (personIds) {
   if (!personIds?.length) return []
   const [rows] = await dbUtils.pool.query(
     `SELECT DISTINCT CAST(av.personId AS CHAR) AS personId,
-       p.fullName AS name, p.firstName, p.lastName
+       p.fullName AS name, p.displayName, p.firstName, p.lastName
      FROM active_volunteer av
      JOIN person p ON av.personId = p.id
      WHERE av.personId IN (?)
@@ -904,6 +904,6 @@ exports.getVolunteers = async function (personIds) {
       exports.getVolunteerVillages(row.personId),
       exports.getVolunteerCapabilities(row.personId),
     ])
-    return { personId: row.personId, name: row.name, firstName: row.firstName, lastName: row.lastName, villages, capabilities }
+    return { personId: row.personId, name: row.name, displayName: row.displayName, firstName: row.firstName, lastName: row.lastName, villages, capabilities }
   }))
 }

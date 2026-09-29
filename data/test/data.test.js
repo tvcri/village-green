@@ -44,8 +44,9 @@ test('persons: no generated-column keys, unique (village,name), themed big villa
     // addresses live in the town of Glocester
     assert.ok(p.town, 'town must be populated')
     if (p.city === 'Chepachet') assert.equal(p.town, 'Glocester')
-    // quirky figure names that don't survive the first/last split live in nickname
-    if (nameById[p.id] !== `${p.firstName} ${p.lastName}`.trim()) assert.equal(p.nickname, nameById[p.id])
+    // quirky figure names that don't survive the first/last/suffix split live
+    // in nickname; the comparison composes like the stored displayName column
+    if (nameById[p.id] !== [p.firstName, p.lastName, p.suffix].filter(Boolean).join(' ')) assert.equal(p.nickname, nameById[p.id])
   }
   // a figure never appears in two villages: unique (villageId, original name)
   const keys = person.map(p => `${p.villageId}::${nameById[p.id].toLowerCase()}`)
@@ -457,24 +458,69 @@ test('all 10 villages have >=1 member and >=1 volunteer; big villages honor thei
   assert.ok(quahog.v >= 40 && quahog.m > quahog.v, `Quahog ${quahog.m}m/${quahog.v}v not member-heavy`)
 })
 
-test('communities: catalog matches migration 0010; ~10-15% tagged; big-village coverage', () => {
+test('circles: catalog matches the 0027 static seed; ~10-15% tagged; big-village coverage', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
-  assert.deepEqual(ds.community, [{ id: 1, name: 'Pride' }, { id: 2, name: 'Veteran' }])
-  const share = ds.person_community.length / ds.person.length
+  assert.deepEqual(ds.circle, [
+    { id: 1, name: 'Circle of Pride' }, { id: 2, name: "Veteran's Circle" },
+    { id: 3, name: 'DownCity' }, { id: 4, name: 'OakHill' },
+  ])
+  const share = ds.person_circle.length / ds.person.length
   assert.ok(share > 0.08 && share < 0.2, `tag share ${share.toFixed(2)}`)
-  const keys = ds.person_community.map(pc => `${pc.personId}:${pc.communityId}`)
-  assert.equal(keys.length, new Set(keys).size, 'unique (person, community)')
-  // each community has >=1 active member and >=1 active volunteer in each big village (1=Arkham, 2=Quahog)
+  const keys = ds.person_circle.map(pc => `${pc.personId}:${pc.circleId}`)
+  assert.equal(keys.length, new Set(keys).size, 'unique (person, circle)')
   const activeMemberIds = new Set(ds.member.filter(m => m.status === 'Active').map(m => m.personId))
   const activeVolIds = new Set(ds.volunteer.filter(v => v.active === 1).map(v => v.personId))
   const personVillage = Object.fromEntries(ds.person.map(p => [p.id, p.villageId]))
+  // each big village (1=Arkham, 2=Quahog) shows an active member in both
+  // circles, and an active volunteer in the Veteran's Circle
   for (const vid of [1, 2]) {
     for (const cid of [1, 2]) {
-      const inVillage = ds.person_community.filter(pc => pc.communityId === cid && personVillage[pc.personId] === vid)
-      assert.ok(inVillage.some(pc => activeMemberIds.has(pc.personId)), `community ${cid} member in village ${vid}`)
-      assert.ok(inVillage.some(pc => activeVolIds.has(pc.personId)), `community ${cid} volunteer in village ${vid}`)
+      const inVillage = ds.person_circle.filter(pc => pc.circleId === cid && personVillage[pc.personId] === vid)
+      assert.ok(inVillage.some(pc => activeMemberIds.has(pc.personId)), `circle ${cid} member in village ${vid}`)
     }
+    const vets = ds.person_circle.filter(pc => pc.circleId === 2 && personVillage[pc.personId] === vid)
+    assert.ok(vets.some(pc => activeVolIds.has(pc.personId)), `Veteran's Circle volunteer in village ${vid}`)
   }
+})
+
+test('circles: Circle of Pride is member-only, as 0027 left production', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const memberIds = new Set(ds.member.map(m => m.personId))
+  const pride = ds.person_circle.filter(pc => pc.circleId === 1)
+  assert.ok(pride.length > 0)
+  assert.ok(pride.every(pc => memberIds.has(pc.personId)), 'a Circle of Pride tag on a non-member')
+})
+
+test('circles: members of the Circle of Pride can prefer a volunteer from it', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const memberByPerson = Object.fromEntries(ds.member.map(m => [m.personId, m.id]))
+  const prideMemberIds = new Set(ds.person_circle.filter(pc => pc.circleId === 1).map(pc => memberByPerson[pc.personId]))
+  assert.ok(ds.member_circle_preference.length > 0)
+  for (const mcp of ds.member_circle_preference) {
+    assert.equal(mcp.circleId, 1)
+    assert.ok(prideMemberIds.has(mcp.memberId), `preference for member ${mcp.memberId} outside the circle`)
+  }
+})
+
+test('persons: isVeteran is set exactly for the Veteran\'s Circle', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const vets = new Set(ds.person_circle.filter(pc => pc.circleId === 2).map(pc => pc.personId))
+  for (const p of ds.person) assert.equal(p.isVeteran ?? null, vets.has(p.id) ? 1 : null, `person ${p.id}`)
+})
+
+test('persons: a Jr./Sr./II/IV suffix lives in suffix, not lastName, as 0027 migrated it', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const suffixed = ds.person.filter(p => p.suffix)
+  assert.ok(suffixed.length > 0)
+  for (const p of ds.person) assert.ok(!/ (jr|sr|ii|iii|iv)\.?$/i.test(p.lastName), `suffix left in lastName: ${p.lastName}`)
+  for (const p of suffixed) assert.match(p.suffix, /^(Jr\.|Sr\.|II|III|IV)$/)
+})
+
+test('persons: preferredContactMethodId references the static contact_method ids', () => {
+  const ds = buildDataset(fullContentWithDest(), 20260630)
+  const set = ds.person.filter(p => p.preferredContactMethodId != null)
+  assert.ok(set.length > ds.person.length * 0.5)
+  assert.ok(set.every(p => [1, 2, 3, 4].includes(p.preferredContactMethodId)))
 })
 
 test('plants: every scenario exists and is recorded', () => {

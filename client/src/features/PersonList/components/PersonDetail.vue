@@ -78,8 +78,16 @@ function removePerson () {
   <div class="person-detail">
     <div class="actions" style="display:flex;gap:0.5rem;margin-bottom:1rem;">
       <Button v-if="canWritePerson" label="Edit Person" icon="pi pi-pencil" @click="goEdit" />
-      <Button v-if="canWriteMember" label="Member" icon="pi pi-id-card" :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
-      <Button v-if="canWriteVolunteer" label="Volunteer" icon="pi pi-users" :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
+      <!-- Each role button names its action. With a role record it opens that
+           role's editor (pencil, like Edit Person); without one it opens the
+           same form, whose submit grants the role. hasMember/VolunteerDetail
+           is the test MemberEdit/VolunteerEdit use to pick Save vs Grant. -->
+      <Button v-if="canWriteMember" :label="hasMemberDetail ? 'Edit Member' : 'Add Member Role'"
+              :icon="hasMemberDetail ? 'pi pi-pencil' : 'pi pi-plus'"
+              :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
+      <Button v-if="canWriteVolunteer" :label="hasVolunteerDetail ? 'Edit Volunteer' : 'Add Volunteer Role'"
+              :icon="hasVolunteerDetail ? 'pi pi-pencil' : 'pi pi-plus'"
+              :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
       <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
         <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="!canDelete" @click="removePerson" />
       </span>

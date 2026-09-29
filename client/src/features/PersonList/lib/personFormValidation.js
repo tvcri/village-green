@@ -1,13 +1,14 @@
+import { isRealCivilDate } from '../../../shared/lib/civilDate.js'
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_RE = /^[\d\s\-()+]{7,}$/
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const ZIP_RE = /^\d{5}$/
 
-export function validatePersonForm (form, errors) {
+export function validatePersonForm (form, errors, extra = {}) {
   Object.keys(errors).forEach(k => delete errors[k])
 
-  if (!form.firstName.trim()) errors.firstName = 'First name is required'
-  if (!form.lastName.trim())  errors.lastName  = 'Last name is required'
+  // First name is optional since 0027 (NULL or a name); last name is required.
+  if (!(form.lastName ?? '').trim()) errors.lastName = 'Last name is required'
 
   if (form.email && !EMAIL_RE.test(form.email))
     errors.email = 'Enter a valid email address'
@@ -21,8 +22,10 @@ export function validatePersonForm (form, errors) {
   if (form.emergencyContactPhone && !PHONE_RE.test(form.emergencyContactPhone))
     errors.emergencyContactPhone = 'Enter a valid phone number'
 
-  if (form.birthDate && (!DATE_RE.test(form.birthDate) || isNaN(Date.parse(form.birthDate))))
+  if (form.birthDate && !isRealCivilDate(form.birthDate))
     errors.birthDate = 'Enter a valid date (YYYY-MM-DD)'
+  if (extra.deceasedDate && !isRealCivilDate(extra.deceasedDate))
+    errors.deceasedDate = 'Enter a valid date (YYYY-MM-DD)'
 
   if (form.zip && !ZIP_RE.test(form.zip))
     errors.zip = 'Zip must be 5 digits'

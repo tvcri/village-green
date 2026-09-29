@@ -5,8 +5,10 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import MemberFormFields from '../../PersonList/components/MemberFormFields.vue'
-import { mapMemberForm, uncertainMapForMember, composeNotes } from '../lib/importMapping.js'
-import { getPerson, patchPerson } from '../../PersonList/api/personApi.js'
+import {
+  mapMemberForm, uncertainMapForMember, composeNotes, buildApplicationEnvelope, mergeCirclePreferences,
+} from '../lib/importMapping.js'
+import { getPerson, patchPerson, getCircles } from '../../PersonList/api/personApi.js'
 import { putMember, patchMember } from '../../PersonList/api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { validateMemberForm } from '../../PersonList/lib/memberFormValidation.js'
@@ -38,6 +40,13 @@ const needsVillage = ref(false)
 const villages = ref([])
 const selectedVillageId = ref(null)
 const savingVillage = ref(false)
+const allCircles = ref([])
+const circlePreferences = ref([])
+// The stored set, known before the catalog loads: an existing member's PATCH
+// sends preferences only when they differ from it, so a catalog failure (the
+// section hidden, the set never pre-ticked) can never wipe stored rows.
+let storedPreferences = []
+const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x))
 
 onMounted(async () => {
   try {
@@ -54,6 +63,15 @@ onMounted(async () => {
       const dump = composeNotes(props.extraction, props.memberIndex)
       form.miscNotes = form.miscNotes ? `${form.miscNotes}\n\n${dump}` : dump
     }
+    const existing = (p.member?.circlePreferences ?? []).map(c => c.circleId)
+    storedPreferences = existing
+    circlePreferences.value = [...existing]
+    allCircles.value = await getCircles()
+    const prideId = allCircles.value.find(c => c.name === 'Circle of Pride')?.circleId
+    // A Yes to "prefer a Circle of Pride volunteer" pre-ticks the preference;
+    // the coordinator sees and can change what is saved.
+    circlePreferences.value = mergeCirclePreferences(existing, prideId,
+      props.extraction.preferences?.circleOfPridePreferred) ?? existing
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load member data — go back and retry', life: 3000 })
@@ -70,6 +88,10 @@ function payload () {
     if (v === '' || v === null) return
     out[k] = v
   })
+  out.application = buildApplicationEnvelope(props.extraction, props.memberIndex)
+  if (!hasMember.value || !sameSet(circlePreferences.value, storedPreferences)) {
+    out.circlePreferences = [...circlePreferences.value]
+  }
   return out
 }
 
@@ -155,6 +177,8 @@ async function saveVillageAndRetry () {
         :errors="errors"
         :uncertain="uncertain"
         :primary-person-name="primaryPersonName"
+        v-model:circle-preferences="circlePreferences"
+        :circles="allCircles"
         @edited="onEdited"
       />
       <div class="step-footer">

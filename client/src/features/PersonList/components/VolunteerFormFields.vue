@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
+import IftaLabel from 'primevue/iftalabel'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
 import DataTable from 'primevue/datatable'
@@ -101,31 +102,37 @@ function updateVettingDate (index, field, date) {
     </div>
 
     <div class="form-field span-4">
-      <label class="label" for="capabilities">
-        Capabilities
-        <i v-if="uncertain.selectedCapabilityIds" class="pi pi-exclamation-triangle uncertain-icon"
-           v-tooltip.top="uncertainText('selectedCapabilityIds')" />
-      </label>
-      <MultiSelect id="capabilities" v-model="selectedCapabilityIds"
-                   :options="capabilityOptions" optionLabel="name" optionValue="capabilityId"
-                   display="chip" placeholder="Select capabilities" class="w-full" />
+      <IftaLabel>
+        <MultiSelect id="capabilities" v-model="selectedCapabilityIds"
+                     :options="capabilityOptions" optionLabel="name" optionValue="capabilityId"
+                     display="chip" placeholder="Select capabilities" class="w-full" />
+        <label for="capabilities">
+          Capabilities
+          <i v-if="uncertain.selectedCapabilityIds" class="pi pi-exclamation-triangle uncertain-icon"
+             v-tooltip.top="uncertainText('selectedCapabilityIds')" />
+        </label>
+      </IftaLabel>
     </div>
 
     <div class="form-field span-4">
-      <label class="label" for="volunteerNotes">Notes</label>
-      <Textarea id="volunteerNotes" v-model="notes"
-                rows="4" class="w-full" />
+      <IftaLabel>
+        <Textarea id="volunteerNotes" v-model="notes"
+                  rows="4" class="w-full" />
+        <label for="volunteerNotes">Notes</label>
+      </IftaLabel>
     </div>
 
     <div class="form-field ">
-      <label class="label" for="associateVillages">
-        Associate Villages
-        <i v-if="uncertain.associateVillageIds" class="pi pi-exclamation-triangle uncertain-icon"
-           v-tooltip.top="uncertainText('associateVillageIds')" />
-      </label>
-      <MultiSelect id="associateVillages" v-model="selectedAssociateVillageIds"
-                   :options="villageOptions" optionLabel="name" optionValue="villageId"
-                   display="chip" placeholder="Select villages" class="w-full" />
+      <IftaLabel>
+        <MultiSelect id="associateVillages" v-model="selectedAssociateVillageIds"
+                     :options="villageOptions" optionLabel="name" optionValue="villageId"
+                     display="chip" placeholder="Select villages" class="w-full" />
+        <label for="associateVillages">
+          Associate Villages
+          <i v-if="uncertain.associateVillageIds" class="pi pi-exclamation-triangle uncertain-icon"
+             v-tooltip.top="uncertainText('associateVillageIds')" />
+        </label>
+      </IftaLabel>
     </div>
 
   </div>
@@ -185,16 +192,16 @@ function updateVettingDate (index, field, date) {
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
-  border-bottom: 2px solid var(--color-border-default);
-  padding-bottom: 0.75rem;
-  margin: 0 0 0.75rem 0;
 }
 .section-header-row .section-header {
-  border-bottom: none;
-  padding-bottom: 0;
   margin: 0;
 }
 .form-field.span-4 { grid-column: 1 / -1; }
+/* Let the section panel's shade show through the vettings table. */
+.p-datatable {
+  --p-datatable-header-cell-background: transparent;
+  --p-datatable-row-background: transparent;
+}
 .add-vetting-row {
   display: flex;
   align-items: center;

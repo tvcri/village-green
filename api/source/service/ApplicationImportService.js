@@ -15,6 +15,12 @@ const num = { type: 'string', description: 'Numeric amount as digits, or "" if b
 const yn = { type: 'string', enum: ['Yes', 'No', ''] }
 const ynSometimes = { type: 'string', enum: ['Yes', 'No', 'Sometimes', ''] }
 
+// The version of this extraction's output shape, not of the paper form: bump it
+// when EXTRACTION_SCHEMA changes (the August 2026 form will). Stored in every
+// application envelope so a reader knows how to parse it. Which form edition
+// the applicant filled in is application.formDate.
+const EXTRACTION_SCHEMA_VERSION = 1
+
 const memberEntry = {
   type: 'object',
   additionalProperties: false,
@@ -53,6 +59,11 @@ const volunteerPerson = {
   },
 }
 
+// The form's edition: the month and year printed under the masthead. Editions
+// ask different questions (June 2024 has no veteran question), so the stored
+// envelope records which one the applicant filled in.
+const formDateField = { ...str, description: 'Month and year printed under the masthead, as YYYY-MM' }
+
 const CAPABILITY_NAME_ENUM = ['Rides', 'Errands', 'Home Help', 'Steering Committee', 'Tech Support', 'Friends']
 
 const EXTRACTION_SCHEMA = {
@@ -66,9 +77,10 @@ const EXTRACTION_SCHEMA = {
         application: {
           type: 'object',
           additionalProperties: false,
-          required: ['applicationDate', 'villageName', 'ambassador', 'householdType'],
+          required: ['applicationDate', 'formDate', 'villageName', 'ambassador', 'householdType'],
           properties: {
             applicationDate: { ...str, description: 'YYYY-MM-DD' },
+            formDate: formDateField,
             villageName: str,
             ambassador: str,
             householdType: { type: 'string', enum: ['Single', 'Dual', ''] },
@@ -118,9 +130,10 @@ const EXTRACTION_SCHEMA = {
         application: {
           type: 'object',
           additionalProperties: false,
-          required: ['applicationDate', 'villageName', 'ambassador'],
+          required: ['applicationDate', 'formDate', 'villageName', 'ambassador'],
           properties: {
             applicationDate: { ...str, description: 'YYYY-MM-DD' },
+            formDate: formDateField,
             villageName: str,
             ambassador: str,
           },
@@ -209,13 +222,15 @@ For a membership application:
 - The form may be filled in block-print style where all letters appear uppercase. Use letter size to infer true case: larger letters represent intended uppercase (start of a word or proper noun) and smaller letters represent intended lowercase. Apply standard title case to names, streets, and cities accordingly. Never return all-caps values for text fields.
 - "members" holds one entry for a Single household. For a Dual household, extract the second household member's own fields as a second entry (never more than two entries). If the second person's field is blank on the form, use an empty string — do not copy the first person's value.
 - For any field that is blank or not filled in, use an empty string "".
+- Address lines: copy what is written on the Apt/Unit line into "unit" and what is written on the Street Address line into "street". Never discard text from either line: a building or complex name is part of the address. If an apartment number is written on the street line, leave it there rather than moving it.
 - duesMonthly and duesYearly are digit strings (e.g. "120"), or "" if blank.
 - Accessibility questions (difficultyHearing, visionLimited, usesWalker, usesCane, usesWheelchair) are Yes/No/Sometimes checkboxes with an adjacent "explain" line. Some applicants check "Yes" but write their explanation on the "Sometimes" line, or check both. When this happens, use the checked Yes/No value as the field's answer — do NOT report it as an uncertain field, this is not ambiguous, the applicant's intent is clear from the checkbox. Instead, put the full explain text verbatim in accessibilityNotes (e.g. "Vision limited: needs glasses. Uses walker: rollator for travel."), one line per field that has explain text. accessibilityNotes is "" if no field had any handwritten explanation.
 - If "No Emergency Contact" is checked or no emergency contact is given, return emergencyContact with every field set to "".
+- If "No Emergency Contact" is checked but a contact is also filled in, the form contradicts itself: extract the filled-in contact, and list "emergencyContact" in uncertainFields with a reason describing the contradiction.
 - Dates are YYYY-MM-DD.
 - "uncertainFields": list ONLY fields whose values are genuinely ambiguous from the handwriting or scan quality — a digit that could be read two ways, a partially cut-off word, an ambiguous checkbox. For each, give the JSON path (e.g. "members[0].zip"), a short reason, and your best alternative reading ("" if none). Do not list fields you read confidently; an empty array means everything was clear.
 - For a volunteer application:
-  - The same block-print case-inference and blank-field rules above apply.
+  - The same block-print case-inference, blank-field, address-line and emergency-contact rules above apply.
   - "capabilityNames" lists every checked volunteer-opportunity option, using these exact names: "Rides", "Errands", "Home Help" (for "Light Household Maintenance"), "Steering Committee" (for "Steering Committee Member"), "Tech Support" (for "Technology Support"), "Friends" (for "Village Friends"). The form shows "Driver" as a parent checkbox with "Rides" and "Errands" as its own indented sub-checkboxes — read the Rides and Errands checkboxes directly; include each only if its own box is checked, regardless of whether the parent "Driver" box is checked or blank.
   - "circleOfPrideJoin" is the form's "Would you like to support the Circle of Pride as a volunteer?" Yes/No answer.
   - Do NOT extract anything from the "Supplemental Section for Drivers" page (license restrictions, vehicle table, insurance company, signature, document checklist) — skip that entire page.
@@ -277,8 +292,11 @@ function assembleResponse (data, villages, usage) {
   if (data.applicationType === 'volunteer') {
     return {
       applicationType: 'volunteer',
+      schemaVersion: EXTRACTION_SCHEMA_VERSION,
+      extractedAt: new Date().toISOString(),
       application: {
         applicationDate: data.application.applicationDate,
+        formDate: data.application.formDate,
         village: resolveVillage(data.application.villageName, villages),
         ambassador: data.application.ambassador,
       },
@@ -301,8 +319,11 @@ function assembleResponse (data, villages, usage) {
   const { newsletterPrint, duesMonthly, duesYearly, paymentMethod, invoiceMailed, ...preferences } = data.preferences
   return {
     applicationType: 'member',
+    schemaVersion: EXTRACTION_SCHEMA_VERSION,
+    extractedAt: new Date().toISOString(),
     application: {
       applicationDate: data.application.applicationDate,
+      formDate: data.application.formDate,
       village: resolveVillage(data.application.villageName, villages),
       ambassador: data.application.ambassador,
       householdType: data.application.householdType,
@@ -321,22 +342,43 @@ function assembleResponse (data, villages, usage) {
   }
 }
 
-// claude-opus-4-8: $5/MTok input, $25/MTok output
-function computeCost ({ input_tokens, output_tokens }) {
+// USD per million tokens, input and output. A model missing here still runs;
+// its cost is reported as null rather than priced as some other model.
+const MODEL_PRICES = {
+  'claude-opus-4-8': { input: 5, output: 25 },
+  'claude-opus-5-5': { input: 4, output: 20 },
+  'claude-sonnet-5': { input: 2, output: 10 },
+  'claude-sonnet-5-5': { input: 2, output: 10 },
+}
+
+function computeCost ({ input_tokens, output_tokens }, model) {
+  const price = MODEL_PRICES[model]
   return {
+    model,
     inputTokens: input_tokens,
     outputTokens: output_tokens,
-    cost: (input_tokens / 1_000_000 * 5) + (output_tokens / 1_000_000 * 25),
+    cost: price
+      ? (input_tokens / 1_000_000 * price.input) + (output_tokens / 1_000_000 * price.output)
+      : null,
   }
 }
 
-async function callClaude (client, pdfBuffer, schema, prompt) {
+// max_tokens is a ceiling, billed only as used. 16000 leaves room for adaptive
+// thinking (on by default from Sonnet 5 on) plus one application's JSON, and
+// stays within what a non-streaming request should ask for.
+const MAX_TOKENS = 16000
+
+// `thinking` and `effort` are optional; omitting them leaves the model's
+// defaults in place (Opus 4.8: no thinking; Sonnet 5.5: adaptive at high).
+// config.anthropic supplies them; see its note on the between_tools default.
+async function callClaude (client, model, pdfBuffer, schema, prompt, { thinking, effort } = {}) {
   let message
   try {
     message = await client.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 4096,
-      output_config: { format: { type: 'json_schema', schema } },
+      model,
+      max_tokens: MAX_TOKENS,
+      ...(thinking && { thinking: { type: thinking } }),
+      output_config: { format: { type: 'json_schema', schema }, ...(effort && { effort }) },
       messages: [{
         role: 'user',
         content: [
@@ -358,6 +400,13 @@ async function callClaude (client, pdfBuffer, schema, prompt) {
     err.status = 502
     throw err
   }
+  // A structured output cut off at the limit is truncated JSON; say so rather
+  // than let it surface as a parse failure or an empty response.
+  if (message.stop_reason === 'max_tokens') {
+    const err = new Error(`The extraction hit the model's output limit (${MAX_TOKENS} tokens) before finishing.`)
+    err.status = 502
+    throw err
+  }
   if (message.stop_reason === 'refusal') {
     const err = new Error('The extraction request was declined by the model. Verify the document is an application form.')
     err.status = 400
@@ -373,12 +422,12 @@ async function callClaude (client, pdfBuffer, schema, prompt) {
   return { data: JSON.parse(text), usage: message.usage }
 }
 
-function combineCost (usages) {
+function combineCost (usages, model) {
   const totals = usages.reduce((acc, u) => ({
     input_tokens: acc.input_tokens + u.input_tokens,
     output_tokens: acc.output_tokens + u.output_tokens,
   }), { input_tokens: 0, output_tokens: 0 })
-  return computeCost(totals)
+  return computeCost(totals, model)
 }
 
 async function extractFromPdf (pdfBuffer) {
@@ -388,23 +437,26 @@ async function extractFromPdf (pdfBuffer) {
     throw err
   }
   const client = new Anthropic({ apiKey: config.anthropic.apiKey })
+  const { model, thinking, effort } = config.anthropic
+  const options = { thinking, effort }
 
   const page1 = await extractPage1(pdfBuffer)
-  const classified = await callClaude(client, page1, CLASSIFY_SCHEMA, CLASSIFY_PROMPT)
+  const classified = await callClaude(client, model, page1, CLASSIFY_SCHEMA, CLASSIFY_PROMPT, options)
   if (classified.data.applicationType === 'unknown') {
     return {
       data: { applicationType: 'unknown', reason: classified.data.reason },
-      usage: combineCost([classified.usage]),
+      usage: combineCost([classified.usage], model),
     }
   }
 
-  const extracted = await callClaude(client, pdfBuffer, variantSchemaFor(classified.data.applicationType), EXTRACTION_PROMPT)
-  return { data: extracted.data, usage: combineCost([classified.usage, extracted.usage]) }
+  const extracted = await callClaude(client, model, pdfBuffer, variantSchemaFor(classified.data.applicationType), EXTRACTION_PROMPT, options)
+  return { data: extracted.data, usage: combineCost([classified.usage, extracted.usage], model) }
 }
 
 module.exports = {
   EXTRACTION_PROMPT,
   EXTRACTION_SCHEMA,
+  EXTRACTION_SCHEMA_VERSION,
   CLASSIFY_SCHEMA,
   CLASSIFY_PROMPT,
   variantSchemaFor,
@@ -412,5 +464,6 @@ module.exports = {
   resolveVillage,
   assembleResponse,
   computeCost,
+  callClaude,
   extractFromPdf,
 }

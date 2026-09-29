@@ -19,6 +19,7 @@ import { getVillagePersons } from '../../../shared/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
+import { personExportColumns, personExportValues } from '../../../shared/lib/personExport.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 
 defineOptions({ name: 'MemberList' })
@@ -46,7 +47,8 @@ const { hasPermission } = useCurrentUser()
 // person:read_birth_date: the API omits birthDate for holders without it, so
 // the export drops the column rather than shipping it empty.
 const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', villageId.value))
-const withoutBirthDate = cols => canReadBirthDate.value ? cols : cols.filter(c => c.key !== 'birthDate')
+// person:read_demographics, the same way, for gender/ethnicity/race/veteran.
+const canReadDemographics = computed(() => hasPermission('person:read_demographics', villageId.value))
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
 const pageRows = ref(10)
@@ -125,7 +127,15 @@ const membersForCsv = computed(() => {
   if (!Array.isArray(persons.value)) return []
   return filteredMembers.value.map(m => {
     const p = persons.value?.find(p => p.personId === m.personId) ?? {}
-    return { ...p, ...m }
+    return {
+      fullName: m.fullName,
+      memberNumber: m.memberNumber,
+      memberLevel: m.memberLevel,
+      joinDate: m.joinDate,
+      serviceNotes: m.serviceNotes,
+      circlePreferences: (m.circlePreferences ?? []).map(c => c.name).join(', '),
+      ...personExportValues(p),
+    }
   })
 })
 
@@ -141,26 +151,16 @@ const navigateToMember = (member) => {
   })
 }
 
-const columnsForCsv = computed(() => withoutBirthDate([
+// Member columns first, then the person block every roster download shares.
+const columnsForCsv = computed(() => [
   { header: 'Full Name', key: 'fullName' },
   { header: 'Member #', key: 'memberNumber' },
   { header: 'Member Level', key: 'memberLevel' },
   { header: 'Join Date', key: 'joinDate' },
   { header: 'Service Notes', key: 'serviceNotes' },
-  { header: 'Email', key: 'email' },
-  { header: 'Phone', key: 'phone' },
-  { header: 'Cell', key: 'cell' },
-  { header: 'Address', key: 'address' },
-  { header: 'City', key: 'city' },
-  { header: 'State', key: 'state' },
-  { header: 'Zip', key: 'zip' },
-  { header: 'Municipality', key: 'town' },
-  { header: 'Birth Date', key: 'birthDate' },
-  { header: 'Emergency Contact Name', key: 'emergencyContactName' },
-  { header: 'Emergency Contact Relationship', key: 'emergencyContactRelationship' },
-  { header: 'Emergency Contact Phone', key: 'emergencyContactPhone' },
-  { header: 'Emergency Contact Email', key: 'emergencyContactEmail' }
-]))
+  { header: 'Prefers a Volunteer From', key: 'circlePreferences' },
+  ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
+])
 
 const handleDownloadCsv = async () => {
   if (!persons.value) await fetchPersons()

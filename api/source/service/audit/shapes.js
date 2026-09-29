@@ -38,14 +38,44 @@ const shapes = {
     ],
     // enrollment_request/fcv_submission reference person but are their own
     // records, not attributes of the person — deliberately not folded.
-    relatedTables: ['enrollment_request', 'fcv_submission'],
+    // person_image: images carry no history (Chris Daley, Part 4) — deliberately not folded.
+    relatedTables: ['enrollment_request', 'fcv_submission', 'person_image'],
     sets: {
-      communities: {
+      circles: {
         kind: 'values',
-        table: 'person_community',
-        sourceColumns: ['id', 'personId', 'communityId'],
+        table: 'person_circle',
+        sourceColumns: ['id', 'personId', 'circleId'],
         sql: `SELECT c.name AS label
-              FROM person_community pc JOIN community c ON c.id = pc.communityId
+              FROM person_circle pc JOIN circle c ON c.id = pc.circleId
+              WHERE pc.personId = ?`,
+      },
+      races: {
+        kind: 'values',
+        table: 'person_race',
+        sourceColumns: ['id', 'personId', 'raceId'],
+        sql: `SELECT r.name AS label
+              FROM person_race pr JOIN race r ON r.id = pr.raceId
+              WHERE pr.personId = ?`,
+      },
+      languages: {
+        kind: 'keyed',
+        key: 'k',
+        table: 'person_language',
+        sourceColumns: ['id', 'personId', 'languageId', 'isPreferred'],
+        sql: `SELECT l.name AS k, pl.isPreferred != 0 AS isPreferred
+              FROM person_language pl JOIN language l ON l.id = pl.languageId
+              WHERE pl.personId = ?`,
+      },
+      contacts: {
+        kind: 'values',
+        table: 'person_contact',
+        sourceColumns: ['id', 'personId', 'name', 'relationship', 'phone', 'email', 'isPrimary', 'sequence'],
+        // Values, not keyed: name is free text (no uniqueness) and ids regenerate
+        // on PATCH, so a keyed diff would collapse duplicate names. The label
+        // carries the whole row, so any edit reads as remove + add.
+        sql: `SELECT CONCAT_WS(' · ', pc.name, pc.relationship, pc.phone, pc.email,
+                               IF(pc.isPrimary, 'primary', NULL)) AS label
+              FROM person_contact pc
               WHERE pc.personId = ?`,
       },
       disabilities: {
@@ -63,7 +93,16 @@ const shapes = {
   member: {
     table: 'member',
     relatedTables: [],
-    sets: {},
+    sets: {
+      circlePreferences: {
+        kind: 'values',
+        table: 'member_circle_preference',
+        sourceColumns: ['id', 'memberId', 'circleId'],
+        sql: `SELECT c.name AS label
+              FROM member_circle_preference mcp JOIN circle c ON c.id = mcp.circleId
+              WHERE mcp.memberId = ?`,
+      },
+    },
   },
 
   volunteer: {

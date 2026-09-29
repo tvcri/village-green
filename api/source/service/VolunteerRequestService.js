@@ -90,6 +90,7 @@ function baseColumns() {
     'sr.phone AS phone',
     `IF(sr.memberPersonId IS NOT NULL, JSON_OBJECT(
       'fullName', mp.fullName,
+      'displayName', mp.displayName,
       'firstName', mp.firstName,
       'lastName', mp.lastName,
       'address', mp.address,

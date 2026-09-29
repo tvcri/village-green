@@ -24,7 +24,14 @@ export const deletePerson = (personId) => apiCall('deletePerson', { personId })
 export const geocodeTown = (body) => apiCall('geocodeTown', {}, body)
 
 // Lookups (Plan A Task 8.5): full lists for id<->name resolution.
-export const getCommunities  = () => apiCall('getCommunities')
+export const getCircles      = () => apiCall('getCircles')
 export const getCapabilities = () => apiCall('getCapabilities')
 export const getDisabilities = () => apiCall('getDisabilities')
 export const getVettingTypes = () => apiCall('getVettingTypes')
+
+// Person catalogs added by 0027.
+export const getGenders        = () => apiCall('getGenders')
+export const getEthnicities    = () => apiCall('getEthnicities')
+export const getRaces          = () => apiCall('getRaces')
+export const getContactMethods = () => apiCall('getContactMethods')
+export const getLanguages      = () => apiCall('getLanguages')

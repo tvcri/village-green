@@ -5,7 +5,7 @@ import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import MemberFormFields from './MemberFormFields.vue'
-import { getPerson } from '../api/personApi.js'
+import { getPerson, getCircles } from '../api/personApi.js'
 import { putMember, patchMember, deleteMember } from '../api/roleApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 import { validateMemberForm } from '../lib/memberFormValidation.js'
@@ -33,6 +33,10 @@ const createdDate = ref('')
 const primaryPersonName = ref('')
 const original = ref({ ...form })
 const errors = reactive({})
+const allCircles = ref([])
+const circlePreferences = ref([])
+let originalPreferences = []
+const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x))
 
 onMounted(async () => {
   try {
@@ -53,11 +57,22 @@ onMounted(async () => {
       })
       primaryPersonName.value = d.primaryPerson?.fullName ?? ''
       createdDate.value = d.createdDate ?? ''
+      circlePreferences.value = (d.circlePreferences ?? []).map(c => c.circleId)
+      originalPreferences = [...circlePreferences.value]
       original.value = { ...form }
     }
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load person', life: 3000 })
+  }
+  // The circle catalog loads last and on its own: a failure only hides the
+  // preferences section. It must never leave an existing member looking like
+  // a new grant, whose PUT would replace the stored role.
+  try {
+    allCircles.value = await getCircles()
+  }
+  catch {
+    toast.add({ severity: 'warn', summary: 'Circles unavailable', detail: 'Service preferences cannot be edited right now', life: 3000 })
   }
 })
 
@@ -93,9 +108,10 @@ async function save () {
   try {
     if (hasMember.value) {
       const body = patchPayload()
+      if (!sameSet(circlePreferences.value, originalPreferences)) body.circlePreferences = [...circlePreferences.value]
       if (Object.keys(body).length) await patchMember(personId.value, body)
     }
-    else await putMember(personId.value, putPayload())
+    else await putMember(personId.value, { ...putPayload(), circlePreferences: [...circlePreferences.value] })
     toast.add({ severity: 'success', summary: 'Saved', detail: 'Member role saved', life: 2000 })
     back()
   }
@@ -127,7 +143,10 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
         <Button label="Back" severity="secondary" @click="back" />
       </div>
 
-      <form v-else @submit.prevent="save">
+      <!-- No submit button, so Enter in a text box never saves (browsers only
+           submit implicitly when a form has one); @submit.prevent stays as a
+           backstop. Save is an ordinary button. -->
+      <form v-else @submit.prevent>
         <MemberFormFields
           v-model:status="form.status"
           v-model:member-number="form.memberNumber"
@@ -149,12 +168,14 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           :village-id="person?.village?.villageId"
           :created-date="createdDate"
           :show-created-date="hasMember"
+          v-model:circle-preferences="circlePreferences"
+          :circles="allCircles"
         />
 
         <div class="form-footer">
           <Button v-if="hasMember" type="button" label="Revoke Role" severity="danger" @click="revoke" />
           <Button type="button" label="Cancel" severity="secondary" @click="back" />
-          <Button type="submit" :label="hasMember ? 'Save' : 'Grant Member Role'" />
+          <Button type="button" :label="hasMember ? 'Save' : 'Grant Member Role'" @click="save" />
         </div>
       </form>
     </template>
@@ -164,6 +185,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
 <style scoped>
 .detail-card {
   max-width: 1100px;
+  margin: 2rem auto;
   border: 1px solid var(--color-border-default);
   box-shadow: var(--box-shadow-card);
 }
@@ -183,12 +205,18 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
   align-items: flex-start;
 }
 
+/* Pinned to the bottom of the viewport while the form scrolls, so Save is
+   reachable from anywhere on a long form. */
 .form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 1.5rem;
-  padding-top: 1rem;
+  padding: 0.75rem 0;
+  background: var(--p-card-background);
   border-top: 1px solid var(--color-border-default);
 }
 </style>

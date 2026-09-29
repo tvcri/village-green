@@ -22,6 +22,16 @@ async function writeMemberWelcomeEvent (connection, personId) {
   )
 }
 
+// Replace the member's circle service preferences. Only called when the body
+// carried the key — an absent key leaves the set untouched.
+async function replaceCirclePreferences (connection, memberId, circleIds) {
+  await connection.query('DELETE FROM member_circle_preference WHERE memberId = ?', [memberId])
+  if (circleIds.length) {
+    await connection.query('INSERT INTO member_circle_preference (memberId, circleId) VALUES ?',
+      [circleIds.map(circleId => [memberId, circleId])])
+  }
+}
+
 module.exports.personHasHomeVillage = async function (personId) {
   const [rows] = await dbUtils.pool.query(
     'SELECT villageId FROM person WHERE id = ?', [personId]
@@ -38,6 +48,10 @@ module.exports.memberExists = async function (personId) {
 
 // Grant or fully replace the member role.
 module.exports.putMember = async function (personId, body, userObject) {
+  const { circlePreferences, application, ...fields } = body
+  // JSON column: mysql2 would expand an object into `key = val` pairs, so the
+  // envelope is stringified. Only written when the key was sent.
+  if (application !== undefined) fields.application = application === null ? null : JSON.stringify(application)
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       // status comes back alongside id: it is the before-state the welcome
@@ -53,20 +67,22 @@ module.exports.putMember = async function (personId, body, userObject) {
           // is the primary welcome path.
           let createdId
           if (existing.length) {
-            if (Object.keys(body).length) {
-              await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+            if (Object.keys(fields).length) {
+              await connection.query('UPDATE member SET ? WHERE personId = ?', [fields, personId])
             }
           }
           else {
             const [[{ nextNumber }]] = await connection.query(
               'SELECT COALESCE(MAX(CAST(memberNumber AS SIGNED)), 0) + 1 AS nextNumber FROM member FOR UPDATE'
             )
-            const [result] = await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...body })
+            const [result] = await connection.query('INSERT INTO member SET ?', { personId, memberNumber: String(nextNumber), ...fields })
             createdId = result.insertId
           }
-          if (isActivation(existing[0]?.status, body.status)) {
+          if (isActivation(existing[0]?.status, fields.status)) {
             await writeMemberWelcomeEvent(connection, personId)
           }
+          const memberId = existing[0]?.id ?? createdId
+          if (circlePreferences !== undefined) await replaceCirclePreferences(connection, memberId, circlePreferences)
           return createdId
         })
     },
@@ -77,6 +93,10 @@ module.exports.putMember = async function (personId, body, userObject) {
 
 // Partially update an existing member role.
 module.exports.patchMember = async function (personId, body, userObject) {
+  const { circlePreferences, application, ...fields } = body
+  // JSON column: mysql2 would expand an object into `key = val` pairs, so the
+  // envelope is stringified. Only written when the key was sent.
+  if (application !== undefined) fields.application = application === null ? null : JSON.stringify(application)
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       // Read the before-state inside the transaction: this is the path a
@@ -88,12 +108,13 @@ module.exports.patchMember = async function (personId, body, userObject) {
       // No member row: the mutation is a no-op UPDATE and there is no entity
       // to audit, so it runs unwrapped (auditUpdate would demand a new id).
       const mutate = async () => {
-        if (Object.keys(body).length) {
-          await connection.query('UPDATE member SET ? WHERE personId = ?', [body, personId])
+        if (Object.keys(fields).length) {
+          await connection.query('UPDATE member SET ? WHERE personId = ?', [fields, personId])
         }
-        if (isActivation(existing[0]?.status, body.status)) {
+        if (isActivation(existing[0]?.status, fields.status)) {
           await writeMemberWelcomeEvent(connection, personId)
         }
+        if (memberId && circlePreferences !== undefined) await replaceCirclePreferences(connection, memberId, circlePreferences)
       }
       if (memberId) {
         await AuditService.auditUpdate(connection,

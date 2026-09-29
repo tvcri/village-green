@@ -53,8 +53,8 @@ export const CLASS_TOTALS = { big: 113, medium: 20, small: 9, tiny: 5 }
 export const TABLE_ORDER = [
   'village', 'user_data', 'role_grant',
   'privacy_rules', 'privacy_acknowledgement',
-  'capability', 'disability', 'vetting_type', 'community',
+  'capability', 'disability', 'vetting_type', 'circle',
   'person', 'member', 'volunteer',
-  'volunteer_capability', 'volunteer_vetting', 'person_disability', 'person_community',
+  'volunteer_capability', 'volunteer_vetting', 'person_disability', 'person_circle', 'member_circle_preference',
   'service_request', 'notification_event', 'fcv_submission',
 ]

@@ -120,8 +120,8 @@ function restart () {
 
       <div class="wizard-footer">
         <span v-if="extraction?.usage" class="usage">
-          {{ extraction.usage.inputTokens }} in / {{ extraction.usage.outputTokens }} out tokens —
-          ${{ extraction.usage.cost.toFixed(4) }}
+          <template v-if="extraction.usage.model">{{ extraction.usage.model }} · </template>{{ extraction.usage.inputTokens }} in / {{ extraction.usage.outputTokens }} out tokens —
+          {{ extraction.usage.cost == null ? 'cost unknown' : `$${extraction.usage.cost.toFixed(4)}` }}
         </span>
         <Button v-if="currentStep.key !== 'done'" label="Cancel" severity="secondary" @click="requestCancel" />
       </div>

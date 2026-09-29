@@ -160,6 +160,19 @@ const config = {
     anthropic: {
         // Server-side only. Never expose via getClientEnv().
         apiKey: process.env.VG_ANTHROPIC_API_KEY,
+        // The application-import extraction model. A setting rather than a
+        // constant so production can move models with an app-setting change
+        // instead of a rebuild; ApplicationImportService prices it.
+        model: process.env.VG_ANTHROPIC_MODEL || 'claude-sonnet-5-5',
+        // thinking is a thinking.type, effort is output_config.effort; unset
+        // sends neither. The default model runs with up-front thinking off
+        // ("between_tools"), which kept every sample scan under ~9s. That
+        // default applies only while VG_ANTHROPIC_MODEL is unset too, because
+        // other models reject between_tools: rolling back to Opus 4.8 by
+        // model name alone must not break every import.
+        thinking: process.env.VG_ANTHROPIC_THINKING ||
+          (process.env.VG_ANTHROPIC_MODEL ? undefined : 'between_tools'),
+        effort: process.env.VG_ANTHROPIC_EFFORT,
         toJSON: function () {
             const {apiKey, ...props} = this
             props.apiKey = !!apiKey

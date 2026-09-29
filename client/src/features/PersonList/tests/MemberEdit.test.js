@@ -27,8 +27,12 @@ vi.mock('../api/personApi.js', () => ({
       householdDues: 100,
       printedNewsletter: false,
       createdDate: '2023-06-15',
+      circlePreferences: [{ circleId: '2', name: "Veteran's Circle" }],
     }
-  })
+  }),
+  getCircles: vi.fn().mockResolvedValue([
+    { circleId: '1', name: 'Circle of Pride' }, { circleId: '2', name: "Veteran's Circle" },
+  ]),
 }))
 vi.mock('../api/roleApi.js', () => ({
   putMember: vi.fn().mockResolvedValue({}),
@@ -38,6 +42,9 @@ vi.mock('../api/roleApi.js', () => ({
 vi.mock('../../MemberList/api/memberApi.js', () => ({
   getVillageMembers: vi.fn().mockResolvedValue([])
 }))
+
+import { getPerson } from '../api/personApi.js'
+import { putMember, patchMember } from '../api/roleApi.js'
 
 beforeEach(() => {
   window.matchMedia = () => ({
@@ -58,6 +65,55 @@ const globalOpts = {
 }
 
 describe('MemberEdit', () => {
+  // A failed load leaves person null, so the no-home-village notice replaces
+  // the form: no Save or Grant button exists to PUT a new role over the stored one.
+  it('a failed person load renders no save button, so it can never PUT a role', async () => {
+    getPerson.mockRejectedValueOnce(new Error('down'))
+    render(MemberEdit, { global: globalOpts })
+    await waitFor(() => expect(getPerson).toHaveBeenCalled())
+    await new Promise(r => setTimeout(r, 0))
+    expect(screen.queryByText('Grant Member Role')).toBeNull()
+    expect(screen.queryByText('Save')).toBeNull()
+    expect(putMember).not.toHaveBeenCalled()
+    expect(patchMember).not.toHaveBeenCalled()
+  })
+
+  it('shows service preferences and saves a toggle', async () => {
+    const { patchMember } = await import('../api/roleApi.js')
+    render(MemberEdit, { global: globalOpts })
+    await screen.findByDisplayValue('M100')
+    const vet = screen.getByText("Veteran's Circle").closest('label').querySelector('input[type="checkbox"]')
+    expect(vet.checked).toBe(true)
+    const pride = screen.getByText('Circle of Pride').closest('label').querySelector('input[type="checkbox"]')
+    await fireEvent.click(pride)
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchMember).toHaveBeenCalled())
+    expect(patchMember.mock.calls[0][1].circlePreferences).toEqual(['2', '1'])
+  })
+
+  it('a failed circle catalog still edits the existing member, never a PUT replace', async () => {
+    const { getCircles } = await import('../api/personApi.js')
+    const { patchMember, putMember } = await import('../api/roleApi.js')
+    getCircles.mockRejectedValueOnce(new Error('down'))
+    render(MemberEdit, { global: globalOpts })
+    await screen.findByDisplayValue('M100')
+    expect(screen.getByText('Save')).toBeInTheDocument()
+    const input = screen.getByDisplayValue('M100')
+    await fireEvent.update(input, 'M101')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchMember).toHaveBeenCalled())
+    expect(putMember).not.toHaveBeenCalled()
+    expect('circlePreferences' in patchMember.mock.calls[0][1]).toBe(false)
+  })
+
+  it('sends no PATCH when nothing, including preferences, changed', async () => {
+    const { patchMember } = await import('../api/roleApi.js')
+    render(MemberEdit, { global: globalOpts })
+    await screen.findByDisplayValue('M100')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchMember).not.toHaveBeenCalled())
+  })
+
   it('loads and displays the existing member values', async () => {
     render(MemberEdit, { global: globalOpts })
     await waitFor(() => expect(screen.getByDisplayValue('M100')).toBeInTheDocument())

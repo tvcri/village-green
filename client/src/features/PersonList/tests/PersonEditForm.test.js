@@ -4,12 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import PrimeVue from 'primevue/config'
 import PersonEditForm from '../components/PersonEditForm.vue'
+import { _resetPersonLookups } from '../composables/usePersonLookups.js'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({ params: { personId: '5' } })
 }))
-vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
+const mockToastAdd = vi.fn()
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: mockToastAdd }) }))
 vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
   useRequirePermission: () => {}
 }))
@@ -25,13 +27,27 @@ vi.mock('../api/personApi.js', () => ({
     email: 'alice@example.com',
     phone: '555-0100',
     village: { villageId: '1' },
-    communities: [{ name: 'Pride' }],
-    disabilities: [{ name: 'Vision', note: 'reading glasses' }]
+    circles: [{ circleId: '1', name: 'Circle of Pride' }],
+    disabilities: [{ name: 'Vision', note: 'reading glasses' }],
+    suffix: 'Jr.',
+    pronouns: 'she/her',
+    gender: { genderId: '1', name: 'Female' },
+    isVeteran: false,
+    races: [],
+    languages: [{ languageId: '1', name: 'English', tag: 'en', isPreferred: true }],
   }),
   createPerson: vi.fn().mockResolvedValue({ personId: '5' }),
   patchPerson: vi.fn().mockResolvedValue({}),
-  getCommunities: vi.fn().mockResolvedValue([{ communityId: 1, name: 'Pride' }, { communityId: 2, name: 'Veteran' }]),
-  getDisabilities: vi.fn().mockResolvedValue([{ disabilityId: 1, name: 'Vision' }])
+  getCircles: vi.fn().mockResolvedValue([
+    { circleId: '1', name: 'Circle of Pride' }, { circleId: '2', name: "Veteran's Circle" },
+    { circleId: '3', name: 'DownCity' }, { circleId: '4', name: 'OakHill' },
+  ]),
+  getDisabilities: vi.fn().mockResolvedValue([{ disabilityId: 1, name: 'Vision' }]),
+  getGenders: vi.fn().mockResolvedValue([{ genderId: '1', name: 'Female' }, { genderId: '2', name: 'Male' }]),
+  getEthnicities: vi.fn().mockResolvedValue([]),
+  getRaces: vi.fn().mockResolvedValue([{ raceId: '1', name: 'Asian' }]),
+  getContactMethods: vi.fn().mockResolvedValue([{ contactMethodId: '1', name: 'Phone' }]),
+  getLanguages: vi.fn().mockResolvedValue([{ languageId: '1', name: 'English', tag: 'en' }, { languageId: '2', name: 'Spanish', tag: 'es' }]),
 }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({
   getVillages: vi.fn().mockResolvedValue([{ villageId: '1', name: 'Testville' }])
@@ -56,6 +72,27 @@ const globalOpts = {
 }
 
 describe('PersonEditForm', () => {
+  it('a failed load toasts and keeps Save disabled, so a blank form never PATCHes nulls', async () => {
+    const { getGenders, patchPerson } = await import('../api/personApi.js')
+    _resetPersonLookups()
+    getGenders.mockRejectedValueOnce(new Error('catalog down'))
+    render(PersonEditForm, { global: globalOpts })
+
+    await waitFor(() => expect(mockToastAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'error', detail: 'Failed to load person' })))
+    const save = screen.getByText('Save').closest('button')
+    expect(save).toBeDisabled()
+    await fireEvent.click(save)
+    expect(patchPerson).not.toHaveBeenCalled()
+    _resetPersonLookups()
+  })
+
+  it('enables Save once the person has loaded', async () => {
+    render(PersonEditForm, { global: globalOpts })
+    await screen.findByDisplayValue('Alice')
+    expect(screen.getByText('Save').closest('button')).toBeEnabled()
+  })
+
   it('loads and displays the existing person values', async () => {
     render(PersonEditForm, { global: globalOpts })
     await waitFor(() => expect(screen.getByDisplayValue('Alice')).toBeInTheDocument())
@@ -82,20 +119,23 @@ describe('PersonEditForm', () => {
     expect(body.email).toBe('alicia@example.com')
   })
 
-  it('toggles the Veteran community checkbox into the saved payload', async () => {
+  it('renders one circle checkbox per catalog row and saves toggles under circles', async () => {
     const { patchPerson } = await import('../api/personApi.js')
     render(PersonEditForm, { global: globalOpts })
-
     await screen.findByDisplayValue('Alice')
-    const veteranLabel = screen.getByText('Veteran').closest('label')
-    const veteranCheckbox = veteranLabel.querySelector('input[type="checkbox"]')
-    await fireEvent.click(veteranCheckbox)
-
+    for (const name of ['Circle of Pride', "Veteran's Circle", 'DownCity', 'OakHill']) {
+      expect(screen.getByText(name)).toBeInTheDocument()
+    }
+    const prideBox = screen.getByText('Circle of Pride').closest('label').querySelector('input[type="checkbox"]')
+    expect(prideBox.checked).toBe(true)
+    const vetBox = screen.getByText("Veteran's Circle").closest('label').querySelector('input[type="checkbox"]')
+    await fireEvent.click(vetBox)
     await fireEvent.click(screen.getByText('Save'))
-
     await waitFor(() => expect(patchPerson).toHaveBeenCalled())
     const [, body] = patchPerson.mock.calls[0]
-    expect(body.communities).toEqual(expect.arrayContaining([1, 2]))
+    expect(body.circles).toEqual(expect.arrayContaining(['1', '2']))
+    expect(body.circles).toHaveLength(2)
+    expect('communities' in body).toBe(false)
   })
 
   it('hides the birth date input and never sends birthDate without person:read_birth_date', async () => {
@@ -115,5 +155,46 @@ describe('PersonEditForm', () => {
     render(PersonEditForm, { global: globalOpts })
     await screen.findByDisplayValue('Alice')
     expect(document.getElementById('birthDate')).not.toBeNull()
+  })
+
+  it('loads the 0027 fields and saves them back unchanged', async () => {
+    const { patchPerson } = await import('../api/personApi.js')
+    render(PersonEditForm, { global: globalOpts })
+    await screen.findByDisplayValue('Jr.')
+    expect(screen.getByDisplayValue('she/her')).toBeInTheDocument()
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchPerson).toHaveBeenCalled())
+    const [, body] = patchPerson.mock.calls[0]
+    expect(body.suffix).toBe('Jr.')
+    expect(body.genderId).toBe('1')
+    expect(body.isVeteran).toBe(false)
+    expect(body.races).toEqual([])
+    expect(body.languages).toEqual([{ languageId: '1', isPreferred: true }])
+  })
+
+  it('omits demographics without person:read_demographics', async () => {
+    mockHasPermission.mockImplementation((key) => key !== 'person:read_demographics')
+    const { patchPerson } = await import('../api/personApi.js')
+    render(PersonEditForm, { global: globalOpts })
+    await screen.findByDisplayValue('Jr.')
+    expect(screen.queryByText('Demographics')).toBeNull()
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchPerson).toHaveBeenCalled())
+    const [, body] = patchPerson.mock.calls[0]
+    for (const k of ['genderId', 'ethnicityId', 'isVeteran', 'races']) expect(k in body).toBe(false)
+    mockHasPermission.mockImplementation(() => true)
+  })
+
+  it('saves a record whose first name is NULL, sending firstName null', async () => {
+    const { getPerson, patchPerson } = await import('../api/personApi.js')
+    getPerson.mockResolvedValueOnce({
+      personId: '5', firstName: null, lastName: 'Smith', village: { villageId: '1' },
+      circles: [], disabilities: [], languages: [],
+    })
+    render(PersonEditForm, { global: globalOpts })
+    await screen.findByDisplayValue('Smith')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchPerson).toHaveBeenCalled())
+    expect(patchPerson.mock.calls[0][1].firstName).toBeNull()
   })
 })

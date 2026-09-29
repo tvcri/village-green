@@ -122,13 +122,18 @@ jobs:
         working-directory: data
         run: npm run roundtrip
 
+      # emit re-runs the doctor, so drift fails this step too; it stays
+      # advisory on PRs like the steps above.
       - name: Emit + app-export the JSONL artifacts
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         working-directory: data
         run: |
           npm run emit
           npm run export
 
+      # With no JSONL emitted, if-no-files-found: error would fail the job.
       - name: Upload JSONL artifacts
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v4
         with:
           name: demo-appdata

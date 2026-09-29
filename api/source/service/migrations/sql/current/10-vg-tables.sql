@@ -48,7 +48,8 @@ DROP TABLE IF EXISTS `active_member`;
  1 AS `printedNewsletter`,
  1 AS `scNotes`,
  1 AS `statusChangeNotes`,
- 1 AS `miscNotes`*/;
+ 1 AS `miscNotes`,
+ 1 AS `application`*/;
 
 --
 -- Temporary view structure for view `active_volunteer`
@@ -124,11 +125,23 @@ CREATE TABLE `ce_dump` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Table structure for table `community`
+-- Table structure for table `circle`
 --
 
-DROP TABLE IF EXISTS `community`;
-CREATE TABLE `community` (
+DROP TABLE IF EXISTS `circle`;
+CREATE TABLE `circle` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `contact_method`
+--
+
+DROP TABLE IF EXISTS `contact_method`;
+CREATE TABLE `contact_method` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
   PRIMARY KEY (`id`),
@@ -172,6 +185,18 @@ CREATE TABLE `enrollment_request` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `ethnicity`
+--
+
+DROP TABLE IF EXISTS `ethnicity`;
+CREATE TABLE `ethnicity` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `fcv_submission`
 --
 
@@ -203,6 +228,32 @@ CREATE TABLE `fcv_submission` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `gender`
+--
+
+DROP TABLE IF EXISTS `gender`;
+CREATE TABLE `gender` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `language`
+--
+
+DROP TABLE IF EXISTS `language`;
+CREATE TABLE `language` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `tag` varchar(10) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`),
+  UNIQUE KEY `tag` (`tag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `member`
 --
 
@@ -227,11 +278,28 @@ CREATE TABLE `member` (
   `scNotes` text,
   `statusChangeNotes` text,
   `miscNotes` text,
+  `application` json DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `person_id` (`personId`),
   KEY `member_primary_person_fk` (`primaryPersonId`),
   CONSTRAINT `member_ibfk_1` FOREIGN KEY (`personId`) REFERENCES `person` (`id`),
   CONSTRAINT `member_primary_person_fk` FOREIGN KEY (`primaryPersonId`) REFERENCES `person` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `member_circle_preference`
+--
+
+DROP TABLE IF EXISTS `member_circle_preference`;
+CREATE TABLE `member_circle_preference` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `memberId` int NOT NULL,
+  `circleId` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `member_circle_preference` (`memberId`,`circleId`),
+  KEY `mcp_circle_fk` (`circleId`),
+  CONSTRAINT `mcp_circle_fk` FOREIGN KEY (`circleId`) REFERENCES `circle` (`id`),
+  CONSTRAINT `mcp_member_fk` FOREIGN KEY (`memberId`) REFERENCES `member` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -262,12 +330,15 @@ DROP TABLE IF EXISTS `person`;
 CREATE TABLE `person` (
   `id` int NOT NULL AUTO_INCREMENT,
   `villageId` int DEFAULT NULL,
-  `fullName` varchar(200) GENERATED ALWAYS AS (concat_ws(_utf8mb4', ',`lastName`,`firstName`)) STORED,
+  `fullName` varchar(200) GENERATED ALWAYS AS (concat_ws(_utf8mb4', ',`lastName`,`firstName`,`suffix`)) STORED,
+  `displayName` varchar(300) GENERATED ALWAYS AS (concat_ws(_utf8mb4' ',`firstName`,`lastName`,`suffix`)) STORED,
   `lastName` varchar(100) NOT NULL,
-  `firstName` varchar(100) NOT NULL,
+  `firstName` varchar(100) DEFAULT NULL,
   `middleInitial` varchar(10) DEFAULT NULL,
+  `suffix` varchar(20) DEFAULT NULL,
   `salutation` varchar(20) DEFAULT NULL,
   `nickname` varchar(100) DEFAULT NULL,
+  `pronouns` varchar(30) DEFAULT NULL,
   `street` varchar(200) DEFAULT NULL,
   `unit` varchar(100) DEFAULT NULL,
   `address` varchar(300) GENERATED ALWAYS AS (concat_ws(_utf8mb4', ',`street`,`unit`)) STORED,
@@ -282,32 +353,63 @@ CREATE TABLE `person` (
   `computerUse` bit(1) DEFAULT NULL,
   `smartphone` bit(1) DEFAULT NULL,
   `birthDate` date DEFAULT NULL,
+  `deceasedDate` date DEFAULT NULL,
   `emergencyContactName` varchar(200) DEFAULT NULL,
   `emergencyContactRelationship` varchar(100) DEFAULT NULL,
   `emergencyContactPhone` varchar(50) DEFAULT NULL,
   `emergencyContactEmail` varchar(200) DEFAULT NULL,
   `comments` text,
+  `genderId` int DEFAULT NULL,
+  `ethnicityId` int DEFAULT NULL,
+  `isVeteran` bit(1) DEFAULT NULL,
+  `preferredContactMethodId` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `person_ibfk_1` (`villageId`),
   KEY `INDEX_email` (`email`),
+  KEY `person_gender_fk` (`genderId`),
+  KEY `person_ethnicity_fk` (`ethnicityId`),
+  KEY `person_contact_method_fk` (`preferredContactMethodId`),
+  CONSTRAINT `person_contact_method_fk` FOREIGN KEY (`preferredContactMethodId`) REFERENCES `contact_method` (`id`),
+  CONSTRAINT `person_ethnicity_fk` FOREIGN KEY (`ethnicityId`) REFERENCES `ethnicity` (`id`),
+  CONSTRAINT `person_gender_fk` FOREIGN KEY (`genderId`) REFERENCES `gender` (`id`),
   CONSTRAINT `person_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
-  CONSTRAINT `person_names_non_empty` CHECK (((`lastName` <> _utf8mb4'') and (`firstName` <> _utf8mb4'')))
+  CONSTRAINT `person_first_name_not_blank` CHECK (((`firstName` is null) or (`firstName` <> _utf8mb4''))),
+  CONSTRAINT `person_last_name_non_empty` CHECK ((`lastName` <> _utf8mb4''))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Table structure for table `person_community`
+-- Table structure for table `person_circle`
 --
 
-DROP TABLE IF EXISTS `person_community`;
-CREATE TABLE `person_community` (
+DROP TABLE IF EXISTS `person_circle`;
+CREATE TABLE `person_circle` (
   `id` int NOT NULL AUTO_INCREMENT,
   `personId` int NOT NULL,
-  `communityId` int NOT NULL,
+  `circleId` int NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `person_community` (`personId`,`communityId`),
-  KEY `pc_community_fk` (`communityId`),
-  CONSTRAINT `pc_community_fk` FOREIGN KEY (`communityId`) REFERENCES `community` (`id`),
-  CONSTRAINT `pc_person_fk` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE CASCADE
+  UNIQUE KEY `person_circle` (`personId`,`circleId`),
+  KEY `person_circle_circle_fk` (`circleId`),
+  CONSTRAINT `person_circle_circle_fk` FOREIGN KEY (`circleId`) REFERENCES `circle` (`id`),
+  CONSTRAINT `person_circle_person_fk` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `person_contact`
+--
+
+DROP TABLE IF EXISTS `person_contact`;
+CREATE TABLE `person_contact` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `personId` int NOT NULL,
+  `name` varchar(200) NOT NULL,
+  `relationship` varchar(100) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `email` varchar(200) DEFAULT NULL,
+  `isPrimary` bit(1) NOT NULL DEFAULT b'0',
+  `sequence` tinyint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `person_contact_person` (`personId`),
+  CONSTRAINT `person_contact_person_fk` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -325,6 +427,59 @@ CREATE TABLE `person_disability` (
   KEY `disability_id` (`disabilityId`),
   CONSTRAINT `person_disability_ibfk_1` FOREIGN KEY (`personId`) REFERENCES `person` (`id`),
   CONSTRAINT `person_disability_ibfk_2` FOREIGN KEY (`disabilityId`) REFERENCES `disability` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `person_image`
+--
+
+DROP TABLE IF EXISTS `person_image`;
+CREATE TABLE `person_image` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `personId` int NOT NULL,
+  `kind` varchar(10) NOT NULL,
+  `mimeType` varchar(50) NOT NULL,
+  `width` smallint unsigned DEFAULT NULL,
+  `height` smallint unsigned DEFAULT NULL,
+  `bytes` mediumblob NOT NULL,
+  `thumbnail` blob,
+  `updatedAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `person_image` (`personId`,`kind`),
+  CONSTRAINT `person_image_person_fk` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `person_language`
+--
+
+DROP TABLE IF EXISTS `person_language`;
+CREATE TABLE `person_language` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `personId` int NOT NULL,
+  `languageId` int NOT NULL,
+  `isPreferred` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `person_language` (`personId`,`languageId`),
+  KEY `person_language_language_fk` (`languageId`),
+  CONSTRAINT `person_language_language_fk` FOREIGN KEY (`languageId`) REFERENCES `language` (`id`),
+  CONSTRAINT `person_language_person_fk` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `person_race`
+--
+
+DROP TABLE IF EXISTS `person_race`;
+CREATE TABLE `person_race` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `personId` int NOT NULL,
+  `raceId` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `person_race` (`personId`,`raceId`),
+  KEY `person_race_race_fk` (`raceId`),
+  CONSTRAINT `person_race_person_fk` FOREIGN KEY (`personId`) REFERENCES `person` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `person_race_race_fk` FOREIGN KEY (`raceId`) REFERENCES `race` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -362,6 +517,18 @@ CREATE TABLE `privacy_rules` (
   KEY `fk_privacy_rules_modifier` (`modifiedByUserId`),
   CONSTRAINT `fk_privacy_rules_modifier` FOREIGN KEY (`modifiedByUserId`) REFERENCES `user_data` (`userId`),
   CONSTRAINT `fk_privacy_rules_publisher` FOREIGN KEY (`publishedByUserId`) REFERENCES `user_data` (`userId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `race`
+--
+
+DROP TABLE IF EXISTS `race`;
+CREATE TABLE `race` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -559,6 +726,7 @@ CREATE TABLE `volunteer` (
   `providerType` varchar(50) DEFAULT NULL,
   `active` bit(1) DEFAULT NULL,
   `notes` text,
+  `application` json DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `person_id` (`personId`),
   CONSTRAINT `volunteer_ibfk_1` FOREIGN KEY (`personId`) REFERENCES `person` (`id`)
@@ -709,7 +877,7 @@ DELIMITER ;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50001 VIEW `active_member` AS select `member`.`id` AS `id`,`member`.`personId` AS `personId`,`member`.`memberNumber` AS `memberNumber`,`member`.`memberLevel` AS `memberLevel`,`member`.`memberType` AS `memberType`,`member`.`primaryPersonId` AS `primaryPersonId`,`member`.`secondaryType` AS `secondaryType`,`member`.`serviceNotes` AS `serviceNotes`,`member`.`joinDate` AS `joinDate`,`member`.`createdDate` AS `createdDate`,`member`.`status` AS `status`,`member`.`dropReason` AS `dropReason`,`member`.`householdSize` AS `householdSize`,`member`.`householdDues` AS `householdDues`,`member`.`quickbooksKey` AS `quickbooksKey`,`member`.`printedNewsletter` AS `printedNewsletter`,`member`.`scNotes` AS `scNotes`,`member`.`statusChangeNotes` AS `statusChangeNotes`,`member`.`miscNotes` AS `miscNotes` from `member` where (`member`.`status` = 'Active') */;
+/*!50001 VIEW `active_member` AS select `member`.`id` AS `id`,`member`.`personId` AS `personId`,`member`.`memberNumber` AS `memberNumber`,`member`.`memberLevel` AS `memberLevel`,`member`.`memberType` AS `memberType`,`member`.`primaryPersonId` AS `primaryPersonId`,`member`.`secondaryType` AS `secondaryType`,`member`.`serviceNotes` AS `serviceNotes`,`member`.`joinDate` AS `joinDate`,`member`.`createdDate` AS `createdDate`,`member`.`status` AS `status`,`member`.`dropReason` AS `dropReason`,`member`.`householdSize` AS `householdSize`,`member`.`householdDues` AS `householdDues`,`member`.`quickbooksKey` AS `quickbooksKey`,`member`.`printedNewsletter` AS `printedNewsletter`,`member`.`scNotes` AS `scNotes`,`member`.`statusChangeNotes` AS `statusChangeNotes`,`member`.`miscNotes` AS `miscNotes`,`member`.`application` AS `application` from `member` where (`member`.`status` = 'Active') */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 
 --
@@ -730,4 +898,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-20 23:06:50
+-- Dump completed on 2026-09-23  2:49:34

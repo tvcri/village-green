@@ -277,3 +277,24 @@ test('GET one on a capability-mismatched request -> 404', async () => {
   const { status } = await vgCall('getVolunteerRequest', { serviceRequestId: errand }, { token: vssJoe })
   assert.equal(status, 404)
 })
+
+// ---- running-text names keep the suffix (0027 moved it out of lastName) ----
+
+test('member contact and GET /user volunteers carry displayName, suffix included', async () => {
+  const ids = [persons.quahogMember.id, persons.quahogVolunteer.id]
+  await withDb(conn => conn.query("UPDATE person SET suffix = 'Jr.' WHERE id IN (?)", [ids]))
+  try {
+    const id = await openRequest()
+    await vgCall('signUpVolunteerRequest', { serviceRequestId: id }, { token: vssJoe, body: { personId: quahogPerson } })
+    const one = await vgCall('getVolunteerRequest', { serviceRequestId: id }, { token: vssJoe })
+    assert.equal(one.status, 200)
+    assert.equal(one.json.member.displayName, 'Peter Griffin Jr.')
+
+    const user = await vgCall('getUser', {}, { token: vssJoe })
+    const joe = user.json.volunteers.find(v => String(v.personId) === quahogPerson)
+    assert.equal(joe.displayName, 'Joe Swanson Jr.')
+  }
+  finally {
+    await withDb(conn => conn.query('UPDATE person SET suffix = NULL WHERE id IN (?)', [ids]))
+  }
+})

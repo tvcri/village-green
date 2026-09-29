@@ -3,13 +3,14 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { buildRecipientQuery } = require('../service/mailingLabels/buildQuery')
 
-// The exact SQL the pre-refactor printedNewsletter.js hand-wrote. The
-// printed-newsletter/member shape must still reproduce it byte-for-byte —
-// the vocabulary changed around it, the query did not.
+// The exact SQL the pre-refactor printedNewsletter.js hand-wrote, plus
+// p.suffix (0027 moved suffixes out of lastName). The printed-newsletter/
+// member shape must reproduce it byte-for-byte.
 const LEGACY_PRINTED_NEWSLETTER_SQL = `
     SELECT
       p.firstName,
       p.lastName,
+      p.suffix,
       p.street,
       p.unit,
       p.city,
@@ -83,7 +84,7 @@ test('every shape selects the seven label columns with padded zip', () => {
     { audience: 'birthday-month', role: 'volunteer', month: 1 },
   ]) {
     const { sql } = buildRecipientQuery(spec)
-    for (const col of ['p.firstName', 'p.lastName', 'p.street', 'p.unit', 'p.city', 'p.state']) {
+    for (const col of ['p.firstName', 'p.lastName', 'p.suffix', 'p.street', 'p.unit', 'p.city', 'p.state']) {
       assert.ok(sql.includes(col), `${col} missing from ${JSON.stringify(spec)}`)
     }
     assert.match(sql, /LPAD\(p\.zip, 5, '0'\) AS zip/)

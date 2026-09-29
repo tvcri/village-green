@@ -58,19 +58,27 @@ export function buildPersons (content, villageIdByName, rng, villagesList) {
   // Naive first-token/last-token split. Names this gets wrong (suffixes like
   // "Astor IV", the disambiguated second William Dyer) carry explicit
   // firstName/lastName overrides in people.json instead of heuristics here.
+  // A trailing Jr./Sr./II/III/IV then moves to suffix, as migration 0027 did
+  // for production ("Brown Jr." -> lastName "Brown", suffix "Jr.").
+  const splitSuffix = (last) => {
+    const m = /^(.+?)[ ,]+(jr|sr|ii|iii|iv)\.?$/i.exec(last)
+    if (!m) return { last, suffix: null }
+    const s = m[2].toLowerCase()
+    return { last: m[1], suffix: s === 'jr' ? 'Jr.' : s === 'sr' ? 'Sr.' : s.toUpperCase() }
+  }
   const splitName = (fig) => {
-    if (fig.lastName) return { first: fig.firstName, last: fig.lastName }
+    if (fig.lastName) return { first: fig.firstName, ...splitSuffix(fig.lastName) }
     const parts = fig.name.replace(/[^A-Za-z .'-]/g, '').split(/\s+/).filter(Boolean)
     const first = parts[0] || fig.name
     // mononyms (the sachems, Consuela) fill both fields — the schema CHECKs
     // both non-empty; the original full name is preserved in nickname
-    return { first, last: parts.length > 1 ? parts[parts.length - 1] : first }
+    return { first, last: parts.length > 1 ? parts[parts.length - 1] : first, suffix: null }
   }
   const emailFor = (name) => name.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '') + '@residents.test'
 
   const makePerson = (fig, villageId, vName) => {
     pid += 1
-    const { first, last } = splitName(fig)
+    const { first, last, suffix } = splitName(fig)
     used.add(fig.name)
     if (fig.bucket === 'invented-descendants') fillerIds.add(pid)
     nameById[pid] = fig.name
@@ -79,13 +87,15 @@ export function buildPersons (content, villageIdByName, rng, villagesList) {
       // never set them. Quirky figure names that don't survive the first/last
       // split ("Del's Lemonade cart") are preserved in nickname.
       id: pid, villageId: villageId,
-      firstName: first, lastName: last,
-      nickname: fig.name === `${first} ${last}`.trim() ? null : fig.name,
+      firstName: first, lastName: last, suffix,
+      nickname: fig.name === `${first} ${last}${suffix ? ` ${suffix}` : ''}`.trim() ? null : fig.name,
       middleInitial: rng.bool(0.5) ? rng.pick('ABCDEFGHJLMPRSTW'.split('')) : null,
       salutation: rng.bool(0.1) ? rng.pick(['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Rev.', 'Capt.']) : null,
       street: `${rng.int(1, 400)} ${rng.pick(RI_STREETS)}`, unit: rng.bool(0.15) ? `Apt ${rng.int(1, 30)}` : null,
       city: RI_TOWNS[vName] || vName, town: RI_MUNIS[vName] || RI_TOWNS[vName] || vName,
       state: 'RI', zip: String(rng.int(2801, 2920)).padStart(5, '0'),
+      // contact_method ids are FIXED by the static seed: 1 Phone, 2 Cell, 3 Email, 4 Mail
+      preferredContactMethodId: rng.bool(0.7) ? rng.pick([1, 2, 3, 4]) : null,
       email: emailFor(fig.name), phone: `401-555-${String(rng.int(100, 999))}`, cell: `401-555-${String(rng.int(100, 999))}`,
       computerUse: rng.bool(0.6) ? 1 : 0, smartphone: rng.bool(0.7) ? 1 : 0,
       birthDate: `19${rng.int(30, 60)}-${String(rng.int(1, 12)).padStart(2, '0')}-${String(rng.int(1, 28)).padStart(2, '0')}`,

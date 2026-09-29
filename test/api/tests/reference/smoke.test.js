@@ -4,11 +4,13 @@ import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 
 // Reference-data smokes: the read-only lookup lists behind the person and
-// volunteer forms. All four are gated by vg:person:read (the readOnly token
-// suffices). Only `capability` ships static rows; the other tables start empty
-// in the scaffolded test schema, so their smokes assert shape, not content.
+// volunteer forms. All are gated by vg:person:read (the readOnly token
+// suffices). capability, circle, gender, ethnicity, race, contact_method and
+// language ship static rows; disability and vetting_type start empty in the
+// scaffolded test schema, so their smokes assert shape, not content.
 // Addressed by operationId (vgCall) — a path rename on main follows the spec.
-const OPS = ['getCommunities', 'getDisabilities', 'getCapabilities', 'getVettingTypes']
+const OPS = ['getCircles', 'getDisabilities', 'getCapabilities', 'getVettingTypes',
+  'getGenders', 'getEthnicities', 'getRaces', 'getContactMethods', 'getLanguages']
 
 test('reference lists require authentication', async () => {
   for (const op of OPS) {
@@ -34,4 +36,23 @@ test('capabilities serves the known reference rows', async () => {
     assert.ok(names.includes(expected), `capabilities include ${expected}`)
   }
   assert.ok(json.every(c => c.capabilityId && c.name), 'items carry {capabilityId, name}')
+})
+
+test('circles serves the four seeded circles by public name', async () => {
+  const { json } = await vgCall('getCircles', {}, { token: tokens.users.full_v1 })
+  assert.deepEqual(json.map(c => c.name).sort(), ['Circle of Pride', 'DownCity', 'OakHill', "Veteran's Circle"])
+  assert.ok(json.every(c => c.circleId && c.name), 'items carry {circleId, name}')
+})
+
+test('lookups serve the settled vocabularies in the settled order', async () => {
+  const t = tokens.users.full_v1
+  assert.deepEqual((await vgCall('getGenders', {}, { token: t })).json.map(x => x.name), ['Female', 'Male', 'Other'])
+  assert.deepEqual((await vgCall('getEthnicities', {}, { token: t })).json.map(x => x.name), ['Hispanic or Latino', 'Not Hispanic or Latino'])
+  assert.deepEqual((await vgCall('getRaces', {}, { token: t })).json.map(x => x.name), [
+    'American Indian or Alaska Native', 'Asian', 'Black or African American',
+    'Native Hawaiian or Other Pacific Islander', 'White',
+  ])
+  assert.deepEqual((await vgCall('getContactMethods', {}, { token: t })).json.map(x => x.name), ['Phone', 'Cell', 'Email', 'Mail'])
+  const langs = (await vgCall('getLanguages', {}, { token: t })).json
+  assert.deepEqual(langs.map(x => `${x.name}/${x.tag}`), ['English/en', 'Italian/it', 'Portuguese/pt', 'Spanish/es'])
 })

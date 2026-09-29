@@ -1817,19 +1817,99 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer ] } ]
 
-  /communities:
+  /circles:
     get:
-      summary: List all communities
-      tags: [Community]
-      operationId: getCommunities
+      summary: List all circles
+      tags: [Circle]
+      operationId: getCircles
       responses:
         '200':
-          description: List of communities
+          description: List of circles
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/Community' }
+                items: { $ref: '#/components/schemas/Circle' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /genders:
+    get:
+      summary: List gender values
+      tags: [Gender]
+      operationId: getGenders
+      responses:
+        '200':
+          description: List of gender values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Gender' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /ethnicities:
+    get:
+      summary: List ethnicity values
+      tags: [Ethnicity]
+      operationId: getEthnicities
+      responses:
+        '200':
+          description: List of ethnicity values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Ethnicity' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /races:
+    get:
+      summary: List race values
+      tags: [Race]
+      operationId: getRaces
+      responses:
+        '200':
+          description: List of race values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Race' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /contact-methods:
+    get:
+      summary: List contact method values
+      tags: [ContactMethod]
+      operationId: getContactMethods
+      responses:
+        '200':
+          description: List of contact method values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ContactMethod' }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+
+  /languages:
+    get:
+      summary: List language values
+      tags: [Language]
+      operationId: getLanguages
+      responses:
+        '200':
+          description: List of language values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Language' }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
 
@@ -2949,12 +3029,22 @@ components:
         applicationType:
           type: string
           enum: [member, volunteer, unknown]
+        schemaVersion:
+          type: integer
+          minimum: 1
+        extractedAt:
+          type: string
+          format: date-time
         usage:
           type: object
           properties:
+            model: { type: string }
             inputTokens: { type: integer }
             outputTokens: { type: integer }
-            cost: { type: number }
+            cost:
+              type: number
+              nullable: true
+              description: USD; null when the model has no known price
     AppDataFormat:
       type: string
       default: gzip
@@ -3022,15 +3112,100 @@ components:
       properties:
         capabilityId: { $ref: '#/components/schemas/CapabilityId' }
         name: { type: string, maxLength: 100 }
-    CommunityId:
+    CircleId:
       $ref: '#/components/schemas/StringIntId'
-    Community:
+    Circle:
       additionalProperties: false
       type: object
-      required: [ communityId, name ]
+      required: [ circleId, name ]
       properties:
-        communityId: { $ref: '#/components/schemas/CommunityId' }
+        circleId: { $ref: '#/components/schemas/CircleId' }
         name: { type: string, maxLength: 100 }
+    GenderId:
+      $ref: '#/components/schemas/StringIntId'
+    Gender:
+      additionalProperties: false
+      type: object
+      required: [ genderId, name ]
+      properties:
+        genderId: { $ref: '#/components/schemas/GenderId' }
+        name: { type: string, maxLength: 100 }
+    EthnicityId:
+      $ref: '#/components/schemas/StringIntId'
+    Ethnicity:
+      additionalProperties: false
+      type: object
+      required: [ ethnicityId, name ]
+      properties:
+        ethnicityId: { $ref: '#/components/schemas/EthnicityId' }
+        name: { type: string, maxLength: 100 }
+    RaceId:
+      $ref: '#/components/schemas/StringIntId'
+    Race:
+      additionalProperties: false
+      type: object
+      required: [ raceId, name ]
+      properties:
+        raceId: { $ref: '#/components/schemas/RaceId' }
+        name: { type: string, maxLength: 100 }
+    ContactMethodId:
+      $ref: '#/components/schemas/StringIntId'
+    ContactMethod:
+      additionalProperties: false
+      type: object
+      required: [ contactMethodId, name ]
+      properties:
+        contactMethodId: { $ref: '#/components/schemas/ContactMethodId' }
+        name: { type: string, maxLength: 100 }
+    LanguageId:
+      $ref: '#/components/schemas/StringIntId'
+    Language:
+      additionalProperties: false
+      type: object
+      required: [ languageId, name, tag ]
+      properties:
+        languageId: { $ref: '#/components/schemas/LanguageId' }
+        name: { type: string, maxLength: 100 }
+        tag: { type: string, maxLength: 10 }
+    PersonLanguage:
+      additionalProperties: false
+      type: object
+      required: [ languageId, name, tag, isPreferred ]
+      properties:
+        languageId: { $ref: '#/components/schemas/LanguageId' }
+        name: { type: string, maxLength: 100 }
+        tag: { type: string, maxLength: 10 }
+        isPreferred: { type: boolean }
+    PersonLanguagePatch:
+      additionalProperties: false
+      type: object
+      required: [ languageId ]
+      properties:
+        languageId: { $ref: '#/components/schemas/LanguageId' }
+        isPreferred: { type: boolean }
+    PersonContact:
+      additionalProperties: false
+      type: object
+      required: [ contactId, name, isPrimary, sequence ]
+      properties:
+        contactId: { $ref: '#/components/schemas/StringIntId' }
+        name: { type: string, maxLength: 200 }
+        relationship: { type: string, maxLength: 100, nullable: true }
+        phone: { type: string, maxLength: 50, nullable: true }
+        email: { type: string, maxLength: 200, nullable: true }
+        isPrimary: { type: boolean }
+        sequence: { type: integer, minimum: 0, maximum: 127 }
+    PersonContactPatch:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        relationship: { type: string, maxLength: 100, nullable: true }
+        phone: { type: string, maxLength: 50, nullable: true }
+        email: { type: string, maxLength: 200, nullable: true }
+        isPrimary: { type: boolean }
+        sequence: { type: integer, minimum: 0, maximum: 127 }
     DisabilityId:
       $ref: '#/components/schemas/StringIntId'
     Disability:
@@ -3499,8 +3674,28 @@ components:
           type: string
           format: date
           nullable: true
+        circlePreferences:
+          description: Circles this member prefers a volunteer from (member_circle_preference).
+          type: array
+          items: { $ref: '#/components/schemas/Circle' }
     MemberId:
       $ref: '#/components/schemas/StringIntId'
+    ApplicationEnvelope:
+      description: >-
+        The import wizard's extraction of one application form, as the form
+        said it (coordinator corrections land in ordinary columns).
+        schemaVersion is the version of the extraction's JSON shape, not of
+        the paper form; the form edition the applicant filled in is
+        extraction.application.formDate (YYYY-MM).
+      type: object
+      additionalProperties: false
+      required: [applicationType, schemaVersion, extractedAt, memberIndex, extraction]
+      properties:
+        applicationType: { type: string, enum: [member, volunteer] }
+        schemaVersion: { type: integer, minimum: 1 }
+        extractedAt: { type: string, format: date-time }
+        memberIndex: { type: integer, minimum: 0, maximum: 1, nullable: true }
+        extraction: { type: object, additionalProperties: true }
     MemberPatch:
       additionalProperties: false
       type: object
@@ -3542,6 +3737,10 @@ components:
         householdSize:
           type: integer
           nullable: true
+        circlePreferences:
+          type: array
+          items: { $ref: '#/components/schemas/CircleId' }
+          uniqueItems: true
         householdDues:
           type: number
           nullable: true
@@ -3561,6 +3760,9 @@ components:
         miscNotes:
           type: string
           nullable: true
+        application:
+          $ref: '#/components/schemas/ApplicationEnvelope'
+          nullable: true
     MemberPut:
       additionalProperties: false
       type: object
@@ -3578,18 +3780,26 @@ components:
         status:          { type: string, maxLength: 50 }
         dropReason:      { type: string, maxLength: 100 }
         householdSize:   { type: integer }
+        circlePreferences:
+          type: array
+          items: { $ref: '#/components/schemas/CircleId' }
+          uniqueItems: true
         householdDues:   { type: number }
         quickbooksKey:   { type: string, maxLength: 50 }
         printedNewsletter: { type: boolean }
         scNotes: { type: string }
         statusChangeNotes: { type: string }
         miscNotes:         { type: string }
+        application:
+          $ref: '#/components/schemas/ApplicationEnvelope'
+          nullable: true
     MemberDetail:
       additionalProperties: false
       type: object
       required:
       - memberId
       - personId
+      - circlePreferences
       properties:
         memberId:
           $ref: '#/components/schemas/MemberId'
@@ -3642,6 +3852,9 @@ components:
         householdSize:
           type: integer
           nullable: true
+        circlePreferences:
+          type: array
+          items: { $ref: '#/components/schemas/Circle' }
         householdDues:
           type: number
           nullable: true
@@ -3667,8 +3880,10 @@ components:
       required:
       - personId
       - fullName
-      - communities
+      - circles
       - disabilities
+      - languages
+      - contacts
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
@@ -3690,6 +3905,17 @@ components:
         nickname:
           type: string
           maxLength: 100
+          nullable: true
+        suffix:
+          type: string
+          maxLength: 20
+          nullable: true
+        displayName:
+          type: string
+          maxLength: 300
+        pronouns:
+          type: string
+          maxLength: 30
           nullable: true
         street:
           type: string
@@ -3735,6 +3961,31 @@ components:
           type: string
           format: date
           nullable: true
+        deceasedDate:
+          type: string
+          format: date
+          nullable: true
+        preferredContactMethod:
+          $ref: '#/components/schemas/ContactMethod'
+          nullable: true
+        languages:
+          type: array
+          items: { $ref: '#/components/schemas/PersonLanguage' }
+        contacts:
+          type: array
+          items: { $ref: '#/components/schemas/PersonContact' }
+        gender:
+          $ref: '#/components/schemas/Gender'
+          nullable: true
+        ethnicity:
+          $ref: '#/components/schemas/Ethnicity'
+          nullable: true
+        races:
+          type: array
+          items: { $ref: '#/components/schemas/Race' }
+        isVeteran:
+          type: boolean
+          nullable: true
         emergencyContactName:
           type: string
           maxLength: 200
@@ -3770,12 +4021,19 @@ components:
         volunteer:
           $ref: '#/components/schemas/VolunteerDetail'
           nullable: true
-        communities:
+        circles:
           type: array
-          items: { $ref: '#/components/schemas/Community' }
+          items: { $ref: '#/components/schemas/Circle' }
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisability' }
+        application:
+          description: Present only with ?projection=application; each key only with its read_application permission.
+          type: object
+          additionalProperties: false
+          properties:
+            member: { $ref: '#/components/schemas/ApplicationEnvelope', nullable: true }
+            volunteer: { $ref: '#/components/schemas/ApplicationEnvelope', nullable: true }
     PersonSummary:
       additionalProperties: false
       type: object
@@ -3824,8 +4082,10 @@ components:
       additionalProperties: false
       type: object
       required:
-      - communities
+      - circles
       - disabilities
+      - languages
+      - contacts
       properties:
         lastName:
           type: string
@@ -3842,6 +4102,17 @@ components:
         nickname:
           type: string
           maxLength: 100
+          nullable: true
+        suffix:
+          type: string
+          maxLength: 20
+          nullable: true
+        displayName:
+          type: string
+          maxLength: 300
+        pronouns:
+          type: string
+          maxLength: 30
           nullable: true
         street:
           type: string
@@ -3875,6 +4146,31 @@ components:
           type: string
           format: date
           nullable: true
+        deceasedDate:
+          type: string
+          format: date
+          nullable: true
+        preferredContactMethod:
+          $ref: '#/components/schemas/ContactMethod'
+          nullable: true
+        languages:
+          type: array
+          items: { $ref: '#/components/schemas/PersonLanguage' }
+        contacts:
+          type: array
+          items: { $ref: '#/components/schemas/PersonContact' }
+        gender:
+          $ref: '#/components/schemas/Gender'
+          nullable: true
+        ethnicity:
+          $ref: '#/components/schemas/Ethnicity'
+          nullable: true
+        races:
+          type: array
+          items: { $ref: '#/components/schemas/Race' }
+        isVeteran:
+          type: boolean
+          nullable: true
         emergencyContactName:
           type: string
           maxLength: 200
@@ -3891,9 +4187,9 @@ components:
           type: string
           maxLength: 200
           nullable: true
-        communities:
+        circles:
           type: array
-          items: { $ref: '#/components/schemas/Community' }
+          items: { $ref: '#/components/schemas/Circle' }
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisability' }
@@ -3912,6 +4208,7 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+          nullable: true
         middleInitial:
           type: string
           maxLength: 10
@@ -3960,6 +4257,39 @@ components:
           type: string
           format: date
           nullable: true
+        suffix:
+          type: string
+          maxLength: 20
+          nullable: true
+        pronouns:
+          type: string
+          maxLength: 30
+          nullable: true
+        deceasedDate:
+          type: string
+          format: date
+          nullable: true
+        preferredContactMethodId:
+          $ref: '#/components/schemas/ContactMethodId'
+          nullable: true
+        genderId:
+          $ref: '#/components/schemas/GenderId'
+          nullable: true
+        ethnicityId:
+          $ref: '#/components/schemas/EthnicityId'
+          nullable: true
+        isVeteran:
+          type: boolean
+          nullable: true
+        races:
+          type: array
+          items: { $ref: '#/components/schemas/RaceId' }
+        languages:
+          type: array
+          items: { $ref: '#/components/schemas/PersonLanguagePatch' }
+        contacts:
+          type: array
+          items: { $ref: '#/components/schemas/PersonContactPatch' }
         emergencyContactName:
           type: string
           maxLength: 200
@@ -3979,9 +4309,9 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageId'
           nullable: true
-        communities:
+        circles:
           type: array
-          items: { $ref: '#/components/schemas/CommunityId' }
+          items: { $ref: '#/components/schemas/CircleId' }
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisabilityPatch' }
@@ -3990,7 +4320,6 @@ components:
       type: object
       required:
       - lastName
-      - firstName
       properties:
         lastName:
           type: string
@@ -4000,6 +4329,7 @@ components:
           type: string
           minLength: 1
           maxLength: 100
+          nullable: true
         middleInitial:
           type: string
           maxLength: 10
@@ -4037,6 +4367,39 @@ components:
         birthDate:
           type: string
           format: date
+        suffix:
+          type: string
+          maxLength: 20
+          nullable: true
+        pronouns:
+          type: string
+          maxLength: 30
+          nullable: true
+        deceasedDate:
+          type: string
+          format: date
+          nullable: true
+        preferredContactMethodId:
+          $ref: '#/components/schemas/ContactMethodId'
+          nullable: true
+        genderId:
+          $ref: '#/components/schemas/GenderId'
+          nullable: true
+        ethnicityId:
+          $ref: '#/components/schemas/EthnicityId'
+          nullable: true
+        isVeteran:
+          type: boolean
+          nullable: true
+        races:
+          type: array
+          items: { $ref: '#/components/schemas/RaceId' }
+        languages:
+          type: array
+          items: { $ref: '#/components/schemas/PersonLanguagePatch' }
+        contacts:
+          type: array
+          items: { $ref: '#/components/schemas/PersonContactPatch' }
         emergencyContactName:
           type: string
           maxLength: 200
@@ -4052,9 +4415,9 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageId'
           nullable: true
-        communities:
+        circles:
           type: array
-          items: { $ref: '#/components/schemas/CommunityId' }
+          items: { $ref: '#/components/schemas/CircleId' }
         disabilities:
           type: array
           items: { $ref: '#/components/schemas/PersonDisabilityPatch' }
@@ -4934,9 +5297,12 @@ components:
               personId:
                 $ref: '#/components/schemas/StringIntId'
               name:
-                description: Tabular display form ("Last, First" fullName)
+                description: Tabular display form ("Last, First, Suffix" fullName)
                 type: string
                 nullable: true
+              displayName:
+                description: Running-text form ("First Last Suffix")
+                type: string
               firstName:
                 type: string
               lastName:
@@ -5504,6 +5870,9 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+        application:
+          $ref: '#/components/schemas/ApplicationEnvelope'
+          nullable: true
     VolunteerPatch:
       additionalProperties: false
       type: object
@@ -5528,13 +5897,20 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+        application:
+          $ref: '#/components/schemas/ApplicationEnvelope'
+          nullable: true
     VolunteerMemberContact:
       nullable: true
       additionalProperties: false
       type: object
       properties:
         fullName:
-          description: Tabular display form ("Last, First")
+          description: Tabular display form ("Last, First, Suffix")
+          type: string
+          nullable: true
+        displayName:
+          description: Running-text form ("First Last Suffix")
           type: string
           nullable: true
         firstName:
@@ -5941,6 +6317,7 @@ components:
           enum:
           - member
           - volunteer
+          - application
     RunSequenceQuery:
       name: after-seq
       in: query
