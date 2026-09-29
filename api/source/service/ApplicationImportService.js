@@ -370,6 +370,7 @@ const MAX_TOKENS = 16000
 
 // `thinking` and `effort` are optional; omitting them leaves the model's
 // defaults in place (Opus 4.8: no thinking; Sonnet 5.5: adaptive at high).
+// config.anthropic supplies them; see its note on the between_tools default.
 async function callClaude (client, model, pdfBuffer, schema, prompt, { thinking, effort } = {}) {
   let message
   try {
