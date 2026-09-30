@@ -232,6 +232,18 @@ function memberColumn ({ financial, scNote, inactive }) {
         FROM person pp WHERE pp.id = m2.primaryPersonId
       ),
       'secondaryType', m2.secondaryType,
+      'secondaryPersons', (
+        SELECT COALESCE(
+          ${dbUtils.jsonArrayAgg({
+            value: `JSON_OBJECT('personId', CAST(sp.id AS CHAR), 'fullName', sp.fullName, 'secondaryType', sm.secondaryType)`,
+            orderBy: 'sp.fullName'
+          })},
+          JSON_ARRAY()
+        )
+        FROM ${memberSource} sm
+        JOIN person sp ON sp.id = sm.personId
+        WHERE sm.primaryPersonId = m2.personId
+      ),
       'serviceNotes', m2.serviceNotes,
       'joinDate', DATE_FORMAT(m2.joinDate, '%Y-%m-%d'),
       'createdDate', DATE_FORMAT(m2.createdDate, '%Y-%m-%d'),

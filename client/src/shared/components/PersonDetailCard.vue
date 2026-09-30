@@ -240,6 +240,11 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.primaryPerson.fullName }}</span>
         </div>
 
+        <div v-if="person.secondaryPersons?.length" class="detail-field">
+          <span class="label">{{ person.secondaryPersons.length > 1 ? 'Secondary Members' : 'Secondary Member' }}</span>
+          <span class="value">{{ person.secondaryPersons.map(s => s.secondaryType ? `${s.fullName} (${s.secondaryType})` : s.fullName).join('; ') }}</span>
+        </div>
+
         <div v-if="person.joinDate" class="detail-field">
           <span class="label">Join Date</span>
           <span class="value">{{ person.joinDate }}</span>

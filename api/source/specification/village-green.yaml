@@ -3800,6 +3800,7 @@ components:
       - memberId
       - personId
       - circlePreferences
+      - secondaryPersons
       properties:
         memberId:
           $ref: '#/components/schemas/MemberId'
@@ -3830,6 +3831,26 @@ components:
           type: string
           maxLength: 50
           nullable: true
+        secondaryPersons:
+          description: >-
+            Members whose primaryPersonId is this person (the reverse of
+            primaryPerson). Subject to the same active-only row gating as the
+            member projection itself.
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [personId, fullName, secondaryType]
+            properties:
+              personId:
+                $ref: '#/components/schemas/PersonId'
+              fullName:
+                type: string
+                maxLength: 200
+              secondaryType:
+                type: string
+                maxLength: 50
+                nullable: true
         serviceNotes:
           type: string
           nullable: true
