@@ -103,3 +103,22 @@ describe('PersonDetailCard — 0027 fields', () => {
     expect(tags).toEqual(['Providence', 'OakHill'])
   })
 })
+
+describe('PersonDetailCard — household links', () => {
+  it('lists secondary members with their relationship on the primary', () => {
+    mount({ ...base, secondaryPersons: [
+      { personId: '6', fullName: 'Currie, Ann', secondaryType: 'Wife' },
+      { personId: '7', fullName: 'Currie, Sam', secondaryType: null },
+    ] })
+    expect(screen.getByText('Secondary Members')).toBeInTheDocument()
+    expect(screen.getByText('Currie, Ann (Wife); Currie, Sam')).toBeInTheDocument()
+  })
+
+  it('uses the singular label for one secondary and omits the field for none', () => {
+    mount({ ...base, secondaryPersons: [{ personId: '6', fullName: 'Currie, Ann', secondaryType: 'Wife' }] })
+    expect(screen.getByText('Secondary Member')).toBeInTheDocument()
+    cleanup()
+    mount({ ...base, secondaryPersons: [] })
+    expect(screen.queryByText(/Secondary Member/)).toBeNull()
+  })
+})
