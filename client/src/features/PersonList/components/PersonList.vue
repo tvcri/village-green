@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onActivated, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -44,7 +44,6 @@ const selectedVillage = ref('All villages')
 
 const showMembers = ref(false)
 const showVolunteers = ref(false)
-const pageRows = ref(10)
 
 // Village options for the filter; 'All villages' is the sentinel meaning no
 // village restriction (server returns persons across all granted villages).
@@ -71,6 +70,59 @@ const hasFilter = computed(() =>
   email.value.trim() || !!selectedVillageId.value
 )
 
+// Every person renders in one list, so the table virtualizes: only the rows in
+// view exist in the DOM (2,000 plain rows took ~5.5 s to mount). The virtual
+// scroller needs one fixed row height; the CSS below pins cells to it.
+const ROW_HEIGHT = 44
+
+// The table scrolls inside its own box, which useScrollRestore (window scroll)
+// doesn't cover, and keep-alive detaching the DOM resets it to the top while
+// the scroller still renders the old rows. Carry its position across visits.
+// Tracked on every scroll: by onDeactivated the DOM is already detached and
+// reads 0.
+const listRoot = ref(null)
+let tableScrollTop = 0
+const tableScroller = () => listRoot.value?.querySelector('.person-table .p-virtualscroller')
+function onTableScroll (event) {
+  if (event.target === tableScroller()) tableScrollTop = event.target.scrollTop
+}
+onActivated(async () => {
+  await nextTick()
+  sizeTable()
+  const el = tableScroller()
+  if (el) el.scrollTop = tableScrollTop
+})
+
+// The box fills the window from wherever the table starts down to the page's
+// bottom padding, so the page itself doesn't scroll as well. Measured, not a
+// fixed calc(): what sits above the table (demo banner, filters wrapping on
+// narrow screens) varies. On a phone the stacked filters push the table below
+// the fold anyway, so there the box takes most of the window once scrolled to.
+const tableHeight = ref('320px')
+function sizeTable () {
+  const root = listRoot.value
+  const table = root?.querySelector('.person-table')
+  if (!table) return
+  const top = table.getBoundingClientRect().top + window.scrollY
+  const bottomPad = parseFloat(getComputedStyle(root).paddingBottom) || 0
+  const floor = window.innerWidth <= 768 ? window.innerHeight * 0.75 : 320
+  tableHeight.value = `${Math.floor(Math.max(floor, window.innerHeight - top - bottomPad))}px`
+}
+let resizeObserver = null
+onMounted(() => {
+  window.addEventListener('resize', sizeTable)
+  resizeObserver = new ResizeObserver(sizeTable)
+  resizeObserver.observe(listRoot.value)
+  // Content above the list (e.g. a banner) moves the table without resizing it.
+  resizeObserver.observe(document.body)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', sizeTable)
+  resizeObserver?.disconnect()
+})
+
+// The list opens fully populated: every person the caller can read, with or
+// without an active role. The filters narrow it server-side from there.
 const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
   () => getPersons({
     villageId: selectedVillageId.value ? [selectedVillageId.value] : undefined,
@@ -79,7 +131,7 @@ const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
     phone: phone.value.trim() || undefined,
     email: email.value.trim() || undefined
   }),
-  { immediate: false }
+  { immediate: true }
 )
 
 // Shared with the export path so a detail re-fetch filters row-for-row the
@@ -242,20 +294,19 @@ function navigateToPerson(personId, fullName) {
   })
 }
 
-watch([firstName, lastName, phone, email, selectedVillage], () => {
-  if (!hasFilter.value) persons.value = null
+// Clearing the last filter goes back to the full list.
+watch(hasFilter, (now, was) => {
+  if (was && !now) fetchPersons()
 })
 
 function onSearch() {
-  if (hasFilter.value) {
-    trackEvent('filter_applied')
-    fetchPersons()
-  }
+  if (hasFilter.value) trackEvent('filter_applied')
+  fetchPersons()
 }
 </script>
 
 <template>
-  <div class="person-list">
+  <div ref="listRoot" class="person-list" @scroll.capture="onTableScroll">
     <div class="list-header">
       <h2>Persons</h2>
       <div class="header-actions">
@@ -304,13 +355,12 @@ function onSearch() {
         label="Search"
         icon="pi pi-search"
         :loading="isLoading"
-        :disabled="!hasFilter"
         @click="onSearch"
       />
       </div>
     </div>
 
-    <div v-if="persons !== null && !isLoading" class="role-filters">
+    <div v-if="persons !== null" class="role-filters">
       <label class="role-filter-label">
         <Checkbox v-model="showMembers" :binary="true" />
         <span>Member</span>
@@ -319,10 +369,16 @@ function onSearch() {
         <Checkbox v-model="showVolunteers" :binary="true" />
         <span>Volunteer</span>
       </label>
+      <ExportButton
+        class="role-filters-export"
+        :disabled="isLoading || isCreatingSheet || isFetchingExport || !filteredPersons?.length"
+        @download="handleDownloadCsv"
+        @export="handleCreateSheet"
+      />
     </div>
 
     <div v-if="filteredPersons === null" class="empty-state">
-      Enter at least one filter to search persons.
+      {{ isLoading ? 'Loading persons…' : 'Persons could not be loaded.' }}
     </div>
 
     <div v-else-if="!isLoading && filteredPersons.length === 0" class="empty-state">
@@ -335,28 +391,17 @@ function onSearch() {
       :loading="isLoading"
       striped-rows
       hover
-      paginator
-      :rows="pageRows"
+      sort-field="fullName"
+      :sort-order="1"
+      scrollable
+      :scroll-height="tableHeight"
+      :virtual-scroller-options="{ itemSize: ROW_HEIGHT }"
+      table-style="table-layout: fixed; min-width: 50rem"
       class="person-table"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
       @row-click="(event) => navigateToPerson(event.data.personId, event.data.fullName)"
     >
-      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
-        <div class="paginator-container">
-          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
-          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
-          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
-          <ExportButton
-            :disabled="isLoading || isCreatingSheet || isFetchingExport"
-            @download="handleDownloadCsv"
-            @export="handleCreateSheet"
-          />
-        </div>
-      </template>
-
       <Column field="fullName" header="Name" sortable style="width: 20%" />
-      <Column field="village.name" header="Village" sortable style="width: 15%" />
+      <Column field="village.name" header="Village" sortable style="width: 14%" />
       <Column header="Roles" style="width: 15%">
         <template #body="{ data }">
           <div class="role-tags">
@@ -369,17 +414,17 @@ function onSearch() {
           </div>
         </template>
       </Column>
-      <Column header="Phone" style="width: 15%">
+      <Column header="Phone" style="width: 12%">
         <template #body="{ data }">
           <span>{{ parsePhoneObj(data.phone).phone || '—' }}</span>
         </template>
       </Column>
-      <Column header="Cell" style="width: 15%">
+      <Column header="Cell" style="width: 12%">
         <template #body="{ data }">
           <span>{{ parsePhoneObj(data.phone).cell || '—' }}</span>
         </template>
       </Column>
-      <Column field="email" header="Email" style="width: 20%">
+      <Column field="email" header="Email" style="width: 27%">
         <template #body="{ data }">
           <span>{{ data.email || '—' }}</span>
         </template>
@@ -446,6 +491,10 @@ function onSearch() {
   align-items: center;
 }
 
+.role-filters-export {
+  margin-left: auto;
+}
+
 .role-filter-label {
   display: flex;
   align-items: center;
@@ -467,6 +516,23 @@ function onSearch() {
 
 .person-table {
   cursor: pointer;
+}
+
+/* Fixed row height for the virtual scroller (ROW_HEIGHT): one line per cell,
+   long values truncated. The table is also table-layout: fixed, so column
+   widths come from the Column styles alone and don't shift as the scroller
+   swaps which rows exist. */
+.person-table :deep(tbody td) {
+  height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.person-table :deep(.role-tags) {
+  flex-wrap: nowrap;
 }
 
 .empty-state {
