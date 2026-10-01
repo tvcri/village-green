@@ -114,6 +114,12 @@ describe('MemberEdit', () => {
     await waitFor(() => expect(patchMember).not.toHaveBeenCalled())
   })
 
+  it('shows an existing member\'s stored status, not the new-grant default', async () => {
+    render(MemberEdit, { global: globalOpts })
+    await screen.findByText('Save')
+    expect(document.querySelector('#status').textContent).toContain('Active')
+  })
+
   it('loads and displays the existing member values', async () => {
     render(MemberEdit, { global: globalOpts })
     await waitFor(() => expect(screen.getByDisplayValue('M100')).toBeInTheDocument())
@@ -228,6 +234,14 @@ describe('MemberEdit', () => {
         expect(screen.getByDisplayValue('2026-08-09')).toBeInTheDocument()
       }
       finally { vi.useRealTimers() }
+    })
+
+    // A new grant starts Pending, as the application import does: the welcome
+    // email (sent on activation) waits until the status is set Active.
+    it('defaults status to Pending', async () => {
+      render(MemberEdit, { global: globalOpts })
+      await screen.findByText('Grant Member Role')
+      expect(document.querySelector('#status').textContent).toContain('Pending')
     })
 
     it('blocks the grant and shows an error when memberLevel is empty', async () => {
