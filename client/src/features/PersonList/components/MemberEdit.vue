@@ -25,7 +25,10 @@ const form = reactive({
   // A new grant joins today; an existing member's stored date overwrites this
   // in onMounted.
   serviceNotes: '', joinDate: todayCivilDate(),
-  status: 'Active', dropReason: '', householdSize: null, householdDues: null,
+  // A new grant starts Pending, matching the application import: the welcome
+  // email (sent on activation) waits until the status is set Active. An
+  // existing member's stored status overwrites this in onMounted.
+  status: 'Pending', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   scNotes: '', statusChangeNotes: '', miscNotes: '',
 })

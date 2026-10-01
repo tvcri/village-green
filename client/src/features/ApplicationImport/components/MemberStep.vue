@@ -23,11 +23,14 @@ const props = defineProps({
 const emit = defineEmits(['member-done'])
 const toast = useToast()
 
-// Full member-form shape (matches MemberEdit) with import prefills merged in
+// Full member-form shape (matches MemberEdit) with import prefills merged in.
+// A new member starts Pending: recorded from receipt of the application, with
+// the welcome email (sent on activation) held until the status is set Active.
+// An existing member's stored status replaces this in onMounted.
 const form = reactive({
   memberNumber: '', memberLevel: '', memberType: '', primaryPersonId: '',
   serviceNotes: '', joinDate: '',
-  status: 'Active', dropReason: '', householdSize: null, householdDues: null,
+  status: 'Pending', dropReason: '', householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   scNotes: '', statusChangeNotes: '', miscNotes: '',
   ...mapMemberForm(props.extraction, props.memberIndex, props.primaryPersonId),
