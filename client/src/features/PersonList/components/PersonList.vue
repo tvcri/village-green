@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onActivated, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -10,8 +10,6 @@ import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
@@ -36,18 +34,16 @@ onMounted(() => {
 
 useScrollRestore('meta-persons', 'meta-person-detail')
 
-const firstName = ref('')
-const lastName = ref('')
+const name = ref('')
 const phone = ref('')
 const email = ref('')
 const selectedVillage = ref('All villages')
 
 const showMembers = ref(false)
 const showVolunteers = ref(false)
-const pageRows = ref(10)
 
 // Village options for the filter; 'All villages' is the sentinel meaning no
-// village restriction (server returns persons across all granted villages).
+// village restriction.
 const { state: allVillages } = useAsyncState(() => getVillages(), { immediate: true })
 const villageOptions = computed(() => [
   'All villages',
@@ -67,23 +63,72 @@ const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', 
 const canReadDemographics = computed(() => hasPermission('person:read_demographics', selectedVillageId.value))
 
 const hasFilter = computed(() =>
-  firstName.value.trim() || lastName.value.trim() || phone.value.trim() ||
-  email.value.trim() || !!selectedVillageId.value
+  !!(name.value.trim() || phone.value.trim() || email.value.trim() || selectedVillageId.value)
 )
 
+function clearFilters () {
+  name.value = ''
+  phone.value = ''
+  email.value = ''
+  selectedVillage.value = 'All villages'
+}
+
+// Every person renders in one list. A plain table rather than a DataTable:
+// DataTable's per-row overhead made ~2,000 rows take over 5 s to mount. The
+// page scrolls as a whole; the filter bar sticks under the breadcrumbs and
+// the table header under the filter bar.
+const sortField = ref('fullName')
+const sortOrder = ref(1)
+const sortKey = { fullName: p => p.fullName ?? '', village: p => p.village?.name ?? '' }
+function toggleSort (field) {
+  if (sortField.value === field) sortOrder.value = -sortOrder.value
+  else { sortField.value = field; sortOrder.value = 1 }
+}
+function sortIcon (field) {
+  if (sortField.value !== field) return 'pi pi-sort-alt'
+  return sortOrder.value === 1 ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'
+}
+
+// The list opens fully populated: every person the caller can read, with or
+// without an active role. All filtering is client-side and live, as you type.
 const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
-  () => getPersons({
-    villageId: selectedVillageId.value ? [selectedVillageId.value] : undefined,
-    firstName: firstName.value.trim() || undefined,
-    lastName: lastName.value.trim() || undefined,
-    phone: phone.value.trim() || undefined,
-    email: email.value.trim() || undefined
-  }),
-  { immediate: false }
+  () => getPersons({}),
+  { immediate: true }
 )
 
-// Shared with the export path so a detail re-fetch filters row-for-row the
-// same way the table does.
+// keep-alive holds the list while a person is opened; re-fetch on return so
+// creates and edits show up (the first activation is the initial load).
+let activatedOnce = false
+onActivated(() => {
+  if (activatedOnce) fetchPersons()
+  activatedOnce = true
+})
+
+// Case- and accent-insensitive, like the MySQL LIKE the server search used.
+function fold (value) {
+  return (value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+}
+
+// Name matches word by word against fullName ("Last, First, Suffix"), so
+// "naomi brown", "brown, n" and "nao" all find "Brown, Naomi".
+const nameWords = computed(() => fold(name.value).split(/[\s,]+/).filter(Boolean))
+
+function matchesFilters (p) {
+  if (selectedVillageId.value && p.village?.villageId !== selectedVillageId.value) return false
+  if (nameWords.value.length) {
+    const fullName = fold(p.fullName)
+    if (!nameWords.value.every(w => fullName.includes(w))) return false
+  }
+  const phoneQuery = phone.value.trim()
+  if (phoneQuery) {
+    const { phone: ph, cell } = parsePhoneObj(p.phone)
+    if (!(ph ?? '').includes(phoneQuery) && !(cell ?? '').includes(phoneQuery)) return false
+  }
+  const emailQuery = fold(email.value.trim())
+  if (emailQuery && !fold(p.email).includes(emailQuery)) return false
+  return true
+}
+
 function matchesRoleFilter(p) {
   if (!showMembers.value && !showVolunteers.value) return true
   const activeAs = parseJson(p.activeAs)
@@ -93,7 +138,13 @@ function matchesRoleFilter(p) {
 
 const filteredPersons = computed(() => {
   if (!persons.value) return null
-  return persons.value.filter(matchesRoleFilter)
+  return persons.value.filter(p => matchesFilters(p) && matchesRoleFilter(p))
+})
+
+const sortedPersons = computed(() => {
+  if (!filteredPersons.value) return null
+  const key = sortKey[sortField.value]
+  return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
 })
 
 function parseJson(val) {
@@ -143,25 +194,23 @@ function detailRowForCsv(p) {
   }
 }
 
-// Re-run the current search with projection=detail at export time — full rows
-// (with circles/disabilities subqueries) are paid only here, never on the
-// live search page.
+// Fetch projection=detail at export time — full rows (with circles/disabilities
+// subqueries) are paid only here, never for the live list — and keep exactly
+// the people on screen, in screen order. The village goes to the server too,
+// so its birthDate/demographics gating matches canReadBirthDate and
+// canReadDemographics above.
 async function fetchRowsForExport() {
   try {
     isFetchingExport.value = true
     const detail = await getPersons({
       villageId: selectedVillageId.value ? [selectedVillageId.value] : undefined,
-      firstName: firstName.value.trim() || undefined,
-      lastName: lastName.value.trim() || undefined,
-      phone: phone.value.trim() || undefined,
-      email: email.value.trim() || undefined,
       projection: ['detail']
     })
-    const rows = detail.filter(matchesRoleFilter)
-    if (rows.length !== (filteredPersons.value?.length ?? 0)) {
-      throw new Error('The results changed since the last search — search again, then retry the export.')
-    }
-    return rows.map(detailRowForCsv)
+    const byId = new Map(detail.map(p => [p.personId, p]))
+    return (sortedPersons.value ?? [])
+      .map(p => byId.get(p.personId))
+      .filter(Boolean)
+      .map(detailRowForCsv)
   } finally {
     isFetchingExport.value = false
   }
@@ -242,149 +291,142 @@ function navigateToPerson(personId, fullName) {
   })
 }
 
-watch([firstName, lastName, phone, email, selectedVillage], () => {
-  if (!hasFilter.value) persons.value = null
+// One analytics event per filtering session, not per keystroke.
+watch(hasFilter, (now, was) => {
+  if (now && !was) trackEvent('filter_applied')
 })
 
-function onSearch() {
-  if (hasFilter.value) {
-    trackEvent('filter_applied')
-    fetchPersons()
-  }
-}
+// The table header sticks below the filter bar, whose height varies (the
+// filters wrap on narrower windows), so its offset follows the measured bar.
+const listRoot = ref(null)
+const toolbar = ref(null)
+let toolbarObserver = null
+onMounted(() => {
+  toolbarObserver = new ResizeObserver(() => {
+    listRoot.value?.style.setProperty('--toolbar-height', `${toolbar.value?.offsetHeight ?? 0}px`)
+  })
+  toolbarObserver.observe(toolbar.value)
+})
+onBeforeUnmount(() => toolbarObserver?.disconnect())
+
+// When a filter changes while scrolled down the list, bring the first matches
+// up under the sticky header instead of leaving the view somewhere mid-list.
+watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async () => {
+  await nextTick()
+  const table = listRoot.value?.querySelector('.person-table')
+  if (!table || !toolbar.value) return
+  const stuckAt = toolbar.value.getBoundingClientRect().bottom
+  const tableTop = table.getBoundingClientRect().top
+  if (tableTop < stuckAt) window.scrollBy(0, tableTop - stuckAt)
+})
 </script>
 
 <template>
-  <div class="person-list">
+  <div ref="listRoot" class="person-list">
     <div class="list-header">
       <h2>Persons</h2>
       <div class="header-actions">
-        <span v-if="filteredPersons !== null && !isLoading" class="result-count">
-          {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
-        </span>
         <Button v-if="canWritePerson" label="New Person" icon="pi pi-plus" @click="$router.push({ name: 'meta-person-create' })" />
         <Button v-if="canWritePerson" label="Import Application" icon="pi pi-file-import" severity="secondary"
           @click="$router.push({ name: 'meta-person-import' })" />
       </div>
     </div>
 
-    <div class="filters">
-      <Select
-        v-model="selectedVillage"
-        :options="villageOptions"
-        placeholder="Village"
-        class="filter-village"
-        :pt="{ root: { style: 'width: 12rem;' } }"
-      />
-      <IconField class="filter-input">
-        <InputIcon class="pi pi-user" />
-        <InputText v-model="firstName" placeholder="First name" @keyup.enter="onSearch" />
-      </IconField>
-      <IconField class="filter-input">
-        <InputIcon class="pi pi-user" />
-        <InputText v-model="lastName" placeholder="Last name" @keyup.enter="onSearch" />
-      </IconField>
-      <IconField class="filter-input">
-        <InputIcon class="pi pi-phone" />
-        <InputText v-model="phone" placeholder="Phone" @keyup.enter="onSearch" />
-      </IconField>
-      <IconField class="filter-input">
-        <InputIcon class="pi pi-envelope" />
-        <InputText v-model="email" placeholder="Email" @keyup.enter="onSearch" />
-      </IconField>
-      <div class="filter-actions">
-      <Button
-        icon="pi pi-times"
-        severity="secondary"
-        text
-        :disabled="!hasFilter"
-        @click="firstName = ''; lastName = ''; phone = ''; email = ''; selectedVillage = 'All villages'"
-      />
-      <Button
-        label="Search"
-        icon="pi pi-search"
-        :loading="isLoading"
-        :disabled="!hasFilter"
-        @click="onSearch"
-      />
+    <div ref="toolbar" class="toolbar">
+      <div class="filters">
+        <Select
+          v-model="selectedVillage"
+          :options="villageOptions"
+          placeholder="Village"
+          class="filter-village"
+          :pt="{ root: { style: 'width: 12rem;' } }"
+        />
+        <IconField class="filter-input filter-name">
+          <InputIcon class="pi pi-user" />
+          <InputText v-model="name" placeholder="Name" />
+        </IconField>
+        <IconField class="filter-input">
+          <InputIcon class="pi pi-phone" />
+          <InputText v-model="phone" placeholder="Phone" />
+        </IconField>
+        <IconField class="filter-input">
+          <InputIcon class="pi pi-envelope" />
+          <InputText v-model="email" placeholder="Email" />
+        </IconField>
+        <div class="filter-actions">
+          <Button
+            icon="pi pi-times"
+            severity="secondary"
+            text
+            aria-label="Clear filters"
+            :disabled="!hasFilter"
+            @click="clearFilters"
+          />
+        </div>
+      </div>
+
+      <div class="role-filters">
+        <label class="role-filter-label">
+          <Checkbox v-model="showMembers" :binary="true" />
+          <span>Member</span>
+        </label>
+        <label class="role-filter-label">
+          <Checkbox v-model="showVolunteers" :binary="true" />
+          <span>Volunteer</span>
+        </label>
+        <span v-if="filteredPersons !== null" class="result-count">
+          {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
+        </span>
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet || isFetchingExport || !filteredPersons?.length"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
       </div>
     </div>
 
-    <div v-if="persons !== null && !isLoading" class="role-filters">
-      <label class="role-filter-label">
-        <Checkbox v-model="showMembers" :binary="true" />
-        <span>Member</span>
-      </label>
-      <label class="role-filter-label">
-        <Checkbox v-model="showVolunteers" :binary="true" />
-        <span>Volunteer</span>
-      </label>
-    </div>
-
     <div v-if="filteredPersons === null" class="empty-state">
-      Enter at least one filter to search persons.
+      {{ isLoading ? 'Loading persons…' : 'Persons could not be loaded.' }}
     </div>
 
     <div v-else-if="!isLoading && filteredPersons.length === 0" class="empty-state">
       No persons found.
     </div>
 
-    <DataTable
-      v-else
-      :value="filteredPersons"
-      :loading="isLoading"
-      striped-rows
-      hover
-      paginator
-      :rows="pageRows"
-      class="person-table"
-      :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' } }"
-      @row-click="(event) => navigateToPerson(event.data.personId, event.data.fullName)"
-    >
-      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
-        <div class="paginator-container">
-          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
-          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
-          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
-          <ExportButton
-            :disabled="isLoading || isCreatingSheet || isFetchingExport"
-            @download="handleDownloadCsv"
-            @export="handleCreateSheet"
-          />
-        </div>
-      </template>
-
-      <Column field="fullName" header="Name" sortable style="width: 20%" />
-      <Column field="village.name" header="Village" sortable style="width: 15%" />
-      <Column header="Roles" style="width: 15%">
-        <template #body="{ data }">
-          <div class="role-tags">
-            <Tag
-              v-for="role in parseJson(data.activeAs)"
-              :key="role"
-              :value="role"
-              :severity="getRoleSeverity(role)"
-            />
-          </div>
-        </template>
-      </Column>
-      <Column header="Phone" style="width: 15%">
-        <template #body="{ data }">
-          <span>{{ parsePhoneObj(data.phone).phone || '—' }}</span>
-        </template>
-      </Column>
-      <Column header="Cell" style="width: 15%">
-        <template #body="{ data }">
-          <span>{{ parsePhoneObj(data.phone).cell || '—' }}</span>
-        </template>
-      </Column>
-      <Column field="email" header="Email" style="width: 20%">
-        <template #body="{ data }">
-          <span>{{ data.email || '—' }}</span>
-        </template>
-      </Column>
-    </DataTable>
+    <table v-else class="person-table">
+      <colgroup>
+        <col style="width: 20%"><col style="width: 14%"><col style="width: 15%">
+        <col style="width: 12%"><col style="width: 12%"><col style="width: 27%">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="sortable" :class="{ sorted: sortField === 'fullName' }" @click="toggleSort('fullName')">
+            Name <i :class="sortIcon('fullName')" />
+          </th>
+          <th class="sortable" :class="{ sorted: sortField === 'village' }" @click="toggleSort('village')">
+            Village <i :class="sortIcon('village')" />
+          </th>
+          <th>Roles</th>
+          <th>Phone</th>
+          <th>Cell</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="p in sortedPersons" :key="p.personId" @click="navigateToPerson(p.personId, p.fullName)">
+          <td>{{ p.fullName }}</td>
+          <td>{{ p.village?.name }}</td>
+          <td>
+            <div class="role-tags">
+              <Tag v-for="role in parseJson(p.activeAs)" :key="role" :value="role" :severity="getRoleSeverity(role)" />
+            </div>
+          </td>
+          <td>{{ parsePhoneObj(p.phone).phone || '—' }}</td>
+          <td>{{ parsePhoneObj(p.phone).cell || '—' }}</td>
+          <td>{{ p.email || '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
@@ -411,6 +453,24 @@ function onSearch() {
 .list-header h2 {
   margin: 0;
   color: var(--color-text-primary);
+}
+
+/* Filters + role checkboxes stick under the breadcrumbs while the list
+   scrolls; opaque so rows pass beneath it. */
+.toolbar {
+  position: sticky;
+  top: var(--breadcrumb-height);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: -0.75rem 0;
+  padding: 0.75rem 0;
+  background: var(--color-background-dark);
+}
+
+.filter-name {
+  flex-grow: 2;
 }
 
 .filters {
@@ -446,6 +506,12 @@ function onSearch() {
   align-items: center;
 }
 
+/* Count beside Download: always in view in the sticky bar, and it is the
+   number of rows the download will hold. */
+.result-count {
+  margin-left: auto;
+}
+
 .role-filter-label {
   display: flex;
   align-items: center;
@@ -469,6 +535,73 @@ function onSearch() {
   cursor: pointer;
 }
 
+/* Plain table styled with the PrimeVue semantic tokens the DataTable theme
+   resolves to (its own --p-datatable-* vars exist only once a DataTable has
+   mounted). Fixed layout
+   so the colgroup widths hold; one line per cell, long values truncated. */
+.person-table {
+  width: 100%;
+  min-width: 50rem;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--p-content-background);
+  color: var(--p-content-color);
+}
+
+.person-table th,
+.person-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+
+.person-table thead th {
+  position: sticky;
+  top: calc(var(--breadcrumb-height) + var(--toolbar-height, 0px));
+  z-index: 1;
+  background: var(--p-content-background);
+  color: var(--p-content-color);
+  font-weight: 600;
+}
+
+.person-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.person-table th.sortable i {
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}
+
+.person-table th.sorted {
+  /* The highlight token is translucent; layer it on an opaque base so rows
+     scrolling under the sticky header don't show through. */
+  background: linear-gradient(var(--p-highlight-background), var(--p-highlight-background)), var(--p-content-background);
+  color: var(--p-highlight-color);
+}
+
+.person-table th.sorted i {
+  color: var(--p-highlight-color);
+}
+
+.person-table tbody tr:nth-child(even) {
+  background: var(--color-background-subtle);
+}
+
+.person-table tbody tr:hover {
+  background: var(--p-content-hover-background);
+}
+
+.role-tags {
+  flex-wrap: nowrap;
+}
+
 .empty-state {
   color: var(--color-text-dim);
   font-style: italic;
@@ -479,6 +612,13 @@ function onSearch() {
 @media (max-width: 768px) {
   .person-list {
     padding: 1rem;
+  }
+  /* The stacked filters would cover the screen; let them scroll away. */
+  .toolbar {
+    position: static;
+  }
+  .person-table thead th {
+    top: var(--breadcrumb-height);
   }
   .filters {
     flex-direction: column;
