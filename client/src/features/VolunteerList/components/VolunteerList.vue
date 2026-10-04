@@ -16,7 +16,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageVolunteers } from '../api/volunteerApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
-import { toCsv, downloadCsv, buildFlagColumns, withFlagValues } from '../../../shared/lib/csvUtils.js'
+import { toCsv, downloadCsv, buildFlagColumns, withFlagValues, flagColumn } from '../../../shared/lib/csvUtils.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
@@ -44,10 +44,13 @@ const { hasPermission } = useCurrentUser()
 const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', villageId.value))
 // person:read_demographics, the same way, for gender/ethnicity/race/veteran.
 const canReadDemographics = computed(() => hasPermission('person:read_demographics', villageId.value))
+// The API returns isAlsoMember only with member:read.
+const canReadMembers = computed(() => hasPermission('member:read', villageId.value))
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
 const pageRows = ref(10)
 const selectedCapabilities = ref([])
+const bothRolesOnly = ref(false)
 const sortField = ref('fullName')
 const sortDir = ref('asc')
 const capabilityOptions = ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support']
@@ -72,6 +75,7 @@ const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => rou
   fetchedByWatch.value = true
   searchText.immediate('')
   selectedCapabilities.value = []
+  bothRolesOnly.value = false
   fetchVolunteers()
   persons.value = null
 })
@@ -99,6 +103,7 @@ onActivated(() => {
   navigatedToDetail.value = false
   searchText.immediate('')
   selectedCapabilities.value = []
+  bothRolesOnly.value = false
   fetchVolunteers()
   persons.value = null
 })
@@ -118,7 +123,7 @@ const filteredVolunteers = computed(() => {
       )
     }
 
-    return nameMatch && capabilityMatch
+    return nameMatch && capabilityMatch && (!bothRolesOnly.value || v.isAlsoMember)
   })
 
   result.sort((a, b) => {
@@ -146,6 +151,7 @@ const volunteersForCsv = computed(() => {
       fullName: v.fullName,
       ...withFlagValues(v, 'capabilities', values),
       capabilities: v.capabilities?.join('; ') ?? '',
+      isAlsoMember: v.isAlsoMember ? 1 : 0,
       ...personExportValues(p),
     }
   })
@@ -168,6 +174,7 @@ const columnsForCsv = computed(() => [
   { header: 'Full Name', key: 'fullName' },
   { header: 'Capabilities', key: 'capabilities' },
   ...capabilityFlags.value.columns,
+  ...(canReadMembers.value ? [flagColumn('Also a Member', 'isAlsoMember')] : []),
   ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
 ])
 
@@ -270,6 +277,10 @@ async function handleCreateSheet() {
             <label :for="`capability-${capability}`">{{ capability }}</label>
           </div>
         </div>
+        <div v-if="canReadMembers" class="role-filter">
+          <Checkbox v-model="bothRolesOnly" input-id="both-roles" binary />
+          <label for="both-roles">Both roles</label>
+        </div>
       </div>
     </div>
 
@@ -303,8 +314,8 @@ async function handleCreateSheet() {
       @row-click="(event) => navigateToVolunteer(event.data)"
       @filter="trackEvent('filter_applied')"
     >
-      <Column field="fullName" header="Name" sortable style="width: 50%"></Column>
-      <Column header="Capabilities" style="width: 50%">
+      <Column field="fullName" header="Name" sortable style="width: 40%"></Column>
+      <Column header="Capabilities" style="width: 45%">
         <template #body="slotProps">
           <div class="capabilities-list">
             <Tag
@@ -317,6 +328,11 @@ async function handleCreateSheet() {
               —
             </span>
           </div>
+        </template>
+      </Column>
+      <Column v-if="canReadMembers" field="isAlsoMember" header="Member" sortable style="width: 15%">
+        <template #body="slotProps">
+          <i v-if="slotProps.data.isAlsoMember" class="pi pi-check" aria-label="Also a member"></i>
         </template>
       </Column>
       <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
@@ -356,6 +372,10 @@ async function handleCreateSheet() {
             </span>
           </div>
           <span v-else class="no-capabilities">None listed</span>
+        </div>
+        <div v-if="canReadMembers && volunteer.isAlsoMember" class="card-row">
+          <span class="label">Also a member</span>
+          <i class="pi pi-check"></i>
         </div>
       </div>
     </div>
@@ -398,10 +418,20 @@ h1 {
   gap: 0.5rem;
 }
 
-.capability-filter label {
+.capability-filter label,
+.role-filter label {
   cursor: pointer;
   font-size: 0.9rem;
   color: var(--color-text-primary);
+}
+
+/* Set apart from the capability checkboxes: it ANDs, they OR. */
+.role-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--color-border-default);
 }
 
 .search-input:focus {

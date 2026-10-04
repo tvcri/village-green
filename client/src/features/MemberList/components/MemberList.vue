@@ -8,6 +8,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
@@ -16,7 +17,7 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useDebouncedRef } from '../../../shared/composables/useDebouncedRef.js'
 import { getVillageMembers } from '../api/memberApi.js'
 import { getVillagePersons } from '../../../shared/api/villageApi.js'
-import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
+import { toCsv, downloadCsv, flagColumn } from '../../../shared/lib/csvUtils.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { personExportColumns, personExportValues } from '../../../shared/lib/personExport.js'
@@ -49,8 +50,11 @@ const { hasPermission } = useCurrentUser()
 const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', villageId.value))
 // person:read_demographics, the same way, for gender/ethnicity/race/veteran.
 const canReadDemographics = computed(() => hasPermission('person:read_demographics', villageId.value))
+// The API returns isAlsoVolunteer only with volunteer:read.
+const canReadVolunteers = computed(() => hasPermission('volunteer:read', villageId.value))
 const isCreatingSheet = ref(false)
 const searchText = useDebouncedRef('', 300)
+const bothRolesOnly = ref(false)
 const pageRows = ref(10)
 const sortField = ref('fullName')
 const sortDir = ref('asc')
@@ -74,6 +78,7 @@ const fetchedByWatch = ref(false)
 const { pause: pauseVillageWatch, resume: resumeVillageWatch } = watch(() => route.params.villageId, () => {
   fetchedByWatch.value = true
   searchText.immediate('')
+  bothRolesOnly.value = false
   fetchMembers()
   persons.value = null
 })
@@ -100,6 +105,7 @@ onActivated(() => {
   }
   navigatedToDetail.value = false
   searchText.immediate('')
+  bothRolesOnly.value = false
   fetchMembers()
   persons.value = null
 })
@@ -108,7 +114,8 @@ const filteredMembers = computed(() => {
   if (!Array.isArray(members.value)) return []
 
   let result = members.value.filter(m =>
-    m.fullName?.toLowerCase().includes(searchText.value.toLowerCase())
+    m.fullName?.toLowerCase().includes(searchText.value.toLowerCase()) &&
+    (!bothRolesOnly.value || m.isAlsoVolunteer)
   )
 
   result.sort((a, b) => {
@@ -134,6 +141,7 @@ const membersForCsv = computed(() => {
       joinDate: m.joinDate,
       serviceNotes: m.serviceNotes,
       circlePreferences: (m.circlePreferences ?? []).map(c => c.name).join(', '),
+      isAlsoVolunteer: m.isAlsoVolunteer ? 1 : 0,
       ...personExportValues(p),
     }
   })
@@ -159,6 +167,7 @@ const columnsForCsv = computed(() => [
   { header: 'Join Date', key: 'joinDate' },
   { header: 'Service Notes', key: 'serviceNotes' },
   { header: 'Prefers a Volunteer From', key: 'circlePreferences' },
+  ...(canReadVolunteers.value ? [flagColumn('Also a Volunteer', 'isAlsoVolunteer')] : []),
   ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
 ])
 
@@ -248,6 +257,10 @@ async function handleCreateSheet() {
           />
           <InputIcon v-if="searchText" class="pi pi-times" style="cursor: pointer" @click.stop="clearSearch" />
         </IconField>
+        <div v-if="canReadVolunteers" class="role-filter">
+          <Checkbox v-model="bothRolesOnly" input-id="both-roles" binary />
+          <label for="both-roles">Both roles</label>
+        </div>
       </div>
     </div>
 
@@ -296,7 +309,7 @@ async function handleCreateSheet() {
       </template>
 
       <Column field="fullName" header="Name" sortable style="width: 25%"></Column>
-      <Column header="Level" sortable style="width: 25%">
+      <Column header="Level" sortable style="width: 20%">
         <template #body="slotProps">
           <Tag
             v-if="slotProps.data.memberLevel"
@@ -306,8 +319,13 @@ async function handleCreateSheet() {
           <span v-else class="text-dim">—</span>
         </template>
       </Column>
-      <Column field="joinDate" header="Join Date" sortable style="width: 25%"></Column>
-      <Column field="memberNumber" header="Member #" sortable style="width: 25%"></Column>
+      <Column field="joinDate" header="Join Date" sortable style="width: 20%"></Column>
+      <Column field="memberNumber" header="Member #" sortable style="width: 20%"></Column>
+      <Column v-if="canReadVolunteers" field="isAlsoVolunteer" header="Volunteer" sortable style="width: 15%">
+        <template #body="slotProps">
+          <i v-if="slotProps.data.isAlsoVolunteer" class="pi pi-check" aria-label="Also a volunteer"></i>
+        </template>
+      </Column>
     </DataTable>
 
     <!-- Mobile Card List -->
@@ -337,6 +355,10 @@ async function handleCreateSheet() {
           <span class="label">Joined:</span>
           <span>{{ member.joinDate ?? '—' }}</span>
         </div>
+        <div v-if="canReadVolunteers && member.isAlsoVolunteer" class="card-row">
+          <span class="label">Also a volunteer</span>
+          <i class="pi pi-check"></i>
+        </div>
       </div>
     </div>
   </div>
@@ -363,6 +385,18 @@ h1 {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.role-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.role-filter label {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
 }
 
 .loading-state,

@@ -203,7 +203,10 @@ module.exports.getVillageMembers = async function (villageId) {
         JSON_ARRAY())
       FROM member_circle_preference mcp
       JOIN circle c ON c.id = mcp.circleId
-      WHERE mcp.memberId = m.id) AS circlePreferences`
+      WHERE mcp.memberId = m.id) AS circlePreferences`,
+    // Dual-role flag: same active view and villageId scoping as
+    // personCounts.both, so the flagged rows add up to that figure.
+    'EXISTS (SELECT 1 FROM active_volunteer av WHERE av.personId = m.personId) AS isAlsoVolunteer'
   ]
   const joins = new Set([
     'active_member m',
@@ -213,6 +216,8 @@ module.exports.getVillageMembers = async function (villageId) {
   const orderBy = ['p.fullName']
   const sql = dbUtils.makeQueryString({columns, joins, predicates, orderBy, format: true})
   const [rows] = await dbUtils.pool.query(sql)
+  // EXISTS yields 0/1; the pool's typeCast only converts BIT columns.
+  for (const row of rows) row.isAlsoVolunteer = row.isAlsoVolunteer === 1
   return rows
 }
 
@@ -223,7 +228,9 @@ module.exports.getVillageVolunteers = async function (villageId) {
     'CAST(vol.personId AS CHAR) AS personId',
   `  COALESCE(CAST(
       CONCAT('[', GROUP_CONCAT(CONCAT('"',c.name,'"') ORDER BY c.name), ']')
-      AS JSON), JSON_ARRAY()) AS capabilities`
+      AS JSON), JSON_ARRAY()) AS capabilities`,
+    // Mirror of getVillageMembers' isAlsoVolunteer.
+    'EXISTS (SELECT 1 FROM active_member am WHERE am.personId = vol.personId) AS isAlsoMember'
   ]
   const joins = new Set([
     'active_volunteer vol',
@@ -236,6 +243,7 @@ module.exports.getVillageVolunteers = async function (villageId) {
   const orderBy = ['p.fullName']
   const sql = dbUtils.makeQueryString({columns, joins, predicates, groupBy, orderBy, format: true})
   let [rows] = await dbUtils.pool.query(sql)
+  for (const row of rows) row.isAlsoMember = row.isAlsoMember === 1
   return rows
 }
 
