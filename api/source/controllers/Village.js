@@ -124,6 +124,10 @@ module.exports.getVillageMembers = async function getVillageMembers (req, res, n
     }
 
     const response = await VillageService.getVillageMembers(villageId)
+    // The flag discloses volunteer status, so it needs volunteer:read too.
+    if (!hasPermission(req.userObject, 'volunteer:read', { villageId })) {
+      for (const member of response) delete member.isAlsoVolunteer
+    }
     res.json(response)
   }
   catch (err) {
@@ -144,6 +148,10 @@ module.exports.getVillageVolunteers = async function getVillageVolunteers (req, 
     }
 
     const response = await VillageService.getVillageVolunteers(villageId)
+    // The flag discloses member status, so it needs member:read too.
+    if (!hasPermission(req.userObject, 'member:read', { villageId })) {
+      for (const volunteer of response) delete volunteer.isAlsoMember
+    }
     res.json(response)
   }
   catch (err) {

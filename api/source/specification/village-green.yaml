@@ -3678,6 +3678,12 @@ components:
           description: Circles this member prefers a volunteer from (member_circle_preference).
           type: array
           items: { $ref: '#/components/schemas/Circle' }
+        isAlsoVolunteer:
+          description: >-
+            True when this member is also an active volunteer. Returned by the
+            village member list only, and only to callers who also hold
+            volunteer:read for the village.
+          type: boolean
     MemberId:
       $ref: '#/components/schemas/StringIntId'
     ApplicationEnvelope:
@@ -5792,6 +5798,12 @@ components:
             properties:
               villageId: { $ref: '#/components/schemas/VillageId' }
               name: { type: string }
+        isAlsoMember:
+          description: >-
+            True when this volunteer is also an active member. Returned by the
+            village volunteer list only, and only to callers who also hold
+            member:read for the village.
+          type: boolean
     VettingTypeId:
       $ref: '#/components/schemas/StringIntId'
     VettingType:

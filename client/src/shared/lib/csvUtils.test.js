@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildFlagColumns, withFlagValues, toCsv } from './csvUtils.js'
+import { buildFlagColumns, withFlagValues, flagColumn, toCsv } from './csvUtils.js'
 
 const rows = [
   { fullName: 'Anderson, Alice', capabilities: ['Rides', 'Errands'] },
@@ -75,5 +75,15 @@ describe('toCsv with flag columns', () => {
       '"Baker, Bob",1,0',
       '"Chen, Cass",0,0'
     ])
+  })
+})
+
+describe('flagColumn', () => {
+  it('builds a single boolean column with the checkmark Sheets format', () => {
+    expect(flagColumn('Also a Volunteer', 'isAlsoVolunteer')).toEqual({
+      header: 'Also a Volunteer',
+      key: 'isAlsoVolunteer',
+      numberFormat: { type: 'NUMBER', pattern: '[=1]"✓";[=0]"";General' }
+    })
   })
 })

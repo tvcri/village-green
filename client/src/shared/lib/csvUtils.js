@@ -90,6 +90,13 @@ export function buildFlagColumns(rows, key) {
 }
 
 /**
+ * A single boolean column: the row value is 1/0, shown as a checkmark in Sheets.
+ */
+export function flagColumn(header, key) {
+  return { header, key, numberFormat: FLAG_NUMBER_FORMAT }
+}
+
+/**
  * Add a 1/0 property per flag column to a row, keyed to match buildFlagColumns().
  */
 export function withFlagValues(row, key, values) {
