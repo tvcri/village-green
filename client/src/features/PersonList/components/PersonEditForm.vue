@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import PersonFormFields from './PersonFormFields.vue'
@@ -15,6 +16,7 @@ import {
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
+import { positionsLostOnVillageChange } from '../../../shared/lib/positionRules.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -65,6 +67,39 @@ async function loadVillages () {
 // a failed load would otherwise PATCH null over every field.
 const loaded = ref(false)
 
+const confirm = useConfirm()
+// The volunteer projection's positions and associates, for the revocation
+// warning (UI spec 7.2). Empty when the caller can't read volunteers.
+const heldPositions = ref([])
+const associateIds = ref([])
+const originalVillageId = ref(null)
+const personDisplayName = ref('')
+
+const lostPositions = computed(() => isEdit.value && String(form.villageId ?? '') !== String(originalVillageId.value ?? '')
+  ? positionsLostOnVillageChange({ positions: heldPositions.value, associateVillageIds: associateIds.value, newHomeVillageId: form.villageId })
+  : [])
+const villageName = (id) => villages.value.find(v => String(v.villageId) === String(id))?.name
+const villageWarning = computed(() => {
+  const lost = lostPositions.value
+  if (!lost.length) return ''
+  const names = [...new Set(lost.map(p => p.name))].join(', ')
+  return `Saving will remove ${lost.length} position${lost.length === 1 ? '' : 's'} that depend${lost.length === 1 ? 's' : ''} on ${villageName(originalVillageId.value)}: ${names}.`
+})
+const lostList = () => lostPositions.value.map(p => `${p.name} (${p.village.name})`).join(', ')
+function confirmVillageChange () {
+  return new Promise(resolve => confirm.require({
+    header: 'Change home village',
+    message: `Change the home village to ${villageName(form.villageId) ?? 'no village'}? ${personDisplayName.value} will no longer hold: ${lostList()}.`,
+    acceptLabel: 'Change village and remove',
+    rejectLabel: 'Keep editing',
+    acceptProps: { severity: 'danger' },
+    rejectProps: { severity: 'secondary' },
+    accept: () => resolve(true),
+    reject: () => resolve(false),
+    onHide: () => resolve(false),
+  }))
+}
+
 onMounted(async () => {
   try {
     await loadVillages()
@@ -72,9 +107,13 @@ onMounted(async () => {
     allDisabilities.value = await getDisabilities()   // [{ disabilityId, name }]
     await lookupsReady
     if (isEdit.value) {
-      const p = await getPerson(personId.value, [])
+      const p = await getPerson(personId.value, hasPermission('volunteer:read') ? ['volunteer'] : [])
       Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
       form.villageId = p.village?.villageId ?? null
+      originalVillageId.value = form.villageId
+      heldPositions.value = p.volunteer?.positions ?? []
+      associateIds.value = (p.volunteer?.associateVillages ?? []).map(v => v.villageId)
+      personDisplayName.value = p.displayName ?? `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim()
       circleNames.value = new Set(p.circles.map(c => c.name))
       disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
       Object.assign(personFields, personFormFromApi(p))
@@ -116,6 +155,8 @@ async function handleSubmit () {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
+  const removedList = lostPositions.value.length ? lostList() : ''
+  if (removedList && !(await confirmVillageChange())) return
   try {
     // An edited address may have a municipality lookup still in flight (or,
     // for an Enter-key submit, not yet started) — settle it before reading
@@ -129,7 +170,7 @@ async function handleSubmit () {
       const created = await createPerson(buildPayload())
       id = created.personId
     }
-    toast.add({ severity: 'success', summary: 'Saved', detail: isEdit.value ? 'Person updated' : 'Person created', life: 2000 })
+    toast.add({ severity: 'success', summary: 'Saved', detail: isEdit.value ? (removedList ? `Person updated. Removed ${removedList}.` : 'Person updated') : 'Person created', life: 2000 })
     router.push({ name: 'meta-person-detail', params: { personId: id } })
   }
   catch {
@@ -212,6 +253,7 @@ function cancel () {
           :circleNames="circleNames"
           :disabilities="disabilities"
           :show-birth-date="showBirthDate"
+          :village-warning="villageWarning"
           @toggle-circle="toggleCircle"
           @toggle-disability="toggleDisability"
           @edit-disability-note="editDisabilityNote"

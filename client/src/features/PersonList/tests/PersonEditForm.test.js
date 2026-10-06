@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
+import { h } from 'vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import PrimeVue from 'primevue/config'
@@ -10,6 +11,8 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({ params: { personId: '5' } })
 }))
+const confirmRequire = vi.fn()
+vi.mock('primevue/useconfirm', () => ({ useConfirm: () => ({ require: confirmRequire }) }))
 const mockToastAdd = vi.fn()
 vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: mockToastAdd }) }))
 vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
@@ -196,5 +199,76 @@ describe('PersonEditForm', () => {
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(patchPerson).toHaveBeenCalled())
     expect(patchPerson.mock.calls[0][1].firstName).toBeNull()
+  })
+})
+
+describe('home village change removes positions', () => {
+  const editPerson = () => ({
+    personId: '5', firstName: 'Lorraine', lastName: 'Abbott', displayName: 'Lorraine Abbott',
+    village: { villageId: '1', name: 'Barrington' }, circles: [], disabilities: [],
+    volunteer: {
+      associateVillages: [{ villageId: '7', name: 'Warwick' }],
+      positions: [
+        { volunteerPositionId: '1', positionId: '1', name: 'Steering Committee', scope: 'village', village: { villageId: '1', name: 'Barrington' }, circle: null },
+        { volunteerPositionId: '2', positionId: '3', name: 'Member Ambassador', scope: 'village', village: { villageId: '7', name: 'Warwick' }, circle: null },
+      ],
+    },
+  })
+  // Stand-in for PersonFormFields: one button emits the Village select's "cleared" event.
+  const FieldsStub = {
+    props: ['villageWarning'],
+    emits: ['update:villageId'],
+    setup: (props, { emit, expose }) => {
+      expose({ townSettled: async () => {} })
+      return () => h('div', [
+      h('button', { 'data-testid': 'clear-village', onClick: () => emit('update:villageId', null) }, 'clear'),
+      h('small', props.villageWarning),
+    ])
+    },
+  }
+  const renderEdit = async (person) => {
+    const { getPerson } = await import('../api/personApi.js')
+    const { getVillages } = await import('../../VillageList/api/villageApi.js')
+    getPerson.mockResolvedValueOnce(person)
+    getVillages.mockResolvedValueOnce([{ villageId: '1', name: 'Barrington' }, { villageId: '7', name: 'Warwick' }])
+    render(PersonEditForm, { global: { ...globalOpts, stubs: { PersonFormFields: FieldsStub } } })
+    await waitFor(() => expect(getPerson).toHaveBeenCalledWith('5', ['volunteer']))
+    await waitFor(() => expect(screen.getByText('Save').closest('button')).toBeEnabled())
+  }
+
+  it('warns under Village and confirms before saving; Keep editing does not save', async () => {
+    const { patchPerson } = await import('../api/personApi.js')
+    await renderEdit(editPerson())
+    await fireEvent.click(screen.getByTestId('clear-village'))
+    expect(await screen.findByText('Saving will remove 1 position that depends on Barrington: Steering Committee.')).toBeInTheDocument()
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(confirmRequire).toHaveBeenCalled())
+    const args = confirmRequire.mock.calls[0][0]
+    expect(args.message).toBe('Change the home village to no village? Lorraine Abbott will no longer hold: Steering Committee (Barrington).')
+    expect(args.acceptLabel).toBe('Change village and remove')
+    args.reject()
+    await Promise.resolve()
+    expect(patchPerson).not.toHaveBeenCalled()
+  })
+
+  it('saves and names the removed positions once the confirm is accepted', async () => {
+    const { patchPerson } = await import('../api/personApi.js')
+    await renderEdit(editPerson())
+    await fireEvent.click(screen.getByTestId('clear-village'))
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(confirmRequire).toHaveBeenCalled())
+    confirmRequire.mock.calls[0][0].accept()
+    await waitFor(() => expect(patchPerson).toHaveBeenCalled())
+    expect(mockToastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Person updated. Removed Steering Committee (Barrington).' }))
+  })
+
+  it('no warning when the change keeps every position', async () => {
+    const p = editPerson(); p.volunteer.positions = p.volunteer.positions.slice(1)
+    await renderEdit(p)
+    await fireEvent.click(screen.getByTestId('clear-village'))
+    expect(screen.queryByText(/Saving will remove/)).toBeNull()
+    await fireEvent.click(screen.getByText('Save'))
+    expect(confirmRequire).not.toHaveBeenCalled()
   })
 })
