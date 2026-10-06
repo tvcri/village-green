@@ -9,7 +9,8 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({ params: { personId: '5' } })
 }))
-vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
+const toastAdd = vi.hoisted(() => vi.fn())
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
   useRequirePermission: () => {}
 }))
@@ -23,15 +24,18 @@ vi.mock('../api/personApi.js', () => ({
       active: true,
       notes: 'Existing notes',
       capabilities: ['Driving'],
-      associateVillages: [],
-      vettings: []
+      vettings: [],
+      trainings: [{ volunteerTrainingId: '9', trainingId: '1', name: 'Volunteer Training', completedDate: '2025-04-25', notes: 'email' }],
+      positions: [{ volunteerPositionId: '3', positionId: '3', name: 'Member Ambassador', scope: 'village', village: { villageId: '7', name: 'Warwick' }, circle: null }],
+      associateVillages: [{ villageId: '7', name: 'Warwick' }],
     }
   }),
   getCapabilities: vi.fn().mockResolvedValue([
     { capabilityId: 1, name: 'Driving' },
     { capabilityId: 2, name: 'Errands' }
   ]),
-  getVettingTypes: vi.fn().mockResolvedValue([])
+  getVettingTypes: vi.fn().mockResolvedValue([]),
+  getCircles: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('../api/roleApi.js', () => ({
   putVolunteer: vi.fn().mockResolvedValue({}),
@@ -39,8 +43,10 @@ vi.mock('../api/roleApi.js', () => ({
   deleteVolunteer: vi.fn().mockResolvedValue({})
 }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({
-  getVillages: vi.fn().mockResolvedValue([{ villageId: '1', name: 'Testville' }])
+  getVillages: vi.fn().mockResolvedValue([{ villageId: '1', name: 'Testville' }, { villageId: '7', name: 'Warwick' }])
 }))
+vi.mock('../../Trainings/api/trainingApi.js', () => ({ getTrainings: vi.fn().mockResolvedValue([{ trainingId: '1', name: 'Volunteer Training' }]) }))
+vi.mock('../../Positions/api/positionApi.js', () => ({ getPositions: vi.fn().mockResolvedValue([{ positionId: '3', name: 'Member Ambassador', scope: 'village', trainingIds: [] }]) }))
 
 import { getPerson } from '../api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../api/roleApi.js'
@@ -70,8 +76,8 @@ const globalOpts = {
 }
 
 describe('VolunteerEdit', () => {
-  // A failed load leaves person null, so the no-home-village notice replaces
-  // the form: no Save or Grant button exists to PUT a new role over the stored one.
+  // A failed load leaves person null, so the Loading notice replaces the
+  // form: no Save or Grant button exists to PUT a new role over the stored one.
   it('a failed person load renders no save button, so it can never PUT a role', async () => {
     getPerson.mockRejectedValueOnce(new Error('down'))
     render(VolunteerEdit, { global: globalOpts })
@@ -107,5 +113,43 @@ describe('VolunteerEdit', () => {
     expect(personId).toBe('5')
     expect(body.notes).toBe('Updated notes')
     expect(body.active).toBe(false)
+  })
+
+  it('renders the form for a person with no home village (Hub volunteer)', async () => {
+    getPerson.mockResolvedValueOnce({ personId: '5', fullName: 'Quinn, Robert', village: null, volunteer: null })
+    render(VolunteerEdit, { global: globalOpts })
+    expect(await screen.findByText('Grant Volunteer Role')).toBeInTheDocument()
+    expect(screen.queryByText(/Set a home village/)).toBeNull()
+  })
+
+  it('sends trainings and positions on save', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await screen.findByDisplayValue('Existing notes')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    const body = patchVolunteer.mock.calls[0][1]
+    expect(body.trainings).toEqual([{ trainingId: '1', completedDate: '2025-04-25', notes: 'email' }])
+    expect(body.positions).toEqual([{ positionId: '3', villageId: '7', circleId: null }])
+  })
+
+  // Review Focus 3: a position its villages no longer cover is left out of
+  // the PATCH (the server would 422 on it) and named in the toast.
+  it('leaves out a position whose village is no longer covered, so the save does not 422', async () => {
+    getPerson.mockResolvedValueOnce({
+      personId: '5', fullName: 'Smith, Alice', village: { villageId: '1' },
+      volunteer: {
+        providerType: null, active: true, notes: 'Existing notes', capabilities: [], vettings: [], trainings: [],
+        associateVillages: [], // Warwick already removed in this form session
+        positions: [{ volunteerPositionId: '3', positionId: '3', name: 'Member Ambassador', scope: 'village', village: { villageId: '7', name: 'Warwick' }, circle: null }],
+      },
+    })
+    render(VolunteerEdit, { global: globalOpts })
+    expect(await screen.findByText('Will be removed on save: Warwick is no longer one of this volunteer’s villages.')).toBeInTheDocument()
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    expect(patchVolunteer.mock.calls[0][1].positions).toEqual([])
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      severity: 'success', detail: 'Volunteer role saved. Removed Member Ambassador, Warwick.',
+    }))
   })
 })

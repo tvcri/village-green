@@ -4,10 +4,15 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import { getPerson, getCapabilities, getVettingTypes } from '../api/personApi.js'
+import { getPerson, getCapabilities, getVettingTypes, getCircles } from '../api/personApi.js'
 import { putVolunteer, patchVolunteer, deleteVolunteer } from '../api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { getTrainings } from '../../Trainings/api/trainingApi.js'
+import { getPositions } from '../../Positions/api/positionApi.js'
 import VolunteerFormFields from './VolunteerFormFields.vue'
+import VolunteerTrainingsFields from './VolunteerTrainingsFields.vue'
+import VolunteerPositionsFields from './VolunteerPositionsFields.vue'
+import { isPositionEligible } from '../../../shared/lib/positionRules.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
@@ -18,7 +23,8 @@ const personId = computed(() => route.params.personId)
 
 const person = ref(null)
 const hasVolunteer = ref(false)
-const hasHomeVillage = computed(() => !!person.value?.village?.villageId)
+// A person with no home village is a Hub volunteer: the role is allowed.
+const homeVillage = computed(() => person.value?.village?.villageId ? person.value.village : null)
 
 const capabilityOptions = ref([])   // [{ capabilityId, name }] from getCapabilities()
 const villageOptions = ref([])      // [{ villageId, name }] from getVillages()
@@ -29,15 +35,23 @@ const providerType = ref('')
 const active = ref(true)
 const notes = ref('')
 const vettings = ref([])
+const trainingOptions = ref([])     // [{ trainingId, name }]
+const positionOptions = ref([])     // [{ positionId, name, scope, trainingIds }]
+const circleOptions = ref([])       // [{ circleId, name }]
+const trainings = ref([])           // [{ trainingId, name, completedDate, notes }]
+const positions = ref([])           // [{ positionId, name, scope, villageId, villageName, circleId, circleName }]
 
 onMounted(async () => {
   try {
-    const [capabilities, vettingTypes, villages] = await Promise.all([
-      getCapabilities(), getVettingTypes(), getVillages(),
+    const [capabilities, vettingTypes, villages, trainingList, positionList, circles] = await Promise.all([
+      getCapabilities(), getVettingTypes(), getVillages(), getTrainings(), getPositions(), getCircles(),
     ])
     capabilityOptions.value = capabilities
     vettingTypeOptions.value = vettingTypes
     villageOptions.value = villages
+    trainingOptions.value = trainingList
+    positionOptions.value = positionList
+    circleOptions.value = circles
     const p = await getPerson(personId.value, ['volunteer'])
     person.value = p
     if (p.volunteer) {
@@ -51,6 +65,12 @@ onMounted(async () => {
       active.value = d.active ?? true
       notes.value = d.notes ?? ''
       vettings.value = d.vettings ?? []
+      trainings.value = (d.trainings ?? []).map(t => ({ trainingId: t.trainingId, name: t.name, completedDate: t.completedDate, notes: t.notes }))
+      positions.value = (d.positions ?? []).map(r => ({
+        positionId: r.positionId, name: r.name, scope: r.scope,
+        villageId: r.village?.villageId ?? null, villageName: r.village?.name ?? null,
+        circleId: r.circle?.circleId ?? null, circleName: r.circle?.name ?? null,
+      }))
     }
   }
   catch {
@@ -59,6 +79,12 @@ onMounted(async () => {
 })
 
 async function save () {
+  // A village position the home and associate villages no longer cover would
+  // 422 the whole save, so it is left out (and named in the toast). Re-adding
+  // the associate village before saving keeps it.
+  const homeId = person.value?.village?.villageId ?? null
+  const kept = positions.value.filter(r => isPositionEligible({ scope: r.scope, villageId: r.villageId }, homeId, selectedAssociateVillageIds.value))
+  const dropped = positions.value.filter(r => !kept.includes(r))
   const body = {
     providerType: providerType.value || null,
     active: active.value,
@@ -66,11 +92,18 @@ async function save () {
     capabilityIds: selectedCapabilityIds.value,
     associateVillageIds: selectedAssociateVillageIds.value,
     vettings: vettings.value.map(({ vettingTypeId, dateEntered, dateExpired, additionalData, notes }) => ({ vettingTypeId, dateEntered, dateExpired, additionalData, notes })),
+    trainings: trainings.value.map(({ trainingId, completedDate, notes }) => ({ trainingId, completedDate: completedDate ?? null, notes: notes ?? null })),
+    positions: kept.map(({ positionId, villageId, circleId }) => ({ positionId, villageId: villageId ?? null, circleId: circleId ?? null })),
   }
   try {
     if (hasVolunteer.value) await patchVolunteer(personId.value, body)
     else await putVolunteer(personId.value, body)
-    toast.add({ severity: 'success', summary: 'Saved', detail: 'Volunteer role saved', life: 2000 })
+    toast.add({
+      severity: 'success',
+      summary: 'Saved',
+      detail: dropped.length ? `Volunteer role saved. Removed ${dropped.map(r => `${r.name}, ${r.villageName}`).join('; ')}.` : 'Volunteer role saved',
+      life: dropped.length ? 5000 : 2000,
+    })
     back()
   }
   catch {
@@ -96,10 +129,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
   <Card class="detail-card">
     <template #title>Volunteer Role — {{ person?.fullName }}</template>
     <template #content>
-      <div v-if="!hasHomeVillage" class="notice">
-        Set a home village on the person before granting a volunteer role.
-        <Button label="Back" severity="secondary" @click="back" />
-      </div>
+      <div v-if="!person" class="notice">Loading…</div>
 
       <!-- No submit button, so Enter in a text box never saves (browsers only
            submit implicitly when a form has one); @submit.prevent stays as a
@@ -117,6 +147,10 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           :vetting-type-options="vettingTypeOptions"
           show-vettings
         />
+        <VolunteerTrainingsFields v-model:trainings="trainings" :training-options="trainingOptions" />
+        <VolunteerPositionsFields v-model:positions="positions" :position-options="positionOptions" :home-village="homeVillage"
+                                  :associate-village-ids="selectedAssociateVillageIds" :village-options="villageOptions"
+                                  :circle-options="circleOptions" :trainings="trainings" :training-options="trainingOptions" />
 
         <div class="form-footer">
           <Button v-if="hasVolunteer" type="button" label="Revoke Role" severity="danger" @click="revoke" />
