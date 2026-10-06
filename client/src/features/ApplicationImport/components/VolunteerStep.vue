@@ -94,9 +94,11 @@ async function grantVolunteerRole (personId, { isExisting = false } = {}) {
     active: active.value,
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
-    associateVillageIds: [],
     application: buildApplicationEnvelope(props.extraction, null),
   }
+  // A PATCH that carries associateVillageIds prunes village positions held at
+  // associate villages, so an existing person's PATCH must omit it entirely.
+  if (!isExisting) body.associateVillageIds = []
   try {
     // For an existing person, patch so fields the wizard doesn't collect
     // (e.g. vettings) are left untouched rather than wiped by a full replace.

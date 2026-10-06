@@ -65,7 +65,7 @@ async function save () {
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
     associateVillageIds: selectedAssociateVillageIds.value,
-    vettings: vettings.value.map(({ vettingTypeId, dateEntered, dateExpired }) => ({ vettingTypeId, dateEntered, dateExpired })),
+    vettings: vettings.value.map(({ vettingTypeId, dateEntered, dateExpired, additionalData, notes }) => ({ vettingTypeId, dateEntered, dateExpired, additionalData, notes })),
   }
   try {
     if (hasVolunteer.value) await patchVolunteer(personId.value, body)

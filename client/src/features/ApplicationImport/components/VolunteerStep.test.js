@@ -81,6 +81,7 @@ describe('VolunteerStep', () => {
     const [personId, body] = putVolunteer.mock.calls[0]
     expect(personId).toBe('42')
     expect(body.capabilityIds).toEqual(['3'])
+    expect(body.associateVillageIds).toEqual([])
     expect(body.notes).toBe('Prefers weekday mornings')
     expect(body.application).toMatchObject({ applicationType: 'volunteer', memberIndex: null })
     expect(emitted()['volunteer-done'][0][0]).toEqual({ personId: '42', fullName: 'Brown, Nicole' })
@@ -94,6 +95,7 @@ describe('VolunteerStep', () => {
     expect(createPerson).not.toHaveBeenCalled()
     expect(putVolunteer).not.toHaveBeenCalled()
     expect(patchVolunteer.mock.calls[0][0]).toBe('9')
+    expect('associateVillageIds' in patchVolunteer.mock.calls[0][1]).toBe(false)
     expect(emitted()['volunteer-done'][0][0]).toEqual({ personId: '9', fullName: 'Brown, Nicole K.' })
   })
 
