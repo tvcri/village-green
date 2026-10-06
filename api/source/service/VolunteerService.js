@@ -57,9 +57,10 @@ async function replaceVettings (connection, volunteerId, vettings) {
     'DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId]
   )
   if (vettings?.length) {
-    const values = vettings.map(v => [volunteerId, v.vettingTypeId, v.dateEntered ?? null, v.dateExpired ?? null])
+    const values = vettings.map(v => [volunteerId, v.vettingTypeId, v.dateEntered ?? null, v.dateExpired ?? null,
+      v.additionalData ?? null, v.notes ?? null])
     await connection.query(
-      'INSERT INTO volunteer_vetting (volunteerId, vettingTypeId, dateEntered, dateExpired) VALUES ?', [values]
+      'INSERT INTO volunteer_vetting (volunteerId, vettingTypeId, dateEntered, dateExpired, additionalData, notes) VALUES ?', [values]
     )
   }
 }

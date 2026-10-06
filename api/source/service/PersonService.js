@@ -306,7 +306,9 @@ function volunteerColumn ({ inactive }) {
               'vettingTypeId', CAST(vv.vettingTypeId AS CHAR),
               'name', vt.name,
               'dateEntered', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d'),
-              'dateExpired', DATE_FORMAT(vv.dateExpired, '%Y-%m-%d')
+              'dateExpired', DATE_FORMAT(vv.dateExpired, '%Y-%m-%d'),
+              'additionalData', vv.additionalData,
+              'notes', vv.notes
             ) ORDER BY vt.name, vv.dateEntered
           ), ']') AS JSON),
           JSON_ARRAY()

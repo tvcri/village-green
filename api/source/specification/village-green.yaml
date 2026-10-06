@@ -5987,6 +5987,13 @@ components:
           type: string
           format: date
           nullable: true
+        additionalData:
+          type: string
+          maxLength: 100
+          nullable: true
+        notes:
+          type: string
+          nullable: true
     VolunteerTrainingInput:
       additionalProperties: false
       type: object
@@ -6057,6 +6064,13 @@ components:
               dateExpired:
                 type: string
                 format: date
+                nullable: true
+              additionalData:
+                type: string
+                maxLength: 100
+                nullable: true
+              notes:
+                type: string
                 nullable: true
         trainings:
           type: array

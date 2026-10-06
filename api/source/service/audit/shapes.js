@@ -131,8 +131,7 @@ const shapes = {
         table: 'volunteer_vetting',
         sourceColumns: ['id', 'volunteerId', 'vettingTypeId', 'dateEntered', 'dateExpired', 'additionalData', 'notes'],
         // Natural key mirrors UNIQUE(volunteerId, vettingTypeId, dateEntered).
-        // additionalData/notes are not rendered into diffs (they are also
-        // dropped by replaceVettings — pre-existing, see plan).
+        // additionalData/notes are not rendered into diffs.
         sql: `SELECT CONCAT(vt.name, ' ', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d')) AS k,
                      vt.name AS vettingType,
                      DATE_FORMAT(vv.dateEntered, '%Y-%m-%d') AS dateEntered,
