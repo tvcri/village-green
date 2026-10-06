@@ -483,6 +483,20 @@ CREATE TABLE `person_race` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `position`
+--
+
+DROP TABLE IF EXISTS `position`;
+CREATE TABLE `position` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `scope` enum('federation','village','circle') NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `position_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `privacy_acknowledgement`
 --
 
@@ -634,6 +648,19 @@ CREATE TABLE `service_request` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `training`
+--
+
+DROP TABLE IF EXISTS `training`;
+CREATE TABLE `training` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `training_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `user_data`
 --
 
@@ -746,6 +773,49 @@ CREATE TABLE `volunteer_capability` (
   KEY `capability_id` (`capabilityId`),
   CONSTRAINT `volunteer_capability_ibfk_1` FOREIGN KEY (`volunteerId`) REFERENCES `volunteer` (`id`),
   CONSTRAINT `volunteer_capability_ibfk_2` FOREIGN KEY (`capabilityId`) REFERENCES `capability` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `volunteer_position`
+--
+
+DROP TABLE IF EXISTS `volunteer_position`;
+CREATE TABLE `volunteer_position` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `volunteerId` int NOT NULL,
+  `positionId` int NOT NULL,
+  `villageId` int DEFAULT NULL,
+  `circleId` int DEFAULT NULL,
+  `villageKey` int GENERATED ALWAYS AS (ifnull(`villageId`,0)) VIRTUAL,
+  `circleKey` int GENERATED ALWAYS AS (ifnull(`circleId`,0)) VIRTUAL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `volunteer_position_natural` (`volunteerId`,`positionId`,`villageKey`,`circleKey`),
+  KEY `vp_position_fk` (`positionId`),
+  KEY `vp_village_fk` (`villageId`),
+  KEY `vp_circle_fk` (`circleId`),
+  CONSTRAINT `vp_circle_fk` FOREIGN KEY (`circleId`) REFERENCES `circle` (`id`),
+  CONSTRAINT `vp_position_fk` FOREIGN KEY (`positionId`) REFERENCES `position` (`id`),
+  CONSTRAINT `vp_village_fk` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
+  CONSTRAINT `vp_volunteer_fk` FOREIGN KEY (`volunteerId`) REFERENCES `volunteer` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `volunteer_training`
+--
+
+DROP TABLE IF EXISTS `volunteer_training`;
+CREATE TABLE `volunteer_training` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `volunteerId` int NOT NULL,
+  `trainingId` int NOT NULL,
+  `completedDate` date DEFAULT NULL,
+  `completedKey` date GENERATED ALWAYS AS (ifnull(`completedDate`,_utf8mb4'1000-01-01')) VIRTUAL,
+  `notes` text,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `volunteer_training_natural` (`volunteerId`,`trainingId`,`completedKey`),
+  KEY `vt_training_fk` (`trainingId`),
+  CONSTRAINT `vt_training_fk` FOREIGN KEY (`trainingId`) REFERENCES `training` (`id`),
+  CONSTRAINT `vt_volunteer_fk` FOREIGN KEY (`volunteerId`) REFERENCES `volunteer` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -898,4 +968,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-23  2:49:34
+-- Dump completed on 2026-10-06 14:46:50

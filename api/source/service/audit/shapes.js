@@ -140,6 +140,30 @@ const shapes = {
               FROM volunteer_vetting vv JOIN vetting_type vt ON vt.id = vv.vettingTypeId
               WHERE vv.volunteerId = ?`,
       },
+      // Repeat completions are separate rows, so the key carries the date.
+      trainings: {
+        kind: 'keyed',
+        key: 'k',
+        table: 'volunteer_training',
+        sourceColumns: ['id', 'volunteerId', 'trainingId', 'completedDate', 'completedKey', 'notes'],
+        sql: `SELECT CONCAT(t.name, ' ', COALESCE(DATE_FORMAT(vt.completedDate, '%Y-%m-%d'), 'undated')) AS k,
+                     t.name AS training,
+                     DATE_FORMAT(vt.completedDate, '%Y-%m-%d') AS completedDate,
+                     vt.notes
+              FROM volunteer_training vt JOIN training t ON t.id = vt.trainingId
+              WHERE vt.volunteerId = ?`,
+      },
+      positions: {
+        kind: 'values',
+        table: 'volunteer_position',
+        sourceColumns: ['id', 'volunteerId', 'positionId', 'villageId', 'circleId', 'villageKey', 'circleKey'],
+        sql: `SELECT CONCAT(pos.name, COALESCE(CONCAT(' — ', v.name), CONCAT(' — ', c.name), '')) AS label
+              FROM volunteer_position vp
+              JOIN \`position\` pos ON pos.id = vp.positionId
+              LEFT JOIN village v ON v.id = vp.villageId
+              LEFT JOIN circle c ON c.id = vp.circleId
+              WHERE vp.volunteerId = ?`,
+      },
     },
   },
 

@@ -28,13 +28,15 @@ test('reference lists return 200 arrays for a read-only caller', async () => {
 })
 
 test('capabilities serves the known reference rows', async () => {
-  // 5 from the static seed + 'Steering Committee' added by migration 0012.
+  // The 5 service capabilities from the static seed. Steering Committee left
+  // the list in migration 0028 (it is a village position now).
   // Superset-tolerant so future additive migrations don't break the smoke.
   const { json } = await vgCall('getCapabilities', {}, { token: tokens.users.full_v1 })
   const names = json.map(c => c.name)
-  for (const expected of ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support', 'Steering Committee']) {
+  for (const expected of ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support']) {
     assert.ok(names.includes(expected), `capabilities include ${expected}`)
   }
+  assert.ok(!names.includes('Steering Committee'), 'Steering Committee is a position now, not a capability')
   assert.ok(json.every(c => c.capabilityId && c.name), 'items carry {capabilityId, name}')
 })
 

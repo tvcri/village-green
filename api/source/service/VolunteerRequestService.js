@@ -10,7 +10,7 @@ const AuditService = require('./audit/AuditService')
 // iff its serviceName matches that capability's prefix or exact match. The
 // colon-terminated prefixes ('Ride:', 'Errand:') cover every subtype AND absorb
 // the legacy whitespace-after-colon variants, since the match cut is at the colon.
-// Capabilities with no service type (Friends, Steering Committee) derive to NULL.
+// Capabilities with no service type (Friends) derive to NULL.
 module.exports.buildCapabilityPrefixCase = function () {
   const whens = dbUtils.SERVICE_CATEGORIES
     .filter(c => c.capability)
