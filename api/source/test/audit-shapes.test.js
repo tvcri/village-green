@@ -3,8 +3,8 @@ const assert = require('node:assert/strict')
 const { shapes, assertShapeInvariants } = require('../service/audit/shapes')
 const { buildRowSql, shadowedAliases, unaccountedReferencingTables, requiredSetAlias, setColumnGaps } = require('../service/audit/AuditService')
 
-test('registry declares exactly the five v1 entity types', () => {
-  assert.deepEqual(Object.keys(shapes).sort(), ['member', 'person', 'serviceRequest', 'user', 'volunteer'])
+test('registry declares exactly the audited entity types', () => {
+  assert.deepEqual(Object.keys(shapes).sort(), ['member', 'person', 'position', 'serviceRequest', 'training', 'user', 'volunteer'])
 })
 
 test('every registry entry passes its own invariants', () => {
