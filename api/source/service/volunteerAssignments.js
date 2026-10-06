@@ -124,7 +124,7 @@ async function catalogScopes (connection, positionIds) {
 
 async function assertIdsExist (connection, table, label, ids) {
   if (!ids.length) return
-  const [rows] = await connection.query(`SELECT CAST(id AS CHAR) AS id FROM ${table} WHERE id IN (?)`, [ids])
+  const [rows] = await connection.query(`SELECT CAST(id AS CHAR) AS id FROM \`${table}\` WHERE id IN (?)`, [ids])
   const missing = ids.filter(id => !rows.some(r => r.id === id))
   if (missing.length) throw new SmError.UnprocessableError(`Unknown ${label}: ${missing.join(', ')}`)
 }
@@ -166,7 +166,8 @@ async function applyPositions (connection, volunteerId, requested, eligibility) 
 
 // For the controller's per-scope authorization (spec §4.3 step 3): which
 // assignments this request adds or removes, with each one's scope. Pool
-// read outside the write transaction; the service re-validates inside it.
+// read outside the write transaction; inside it the service re-checks scope shape,
+// existence and eligibility (422), not authorization.
 // An unknown positionId gets scope null, which the controller treats as
 // needing a federation grant; the service then rejects it with 422.
 async function positionChanges (personId, requested) {

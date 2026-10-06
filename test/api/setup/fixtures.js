@@ -163,7 +163,7 @@ export const volunteers = {
 
 // capabilityId values come from the scaffold's static catalog
 // (sql/current/20-vg-static.sql): 1 Errands, 2 Friends, 3 Home Help, 4 Tech
-// Support, 5 Rides, 11 Steering Committee.
+// Support, 5 Rides (11 Steering Committee was removed by migration 0028).
 //
 // VolunteerRequestService maps capability -> serviceName PREFIX ('Rides' ->
 // 'Ride:', 'Errands' -> 'Errand:'), so scope=open only surfaces requests whose

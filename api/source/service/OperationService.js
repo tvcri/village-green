@@ -673,7 +673,7 @@ exports.getAppInfo = async function(options = {}) {
   if (includeRowCounts) {
     const rowCountQueries = []
     for (const table in tables) {
-      rowCountQueries.push(dbUtils.pool.query(`SELECT "${table}" as tableName, count(*) as rowCount from ${table}`))
+      rowCountQueries.push(dbUtils.pool.query(`SELECT "${table}" as tableName, count(*) as rowCount from \`${table}\``))
     }
     queries.push(Promise.all(rowCountQueries))
   }

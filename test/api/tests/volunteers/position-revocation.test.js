@@ -52,9 +52,13 @@ test('clearing the home village (becoming a Hub volunteer) keeps Hub and associa
 
 test('a volunteer PATCH removing an associate village, without positions, revokes what it covered', async () => {
   const s = await setup('RAssoc')
+  const before = (await auditRows('volunteer', s.volunteerId)).length
   const res = await vgCall('patchPersonVolunteer', { personId: s.personId }, { token: staff, body: { associateVillageIds: [] } })
   assert.equal(res.status, 200)
   assert.deepEqual(res.json.volunteer.positions.map(p => p.positionId).sort(), [s.atHome, s.hub].sort())
+  const rows = await auditRows('volunteer', s.volunteerId)
+  assert.equal(rows.length, before + 1, 'one volunteer audit row for the PATCH')
+  assert.equal(rows.at(-1).changes.diff.positions.removed.length, 1)
 })
 
 test('a person PATCH that does not touch villageId revokes nothing and writes no volunteer audit row', async () => {

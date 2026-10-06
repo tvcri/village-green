@@ -108,3 +108,15 @@ test('village users are denied (volunteer:write is federation-only today)', asyn
   const v = await makePosition('village')
   assert.equal((await patch(personId, { positions: [{ positionId: v, villageId: scratch }] }, tokens.users.full_v1)).status, 403)
 })
+
+test('deleting a volunteer removes their position assignments', async () => {
+  const personId = await makeVolunteer('PDel')
+  const positionId = await makePosition('federation')
+  const put = await vgCall('patchPersonVolunteer', { personId }, { token: staff, body: { positions: [{ positionId }] } })
+  assert.equal(put.status, 200)
+  const volunteerId = await withDb(async (c) => (await c.query('SELECT id FROM volunteer WHERE personId = ?', [personId]))[0][0].id)
+  const count = () => withDb(async (c) => (await c.query('SELECT COUNT(*) n FROM volunteer_position WHERE volunteerId = ?', [volunteerId]))[0][0].n)
+  assert.equal(await count(), 1)
+  assert.equal((await vgCall('deletePersonVolunteer', { personId }, { token: staff })).status, 204)
+  assert.equal(await count(), 0)
+})

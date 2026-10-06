@@ -51,9 +51,9 @@ test('buildRowSql selects the whole row plus extras, keyed by idColumn', () => {
   const sql = buildRowSql({
     table: 'person', extras: [{ name: 'village', expr: '(SELECT 1)' }], relatedTables: [], sets: {},
   })
-  assert.equal(sql, 'SELECT t.*, (SELECT 1) AS `village` FROM person t WHERE t.`id` = ?')
+  assert.equal(sql, 'SELECT t.*, (SELECT 1) AS `village` FROM `person` t WHERE t.`id` = ?')
   const sqlUser = buildRowSql({ table: 'user_data', idColumn: 'userId', relatedTables: [], sets: {} })
-  assert.equal(sqlUser, 'SELECT t.* FROM user_data t WHERE t.`userId` = ?')
+  assert.equal(sqlUser, 'SELECT t.* FROM `user_data` t WHERE t.`userId` = ?')
 })
 
 test('shadowedAliases flags extras/set names that would hide a real column', () => {

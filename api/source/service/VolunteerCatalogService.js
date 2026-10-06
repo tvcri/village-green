@@ -12,12 +12,12 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) 
   const columns = [
     `CAST(c.id AS CHAR) AS ${idName}`, 'c.name', 'c.description',
     ...(hasScope ? ['c.scope'] : []),
-    `(SELECT COUNT(DISTINCT j.volunteerId) FROM ${junction} j WHERE j.${entityType}Id = c.id) AS holderCount`,
+    `(SELECT COUNT(DISTINCT j.volunteerId) FROM \`${junction}\` j WHERE j.${entityType}Id = c.id) AS holderCount`,
   ].join(', ')
 
   async function holderCount (connection, id) {
     const [[row]] = await connection.query(
-      `SELECT COUNT(DISTINCT volunteerId) AS n FROM ${junction} WHERE ${entityType}Id = ?`, [id])
+      `SELECT COUNT(DISTINCT volunteerId) AS n FROM \`${junction}\` WHERE ${entityType}Id = ?`, [id])
     return row.n
   }
 
