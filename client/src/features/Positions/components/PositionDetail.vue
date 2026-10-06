@@ -1,7 +1,7 @@
 <script setup>
 // One position's page (UI spec §5): holders by group; add and remove in
 // place, staged until one save.
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -37,6 +37,10 @@ const removeIds = ref(new Set())
 const openKey = ref(null)
 const villageFilter = ref(null)
 const saving = ref(false)
+const loaded = ref(false)
+const flashIds = ref(new Set())
+let flashTimer = null
+onBeforeUnmount(() => clearTimeout(flashTimer))
 
 const dirty = computed(() => adds.value.length > 0 || removeIds.value.size > 0)
 useUnsavedChangesGuard(() => dirty.value)
@@ -44,12 +48,13 @@ useUnsavedChangesGuard(() => dirty.value)
 onMounted(async () => {
   try {
     const [positions, trainings, vs, cs, hs] = await Promise.all([getPositions(), getTrainings(), getVillages(), getCircles(), getPositionHolders(positionId.value)])
-    position.value = positions.find(p => p.positionId === positionId.value) ?? null
-    trainingNames.value = new Map(trainings.map(t => [t.trainingId, t.name]))
-    villages.value = vs
-    circles.value = cs
-    const expected = position.value?.trainingIds ?? []
-    const lists = await Promise.all(expected.map(id => getTrainingCompletions(id)))
+    const pos = positions.find(p => p.positionId === positionId.value) ?? null
+    const expected = pos?.trainingIds ?? []
+    // The roster is a write-only extra: its failure must not hide the holders.
+    const rosterP = canWrite.value
+      ? getVolunteerRoster().catch(() => { toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load the volunteer list; adding holders is unavailable', life: 4000 }); return [] })
+      : Promise.resolve([])
+    const [lists, rs] = await Promise.all([Promise.all(expected.map(id => getTrainingCompletions(id))), rosterP])
     latestByTraining.value = new Map(expected.map((id, i) => {
       const m = new Map()
       for (const c of lists[i]) {
@@ -58,15 +63,20 @@ onMounted(async () => {
       }
       return [id, m]
     }))
-    if (canWrite.value) roster.value = await getVolunteerRoster()
-    holders.value = hs // last, so rows never render before their training hints
+    trainingNames.value = new Map(trainings.map(t => [t.trainingId, t.name]))
+    villages.value = vs
+    circles.value = cs
+    roster.value = rs
+    holders.value = hs
+    position.value = pos
+    loaded.value = true
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load the position', life: 3000 })
   }
 })
 
-const groups = computed(() => position.value
+const groups = computed(() => position.value && loaded.value
   ? holderGroups({ position: position.value, holders: holders.value, villages: villages.value, circles: circles.value, adds: adds.value })
     .filter(g => !villageFilter.value || g.villageId === villageFilter.value)
   : [])
@@ -98,7 +108,12 @@ async function save () {
   const nAdd = adds.value.length
   const nRm = removeIds.value.size
   try {
-    holders.value = await patchPositionHolders(positionId.value, buildHoldersPatch(adds.value, removeIds.value))
+    const before = new Set(holders.value.map(h => h.volunteerPositionId))
+    const after = await patchPositionHolders(positionId.value, buildHoldersPatch(adds.value, removeIds.value))
+    holders.value = after
+    flashIds.value = new Set(after.filter(h => !before.has(h.volunteerPositionId)).map(h => h.volunteerPositionId))
+    clearTimeout(flashTimer)
+    flashTimer = setTimeout(() => { flashIds.value = new Set() }, 2500)
     discard()
     const parts = [nAdd && `added ${nAdd} ${nAdd === 1 ? 'holder' : 'holders'}`, nRm && `removed ${nRm}`].filter(Boolean)
     toast.add({ severity: 'success', summary: 'Saved', detail: `${position.value.name}: ${parts.join(', ')}.`, life: 4000 })
@@ -113,7 +128,7 @@ async function save () {
 </script>
 
 <template>
-  <div v-if="position" class="position-detail">
+  <div v-if="position && loaded" class="position-detail">
     <div class="head">
       <h1>{{ position.name }}</h1>
       <div class="stats">
@@ -127,7 +142,7 @@ async function save () {
     <Select v-if="position.scope === 'village'" v-model="villageFilter" :options="villages" optionLabel="name" optionValue="villageId"
             placeholder="All villages" showClear aria-label="Village" class="filter" />
     <HolderGroup v-for="g in groups" :key="g.key" :group="g" :show-hint="position.trainingIds.length > 0" :hint-for="hintFor"
-                 :remove-ids="removeIds" :roster="roster" :status="statusFor(g)" :can-write="canWrite" :open="openKey === g.key"
+                 :remove-ids="removeIds" :flash-ids="flashIds" :roster="roster" :status="statusFor(g)" :can-write="canWrite" :open="openKey === g.key"
                  :person-by-id="personById" @toggle="openKey = openKey === g.key ? null : g.key" @select="p => select(g, p)"
                  @remove="markRemove" @undo="undo" @unadd="unadd" />
     <div v-if="dirty" class="form-footer">

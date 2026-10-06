@@ -9,6 +9,7 @@ const props = defineProps({
   showHint: { type: Boolean, default: false },
   hintFor: { type: Function, required: true }, // personId -> { missing: string[], ok: string[] }
   removeIds: { type: Object, required: true }, // Set<volunteerPositionId>
+  flashIds: { type: Object, default: () => new Set() }, // rows to flash after a save
   roster: { type: Array, default: () => [] },
   status: { type: Function, required: true }, // person -> { disabled, reason }
   canWrite: { type: Boolean, default: false },
@@ -30,7 +31,7 @@ const empty = () => !props.group.rows.length && !props.group.adds.length
                      :input-id="`add-${group.key}`" @select="p => $emit('select', p)" />
     <table v-if="!empty()">
       <tbody>
-        <tr v-for="h in group.rows" :key="h.volunteerPositionId" :class="{ removing: removeIds.has(h.volunteerPositionId) }">
+        <tr v-for="h in group.rows" :key="h.volunteerPositionId" :class="{ removing: removeIds.has(h.volunteerPositionId), flash: flashIds.has(h.volunteerPositionId) }">
           <td class="name">
             {{ h.person.fullName }}
             <span v-if="h.village && h.person.village?.villageId !== h.village.villageId" class="dim">(associate)</span>
@@ -77,6 +78,8 @@ td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--color-border-defaul
 .name { width: 40%; }
 .state { width: 9rem; }
 .actions { width: 5rem; text-align: right; }
+tr.flash td { animation: flash 2.4s ease-out; }
+@keyframes flash { 0%, 40% { box-shadow: inset 0 0 0 999px rgba(250, 204, 21, 0.35); } 100% { box-shadow: none; } }
 .removing td { color: var(--color-text-dim); }
 .removing .name { text-decoration: line-through; }
 .adding td { background: var(--p-primary-50); }

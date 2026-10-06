@@ -68,9 +68,15 @@ describe('PositionDetail', () => {
     await fireEvent.click(screen.getByLabelText('Remove Anthony Medeiros from this position'))
     expect(screen.getByText('Will be removed')).toBeInTheDocument()
     expect(screen.getByText('1 to add, 1 to remove')).toBeInTheDocument()
+    patchPositionHolders.mockResolvedValueOnce([
+      { volunteerPositionId: '20', village: barrington, circle: null, person: { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, active: true } },
+      { volunteerPositionId: '30', village: barrington, circle: null, person: { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, active: true } },
+    ])
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(patchPositionHolders).toHaveBeenCalled())
     expect(patchPositionHolders.mock.calls[0]).toEqual(['5', { add: [{ personId: '5', villageId: '1', circleId: null }], remove: ['21'] }])
+    await waitFor(() => expect(screen.getByText('Walsh, Bridget').closest('tr')).toHaveClass('flash'))
+    expect(screen.getByText('Abbott, Lorraine').closest('tr')).not.toHaveClass('flash')
   })
 
   it('Undo restores a holder marked for removal', async () => {
