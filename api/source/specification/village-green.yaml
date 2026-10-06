@@ -1961,6 +1961,100 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
 
+  /trainings:
+    get:
+      summary: List volunteer trainings
+      tags: [Training]
+      operationId: getTrainings
+      responses:
+        '200':
+          description: The training catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Training' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a training to the catalog (training:admin)
+      tags: [Training]
+      operationId: createTraining
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainingCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Training' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /trainings/{trainingId}:
+    parameters: [ { $ref: '#/components/parameters/TrainingIdPath' } ]
+    patch:
+      summary: Rename or redescribe a training (training:admin)
+      tags: [Training]
+      operationId: patchTraining
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainingPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Training' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a training nobody holds (training:admin); 409 when held
+      tags: [Training]
+      operationId: deleteTraining
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /positions:
+    get:
+      summary: List volunteer positions
+      tags: [Position]
+      operationId: getPositions
+      responses:
+        '200':
+          description: The position catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Position' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a position to the catalog (position:admin)
+      tags: [Position]
+      operationId: createPosition
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PositionCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Position' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /positions/{positionId}:
+    parameters: [ { $ref: '#/components/parameters/PositionIdPath' } ]
+    patch:
+      summary: Rename, redescribe or rescope a position (position:admin); scope is 409 while held
+      tags: [Position]
+      operationId: patchPosition
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PositionPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Position' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a position nobody holds (position:admin); 409 when held
+      tags: [Position]
+      operationId: deletePosition
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
   /service-requests:
     get:
       summary: List service requests
@@ -5813,6 +5907,71 @@ components:
       properties:
         vettingTypeId: { $ref: '#/components/schemas/VettingTypeId' }
         name: { type: string, maxLength: 100 }
+    TrainingId:
+      $ref: '#/components/schemas/StringIntId'
+    CatalogName:
+      type: string
+      minLength: 1
+      maxLength: 100
+    CatalogDescription:
+      type: string
+      maxLength: 255
+      nullable: true
+    Training:
+      additionalProperties: false
+      type: object
+      required: [ trainingId, name, description, holderCount ]
+      properties:
+        trainingId: { $ref: '#/components/schemas/TrainingId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        holderCount: { type: integer, minimum: 0, description: Volunteers holding at least one record of this training }
+    TrainingCreate:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+    TrainingPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+    PositionId:
+      $ref: '#/components/schemas/StringIntId'
+    PositionScope:
+      type: string
+      enum: [ federation, village, circle ]
+      description: Where the position is held. The UI says "Hub" for federation.
+    Position:
+      additionalProperties: false
+      type: object
+      required: [ positionId, name, description, scope, holderCount ]
+      properties:
+        positionId: { $ref: '#/components/schemas/PositionId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        scope: { $ref: '#/components/schemas/PositionScope' }
+        holderCount: { type: integer, minimum: 0, description: Volunteers holding this position anywhere }
+    PositionCreate:
+      additionalProperties: false
+      type: object
+      required: [ name, scope ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        scope: { $ref: '#/components/schemas/PositionScope' }
+    PositionPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        scope: { $ref: '#/components/schemas/PositionScope' }
     VolunteerVettingInput:
       additionalProperties: false
       type: object
@@ -6337,6 +6496,18 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/PersonId'
+    TrainingIdPath:
+      name: trainingId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/TrainingId'
+    PositionIdPath:
+      name: positionId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/PositionId'
     PersonProjectionQuery:
       name: projection
       in: query

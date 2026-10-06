@@ -167,6 +167,19 @@ const shapes = {
     },
   },
 
+  // Staff-owned catalogs (trainings/positions spec). The volunteer-side
+  // junctions are folded into the volunteer shape, not here.
+  training: {
+    table: 'training',
+    relatedTables: ['volunteer_training'],
+    sets: {},
+  },
+  position: {
+    table: 'position',
+    relatedTables: ['volunteer_position'],
+    sets: {},
+  },
+
   user: {
     table: 'user_data',
     idColumn: 'userId',

@@ -132,7 +132,7 @@ exports.getAppData = async function (res, format) {
 
   // Select and handle the row count for each table. 
   for (const table of tableNames) {
-    const [row] = await dbUtils.pool.query(`select count(*) as cnt from ${table}`)
+    const [row] = await dbUtils.pool.query(`select count(*) as cnt from \`${table}\``)
     const rowCount = row[0].cnt
     tableMetadata[table].rowCount = rowCount
     tables.push({table, rowCount})
@@ -148,7 +148,7 @@ exports.getAppData = async function (res, format) {
     // perform custom type casting of fields to JS
     /** @type {Readable} */
     const queryStream = dbUtils.pool.pool.query({
-      sql: `select ${tableMetadata[table].columns} from ${table}`,
+      sql: `select ${tableMetadata[table].columns} from \`${table}\``,
       rowsAsArray: true,
       typeCast: function (field, next) {
          // BIT(1) fields returned as boolean, NULL kept as null
@@ -355,8 +355,8 @@ exports.replaceAppData = async function (buffer, contentType, progressCb = () =>
      * @returns {{table:string, sql:string, valueCount:number}} */
     formatCurrentQuery() {
       const sqlInsert = this.currentBinds.length
-        ? `insert into ${this.currentMetadata.table}(${this.currentMetadata.columns}) values ?`
-        : `truncate ${this.currentMetadata.table}`
+        ? `insert into \`${this.currentMetadata.table}\`(${this.currentMetadata.columns}) values ?`
+        : `truncate \`${this.currentMetadata.table}\``
       return {
         table: this.currentMetadata.table,
         sql: dbUtils.pool.format(sqlInsert, [this.currentBinds]),
@@ -413,7 +413,7 @@ exports.replaceAppData = async function (buffer, contentType, progressCb = () =>
     const [tables] = await connection.query(sql,[config.database.schema])
     await connection.query('SET FOREIGN_KEY_CHECKS = 0')
     for (const table of tables) {
-      const drop = `DROP ${table.TABLE_TYPE === 'BASE TABLE' ? 'TABLE' : 'VIEW'} ${table.TABLE_NAME}`
+      const drop = `DROP ${table.TABLE_TYPE === 'BASE TABLE' ? 'TABLE' : 'VIEW'} \`${table.TABLE_NAME}\``
       await connection.query(drop)
       progressCb({sql: drop})
     }
