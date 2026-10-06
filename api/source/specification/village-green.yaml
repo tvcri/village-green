@@ -2100,6 +2100,28 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer ] } ]
 
+  /positions/{positionId}/holders:
+    parameters: [ { $ref: '#/components/parameters/PositionIdPath' } ]
+    get:
+      summary: Who holds this position
+      tags: [Position]
+      operationId: getPositionHolders
+      responses:
+        '200': { description: 'Holders by village or circle, then name', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PositionHolder' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer:read ] } ]
+    patch:
+      summary: Add and remove holders in one transaction
+      tags: [Position]
+      operationId: patchPositionHolders
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PositionHoldersPatch' } } }
+      responses:
+        '200': { description: The holder list after the change, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PositionHolder' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
   /service-requests:
     get:
       summary: List service requests
@@ -6096,6 +6118,43 @@ components:
             properties:
               personId: { $ref: '#/components/schemas/PersonId' }
               reason: { type: string, enum: [ alreadyHolds, noHomeVillage ] }
+    PositionHolder:
+      additionalProperties: false
+      type: object
+      required: [ volunteerPositionId, village, circle, person ]
+      properties:
+        volunteerPositionId: { $ref: '#/components/schemas/StringIntId' }
+        village:
+          type: object
+          nullable: true
+          properties:
+            villageId: { $ref: '#/components/schemas/VillageId' }
+            name: { type: string }
+        circle:
+          type: object
+          nullable: true
+          properties:
+            circleId: { $ref: '#/components/schemas/CircleId' }
+            name: { type: string }
+        person: { $ref: '#/components/schemas/VolunteerPersonRef' }
+    PositionHoldersPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        add:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [ personId ]
+            properties:
+              personId: { $ref: '#/components/schemas/PersonId' }
+              villageId: { $ref: '#/components/schemas/VillageIdNullable' }
+              circleId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        remove:
+          type: array
+          items: { $ref: '#/components/schemas/StringIntId' }
     VolunteerVettingInput:
       additionalProperties: false
       type: object
