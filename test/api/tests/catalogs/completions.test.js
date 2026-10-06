@@ -2,7 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
-import { villages } from '../../setup/fixtures.js'
+import { villages, users } from '../../setup/fixtures.js'
+import { withDb } from '../../lib/db.js'
 import { auditRows } from '../audit/lib.js'
 
 // Batch completions on the training (UI spec §2.4).
@@ -108,14 +109,48 @@ test('callers without volunteer:write get 403 and nothing is written', async () 
   assert.equal((await vgCall('getTrainingCompletions', { trainingId }, { token: staff })).json.length, 0)
 })
 
+test('a village-scoped writer posting a batch that includes someone outside their village gets 403, and nobody is recorded', async () => {
+  // No seeded role grants volunteer:write at village scope (it is
+  // federation-only today), so the test makes a throwaway village-scoped role
+  // with volunteer:read + volunteer:write, grants it to the disposable scratch
+  // persona at the scratch village, and removes both afterwards.
+  const writer = tokens.users.scratch
+  const roleName = uniq('TmpVillageWriter')
+  const roleId = await withDb(async c => {
+    const [r] = await c.query("INSERT INTO role (name, scope, isSystem) VALUES (?, 'village', 0)", [roleName])
+    await c.query("INSERT INTO role_permission (roleId, permission) VALUES (?, 'volunteer:read'), (?, 'volunteer:write')", [r.insertId, r.insertId])
+    await c.query('INSERT INTO role_grant (villageId, userId, roleId) VALUES (?, ?, ?)', [villages.scratch.id, users.scratch.userId, r.insertId])
+    return r.insertId
+  })
+  try {
+    const trainingId = await makeTraining()
+    const inside = await makeVolunteer(uniq('Inside'))
+    const outside = await makeVolunteer(uniq('Outside'), { villageId: String(villages.quahog.id) })
+    const mixed = await record(trainingId, { completedDate: '2026-10-01', personIds: [inside, outside] }, writer)
+    assert.equal(mixed.status, 403)
+    assert.equal((await vgCall('getTrainingCompletions', { trainingId }, { token: staff })).json.length, 0, 'all or nothing')
+    // control: the grant does work for someone inside their own village
+    assert.equal((await record(trainingId, { completedDate: '2026-10-01', personIds: [inside] }, writer)).status, 200)
+  } finally {
+    await withDb(async c => {
+      await c.query('DELETE FROM role_grant WHERE roleId = ?', [roleId])
+      await c.query('DELETE FROM role_permission WHERE roleId = ?', [roleId])
+      await c.query('DELETE FROM role WHERE roleId = ?', [roleId])
+    })
+  }
+})
+
 test('DELETE removes one record (audited); a record of another training is 404', async () => {
   const t1 = await makeTraining(); const t2 = await makeTraining()
   const a = await makeVolunteer(uniq('Del'))
   await record(t1, { completedDate: '2026-09-01', personIds: [a] })
   const row = (await vgCall('getTrainingCompletions', { trainingId: t1 }, { token: staff })).json[0]
+  const volunteerId = Number(await volunteerIdOf(a))
+  const before = await auditRows('volunteer', volunteerId)
   assert.equal((await vgCall('deleteTrainingCompletion', { trainingId: t2, volunteerTrainingId: row.volunteerTrainingId }, { token: staff })).status, 404)
   assert.equal((await vgCall('deleteTrainingCompletion', { trainingId: t1, volunteerTrainingId: row.volunteerTrainingId }, { token: staff })).status, 204)
   assert.equal((await vgCall('getTrainingCompletions', { trainingId: t1 }, { token: staff })).json.length, 0)
-  const rows = await auditRows('volunteer', Number(await volunteerIdOf(a)))
-  assert.ok(rows.length >= 2, 'record and removal both audited')
+  const after = await auditRows('volunteer', volunteerId)
+  assert.equal(after.length, before.length + 1, 'the removal wrote exactly one audit event')
+  assert.ok(JSON.stringify(after.at(-1).changes).includes('2026-09-01'), 'newest event reflects the removed completion')
 })
