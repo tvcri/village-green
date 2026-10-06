@@ -2013,6 +2013,46 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer ] } ]
 
+  /trainings/{trainingId}/completions:
+    parameters: [ { $ref: '#/components/parameters/TrainingIdPath' } ]
+    get:
+      summary: Who completed this training, newest first
+      tags: [Training]
+      operationId: getTrainingCompletions
+      responses:
+        '200':
+          description: One row per completion
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TrainingCompletion' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer:read ] } ]
+    post:
+      summary: Record one completion date for several volunteers, optionally assigning a position
+      tags: [Training]
+      operationId: recordTrainingCompletions
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainingCompletionsRecord' } } }
+      responses:
+        '200': { description: What happened per person, content: { application/json: { schema: { $ref: '#/components/schemas/TrainingCompletionsResult' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /trainings/{trainingId}/completions/{volunteerTrainingId}:
+    parameters:
+      - $ref: '#/components/parameters/TrainingIdPath'
+      - name: volunteerTrainingId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/StringIntId' }
+    delete:
+      summary: Remove one completion record
+      tags: [Training]
+      operationId: deleteTrainingCompletion
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
   /positions:
     get:
       summary: List volunteer positions
@@ -6001,6 +6041,61 @@ components:
           type: array
           uniqueItems: true
           items: { $ref: '#/components/schemas/TrainingId' }
+    VolunteerPersonRef:
+      additionalProperties: false
+      type: object
+      required: [ personId, fullName, displayName, village, active ]
+      properties:
+        personId: { $ref: '#/components/schemas/PersonId' }
+        fullName: { type: string }
+        displayName: { type: string }
+        village:
+          type: object
+          nullable: true
+          properties:
+            villageId: { $ref: '#/components/schemas/VillageId' }
+            name: { type: string }
+        active: { type: boolean, nullable: true }
+    TrainingCompletion:
+      additionalProperties: false
+      type: object
+      required: [ volunteerTrainingId, completedDate, notes, person ]
+      properties:
+        volunteerTrainingId: { $ref: '#/components/schemas/StringIntId' }
+        completedDate: { type: string, format: date, nullable: true }
+        notes: { type: string, nullable: true }
+        person: { $ref: '#/components/schemas/VolunteerPersonRef' }
+    TrainingCompletionsRecord:
+      additionalProperties: false
+      type: object
+      required: [ completedDate, personIds ]
+      properties:
+        completedDate: { type: string, format: date }
+        notes: { type: string, nullable: true }
+        personIds:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/PersonId' }
+        positionId:
+          allOf: [ { $ref: '#/components/schemas/StringIntIdNullable' } ]
+    TrainingCompletionsResult:
+      additionalProperties: false
+      type: object
+      required: [ recorded, skipped, assigned, notAssigned ]
+      properties:
+        recorded: { type: array, items: { $ref: '#/components/schemas/PersonId' } }
+        skipped: { type: array, items: { $ref: '#/components/schemas/PersonId' } }
+        assigned: { type: array, items: { $ref: '#/components/schemas/PersonId' } }
+        notAssigned:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [ personId, reason ]
+            properties:
+              personId: { $ref: '#/components/schemas/PersonId' }
+              reason: { type: string, enum: [ alreadyHolds, noHomeVillage ] }
     VolunteerVettingInput:
       additionalProperties: false
       type: object
