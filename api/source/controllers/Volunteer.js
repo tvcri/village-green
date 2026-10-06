@@ -4,6 +4,7 @@ const PersonService = require('../service/PersonService')
 const SmError = require('../utils/error')
 const VillageService = require('../service/VillageService')
 const { hasPermission } = require('../utils/authz')
+const volunteerReadScope = require('../utils/volunteerReadScope')
 const volunteerAssignments = require('../service/volunteerAssignments')
 
 // Each added or removed position is authorized against its own scope
@@ -22,15 +23,11 @@ async function authorizePositionChanges (req, personId, requested) {
 
 module.exports.getVolunteers = async function getVolunteers (req, res, next) {
   try {
-    const villageIdsGranted = hasPermission(req.userObject, 'volunteer:read')
-      ? null // federation read: unrestricted
-      : Object.keys(req.userObject.grants).filter(
-          vid => hasPermission(req.userObject, 'volunteer:read', { villageId: vid })
-        )
-    if (villageIdsGranted && !villageIdsGranted.length) {
-      throw new SmError.PrivilegeError()
-    }
-    const response = await VillageService.getVolunteers({ villageIdsGranted })
+    const { villageIdsGranted, includeInactive } = volunteerReadScope(req.userObject)
+    const response = await VillageService.getVolunteers({
+      villageIdsGranted,
+      includeInactive: req.query.includeInactive === true && includeInactive,
+    })
     res.json(response)
   }
   catch (err) { next(err) }

@@ -1721,6 +1721,11 @@ paths:
       tags:
       - Volunteer
       operationId: getVolunteers
+      parameters:
+        - name: includeInactive
+          in: query
+          description: Include inactive volunteers. Honoured only for callers holding federation volunteer:read_inactive.
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: List of volunteers
@@ -5881,6 +5886,18 @@ components:
         fullName:
           type: string
           maxLength: 200
+        displayName:
+          type: string
+          maxLength: 300
+        active:
+          type: boolean
+          nullable: true
+        village:
+          type: object
+          nullable: true
+          properties:
+            villageId: { $ref: '#/components/schemas/VillageId' }
+            name: { type: string }
         capabilities:
           type: array
           items:

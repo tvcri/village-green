@@ -247,17 +247,24 @@ module.exports.getVillageVolunteers = async function (villageId) {
   return rows
 }
 
-module.exports.getVolunteers = async function ({ villageIdsGranted }) {
+module.exports.getVolunteers = async function ({ villageIdsGranted, includeInactive = false }) {
   const columns = [
     'p.fullName',
+    'p.displayName',
     'CAST(vol.id AS CHAR) AS volunteerId',
     'CAST(vol.personId AS CHAR) AS personId',
-  `  COALESCE(CAST(
+    'vol.active',
+    `(SELECT JSON_OBJECT('villageId', CAST(hv.id AS CHAR), 'name', hv.name) FROM village hv WHERE hv.id = p.villageId) AS village`,
+    `COALESCE(CAST(
       CONCAT('[', GROUP_CONCAT(CONCAT('"',c.name,'"') ORDER BY c.name), ']')
-      AS JSON), JSON_ARRAY()) AS capabilities`
+      AS JSON), JSON_ARRAY()) AS capabilities`,
+    `(SELECT COALESCE(CAST(CONCAT('[', GROUP_CONCAT(
+        JSON_OBJECT('villageId', CAST(vva.villageId AS CHAR), 'name', av.name) ORDER BY av.name), ']') AS JSON), JSON_ARRAY())
+      FROM volunteer_village_associate vva JOIN village av ON av.id = vva.villageId
+      WHERE vva.volunteerId = vol.id) AS associateVillages`,
   ]
   const joins = new Set([
-    'active_volunteer vol',
+    `${includeInactive ? 'volunteer' : 'active_volunteer'} vol`,
     'JOIN person p ON p.id = vol.personId',
     'LEFT JOIN volunteer_capability vc ON vc.volunteerId = vol.id',
     'LEFT JOIN capability c ON c.id = vc.capabilityId'
