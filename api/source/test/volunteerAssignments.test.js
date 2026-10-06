@@ -65,4 +65,6 @@ test('isEligible: village scope needs the home village or an associate village; 
   assert.equal(va.isEligible({ villageId: '2' }, 'village', { homeVillageId: null, associateVillageIds: [] }), false)
   assert.equal(va.isEligible({}, 'federation', { homeVillageId: null, associateVillageIds: [] }), true)
   assert.equal(va.isEligible({ circleId: '1' }, 'circle', ctx), true)
+  assert.equal(va.isEligible({}, 'village', { homeVillageId: null, associateVillageIds: [] }), false, 'no village on either side')
+  assert.equal(va.isEligible({ villageId: '4' }, 'village', { homeVillageId: 4 }), true, 'associateVillageIds may be omitted')
 })

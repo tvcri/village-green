@@ -66,8 +66,9 @@ function scopeShapeError (p, scope) {
 
 // D8: a village-scoped position must be in the home village or an associate
 // village. Hub and circle positions have no village association.
-function isEligible (p, scope, { homeVillageId, associateVillageIds }) {
+function isEligible (p, scope, { homeVillageId, associateVillageIds = [] }) {
   if (scope !== 'village') return true
+  if (p.villageId === null || p.villageId === undefined) return false
   const v = s(p.villageId)
   return v === s(homeVillageId) || associateVillageIds.map(s).includes(v)
 }
