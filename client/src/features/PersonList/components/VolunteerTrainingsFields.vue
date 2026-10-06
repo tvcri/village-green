@@ -8,16 +8,26 @@ import Button from 'primevue/button'
 import { serviceDateToDate, dateToServiceDate, formatCivilDate } from '../../../shared/lib/civilDate.js'
 
 const props = defineProps({ trainingOptions: { type: Array, required: true } })
+// Rows: { key, sortDate, trainingId, name, completedDate, notes }. `key` is a
+// stable row identity and `sortDate` the date the row is ordered by. Both are
+// set when the row is loaded or added and left alone on edit: a DatePicker
+// writes on every keystroke that parses ('05/12/2' is a date), so keying or
+// sorting on completedDate would remount and move the row mid-typing. Neither
+// is sent to the API. Rows without them fall back to index / completedDate.
 const trainings = defineModel('trainings', { type: Array, required: true })
+
+let seq = 0
+const newKey = () => `new${++seq}`
 
 const newDate = ref(null) // 'YYYY-MM-DD' or null
 const newNotes = ref('')
 const error = ref('')
 
 // By name, then newest first; the undated record (if any) sorts last.
+const sortDateOf = (t) => (t.sortDate !== undefined ? t.sortDate : t.completedDate) ?? ''
 const sorted = computed(() => trainings.value
-  .map((t, index) => ({ ...t, index }))
-  .sort((a, b) => a.name.localeCompare(b.name) || (b.completedDate ?? '').localeCompare(a.completedDate ?? '')))
+  .map((t, index) => ({ ...t, index, rowKey: t.key ?? `i${index}` }))
+  .sort((a, b) => a.name.localeCompare(b.name) || sortDateOf(b).localeCompare(sortDateOf(a))))
 
 // The server 422s on a duplicate (trainingId, completedDate), so the form
 // refuses one rather than letting Save fail.
@@ -54,7 +64,9 @@ function add (option) {
     error.value = clashMessage(option.name, date)
     return
   }
-  trainings.value = [...trainings.value, { trainingId: option.trainingId, name: option.name, completedDate: date, notes: newNotes.value.trim() || null }]
+  trainings.value = [...trainings.value, {
+    key: newKey(), sortDate: date, trainingId: option.trainingId, name: option.name, completedDate: date, notes: newNotes.value.trim() || null,
+  }]
   newDate.value = null
   newNotes.value = ''
 }
@@ -66,7 +78,7 @@ function add (option) {
     <table class="rows">
       <thead><tr><th>Training</th><th>Date completed</th><th>Notes</th><th></th></tr></thead>
       <tbody>
-        <tr v-for="t in sorted" :key="`${t.trainingId}|${t.completedDate}`">
+        <tr v-for="t in sorted" :key="t.rowKey">
           <td data-testid="training-name">{{ t.name }}</td>
           <td>
             <DatePicker :modelValue="serviceDateToDate(t.completedDate)" dateFormat="mm/dd/yy" showIcon showButtonBar

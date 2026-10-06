@@ -97,7 +97,7 @@ function remove (i) { const next = positions.value.slice(); next.splice(i, 1); p
       <Button label="Add Position" icon="pi pi-plus" :disabled="chosen.scope !== 'federation' && !where" @click="addPosition" />
     </div>
     <small v-if="chosen?.scope === 'village'" class="dim">
-      Only {{ homeVillage ? `${homeVillage.name} (home) and` : '' }} this volunteer’s associate villages are offered. To hold it elsewhere,
+      Only {{ homeVillage?.name ? `${homeVillage.name} (home) and` : '' }} this volunteer’s associate villages are offered. To hold it elsewhere,
       add that village under Associate Villages first; the list updates immediately.
     </small>
     <small v-if="chosen && hint({ positionId: chosen.positionId }).length" class="hint">

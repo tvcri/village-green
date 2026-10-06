@@ -152,4 +152,26 @@ describe('VolunteerEdit', () => {
       severity: 'success', detail: 'Volunteer role saved. Removed Member Ambassador, Warwick.',
     }))
   })
+
+  // Review Focus 3, second half: removing the associate village and re-adding
+  // it before save keeps the position, and the toast names no removal.
+  it('keeps a position when its associate village is removed and re-added before save', async () => {
+    const { container } = render(VolunteerEdit, { global: globalOpts })
+    await screen.findByDisplayValue('Existing notes')
+    const chip = [...container.querySelectorAll('.p-multiselect-chip-item')].find(e => e.textContent.includes('Warwick'))
+    await fireEvent.click(chip.querySelector('.p-chip-remove-icon'))
+    expect(await screen.findByText(/Will be removed on save: Warwick/)).toBeInTheDocument()
+
+    await fireEvent.click(container.querySelector('#associateVillages'))
+    const option = (await screen.findAllByRole('option')).find(o => o.textContent.includes('Warwick'))
+    await fireEvent.click(option)
+    await waitFor(() => expect(screen.queryByText(/Will be removed on save/)).toBeNull())
+
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    const body = patchVolunteer.mock.calls[0][1]
+    expect(body.associateVillageIds).toEqual(['7'])
+    expect(body.positions).toEqual([{ positionId: '3', villageId: '7', circleId: null }])
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', detail: 'Volunteer role saved' }))
+  })
 })

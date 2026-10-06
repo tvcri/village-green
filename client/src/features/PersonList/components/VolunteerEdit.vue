@@ -24,7 +24,14 @@ const personId = computed(() => route.params.personId)
 const person = ref(null)
 const hasVolunteer = ref(false)
 // A person with no home village is a Hub volunteer: the role is allowed.
-const homeVillage = computed(() => person.value?.village?.villageId ? person.value.village : null)
+// Person.village carries name with villageId; the villageOptions lookup is a
+// fallback so the help text never reads "undefined (home)".
+const homeVillage = computed(() => {
+  const v = person.value?.village
+  if (!v?.villageId) return null
+  const name = v.name ?? villageOptions.value.find(o => String(o.villageId) === String(v.villageId))?.name ?? null
+  return { villageId: v.villageId, name }
+})
 
 const capabilityOptions = ref([])   // [{ capabilityId, name }] from getCapabilities()
 const villageOptions = ref([])      // [{ villageId, name }] from getVillages()
@@ -65,7 +72,11 @@ onMounted(async () => {
       active.value = d.active ?? true
       notes.value = d.notes ?? ''
       vettings.value = d.vettings ?? []
-      trainings.value = (d.trainings ?? []).map(t => ({ trainingId: t.trainingId, name: t.name, completedDate: t.completedDate, notes: t.notes }))
+      // key/sortDate: stable row identity and order for VolunteerTrainingsFields; never sent.
+      trainings.value = (d.trainings ?? []).map(t => ({
+        key: `vt${t.volunteerTrainingId}`, sortDate: t.completedDate,
+        trainingId: t.trainingId, name: t.name, completedDate: t.completedDate, notes: t.notes,
+      }))
       positions.value = (d.positions ?? []).map(r => ({
         positionId: r.positionId, name: r.name, scope: r.scope,
         villageId: r.village?.villageId ?? null, villageName: r.village?.name ?? null,
