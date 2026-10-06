@@ -1,6 +1,5 @@
 'use strict';
 const VolunteerService = require('../service/VolunteerService')
-const MemberService = require('../service/MemberService')
 const PersonService = require('../service/PersonService')
 const SmError = require('../utils/error')
 const VillageService = require('../service/VillageService')
@@ -29,11 +28,10 @@ module.exports.putPersonVolunteer = async function putPersonVolunteer (req, res,
     if (!person) throw new SmError.NotFoundError()
     // The volunteer role is granted against the person's home village, not a
     // body field — gate on the person record being mutated, same as Member.
+    // Unlike Member, no home village is required: a villageless person is a
+    // Hub volunteer, and the gate then needs a federation-level grant.
     if (!hasPermission(req.userObject, 'volunteer:write', { villageId: person.village?.villageId })) {
       throw new SmError.PrivilegeError()
-    }
-    if (!(await MemberService.personHasHomeVillage(personId))) {
-      throw new SmError.UnprocessableError('Person must have a home village to hold a volunteer role.')
     }
     const response = await VolunteerService.putVolunteer(personId, req.body, req.userObject)
     res.json(response)
