@@ -1,8 +1,10 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const router = useRouter()
+const { hasPermission } = useCurrentUser()
 
 const sections = [
   {
@@ -10,8 +12,12 @@ const sections = [
     icon: 'pi-users',
     heading: 'Constituents',
     blurb:
-      'Members and volunteers, from first application onward. Add new people, work applications through intake, and keep each record current.',
-    actions: [{ label: 'Persons', route: 'meta-persons' }],
+      'Members and volunteers, from first application onward. Add new people, work applications through intake, record trainings and positions, and keep each record current.',
+    actions: [
+      { label: 'Persons', route: 'meta-persons' },
+      { label: 'Trainings', route: 'meta-trainings', permission: 'volunteer:read' },
+      { label: 'Positions', route: 'meta-positions', permission: 'volunteer:read' },
+    ],
   },
   {
     key: 'operations',
@@ -71,7 +77,7 @@ const sections = [
         <p v-if="section.upcoming" class="upcoming">{{ section.upcoming }}</p>
         <div v-if="section.actions.length" class="actions">
           <Button
-            v-for="action in section.actions"
+            v-for="action in section.actions.filter(a => !a.permission || hasPermission(a.permission))"
             :key="action.route"
             :label="action.label"
             @click="router.push({ name: action.route })"

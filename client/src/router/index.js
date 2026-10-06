@@ -150,6 +150,18 @@ const routes = [
     meta: { requiresPermission: 'sr:write' },
   },
   {
+    path: '/meta/trainings',
+    name: 'meta-trainings',
+    component: () => import('../features/Trainings/components/TrainingList.vue'),
+    meta: { requiresPermission: 'volunteer:read' },
+  },
+  {
+    path: '/meta/trainings/:trainingId',
+    name: 'meta-training-detail',
+    component: () => import('../features/Trainings/components/TrainingDetail.vue'),
+    meta: { requiresPermission: 'volunteer:read' },
+  },
+  {
     path: '/meta/persons',
     name: 'meta-persons',
     component: () => import('../features/PersonList/components/PersonList.vue'),

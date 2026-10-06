@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
+import { getTrainings } from '../features/Trainings/api/trainingApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
 import { setPendingHighlight } from '../shared/lib/pendingHighlight.js'
@@ -51,8 +52,15 @@ const { state: adminUsers, execute: fetchAdminUsers } = useAsyncState(
   { immediate: false, onError: null }
 )
 
+const { state: trainingCatalog, execute: fetchTrainingCatalog } = useAsyncState(
+  () => getTrainings(),
+  { immediate: false, onError: null }
+)
+
 watch(() => route.name, (routeName) => {
   if (!routeName) return
+
+  if (routeName === 'meta-training-detail' && trainingCatalog.value === null) fetchTrainingCatalog()
 
   if (routeName === 'admin-user-grants' && adminUsers.value === null) {
     fetchAdminUsers()
@@ -146,6 +154,7 @@ const breadcrumbs = computed(() => {
   const META_SECTIONS = [
     { label: 'Metrics', name: 'meta-metrics' },
     { label: 'Persons', name: 'meta-persons' },
+    { label: 'Trainings', name: 'meta-trainings' },
     { label: 'Service Requests', name: 'meta-service-requests' },
     { label: 'Friends', name: 'meta-friends' },
     { label: 'Mailing Labels', name: 'meta-mailing-labels' },
@@ -187,6 +196,15 @@ const breadcrumbs = computed(() => {
     case 'meta-persons':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', siblings: otherMetaSections('meta-persons') })
+      break
+    case 'meta-trainings':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Trainings', siblings: otherMetaSections('meta-trainings') })
+      break
+    case 'meta-training-detail':
+      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Trainings', route: { name: 'meta-trainings' } })
+      crumbs.push({ label: trainingCatalog.value?.find(t => t.trainingId === route.params.trainingId)?.name ?? 'Training' })
       break
     case 'meta-friends':
       crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
