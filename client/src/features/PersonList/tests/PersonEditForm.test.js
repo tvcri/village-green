@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vue'
 import { h } from 'vue'
+import { flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import PrimeVue from 'primevue/config'
@@ -244,11 +245,14 @@ describe('home village change removes positions', () => {
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(confirmRequire).toHaveBeenCalled())
     const args = confirmRequire.mock.calls[0][0]
-    expect(args.message).toBe('Change the home village to no village? Lorraine Abbott will no longer hold: Steering Committee (Barrington).')
+    expect(args.message).toBe('Remove the home village? Lorraine Abbott will become a Hub volunteer and will no longer hold: Steering Committee (Barrington).')
+    expect(args.header).toBe('Remove home village')
     expect(args.acceptLabel).toBe('Change village and remove')
     args.reject()
-    await Promise.resolve()
+    await flushPromises()
     expect(patchPerson).not.toHaveBeenCalled()
+    expect(mockToastAdd).not.toHaveBeenCalled()
+    expect(screen.getByText(/Saving will remove 1 position/)).toBeInTheDocument()
   })
 
   it('saves and names the removed positions once the confirm is accepted', async () => {

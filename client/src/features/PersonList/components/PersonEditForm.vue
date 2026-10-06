@@ -83,13 +83,16 @@ const villageWarning = computed(() => {
   const lost = lostPositions.value
   if (!lost.length) return ''
   const names = [...new Set(lost.map(p => p.name))].join(', ')
-  return `Saving will remove ${lost.length} position${lost.length === 1 ? '' : 's'} that depend${lost.length === 1 ? 's' : ''} on ${villageName(originalVillageId.value)}: ${names}.`
+  return `Saving will remove ${lost.length} position${lost.length === 1 ? '' : 's'} that depend${lost.length === 1 ? 's' : ''} on ${[...new Set(lost.map(p => p.village.name))].join(', ')}: ${names}.`
 })
 const lostList = () => lostPositions.value.map(p => `${p.name} (${p.village.name})`).join(', ')
 function confirmVillageChange () {
+  const clearing = !form.villageId
   return new Promise(resolve => confirm.require({
-    header: 'Change home village',
-    message: `Change the home village to ${villageName(form.villageId) ?? 'no village'}? ${personDisplayName.value} will no longer hold: ${lostList()}.`,
+    header: clearing ? 'Remove home village' : 'Change home village',
+    message: clearing
+      ? `Remove the home village? ${personDisplayName.value} will become a Hub volunteer and will no longer hold: ${lostList()}.`
+      : `Change the home village to ${villageName(form.villageId)}? ${personDisplayName.value} will no longer hold: ${lostList()}.`,
     acceptLabel: 'Change village and remove',
     rejectLabel: 'Keep editing',
     acceptProps: { severity: 'danger' },
