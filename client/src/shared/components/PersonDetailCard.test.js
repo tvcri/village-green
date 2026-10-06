@@ -122,3 +122,36 @@ describe('PersonDetailCard — household links', () => {
     expect(screen.queryByText(/Secondary Member/)).toBeNull()
   })
 })
+
+describe('PersonDetailCard — volunteer trainings and positions', () => {
+  const volunteerPerson = (extra) => ({
+    personId: '1', firstName: 'Lorraine', lastName: 'Abbott', fullName: 'Abbott, Lorraine', active: true,
+    capabilities: [], associateVillages: [], vettings: [], ...extra,
+  })
+
+  it('shows position badges and one line per training, dates newest first', () => {
+    mount(volunteerPerson({
+      positions: [
+        { volunteerPositionId: '1', positionId: '1', name: 'Steering Committee', scope: 'village', village: { villageId: '1', name: 'Barrington' }, circle: null },
+        { volunteerPositionId: '2', positionId: '2', name: 'Board of Directors', scope: 'federation', village: null, circle: null },
+      ],
+      trainings: [
+        { volunteerTrainingId: '1', trainingId: '1', name: 'Volunteer Training', completedDate: '2025-04-25', notes: 'email' },
+        { volunteerTrainingId: '2', trainingId: '1', name: 'Volunteer Training', completedDate: '2023-05-02', notes: null },
+        { volunteerTrainingId: '3', trainingId: '4', name: 'LSC Training', completedDate: null, notes: null },
+      ],
+    }), 'volunteer')
+    expect(screen.getByText('Steering Committee · Barrington')).toBeInTheDocument()
+    expect(screen.getByText('Board of Directors · Hub')).toBeInTheDocument()
+    expect(screen.getByText('Apr 25, 2025; May 2, 2023')).toBeInTheDocument()
+    expect(screen.getByText('date not recorded')).toBeInTheDocument()
+    expect(screen.queryByText('email')).toBeNull()
+  })
+
+  it('shows Volunteer Information when positions are the only volunteer data', () => {
+    mount(volunteerPerson({ active: null,
+      positions: [{ volunteerPositionId: '2', positionId: '2', name: 'Board of Directors', scope: 'federation', village: null, circle: null }],
+    }), 'volunteer')
+    expect(screen.getByText('Volunteer Information')).toBeInTheDocument()
+  })
+})

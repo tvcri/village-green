@@ -3,6 +3,8 @@ import { computed, ref } from 'vue'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import PersonMap from '../../components/PersonMap.vue'
+import { formatCivilDate } from '../lib/civilDate.js'
+import { positionPlace } from '../lib/positionRules.js'
 
 const props = defineProps({
   person: {
@@ -50,6 +52,17 @@ const mapAddress = computed(() => {
 
 const isMember = computed(() => props.hasMemberDetail ?? (props.personType === 'member' || props.personType === 'member, volunteer'))
 const isVolunteer = computed(() => props.hasVolunteerDetail ?? (props.personType === 'volunteer' || props.personType === 'member, volunteer'))
+
+// One line per training, dates in the projection's order (newest first,
+// undated last).
+const trainingLines = computed(() => {
+  const byId = new Map()
+  for (const t of props.person.trainings ?? []) {
+    if (!byId.has(t.trainingId)) byId.set(t.trainingId, { trainingId: t.trainingId, name: t.name, dates: [] })
+    byId.get(t.trainingId).dates.push(t.completedDate ? formatCivilDate(t.completedDate) : 'date not recorded')
+  }
+  return [...byId.values()].map(l => ({ ...l, text: l.dates.join('; ') }))
+})
 
 const languagesText = computed(() => (props.person.languages ?? [])
   .map(l => l.isPreferred ? `${l.name} (preferred)` : l.name)
@@ -324,7 +337,7 @@ const copyEmail = async (email) => {
       </div>
 
       <!-- Volunteer-specific Section -->
-      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.active != null)" class="section">
+      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.positions?.length || person.trainings?.length || person.active != null)" class="section">
         <h3 class="section-header">Volunteer Information</h3>
         <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities</span>
@@ -348,6 +361,18 @@ const copyEmail = async (email) => {
               class="capability-badge"
             />
           </div>
+        </div>
+
+        <div v-if="person.positions?.length" class="detail-field capabilities-field">
+          <span class="label">Positions</span>
+          <div class="capabilities-list">
+            <Tag v-for="pos in person.positions" :key="pos.volunteerPositionId"
+                 :value="`${pos.name} · ${positionPlace(pos)}`" class="capability-badge" />
+          </div>
+        </div>
+        <div v-for="line in trainingLines" :key="line.trainingId" class="detail-field">
+          <span class="label">{{ line.name }}</span>
+          <span class="value">{{ line.text }}</span>
         </div>
 
         <div v-if="person.active != null" class="detail-field">
