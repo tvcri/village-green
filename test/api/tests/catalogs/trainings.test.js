@@ -68,6 +68,8 @@ test('deleting a held training -> 409 naming the count', async () => {
   assert.equal(patch.status, 200)
   const list = await vgCall('getTrainings', {}, { token: staff })
   assert.equal(list.json.find(t => t.trainingId === trainingId).holderCount, 1)
+  assert.equal(list.json.find(t => t.trainingId === trainingId).lastCompletedDate, '2026-01-15')
+  assert.equal(created.json.lastCompletedDate, null)
   const del = await vgCall('deleteTraining', { trainingId }, { token: admin })
   assert.equal(del.status, 409)
   assert.match(JSON.stringify(del.json), /1 volunteer/)

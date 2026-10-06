@@ -5999,12 +5999,13 @@ components:
     Training:
       additionalProperties: false
       type: object
-      required: [ trainingId, name, description, holderCount ]
+      required: [ trainingId, name, description, holderCount, lastCompletedDate ]
       properties:
         trainingId: { $ref: '#/components/schemas/TrainingId' }
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
         holderCount: { type: integer, minimum: 0, description: Volunteers holding at least one record of this training }
+        lastCompletedDate: { type: string, format: date, nullable: true, description: Newest dated completion of this training (null when none) }
     TrainingCreate:
       additionalProperties: false
       type: object

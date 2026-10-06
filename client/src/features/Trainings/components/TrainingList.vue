@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import { formatCivilDate } from '../../../shared/lib/civilDate.js'
 import { getTrainings } from '../api/trainingApi.js'
 import { getPositions } from '../../Positions/api/positionApi.js'
 
@@ -30,6 +31,9 @@ const open = (e) => router.push({ name: 'meta-training-detail', params: { traini
         </template>
       </Column>
       <Column field="holderCount" header="Volunteers" />
+      <Column header="Last recorded">
+        <template #body="{ data }">{{ data.lastCompletedDate ? formatCivilDate(data.lastCompletedDate) : '—' }}</template>
+      </Column>
       <template #empty>No trainings yet. An application administrator adds them under Admin › Trainings.</template>
     </DataTable>
   </div>

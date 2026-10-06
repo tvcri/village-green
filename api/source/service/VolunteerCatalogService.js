@@ -14,6 +14,8 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) 
     `CAST(c.id AS CHAR) AS ${idName}`, 'c.name', 'c.description',
     ...(hasScope ? ['c.scope'] : []),
     `(SELECT COUNT(DISTINCT j.volunteerId) FROM \`${junction}\` j WHERE j.${entityType}Id = c.id) AS holderCount`,
+    // Trainings only: newest dated completion, unscoped like holderCount.
+    ...(hasScope ? [] : ["(SELECT DATE_FORMAT(MAX(vt.completedDate), '%Y-%m-%d') FROM volunteer_training vt WHERE vt.trainingId = c.id) AS lastCompletedDate"]),
     // Positions only: the trainings expected before assignment (UI spec §2.3).
     ...(hasScope ? [`COALESCE((SELECT JSON_ARRAYAGG(CAST(pt.trainingId AS CHAR)) FROM position_training pt WHERE pt.positionId = c.id), JSON_ARRAY()) AS trainingIds`] : []),
   ].join(', ')
