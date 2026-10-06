@@ -162,6 +162,18 @@ const routes = [
     meta: { requiresPermission: 'volunteer:read' },
   },
   {
+    path: '/meta/positions',
+    name: 'meta-positions',
+    component: () => import('../features/Positions/components/PositionList.vue'),
+    meta: { requiresPermission: 'volunteer:read' },
+  },
+  {
+    path: '/meta/positions/:positionId',
+    name: 'meta-position-detail',
+    component: () => import('../features/Positions/components/PositionDetail.vue'),
+    meta: { requiresPermission: 'volunteer:read' },
+  },
+  {
     path: '/meta/persons',
     name: 'meta-persons',
     component: () => import('../features/PersonList/components/PersonList.vue'),
