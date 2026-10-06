@@ -5949,13 +5949,17 @@ components:
     Position:
       additionalProperties: false
       type: object
-      required: [ positionId, name, description, scope, holderCount ]
+      required: [ positionId, name, description, scope, holderCount, trainingIds ]
       properties:
         positionId: { $ref: '#/components/schemas/PositionId' }
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
         scope: { $ref: '#/components/schemas/PositionScope' }
         holderCount: { type: integer, minimum: 0, description: Volunteers holding this position anywhere }
+        trainingIds:
+          type: array
+          description: Trainings expected before assignment. Reminders only; never enforced.
+          items: { $ref: '#/components/schemas/TrainingId' }
     PositionCreate:
       additionalProperties: false
       type: object
@@ -5964,6 +5968,10 @@ components:
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
         scope: { $ref: '#/components/schemas/PositionScope' }
+        trainingIds:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/TrainingId' }
     PositionPatch:
       additionalProperties: false
       type: object
@@ -5972,6 +5980,10 @@ components:
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
         scope: { $ref: '#/components/schemas/PositionScope' }
+        trainingIds:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/TrainingId' }
     VolunteerVettingInput:
       additionalProperties: false
       type: object

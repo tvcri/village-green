@@ -9,6 +9,7 @@ import { auditRows } from '../audit/lib.js'
 // Positions on the volunteer (spec §4.2–4.3, D8). Throwaways live in the
 // scratch village (home); quahog serves as the associate village.
 const staff = tokens.users.staff
+const admin = tokens.users.admin
 const scratch = String(villages.scratch.id)
 const quahog = String(villages.quahog.id)
 const innsmouth = String(villages.innsmouth.id)
@@ -23,7 +24,7 @@ async function makeVolunteer (lastName, { villageId = scratch, associateVillageI
   return p.json.personId
 }
 async function makePosition (scope) {
-  const r = await vgCall('createPosition', {}, { token: staff, body: { name: uniq(`${scope} pos`), scope } })
+  const r = await vgCall('createPosition', {}, { token: admin, body: { name: uniq(`${scope} pos`), scope } })
   assert.equal(r.status, 201)
   return r.json.positionId
 }

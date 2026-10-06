@@ -2,6 +2,7 @@
 const dbUtils = require('./utils')
 const SmError = require('../utils/error')
 const AuditService = require('./audit/AuditService')
+const { assertIdsExist } = require('./volunteerAssignments')
 
 // The two staff-owned volunteer catalogs (trainings, positions) behave the
 // same apart from position.scope, so one factory serves both. Holder counts
@@ -13,12 +14,25 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) 
     `CAST(c.id AS CHAR) AS ${idName}`, 'c.name', 'c.description',
     ...(hasScope ? ['c.scope'] : []),
     `(SELECT COUNT(DISTINCT j.volunteerId) FROM \`${junction}\` j WHERE j.${entityType}Id = c.id) AS holderCount`,
+    // Positions only: the trainings expected before assignment (UI spec §2.3).
+    ...(hasScope ? [`COALESCE((SELECT JSON_ARRAYAGG(CAST(pt.trainingId AS CHAR)) FROM position_training pt WHERE pt.positionId = c.id), JSON_ARRAY()) AS trainingIds`] : []),
   ].join(', ')
 
   async function holderCount (connection, id) {
     const [[row]] = await connection.query(
       `SELECT COUNT(DISTINCT volunteerId) AS n FROM \`${junction}\` WHERE ${entityType}Id = ?`, [id])
     return row.n
+  }
+
+  // Full replace of a position's expected trainings. Runs inside the
+  // caller's auditUpdate so the position's `trainings` set diff sees it.
+  async function replaceTrainingLinks (connection, id, trainingIds) {
+    const ids = [...new Set(trainingIds.map(String))]
+    await assertIdsExist(connection, 'training', 'trainingId', ids)
+    await connection.query('DELETE FROM position_training WHERE positionId = ?', [id])
+    if (ids.length) {
+      await connection.query('INSERT INTO position_training (positionId, trainingId) VALUES ?', [ids.map(t => [id, t])])
+    }
   }
 
   function rethrowDuplicate (err, name) {
@@ -47,6 +61,7 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) 
           transactionFn: (connection) => AuditService.auditUpdate(connection, { entityType, userId },
             async () => {
               const [res] = await connection.query(`INSERT INTO ${t} SET ?`, fields)
+              if (hasScope && body.trainingIds?.length) await replaceTrainingLinks(connection, res.insertId, body.trainingIds)
               return res.insertId
             }),
         })
@@ -70,7 +85,10 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) 
               }
             }
             await AuditService.auditUpdate(connection, { entityType, entityId: id, userId },
-              () => connection.query(`UPDATE ${t} SET ? WHERE id = ?`, [fields, id]))
+              async () => {
+                if (Object.keys(fields).length) await connection.query(`UPDATE ${t} SET ? WHERE id = ?`, [fields, id])
+                if (hasScope && body.trainingIds !== undefined) await replaceTrainingLinks(connection, id, body.trainingIds)
+              })
             return id
           },
         })

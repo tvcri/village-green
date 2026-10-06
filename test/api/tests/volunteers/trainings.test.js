@@ -9,6 +9,7 @@ import { auditRows } from '../audit/lib.js'
 // Training records on the volunteer (spec D5, §4.2). Full-array replace,
 // applied as a diff keyed on (trainingId, completedDate).
 const staff = tokens.users.staff
+const admin = tokens.users.admin
 const scratch = String(villages.scratch.id)
 const uniq = (s) => `${s} ${Date.now()}-${Math.round(Math.random() * 1e6)}`
 
@@ -19,7 +20,7 @@ async function makeVolunteer (lastName) {
   return p.json.personId
 }
 async function makeTraining () {
-  const r = await vgCall('createTraining', {}, { token: staff, body: { name: uniq('Training') } })
+  const r = await vgCall('createTraining', {}, { token: admin, body: { name: uniq('Training') } })
   assert.equal(r.status, 201)
   return r.json.trainingId
 }

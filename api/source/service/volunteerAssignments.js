@@ -200,6 +200,6 @@ async function pruneIneligiblePositions (connection, volunteerId) {
 }
 
 module.exports = {
-  trainingKey, positionKey, findDuplicateKeys, diffTrainings, diffPositions, scopeShapeError, isEligible, applyTrainings,
+  trainingKey, positionKey, findDuplicateKeys, diffTrainings, diffPositions, scopeShapeError, isEligible, assertIdsExist, applyTrainings,
   applyPositions, positionChanges, pruneIneligiblePositions,
 }

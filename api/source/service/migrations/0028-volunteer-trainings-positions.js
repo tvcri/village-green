@@ -18,8 +18,12 @@ const MigrationHandler = require('./lib/MigrationHandler')
 // `position` is backtick-quoted throughout: POSITION is a built-in function
 // name and becomes reserved under IGNORE_SPACE.
 //
-// Staff (roleId 5) gets the two catalog permissions, as 0026 did for
-// person:read_birth_date. Admin holds '*'.
+// No role gets the two catalog permissions: the application administrator
+// maintains the lists, and those people hold Admin ('*'). See the UI spec
+// (2026-10-06-trainings-positions-ui-design.md §2.2).
+//
+// position_training: which trainings a position expects before assignment.
+// Reminders only; nothing enforces it (UI spec §2.1, D4 reworded).
 const upMigration = [
   `CREATE TABLE training (
     id          INT NOT NULL AUTO_INCREMENT,
@@ -74,6 +78,15 @@ const upMigration = [
     CONSTRAINT vp_circle_fk    FOREIGN KEY (circleId)    REFERENCES circle (id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
 
+  `CREATE TABLE position_training (
+    positionId INT NOT NULL,
+    trainingId INT NOT NULL,
+    PRIMARY KEY (positionId, trainingId),
+    KEY pt_training_fk (trainingId),
+    CONSTRAINT pt_position_fk FOREIGN KEY (positionId) REFERENCES \`position\` (id) ON DELETE CASCADE,
+    CONSTRAINT pt_training_fk FOREIGN KEY (trainingId) REFERENCES training (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
+
   // 1. Volunteer Training: vetting -> training
   `INSERT INTO training (name)
      SELECT name FROM vetting_type WHERE name = 'Volunteer Training'`,
@@ -104,16 +117,11 @@ const upMigration = [
      JOIN capability c ON c.id = vc.capabilityId
      WHERE c.name = 'Steering Committee'`,
   `DELETE FROM capability WHERE name = 'Steering Committee'`,
-
-  // 3. Catalog permissions for Staff
-  `INSERT IGNORE INTO role_permission (roleId, permission) VALUES (5, 'training:admin'), (5, 'position:admin')`,
 ]
 
 // Reverses everything. Trainings/positions created after the migration are
 // lost, which is acceptable for a rollback (spec §5.3).
 const downMigration = [
-  `DELETE FROM role_permission WHERE permission IN ('training:admin', 'position:admin')`,
-
   `INSERT INTO capability (name)
      SELECT 'Steering Committee' FROM DUAL
      WHERE EXISTS (SELECT 1 FROM \`position\` WHERE name = 'Steering Committee')
@@ -134,6 +142,7 @@ const downMigration = [
      JOIN training t ON t.id = vtr.trainingId AND t.name = 'Volunteer Training'
      JOIN vetting_type vt ON vt.name = 'Volunteer Training'`,
 
+  `DROP TABLE position_training`,
   `DROP TABLE volunteer_position`,
   `DROP TABLE volunteer_training`,
   `DROP TABLE \`position\``,

@@ -497,6 +497,20 @@ CREATE TABLE `position` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `position_training`
+--
+
+DROP TABLE IF EXISTS `position_training`;
+CREATE TABLE `position_training` (
+  `positionId` int NOT NULL,
+  `trainingId` int NOT NULL,
+  PRIMARY KEY (`positionId`,`trainingId`),
+  KEY `pt_training_fk` (`trainingId`),
+  CONSTRAINT `pt_position_fk` FOREIGN KEY (`positionId`) REFERENCES `position` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pt_training_fk` FOREIGN KEY (`trainingId`) REFERENCES `training` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `privacy_acknowledgement`
 --
 
@@ -968,4 +982,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-06 14:46:50
+-- Dump completed on 2026-10-06 19:28:11

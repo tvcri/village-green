@@ -170,13 +170,23 @@ const shapes = {
   // junctions are folded into the volunteer shape, not here.
   training: {
     table: 'training',
-    relatedTables: ['volunteer_training'],
+    // position_training's training FK: the link is recorded on the position.
+    relatedTables: ['volunteer_training', 'position_training'],
     sets: {},
   },
   position: {
     table: 'position',
     relatedTables: ['volunteer_position'],
-    sets: {},
+    sets: {
+      trainings: {
+        kind: 'values',
+        table: 'position_training',
+        sourceColumns: ['positionId', 'trainingId'],
+        sql: `SELECT t.name AS label
+              FROM position_training pt JOIN training t ON t.id = pt.trainingId
+              WHERE pt.positionId = ?`,
+      },
+    },
   },
 
   user: {

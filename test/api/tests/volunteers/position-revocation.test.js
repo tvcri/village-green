@@ -10,6 +10,7 @@ import { auditRows } from '../audit/lib.js'
 // positions that no longer qualify, and the revocation lands in the
 // VOLUNTEER audit trail (spec §4.3 "Revocation").
 const staff = tokens.users.staff
+const admin = tokens.users.admin
 const scratch = String(villages.scratch.id)
 const quahog = String(villages.quahog.id)
 const innsmouth = String(villages.innsmouth.id)
@@ -18,7 +19,7 @@ const uniq = (s) => `${s} ${Date.now()}-${Math.round(Math.random() * 1e6)}`
 async function setup (lastName) {
   const p = await vgCall('createPerson', {}, { token: staff, body: { villageId: scratch, firstName: 'Throwaway', lastName } })
   const personId = p.json.personId
-  const mk = async (scope) => (await vgCall('createPosition', {}, { token: staff, body: { name: uniq(scope), scope } })).json.positionId
+  const mk = async (scope) => (await vgCall('createPosition', {}, { token: admin, body: { name: uniq(scope), scope } })).json.positionId
   const atHome = await mk('village'); const atAssoc = await mk('village'); const hub = await mk('federation')
   const put = await vgCall('putPersonVolunteer', { personId }, { token: staff, body: {
     active: true, associateVillageIds: [quahog],

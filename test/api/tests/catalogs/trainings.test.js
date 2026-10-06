@@ -9,6 +9,7 @@ import { auditRows } from '../audit/lib.js'
 // training:admin (Staff role, Admin '*') writes. Names are unique; an entry
 // with holders can't be deleted (409 with the count).
 const staff = tokens.users.staff
+const admin = tokens.users.admin
 const scratch = String(villages.scratch.id)
 const uniq = (s) => `${s} ${Date.now()}-${Math.round(Math.random() * 1e6)}`
 
@@ -26,7 +27,7 @@ async function makeVolunteer (lastName) {
 
 test('staff creates, renames and deletes a training', async () => {
   const name = uniq('CPR')
-  const created = await vgCall('createTraining', {}, { token: staff, body: { name, description: 'Hands-only CPR' } })
+  const created = await vgCall('createTraining', {}, { token: admin, body: { name, description: 'Hands-only CPR' } })
   assert.equal(created.status, 201)
   assert.equal(created.json.name, name)
   assert.equal(created.json.description, 'Hands-only CPR')
@@ -37,7 +38,7 @@ test('staff creates, renames and deletes a training', async () => {
   assert.equal(list.status, 200)
   assert.ok(list.json.some(t => t.trainingId === trainingId), 'village staff can read the catalog')
 
-  const renamed = await vgCall('patchTraining', { trainingId }, { token: staff, body: { name: `${name} (renamed)` } })
+  const renamed = await vgCall('patchTraining', { trainingId }, { token: admin, body: { name: `${name} (renamed)` } })
   assert.equal(renamed.status, 200)
   assert.equal(renamed.json.name, `${name} (renamed)`)
   assert.equal(renamed.json.description, 'Hands-only CPR', 'PATCH leaves unsent fields alone')
@@ -45,20 +46,20 @@ test('staff creates, renames and deletes a training', async () => {
   const rows = await auditRows('training', Number(trainingId))
   assert.deepEqual(rows.map(r => r.action), ['create', 'update'])
 
-  const del = await vgCall('deleteTraining', { trainingId }, { token: staff })
+  const del = await vgCall('deleteTraining', { trainingId }, { token: admin })
   assert.equal(del.status, 204)
-  const gone = await vgCall('patchTraining', { trainingId }, { token: staff, body: { name: 'x' } })
+  const gone = await vgCall('patchTraining', { trainingId }, { token: admin, body: { name: 'x' } })
   assert.equal(gone.status, 404)
 })
 
 test('duplicate training name -> 409', async () => {
   const name = uniq('Dup')
-  assert.equal((await vgCall('createTraining', {}, { token: staff, body: { name } })).status, 201)
-  assert.equal((await vgCall('createTraining', {}, { token: staff, body: { name } })).status, 409)
+  assert.equal((await vgCall('createTraining', {}, { token: admin, body: { name } })).status, 201)
+  assert.equal((await vgCall('createTraining', {}, { token: admin, body: { name } })).status, 409)
 })
 
 test('deleting a held training -> 409 naming the count', async () => {
-  const created = await vgCall('createTraining', {}, { token: staff, body: { name: uniq('Held') } })
+  const created = await vgCall('createTraining', {}, { token: admin, body: { name: uniq('Held') } })
   const trainingId = created.json.trainingId
   const personId = await makeVolunteer('THeld')
   const patch = await vgCall('patchPersonVolunteer', { personId }, {
@@ -67,7 +68,7 @@ test('deleting a held training -> 409 naming the count', async () => {
   assert.equal(patch.status, 200)
   const list = await vgCall('getTrainings', {}, { token: staff })
   assert.equal(list.json.find(t => t.trainingId === trainingId).holderCount, 1)
-  const del = await vgCall('deleteTraining', { trainingId }, { token: staff })
+  const del = await vgCall('deleteTraining', { trainingId }, { token: admin })
   assert.equal(del.status, 409)
   assert.match(JSON.stringify(del.json), /1 volunteer/)
 })
@@ -82,4 +83,16 @@ test('village users and board cannot write the catalog', async () => {
 test('a grantless user cannot read the catalog', async () => {
   const res = await vgCall('getTrainings', {}, { token: tokens.users.nogrants })
   assert.equal(res.status, 403)
+})
+
+test('staff can no longer write the training catalog (no Staff grant)', async () => {
+  assert.equal((await vgCall('createTraining', {}, { token: staff, body: { name: uniq('StaffNo') } })).status, 403)
+})
+
+test('deleting an unheld training removes its position links instead of refusing', async () => {
+  const trainingId = (await vgCall('createTraining', {}, { token: admin, body: { name: uniq('Linked') } })).json.trainingId
+  const positionId = (await vgCall('createPosition', {}, { token: admin, body: { name: uniq('Uses it'), scope: 'federation', trainingIds: [trainingId] } })).json.positionId
+  assert.equal((await vgCall('deleteTraining', { trainingId }, { token: admin })).status, 204)
+  const pos = (await vgCall('getPositions', {}, { token: admin })).json.find(p => p.positionId === positionId)
+  assert.deepEqual(pos.trainingIds, [])
 })
