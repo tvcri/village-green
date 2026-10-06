@@ -6000,6 +6000,14 @@ components:
         notes:
           type: string
           nullable: true
+    VolunteerPositionInput:
+      additionalProperties: false
+      type: object
+      required: [ positionId ]
+      properties:
+        positionId: { $ref: '#/components/schemas/PositionId' }
+        villageId: { $ref: '#/components/schemas/VillageIdNullable' }
+        circleId: { $ref: '#/components/schemas/StringIntIdNullable' }
     VolunteerDetail:
       additionalProperties: false
       type: object
@@ -6062,6 +6070,29 @@ components:
               name: { type: string, maxLength: 100 }
               completedDate: { type: string, format: date, nullable: true }
               notes: { type: string, nullable: true }
+        positions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [ volunteerPositionId, positionId, name, scope, village, circle ]
+            properties:
+              volunteerPositionId: { $ref: '#/components/schemas/StringIntId' }
+              positionId: { $ref: '#/components/schemas/PositionId' }
+              name: { type: string, maxLength: 100 }
+              scope: { $ref: '#/components/schemas/PositionScope' }
+              village:
+                type: object
+                nullable: true
+                properties:
+                  villageId: { $ref: '#/components/schemas/VillageId' }
+                  name: { type: string }
+              circle:
+                type: object
+                nullable: true
+                properties:
+                  circleId: { $ref: '#/components/schemas/CircleId' }
+                  name: { type: string }
     VolunteerId:
       $ref: '#/components/schemas/StringIntId'
     VolunteerPut:
@@ -6090,6 +6121,9 @@ components:
         trainings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerTrainingInput' }
+        positions:
+          type: array
+          items: { $ref: '#/components/schemas/VolunteerPositionInput' }
         application:
           $ref: '#/components/schemas/ApplicationEnvelope'
           nullable: true
@@ -6120,6 +6154,9 @@ components:
         trainings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerTrainingInput' }
+        positions:
+          type: array
+          items: { $ref: '#/components/schemas/VolunteerPositionInput' }
         application:
           $ref: '#/components/schemas/ApplicationEnvelope'
           nullable: true

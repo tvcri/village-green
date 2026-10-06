@@ -29,6 +29,15 @@ async function replaceCapabilities (connection, volunteerId, capabilityIds) {
   }
 }
 
+// D8 eligibility context: the home village plus the associate villages as
+// they stand inside this transaction (after this request's associate write).
+async function eligibilityContext (connection, personId, volunteerId) {
+  const [[person]] = await connection.query('SELECT villageId FROM person WHERE id = ?', [personId])
+  const [assoc] = await connection.query(
+    'SELECT villageId FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
+  return { homeVillageId: person?.villageId ?? null, associateVillageIds: assoc.map(a => a.villageId) }
+}
+
 // Full-array replace of associate villages for a volunteer.
 async function replaceAssociateVillages (connection, volunteerId, villageIds) {
   await connection.query(
@@ -63,7 +72,7 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], trainings = [], application } = {}, userObject) {
+module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], trainings = [], positions = [], application } = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
@@ -85,6 +94,8 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
           await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
           await replaceVettings(connection, volunteerId, vettings)
           await volunteerAssignments.applyTrainings(connection, volunteerId, trainings)
+          await volunteerAssignments.applyPositions(connection, volunteerId, positions,
+            await eligibilityContext(connection, personId, volunteerId))
           return volunteerId
         })
     },
@@ -123,6 +134,10 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
           if (body.trainings !== undefined) {
             await volunteerAssignments.applyTrainings(connection, volunteerId, body.trainings)
           }
+          if (body.positions !== undefined) {
+            await volunteerAssignments.applyPositions(connection, volunteerId, body.positions,
+              await eligibilityContext(connection, personId, volunteerId))
+          }
           return volunteerId
         })
     },
@@ -147,6 +162,7 @@ module.exports.deleteVolunteer = async function (personId, userId) {
           await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_training WHERE volunteerId = ?', [volunteerId])
+          await connection.query('DELETE FROM volunteer_position WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
         })

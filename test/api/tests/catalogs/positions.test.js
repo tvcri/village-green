@@ -44,3 +44,13 @@ test('village users cannot write the catalog; staff and village users can read i
   assert.equal(res.status, 403)
   assert.equal((await vgCall('getPositions', {}, { token: tokens.users.full_v1 })).status, 200)
 })
+
+test('a held position: scope change -> 409, delete -> 409', async () => {
+  const created = await vgCall('createPosition', {}, { token: staff, body: { name: uniq('Held'), scope: 'federation' } })
+  const positionId = created.json.positionId
+  const p = await vgCall('createPerson', {}, { token: staff, body: { villageId: '4', firstName: 'Throwaway', lastName: 'PosHeld' } })
+  await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { active: true, positions: [{ positionId }] } })
+  assert.equal((await vgCall('patchPosition', { positionId }, { token: staff, body: { scope: 'village' } })).status, 409)
+  assert.equal((await vgCall('patchPosition', { positionId }, { token: staff, body: { name: uniq('Renamed') } })).status, 200, 'rename still works')
+  assert.equal((await vgCall('deletePosition', { positionId }, { token: staff })).status, 409)
+})

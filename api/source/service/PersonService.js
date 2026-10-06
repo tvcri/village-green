@@ -330,6 +330,26 @@ function volunteerColumn ({ inactive }) {
         FROM volunteer_training vtr
         JOIN training tr ON tr.id = vtr.trainingId
         WHERE vtr.volunteerId = vol3.id
+      ),
+      'positions', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT(
+              'volunteerPositionId', CAST(vp.id AS CHAR),
+              'positionId', CAST(vp.positionId AS CHAR),
+              'name', pos.name,
+              'scope', pos.scope,
+              'village', IF(vp.villageId IS NULL, NULL, JSON_OBJECT('villageId', CAST(vp.villageId AS CHAR), 'name', pv.name)),
+              'circle', IF(vp.circleId IS NULL, NULL, JSON_OBJECT('circleId', CAST(vp.circleId AS CHAR), 'name', pc.name))
+            ) ORDER BY pos.name, pv.name, pc.name
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_position vp
+        JOIN \`position\` pos ON pos.id = vp.positionId
+        LEFT JOIN village pv ON pv.id = vp.villageId
+        LEFT JOIN circle pc ON pc.id = vp.circleId
+        WHERE vp.volunteerId = vol3.id
       )
     ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``
 }
