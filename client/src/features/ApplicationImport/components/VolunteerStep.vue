@@ -3,7 +3,6 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import Select from 'primevue/select'
 import PersonFormFields from '../../PersonList/components/PersonFormFields.vue'
 import VolunteerFormFields from '../../PersonList/components/VolunteerFormFields.vue'
 import { validatePersonForm } from '../../PersonList/lib/personFormValidation.js'
@@ -15,7 +14,7 @@ import {
 import { usePersonLookups } from '../../PersonList/composables/usePersonLookups.js'
 import { emptyPersonFields, addPersonFields } from '../../PersonList/lib/personPayload.js'
 import {
-  getPersons, createPerson, patchPerson, getDisabilities, getCapabilities,
+  getPersons, createPerson, getDisabilities, getCapabilities,
 } from '../../PersonList/api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../../PersonList/api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
@@ -47,9 +46,6 @@ const noCircles = new Set()
 const showDemographics = computed(() => hasPermission('person:read_demographics', form.villageId))
 const personFields = reactive({ ...emptyPersonFields(), ...personExtrasFields(props.extraction.person) })
 const { lookups, ready: lookupsReady } = usePersonLookups()
-const needsVillage = ref(false)
-const selectedVillageId = ref(null)
-const savingVillage = ref(false)
 
 const selectedCapabilityIds = ref([])
 const providerType = ref('Non-member Volunteer')
@@ -112,42 +108,19 @@ async function grantVolunteerRole (personId, { isExisting = false } = {}) {
     })
   }
   catch (err) {
-    if (err?.status === 422) {
-      needsVillage.value = true
-    }
-    else {
-      toast.add({ severity: 'error', summary: 'Error', detail: err?.body?.error ?? 'Failed to save volunteer role', life: 4000 })
-    }
+    toast.add({ severity: 'error', summary: 'Error', detail: err?.body?.error ?? 'Failed to save volunteer role', life: 4000 })
   }
 }
 
 let createdPersonId = null
-let createdPersonIsExisting = false
 let createdPersonName = ''   // the stored fullName, suffix included
 
 async function useExisting (person) {
   createdPersonId = person.personId
-  createdPersonIsExisting = true
   createdPersonName = person.fullName
   saving.value = true
   await grantVolunteerRole(person.personId, { isExisting: true })
   saving.value = false
-}
-
-async function saveVillageAndRetry () {
-  if (!selectedVillageId.value || !createdPersonId) return
-  savingVillage.value = true
-  try {
-    await patchPerson(createdPersonId, { villageId: selectedVillageId.value })
-    needsVillage.value = false
-    await grantVolunteerRole(createdPersonId, { isExisting: createdPersonIsExisting })
-  }
-  catch (err) {
-    toast.add({ severity: 'error', summary: 'Error', detail: err?.body?.error ?? 'Failed to save village', life: 4000 })
-  }
-  finally {
-    savingVillage.value = false
-  }
 }
 
 async function submit () {
@@ -166,7 +139,6 @@ async function submit () {
     addPersonFields(payload, personFields, { isEdit: false, showDemographics: showDemographics.value })
     const created = await createPerson(payload)
     createdPersonId = created.personId
-    createdPersonIsExisting = false
     createdPersonName = created.fullName
     await grantVolunteerRole(created.personId)
   }
@@ -189,19 +161,6 @@ async function submit () {
           <Button label="Use This Person" size="small" link @click="useExisting(p)" />
         </li>
       </ul>
-    </Message>
-
-    <Message v-if="needsVillage" severity="warn" :closable="false">
-      <div class="village-fix">
-        <p>This person needs a home village before a volunteer role can be granted.</p>
-        <Select
-          v-model="selectedVillageId"
-          :options="villages" optionLabel="name" optionValue="villageId"
-          placeholder="Select a village" class="w-full"
-        />
-        <Button label="Save Village & Retry" size="small" :loading="savingVillage"
-          :disabled="!selectedVillageId" @click="saveVillageAndRetry" />
-      </div>
     </Message>
 
     <form @submit.prevent="submit">
@@ -261,6 +220,4 @@ async function submit () {
 <style scoped>
 .dup-list { margin: 0.5rem 0 0; padding-left: 1.25rem; }
 .step-footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; }
-.village-fix { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; margin-top: 0.5rem; }
-.village-fix .w-full { width: 100%; max-width: 320px; }
 </style>

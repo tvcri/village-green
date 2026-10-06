@@ -106,12 +106,4 @@ describe('VolunteerStep', () => {
     const body = createPerson.mock.calls[0][0]
     for (const k of ['genderId', 'ethnicityId', 'isVeteran', 'races']) expect(k in body).toBe(false)
   })
-
-  it('a 422 from the role grant asks for a home village, then retries', async () => {
-    putVolunteer.mockRejectedValueOnce(Object.assign(new Error('no village'), { status: 422 }))
-    mount()
-    await screen.findByDisplayValue('Brown')
-    await fireEvent.click(screen.getByText('Create Person & Grant Volunteer Role'))
-    expect(await screen.findByText(/needs a home village/)).toBeInTheDocument()
-  })
 })
