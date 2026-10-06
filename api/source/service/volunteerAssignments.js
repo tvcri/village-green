@@ -180,7 +180,25 @@ async function positionChanges (personId, requested) {
   }
 }
 
+// D8 revocation: delete village-scoped positions whose village is neither
+// the home village nor a remaining associate village. Runs on the caller's
+// transaction, after the write that changed the association.
+async function pruneIneligiblePositions (connection, volunteerId) {
+  const [res] = await connection.query(
+    `DELETE vp FROM volunteer_position vp
+     JOIN \`position\` pos ON pos.id = vp.positionId AND pos.scope = 'village'
+     JOIN volunteer v ON v.id = vp.volunteerId
+     JOIN person p ON p.id = v.personId
+     WHERE vp.volunteerId = ?
+       AND NOT (vp.villageId <=> p.villageId)
+       AND NOT EXISTS (
+         SELECT 1 FROM volunteer_village_associate a
+         WHERE a.volunteerId = vp.volunteerId AND a.villageId = vp.villageId)`,
+    [volunteerId])
+  return res.affectedRows
+}
+
 module.exports = {
   trainingKey, positionKey, findDuplicateKeys, diffTrainings, diffPositions, scopeShapeError, isEligible, applyTrainings,
-  applyPositions, positionChanges,
+  applyPositions, positionChanges, pruneIneligiblePositions,
 }

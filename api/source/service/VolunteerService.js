@@ -138,6 +138,9 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
             await volunteerAssignments.applyPositions(connection, volunteerId, body.positions,
               await eligibilityContext(connection, personId, volunteerId))
           }
+          if (body.associateVillageIds !== undefined && body.positions === undefined) {
+            await volunteerAssignments.pruneIneligiblePositions(connection, volunteerId)
+          }
           return volunteerId
         })
     },

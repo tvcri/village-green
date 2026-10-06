@@ -3,6 +3,7 @@ const dbUtils = require('./utils')
 const { hasPermission } = require('../utils/authz')
 const AuditService = require('./audit/AuditService')
 const SmError = require('../utils/error')
+const volunteerAssignments = require('./volunteerAssignments')
 
 // Replacement-set rules that no constraint can express, checked before the
 // transaction opens so they surface as 400s rather than 500s:
@@ -652,6 +653,16 @@ module.exports.patchPerson = async function (personId, body, userId) {
           }
           await writeSets(connection, personId, { races, languages, contacts }, { replace: true })
         })
+      // D8: a home-village change revokes village positions that no longer
+      // qualify. Positions are audited on the volunteer, so the prune gets
+      // its own volunteer auditUpdate; an empty prune diffs to nothing.
+      if ('villageId' in personFields) {
+        const [vol] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
+        if (vol.length) {
+          await AuditService.auditUpdate(connection, { entityType: 'volunteer', entityId: vol[0].id, userId },
+            () => volunteerAssignments.pruneIneligiblePositions(connection, vol[0].id))
+        }
+      }
     },
     statusObj: undefined
   })
