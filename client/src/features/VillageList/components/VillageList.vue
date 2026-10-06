@@ -45,7 +45,7 @@ const metaVillageCounts = computed(() => {
   )
 })
 
-// Meta Village is visible to users holding any federation-scoped role grant.
+// The Hub card is visible to users holding any federation-scoped role grant.
 const showMetaVillage = computed(() => hasFederationAccess.value)
 
 // The VSS card uses the same volunteer-identity gate as the header menu item —
@@ -100,7 +100,7 @@ const navigateToVillage = (villageId) => {
       >
         <template #title>
           <div class="title-header">
-            <span class="village-name">Meta Village</span>
+            <span class="village-name">Hub</span>
             <Tag
               icon="pi pi-users"
               :value="`${metaVillageCounts.member + metaVillageCounts.volunteer + metaVillageCounts.both}`"

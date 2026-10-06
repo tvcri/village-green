@@ -60,7 +60,7 @@ const sections = [
 
 <template>
   <div class="meta-village">
-    <h1>Meta Village</h1>
+    <h1>Hub</h1>
 
     <div class="sections">
       <section
