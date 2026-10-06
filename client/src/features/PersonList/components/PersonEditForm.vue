@@ -116,7 +116,7 @@ onMounted(async () => {
       originalVillageId.value = form.villageId
       heldPositions.value = p.volunteer?.positions ?? []
       associateIds.value = (p.volunteer?.associateVillages ?? []).map(v => v.villageId)
-      personDisplayName.value = p.displayName ?? `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim()
+      personDisplayName.value = p.displayName
       circleNames.value = new Set(p.circles.map(c => c.name))
       disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
       Object.assign(personFields, personFormFromApi(p))

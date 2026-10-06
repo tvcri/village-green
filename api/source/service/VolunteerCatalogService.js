@@ -4,7 +4,7 @@ const SmError = require('../utils/error')
 const AuditService = require('./audit/AuditService')
 const { assertIdsExist } = require('./volunteerAssignments')
 
-// The two staff-owned volunteer catalogs (trainings, positions) behave the
+// The two volunteer catalogs (trainings, positions; written only by Admin's '*') behave the
 // same apart from position.scope, so one factory serves both. Holder counts
 // are always included: the admin page needs them to explain a 409 before
 // the user clicks (spec §4.1).

@@ -194,7 +194,7 @@ function askDelete (row) {
                   placeholder="Select scope" :disabled="held" />
           <small class="help">
             {{ held
-              ? `Scope can’t change while ${plural(editing.holderCount, 'volunteer')} hold this position.`
+              ? `Scope can’t change while ${plural(editing.holderCount, 'volunteer')} ${editing.holderCount === 1 ? 'holds' : 'hold'} this position.`
               : 'Hub: held for TVCRI as a whole. Village: held in one village. Circle: held in one circle.' }}
           </small>
         </div>

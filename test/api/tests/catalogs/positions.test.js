@@ -4,13 +4,13 @@ import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { auditRows } from '../audit/lib.js'
 
-// /positions: staff-owned catalog with a scope (federation|village|circle).
+// /positions: volunteer catalog with a scope (federation|village|circle).
 // Scope is frozen while anyone holds the position (spec §4.1).
 const staff = tokens.users.staff
 const admin = tokens.users.admin
 const uniq = (s) => `${s} ${Date.now()}-${Math.round(Math.random() * 1e6)}`
 
-test('staff creates a position with a scope, renames it, changes scope while unheld, deletes it', async () => {
+test('admin creates a position with a scope, renames it, changes scope while unheld, deletes it', async () => {
   const name = uniq('Newsletter liaison')
   const created = await vgCall('createPosition', {}, { token: admin, body: { name, scope: 'village' } })
   assert.equal(created.status, 201)

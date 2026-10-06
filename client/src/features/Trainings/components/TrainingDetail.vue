@@ -34,7 +34,7 @@ const panelDirty = ref(false)
 const flashIds = ref(new Set())
 const search = ref('')
 const villageFilter = ref(null)
-useUnsavedChangesGuard(() => panelDirty.value)
+useUnsavedChangesGuard(() => recording.value && panelDirty.value)
 
 const linkedPositions = computed(() => positions.value.filter(p => p.trainingIds.includes(trainingId.value) && p.scope !== 'circle'))
 const allLinked = computed(() => positions.value.filter(p => p.trainingIds.includes(trainingId.value)))

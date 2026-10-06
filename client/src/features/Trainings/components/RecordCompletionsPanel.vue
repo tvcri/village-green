@@ -53,6 +53,7 @@ function add (p) { attendeeIds.value = [...attendeeIds.value, p.personId] }
 function drop (personId) { attendeeIds.value = attendeeIds.value.filter(id => id !== personId) }
 
 function close () {
+  dirty.value = false
   attendeeIds.value = []
   emit('close')
 }
@@ -66,6 +67,7 @@ async function save () {
       completedDate: date.value, notes: notes.value.trim() || null, personIds, positionId: positionId.value || null,
     })
     const message = resultMessage({ trainingName: props.training.name, date: date.value, positionName: position.value?.name, result })
+    dirty.value = false
     attendeeIds.value = []
     emit('saved', { result, date: date.value, message })
   }
@@ -137,7 +139,7 @@ async function save () {
         </template>
         <template v-else>Add at least one volunteer</template>
       </span>
-      <Button :label="flags.length ? 'Discard' : 'Close'" severity="secondary" @click="close" />
+      <Button :label="flags.length ? 'Discard' : 'Close'" severity="secondary" :disabled="saving" @click="close" />
       <Button label="Save" :loading="saving" :disabled="!date || !(summary.toSave || summary.toAssign)" @click="save" />
     </div>
   </section>

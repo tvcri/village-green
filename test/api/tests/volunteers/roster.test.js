@@ -45,6 +45,15 @@ test('a Hub volunteer has village null', async () => {
   assert.equal(row.village, null)
 })
 
+test('includeInactive is ignored without volunteer:read_inactive (board)', async () => {
+  const inactiveId = await makeVolunteer(uniq('RosterBoardInactive'), { active: false })
+  const res = await vgCall('getVolunteers', { includeInactive: true }, { token: tokens.users.board })
+  assert.equal(res.status, 200)
+  assert.ok(res.json.length > 0)
+  assert.ok(res.json.every(v => v.active === true), 'only active rows')
+  assert.ok(!res.json.some(v => v.personId === inactiveId), 'inactive volunteer not returned')
+})
+
 test('callers without volunteer:read get 403', async () => {
   assert.equal((await vgCall('getVolunteers', {}, { token: tokens.users.nogrants })).status, 403)
 })

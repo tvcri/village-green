@@ -55,6 +55,14 @@ describe('CatalogAdmin — positions', () => {
     expect(screen.getByLabelText('Delete Board of Directors')).not.toBeDisabled()
   })
 
+  it('the locked-scope reason agrees with a single holder', async () => {
+    getPositions.mockResolvedValue([{ ...POSITIONS[0], holderCount: 1 }])
+    render(CatalogAdmin, opts('position'))
+    await screen.findByText('Steering Committee')
+    await fireEvent.click(screen.getByLabelText('Edit Steering Committee'))
+    expect(await screen.findByText('Scope can’t change while 1 volunteer holds this position.')).toBeInTheDocument()
+  })
+
   it('edit dialog on a held position locks scope with the reason and keeps trainingIds on save', async () => {
     patchPosition.mockResolvedValue({})
     render(CatalogAdmin, opts('position'))

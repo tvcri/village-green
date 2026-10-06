@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/vu
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import PrimeVue from 'primevue/config'
+import { onBeforeRouteLeave } from 'vue-router'
 import TrainingDetail from '../components/TrainingDetail.vue'
 
 vi.mock('vue-router', () => ({
@@ -79,5 +80,32 @@ describe('TrainingDetail', () => {
     expect(body.personIds).toEqual(['3', '16'])
     expect(body.positionId).toBe('5')
     expect(body.completedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  // The guard callback useUnsavedChangesGuard registered; true = leave without asking.
+  const leaveGuard = () => onBeforeRouteLeave.mock.calls.at(-1)[0]
+
+  async function openPanelAndAdd () {
+    render(TrainingDetail, opts)
+    await screen.findByText('Abbott, Lorraine')
+    await fireEvent.click(screen.getByText('Record completions'))
+    await waitFor(() => expect(screen.getByLabelText('Add volunteers')).toBeInTheDocument())
+    await addByName('nguy')
+    await screen.findByText('Nguyen, Linh')
+    expect(leaveGuard()()).toBeInstanceOf(Promise) // dirty while staged: asks first
+  }
+
+  it('is not dirty after a successful save (breadcrumb leaves without a prompt)', async () => {
+    await openPanelAndAdd()
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(screen.queryByText('Save')).not.toBeInTheDocument())
+    expect(leaveGuard()()).toBe(true)
+  })
+
+  it('is not dirty after Discard', async () => {
+    await openPanelAndAdd()
+    await fireEvent.click(screen.getByText('Discard'))
+    await waitFor(() => expect(screen.queryByText('Save')).not.toBeInTheDocument())
+    expect(leaveGuard()()).toBe(true)
   })
 })

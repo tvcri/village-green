@@ -5,8 +5,8 @@ import { tokens } from '../../lib/context.js'
 import { villages } from '../../setup/fixtures.js'
 import { auditRows } from '../audit/lib.js'
 
-// /trainings: staff-owned catalog (spec §4.1). Any staff user reads; only
-// training:admin (Staff role, Admin '*') writes. Names are unique; an entry
+// /trainings: volunteer catalog (spec §4.1). Any staff user reads; only
+// training:admin writes, and only Admin's '*' covers it (Staff has no grant). Names are unique; an entry
 // with holders can't be deleted (409 with the count).
 const staff = tokens.users.staff
 const admin = tokens.users.admin
@@ -25,7 +25,7 @@ async function makeVolunteer (lastName) {
   return p.json.personId
 }
 
-test('staff creates, renames and deletes a training', async () => {
+test('admin creates, renames and deletes a training', async () => {
   const name = uniq('CPR')
   const created = await vgCall('createTraining', {}, { token: admin, body: { name, description: 'Hands-only CPR' } })
   assert.equal(created.status, 201)
