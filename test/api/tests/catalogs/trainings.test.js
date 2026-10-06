@@ -57,7 +57,7 @@ test('duplicate training name -> 409', async () => {
   assert.equal((await vgCall('createTraining', {}, { token: staff, body: { name } })).status, 409)
 })
 
-test.todo('deleting a held training -> 409 naming the count', async () => {
+test('deleting a held training -> 409 naming the count', async () => {
   const created = await vgCall('createTraining', {}, { token: staff, body: { name: uniq('Held') } })
   const trainingId = created.json.trainingId
   const personId = await makeVolunteer('THeld')

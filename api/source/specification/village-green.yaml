@@ -5987,6 +5987,19 @@ components:
           type: string
           format: date
           nullable: true
+    VolunteerTrainingInput:
+      additionalProperties: false
+      type: object
+      required: [ trainingId ]
+      properties:
+        trainingId: { $ref: '#/components/schemas/TrainingId' }
+        completedDate:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+          nullable: true
     VolunteerDetail:
       additionalProperties: false
       type: object
@@ -6037,6 +6050,18 @@ components:
                 type: string
                 format: date
                 nullable: true
+        trainings:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [ volunteerTrainingId, trainingId, name, completedDate, notes ]
+            properties:
+              volunteerTrainingId: { $ref: '#/components/schemas/StringIntId' }
+              trainingId: { $ref: '#/components/schemas/TrainingId' }
+              name: { type: string, maxLength: 100 }
+              completedDate: { type: string, format: date, nullable: true }
+              notes: { type: string, nullable: true }
     VolunteerId:
       $ref: '#/components/schemas/StringIntId'
     VolunteerPut:
@@ -6062,6 +6087,9 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+        trainings:
+          type: array
+          items: { $ref: '#/components/schemas/VolunteerTrainingInput' }
         application:
           $ref: '#/components/schemas/ApplicationEnvelope'
           nullable: true
@@ -6089,6 +6117,9 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+        trainings:
+          type: array
+          items: { $ref: '#/components/schemas/VolunteerTrainingInput' }
         application:
           $ref: '#/components/schemas/ApplicationEnvelope'
           nullable: true

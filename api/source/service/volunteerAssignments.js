@@ -5,6 +5,8 @@
 // Pure helpers first; the DB functions below them run on the caller's
 // transaction connection.
 
+const SmError = require('../utils/error')
+
 const s = (v) => (v === null || v === undefined ? '' : String(v))
 const nullIfEmpty = (v) => (v === undefined || v === '' ? null : v)
 
@@ -73,6 +75,37 @@ function isEligible (p, scope, { homeVillageId, associateVillageIds = [] }) {
   return v === s(homeVillageId) || associateVillageIds.map(s).includes(v)
 }
 
+async function loadTrainings (connection, volunteerId) {
+  const [rows] = await connection.query(
+    `SELECT id, trainingId, DATE_FORMAT(completedDate, '%Y-%m-%d') AS completedDate, notes
+     FROM volunteer_training WHERE volunteerId = ?`, [volunteerId])
+  return rows
+}
+
+async function applyTrainings (connection, volunteerId, requested) {
+  if (findDuplicateKeys(requested, trainingKey).length) {
+    throw new SmError.UnprocessableError('The same training is listed twice with the same completion date (or twice undated).')
+  }
+  const ids = [...new Set(requested.map(t => String(t.trainingId)))]
+  if (ids.length) {
+    const [known] = await connection.query('SELECT CAST(id AS CHAR) AS id FROM training WHERE id IN (?)', [ids])
+    const missing = ids.filter(id => !known.some(k => k.id === id))
+    if (missing.length) throw new SmError.UnprocessableError(`Unknown trainingId: ${missing.join(', ')}`)
+  }
+  const { add, remove, update } = diffTrainings(await loadTrainings(connection, volunteerId), requested)
+  if (remove.length) {
+    await connection.query('DELETE FROM volunteer_training WHERE id IN (?)', [remove.map(r => r.id)])
+  }
+  for (const u of update) {
+    await connection.query('UPDATE volunteer_training SET notes = ? WHERE id = ?', [u.notes, u.id])
+  }
+  if (add.length) {
+    await connection.query(
+      'INSERT INTO volunteer_training (volunteerId, trainingId, completedDate, notes) VALUES ?',
+      [add.map(t => [volunteerId, t.trainingId, t.completedDate ?? null, nullIfEmpty(t.notes)])])
+  }
+}
+
 module.exports = {
-  trainingKey, positionKey, findDuplicateKeys, diffTrainings, diffPositions, scopeShapeError, isEligible,
+  trainingKey, positionKey, findDuplicateKeys, diffTrainings, diffPositions, scopeShapeError, isEligible, applyTrainings,
 }

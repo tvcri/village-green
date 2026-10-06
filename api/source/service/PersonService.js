@@ -313,6 +313,23 @@ function volunteerColumn ({ inactive }) {
         FROM volunteer_vetting vv
         JOIN vetting_type vt ON vt.id = vv.vettingTypeId
         WHERE vv.volunteerId = vol3.id
+      ),
+      'trainings', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT(
+              'volunteerTrainingId', CAST(vtr.id AS CHAR),
+              'trainingId', CAST(vtr.trainingId AS CHAR),
+              'name', tr.name,
+              'completedDate', DATE_FORMAT(vtr.completedDate, '%Y-%m-%d'),
+              'notes', vtr.notes
+            ) ORDER BY tr.name, vtr.completedDate IS NULL, vtr.completedDate DESC
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_training vtr
+        JOIN training tr ON tr.id = vtr.trainingId
+        WHERE vtr.volunteerId = vol3.id
       )
     ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``
 }

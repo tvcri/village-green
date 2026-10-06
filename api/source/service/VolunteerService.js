@@ -2,6 +2,7 @@
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
 const AuditService = require('./audit/AuditService')
+const volunteerAssignments = require('./volunteerAssignments')
 
 // Ensure a volunteer row exists for the person; return its id.
 async function ensureVolunteer (connection, personId) {
@@ -62,7 +63,7 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], application } = {}, userObject) {
+module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], trainings = [], application } = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
@@ -83,6 +84,7 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
           await replaceCapabilities(connection, volunteerId, capabilityIds)
           await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
           await replaceVettings(connection, volunteerId, vettings)
+          await volunteerAssignments.applyTrainings(connection, volunteerId, trainings)
           return volunteerId
         })
     },
@@ -118,6 +120,9 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
           if (body.vettings !== undefined) {
             await replaceVettings(connection, volunteerId, body.vettings)
           }
+          if (body.trainings !== undefined) {
+            await volunteerAssignments.applyTrainings(connection, volunteerId, body.trainings)
+          }
           return volunteerId
         })
     },
@@ -129,6 +134,7 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
 module.exports.deleteVolunteer = async function (personId, userId) {
   // volunteer_capability and volunteer_village_associate cascade on volunteer delete
   // (associate has ON DELETE CASCADE; capability is cleared explicitly for safety).
+  // volunteer_vetting and volunteer_training are likewise cleared explicitly.
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [rows] = await connection.query(
@@ -140,6 +146,7 @@ module.exports.deleteVolunteer = async function (personId, userId) {
         async () => {
           await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
+          await connection.query('DELETE FROM volunteer_training WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
         })
