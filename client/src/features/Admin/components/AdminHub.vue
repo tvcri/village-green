@@ -1,8 +1,10 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const router = useRouter()
+const { hasPermission } = useCurrentUser()
 
 const navigateToUserAccess = () => {
   router.push({ name: 'admin-user-access' })
@@ -26,6 +28,8 @@ const navigateToPrivacy = () => {
       <Button label="Users" @click="navigateToUserAccess" />
       <Button label="Analytics" @click="navigateToAnalytics" />
       <Button label="Privacy Agreement" @click="navigateToPrivacy" />
+      <Button v-if="hasPermission('training:admin')" label="Trainings" @click="router.push({ name: 'admin-trainings' })" />
+      <Button v-if="hasPermission('position:admin')" label="Positions" @click="router.push({ name: 'admin-positions' })" />
     </div>
   </div>
 </template>

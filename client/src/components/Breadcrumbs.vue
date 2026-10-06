@@ -92,6 +92,12 @@ const breadcrumbs = computed(() => {
         crumbs.push({ label: userName })
         break
       }
+      case 'admin-trainings':
+        crumbs.push({ label: 'Trainings' })
+        break
+      case 'admin-positions':
+        crumbs.push({ label: 'Positions' })
+        break
     }
     return crumbs
   }
