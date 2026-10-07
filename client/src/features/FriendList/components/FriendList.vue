@@ -13,6 +13,7 @@ import Tag from 'primevue/tag'
 import Popover from 'primevue/popover'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
+import TableFooter from '../../../components/TableFooter.vue'
 import { getFriends } from '../api/friendApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
@@ -436,18 +437,14 @@ function toggleNotes(event, friendId) {
       @sort="onSort"
       :pt="{ tableContainer: { style: 'overflow: visible;' }, thead: { style: 'top: var(--breadcrumb-height); z-index: 1;' }, headerRow: { style: 'background: var(--color-background-light);' } }"
     >
-      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
-        <div class="paginator-container">
-          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
-          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
-          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+      <template #paginatorcontainer="footer">
+        <TableFooter v-bind="footer" v-model="pageRows">
           <ExportButton
             :disabled="isLoading || isCreatingSheet"
             @download="handleDownloadCsv"
             @export="handleCreateSheet"
           />
-        </div>
+        </TableFooter>
       </template>
 
       <Column field="visitDate" header="Visit Date" sortable style="width: 10%" />
