@@ -8,14 +8,18 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import HolderGroup from './HolderGroup.vue'
+import ExportButton from '../../../components/ExportButton.vue'
 import { getPositions, getPositionHolders, patchPositionHolders } from '../api/positionApi.js'
 import { getTrainings, getTrainingCompletions } from '../../Trainings/api/trainingApi.js'
 import { getVolunteerRoster } from '../../VolunteerList/api/volunteerApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getCircles } from '../../PersonList/api/personApi.js'
 import { holderGroups, candidateStatus, buildHoldersPatch } from '../lib/holderStaging.js'
-import { scopeLabel } from '../../../shared/lib/positionRules.js'
+import { scopeLabel, positionPlace } from '../../../shared/lib/positionRules.js'
 import { formatCivilDate } from '../../../shared/lib/civilDate.js'
+import { personExportColumns } from '../../../shared/lib/personExport.js'
+import { withPersonDetail, exportSlug } from '../../PersonList/lib/personDetailExport.js'
+import { useExportActions } from '../../../shared/composables/useExportActions.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { useUnsavedChangesGuard } from '../../../shared/composables/useUnsavedChangesGuard.js'
 
@@ -93,6 +97,48 @@ function hintFor (personId) {
   return { missing, ok }
 }
 
+// Download / Google Sheet: the saved holders only (group.rows), never staged
+// adds, and a holder marked for removal still holds it until Save. On-screen
+// group order, then name order. One column per expected training: the newest
+// completed date (stored YYYY-MM-DD), "No date" when only undated records
+// exist, blank when there is no record — the data behind the hints.
+const exportColumns = computed(() => {
+  const pos = position.value
+  return [
+    { header: 'Full Name', key: 'fullName' },
+    { header: 'Where', key: 'where' },
+    ...(pos?.scope === 'village' ? [{ header: 'Held Through', key: 'heldThrough' }] : []),
+    { header: 'Status', key: 'status' },
+    ...(pos?.trainingIds ?? []).map(id => ({ header: trainingNames.value.get(id) ?? '', key: `training:${id}` })),
+    ...personExportColumns({ birthDate: hasPermission('person:read_birth_date'), demographics: hasPermission('person:read_demographics') }),
+  ]
+})
+function holderExportRows () {
+  const pos = position.value
+  return groups.value.flatMap(g => [...g.rows]
+    .sort((a, b) => a.person.fullName.localeCompare(b.person.fullName))
+    .map(h => {
+      const row = {
+        personId: h.person.personId,
+        fullName: h.person.fullName,
+        where: positionPlace(h),
+        status: h.person.active ? 'Active' : 'Inactive',
+      }
+      if (pos.scope === 'village') row.heldThrough = h.person.village?.villageId === h.village?.villageId ? 'Home' : 'Associate'
+      for (const id of pos.trainingIds) {
+        const d = latestByTraining.value.get(id)?.get(h.person.personId)
+        row[`training:${id}`] = d === undefined ? '' : (d || 'No date')
+      }
+      return row
+    }))
+}
+const { busy: exportBusy, download, exportSheet } = useExportActions({
+  buildRows: () => withPersonDetail(holderExportRows(), row => row.personId),
+  columns: exportColumns,
+  filename: () => `${exportSlug(position.value.name)}-holders.csv`,
+  sheetTitle: () => `${position.value.name} Holders`,
+})
+
 const personById = (id) => roster.value.find(p => p.personId === id) ?? holders.value.find(h => h.person.personId === id)?.person ?? {}
 const statusFor = (group) => (p) => candidateStatus(p, group, position.value, holders.value, adds.value)
 function select (group, p) {
@@ -130,7 +176,10 @@ async function save () {
 <template>
   <div v-if="position && loaded" class="position-detail">
     <div class="head">
-      <h1>{{ position.name }}</h1>
+      <div class="title-row">
+        <h1>{{ position.name }}</h1>
+        <ExportButton :disabled="exportBusy || !groups.some(g => g.rows.length)" @download="download" @export="exportSheet" />
+      </div>
       <div class="stats">
         <Tag :value="scopeLabel(position.scope)" severity="secondary" />
         <span><b>{{ holders.length }}</b> {{ holders.length === 1 ? 'holder' : 'holders' }}</span>
@@ -156,6 +205,7 @@ async function save () {
 <style scoped>
 .position-detail { padding: 2rem; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
 h1 { margin: 0; }
+.title-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .stats { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; color: var(--color-text-dim); font-size: 0.9rem; }
 .filter { max-width: 16rem; }
 /* Pinned to the bottom of the viewport (UI spec §8). No ancestor may set overflow hidden/auto. */

@@ -10,10 +10,15 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import RecordCompletionsPanel from './RecordCompletionsPanel.vue'
+import TableFooter from '../../../components/TableFooter.vue'
+import ExportButton from '../../../components/ExportButton.vue'
 import { getTrainings, getTrainingCompletions, deleteTrainingCompletion } from '../api/trainingApi.js'
 import { getPositions } from '../../Positions/api/positionApi.js'
 import { getVolunteerRoster } from '../../VolunteerList/api/volunteerApi.js'
 import { formatCivilDate } from '../../../shared/lib/civilDate.js'
+import { personExportColumns } from '../../../shared/lib/personExport.js'
+import { withPersonDetail, exportSlug } from '../../PersonList/lib/personDetailExport.js'
+import { useExportActions } from '../../../shared/composables/useExportActions.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { useUnsavedChangesGuard } from '../../../shared/composables/useUnsavedChangesGuard.js'
 
@@ -34,6 +39,7 @@ const panelDirty = ref(false)
 const flashIds = ref(new Set())
 const search = ref('')
 const villageFilter = ref(null)
+const pageRows = ref(25)
 useUnsavedChangesGuard(() => recording.value && panelDirty.value)
 
 const linkedPositions = computed(() => positions.value.filter(p => p.trainingIds.includes(trainingId.value) && p.scope !== 'circle'))
@@ -44,6 +50,30 @@ const shown = computed(() => {
   return completions.value.filter(c =>
     (!villageFilter.value || c.person.village?.name === villageFilter.value) &&
     (!q || c.person.fullName.toLowerCase().includes(q) || c.person.displayName.toLowerCase().includes(q)))
+})
+
+// Download / Google Sheet: every row in `shown` (filters applied, all pages),
+// in table order. Completed stays the stored YYYY-MM-DD string.
+const exportColumns = computed(() => [
+  { header: 'Full Name', key: 'fullName' },
+  { header: 'Village', key: 'villageName' },
+  { header: 'Status', key: 'status' },
+  { header: 'Completed', key: 'completedDate' },
+  { header: 'Notes', key: 'notes' },
+  ...personExportColumns({ birthDate: hasPermission('person:read_birth_date'), demographics: hasPermission('person:read_demographics') }),
+])
+const { busy: exportBusy, download, exportSheet } = useExportActions({
+  buildRows: () => withPersonDetail(shown.value.map(c => ({
+    personId: c.person.personId,
+    fullName: c.person.fullName,
+    villageName: c.person.village?.name ?? 'Hub volunteer',
+    status: c.person.active ? 'Active' : 'Inactive',
+    completedDate: c.completedDate ?? '',
+    notes: c.notes ?? '',
+  })), row => row.personId),
+  columns: exportColumns,
+  filename: () => `${exportSlug(training.value.name)}-completions.csv`,
+  sheetTitle: () => `${training.value.name} Completions`,
 })
 
 async function loadCompletions () { completions.value = await getTrainingCompletions(trainingId.value) }
@@ -121,8 +151,13 @@ function openPerson (row) { router.push({ name: 'meta-person-detail', params: { 
       <InputText v-model="search" type="search" placeholder="Search by name" aria-label="Search completions by name" />
       <Select v-model="villageFilter" :options="villageOptions" placeholder="All villages" showClear aria-label="Village" />
     </div>
-    <DataTable :value="shown" size="small" dataKey="volunteerTrainingId" paginator :rows="25"
+    <DataTable :value="shown" size="small" dataKey="volunteerTrainingId" paginator :rows="pageRows"
                :rowClass="row => (flashIds.has(row.volunteerTrainingId) ? 'flash' : '')">
+      <template #paginatorcontainer="footer">
+        <TableFooter v-bind="footer" v-model="pageRows">
+          <ExportButton :disabled="exportBusy || !shown.length" @download="download" @export="exportSheet" />
+        </TableFooter>
+      </template>
       <Column header="Volunteer">
         <template #body="{ data }"><a class="link" @click="openPerson(data)">{{ data.person.fullName }}</a></template>
       </Column>
