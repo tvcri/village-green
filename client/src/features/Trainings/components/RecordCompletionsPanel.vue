@@ -86,9 +86,9 @@ async function save () {
     <div class="grid2">
       <div class="field">
         <label for="completed-date">Date completed</label>
-        <DatePicker inputId="completed-date" :modelValue="serviceDateToDate(date)" dateFormat="mm/dd/yy" showIcon
+        <DatePicker inputId="completed-date" :modelValue="serviceDateToDate(date)" dateFormat="mm/dd/yy" showIcon fluid
                     @update:modelValue="d => { date = dateToServiceDate(d) }" />
-        <small class="help">Required. Applies to everyone you add.</small>
+        <small class="help">Required.</small>
       </div>
       <div class="field">
         <label for="completion-notes">Notes (optional)</label>
@@ -106,9 +106,12 @@ async function save () {
       </label>
       <small class="help">
         {{ training.name }} leads to {{ linkedPositions.map(p => p.name).join(' and ') }}.
-        {{ position?.scope === 'village'
-          ? 'Each volunteer is assigned in their home village. To assign in an associate village, use the position’s page or the volunteer’s form.'
-          : 'Volunteers who already hold it are left as they are.' }}
+        <template v-if="position?.scope === 'village'">
+          Each volunteer becomes {{ position.name }} in their home village. To assign one in an associate village, use the position’s page or the volunteer’s form.
+        </template>
+        <template v-else-if="position">
+          Volunteers who are already {{ position.name }} are skipped.
+        </template>
       </small>
     </fieldset>
 
@@ -153,6 +156,8 @@ h2 { margin: 0; font-size: 1.1rem; }
 .field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .field label, legend { font-size: 0.85rem; font-weight: 600; color: var(--color-text-dim); }
 fieldset.assign { border: none; padding: 0; margin: 0; }
+/* A legend isn't a flex item of its fieldset, so .field's gap never reaches it. */
+fieldset.assign legend { padding: 0; margin-bottom: 0.4rem; }
 .radio { display: flex; align-items: center; gap: 0.5rem; }
 .help { color: var(--color-text-dim); }
 .error { color: var(--color-text-error); }

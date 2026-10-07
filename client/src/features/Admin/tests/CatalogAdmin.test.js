@@ -69,12 +69,23 @@ describe('CatalogAdmin — positions', () => {
     await screen.findByText('Steering Committee')
     await fireEvent.click(screen.getByLabelText('Edit Steering Committee'))
     expect(await screen.findByText('Scope can’t change while 43 volunteers hold this position.')).toBeInTheDocument()
-    expect(screen.getByText(/A new name appears on every one of their records/)).toBeInTheDocument()
+    expect(screen.getByText(/Updating the name will update every one of their records/)).toBeInTheDocument()
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(patchPosition).toHaveBeenCalled())
     const [id, body] = patchPosition.mock.calls[0]
     expect(id).toBe('1')
     expect(body).toEqual({ name: 'Steering Committee', description: null, trainingIds: [] })
+  })
+
+  it('expected-trainings list offers every training and has no select-all', async () => {
+    render(CatalogAdmin, opts('position'))
+    await screen.findByText('Steering Committee')
+    await fireEvent.click(screen.getByLabelText('Edit Steering Committee'))
+    await screen.findByText('Trainings expected before assignment (optional)')
+    await fireEvent.click(document.querySelector('#catalog-trainings'))
+    const options = await screen.findAllByRole('option')
+    expect(options.map(o => o.textContent.trim())).toEqual(['LSC Training', 'Volunteer Training'])
+    expect(document.querySelector('.p-multiselect-header .p-checkbox')).toBeNull()
   })
 
   it('shows a duplicate-name 409 inline under Name', async () => {

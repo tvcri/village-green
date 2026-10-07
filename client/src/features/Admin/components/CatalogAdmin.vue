@@ -186,7 +186,7 @@ function askDelete (row) {
         </div>
         <p v-if="held" class="note">
           {{ plural(editing.holderCount, 'volunteer') }} {{ editing.holderCount === 1 ? 'has' : 'have' }} this {{ cfg.singular }}.
-          A new name appears on every one of their records.
+          Updating the name will update every one of their records.
         </p>
         <div v-if="cfg.hasScope" class="field">
           <label for="catalog-scope">Scope</label>
@@ -201,11 +201,10 @@ function askDelete (row) {
         <div v-if="cfg.hasScope" class="field">
           <label for="catalog-trainings">Trainings expected before assignment (optional)</label>
           <MultiSelect id="catalog-trainings" v-model="form.trainingIds" :options="trainingOptions"
-                       optionLabel="name" optionValue="trainingId" display="chip" placeholder="None" />
+                       optionLabel="name" optionValue="trainingId" display="chip" placeholder="None" :showToggleAll="false" />
           <small class="help">
             Village Green never blocks an assignment. When someone without these trainings is assigned, staff see a
-            reminder, and recording one of these trainings offers to assign this position. Volunteer Training is best
-            left off, since every active volunteer has it.
+            reminder, and recording one of these trainings offers to assign this position.
           </small>
         </div>
         <div class="field">
