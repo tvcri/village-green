@@ -14,7 +14,7 @@ import { getTrainings, getTrainingCompletions } from '../../Trainings/api/traini
 import { getVolunteerRoster } from '../../VolunteerList/api/volunteerApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getCircles } from '../../PersonList/api/personApi.js'
-import { holderGroups, candidateStatus, buildHoldersPatch } from '../lib/holderStaging.js'
+import { holderGroups, isPositionCandidate, candidateStatus, candidateNote, buildHoldersPatch } from '../lib/holderStaging.js'
 import { scopeLabel, positionPlace } from '../../../shared/lib/positionRules.js'
 import { formatCivilDate } from '../../../shared/lib/civilDate.js'
 import { personExportColumns } from '../../../shared/lib/personExport.js'
@@ -140,7 +140,8 @@ const { busy: exportBusy, download, exportSheet } = useExportActions({
 })
 
 const personById = (id) => roster.value.find(p => p.personId === id) ?? holders.value.find(h => h.person.personId === id)?.person ?? {}
-const statusFor = (group) => (p) => candidateStatus(p, group, position.value, holders.value, adds.value)
+const statusFor = (group) => (p) => candidateStatus(p, group, holders.value, adds.value)
+const candidatesFor = (group) => roster.value.filter(p => isPositionCandidate(p, group, position.value))
 function select (group, p) {
   adds.value = [...adds.value, { key: `${p.personId}|${group.villageId ?? ''}|${group.circleId ?? ''}`, personId: p.personId, villageId: group.villageId, circleId: group.circleId }]
 }
@@ -191,7 +192,7 @@ async function save () {
     <Select v-if="position.scope === 'village'" v-model="villageFilter" :options="villages" optionLabel="name" optionValue="villageId"
             placeholder="All villages" showClear aria-label="Village" class="filter" />
     <HolderGroup v-for="g in groups" :key="g.key" :group="g" :show-hint="position.trainingIds.length > 0" :hint-for="hintFor"
-                 :remove-ids="removeIds" :flash-ids="flashIds" :roster="roster" :status="statusFor(g)" :can-write="canWrite" :open="openKey === g.key"
+                 :remove-ids="removeIds" :flash-ids="flashIds" :candidates="candidatesFor(g)" :candidate-note="candidateNote(g)" :status="statusFor(g)" :can-write="canWrite" :open="openKey === g.key"
                  :person-by-id="personById" @toggle="openKey = openKey === g.key ? null : g.key" @select="p => select(g, p)"
                  @remove="markRemove" @undo="undo" @unadd="unadd" />
     <div v-if="dirty" class="form-footer">

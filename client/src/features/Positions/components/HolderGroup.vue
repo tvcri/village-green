@@ -10,7 +10,8 @@ const props = defineProps({
   hintFor: { type: Function, required: true }, // personId -> { missing: string[], ok: string[] }
   removeIds: { type: Object, required: true }, // Set<volunteerPositionId>
   flashIds: { type: Object, default: () => new Set() }, // rows to flash after a save
-  roster: { type: Array, default: () => [] },
+  candidates: { type: Array, default: () => [] }, // who the add search offers here
+  candidateNote: { type: String, default: '' },
   status: { type: Function, required: true }, // person -> { disabled, reason }
   canWrite: { type: Boolean, default: false },
   open: { type: Boolean, default: false },
@@ -27,8 +28,11 @@ const empty = () => !props.group.rows.length && !props.group.adds.length
       <Button v-if="canWrite" class="add-btn" label="Add" icon="pi pi-plus" size="small" severity="secondary" outlined
               :aria-label="group.villageId || group.circleId ? `Add a holder in ${group.label}` : 'Add a holder'" @click="$emit('toggle')" />
     </h3>
-    <VolunteerSearch v-if="open" :candidates="roster" :status="status" :label="`Add a volunteer in ${group.label}`"
-                     :input-id="`add-${group.key}`" @select="p => $emit('select', p)" />
+    <template v-if="open">
+      <VolunteerSearch :candidates="candidates" :status="status" :label="`Add a volunteer in ${group.label}`"
+                       :input-id="`add-${group.key}`" @select="p => $emit('select', p)" />
+      <small v-if="candidateNote" class="candidate-note">{{ candidateNote }}</small>
+    </template>
     <table v-if="!empty()">
       <tbody>
         <tr v-for="h in group.rows" :key="h.volunteerPositionId" :class="{ removing: removeIds.has(h.volunteerPositionId), flash: flashIds.has(h.volunteerPositionId) }">
@@ -68,6 +72,7 @@ const empty = () => !props.group.rows.length && !props.group.adds.length
 
 <style scoped>
 .holder-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.candidate-note { color: var(--color-text-dim); font-size: 0.8rem; }
 .holder-group.vacant { padding-bottom: 0.4rem; border-bottom: 1px dashed var(--color-border-default); }
 h3 { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1rem; }
 .vacant h3 { color: var(--color-text-dim); }

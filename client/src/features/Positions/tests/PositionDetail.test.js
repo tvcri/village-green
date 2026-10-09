@@ -56,6 +56,26 @@ describe('PositionDetail', () => {
     expect(screen.getAllByText('No holders').length).toBe(1)
   })
 
+  // Agreed with staff 2026-10-08: the add search lists only who can hold it
+  // here, active volunteers of the village (own or associate), not greyed rows.
+  it('the add search lists only active volunteers eligible for the village', async () => {
+    getVolunteerRoster.mockResolvedValueOnce([
+      { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, active: true, associateVillages: [] },
+      { personId: '6', fullName: 'Walsh, Ines', displayName: 'Ines Walsh', village: barrington, active: false, associateVillages: [] },
+      { personId: '7', fullName: 'Walsh, Peter', displayName: 'Peter Walsh', village: bristol, active: true, associateVillages: [] },
+      { personId: '9', fullName: 'Walsh, Ruth', displayName: 'Ruth Walsh', village: bristol, active: true, associateVillages: [barrington] },
+    ])
+    render(PositionDetail, opts)
+    await screen.findByText('Abbott, Lorraine')
+    await fireEvent.click(screen.getByLabelText('Add a holder in Barrington'))
+    expect(screen.getByText('Lists active volunteers whose village or associate village is Barrington.')).toBeInTheDocument()
+    const input = await screen.findByLabelText('Add a volunteer in Barrington')
+    await fireEvent.focus(input)
+    await fireEvent.update(input, 'walsh')
+    const names = screen.getAllByRole('option').map(o => o.querySelector('.name').firstChild.textContent.trim())
+    expect(names).toEqual(['Walsh, Bridget', 'Walsh, Ruth'])
+  })
+
   it('stages an add and a removal, then saves both in one PATCH', async () => {
     render(PositionDetail, opts)
     await screen.findByText('Abbott, Lorraine')

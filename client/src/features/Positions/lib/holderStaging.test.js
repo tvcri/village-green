@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { holderGroups, candidateStatus, buildHoldersPatch } from './holderStaging.js'
+import { holderGroups, isPositionCandidate, candidateStatus, candidateNote, buildHoldersPatch } from './holderStaging.js'
 
 const villages = [{ villageId: '1', name: 'Barrington' }, { villageId: '2', name: 'Aquidneck Island' }, { villageId: '7', name: 'Warwick' }]
 const vPos = { positionId: '5', scope: 'village' }
@@ -22,21 +22,43 @@ describe('holderGroups', () => {
   })
 })
 
+describe('isPositionCandidate', () => {
+  const group = { key: '1', label: 'Barrington', villageId: '1', circleId: null }
+  const vol = (over) => ({ personId: '2', village: villages[0], associateVillages: [], active: true, ...over })
+  it('an active volunteer of the village qualifies', () => {
+    expect(isPositionCandidate(vol(), group, vPos)).toBe(true)
+  })
+  it('an inactive volunteer never does', () => {
+    expect(isPositionCandidate(vol({ active: false }), group, vPos)).toBe(false)
+    expect(isPositionCandidate(vol({ active: false }), { key: 'hub', villageId: null, circleId: null }, { scope: 'federation' })).toBe(false)
+  })
+  it('another village does not; an associate village does', () => {
+    expect(isPositionCandidate(vol({ village: villages[2] }), group, vPos)).toBe(false)
+    expect(isPositionCandidate(vol({ village: villages[2], associateVillages: [{ villageId: '1', name: 'Barrington' }] }), group, vPos)).toBe(true)
+  })
+  it('a Hub volunteer does not qualify for a village group, but does for a Hub position', () => {
+    expect(isPositionCandidate(vol({ village: null }), group, vPos)).toBe(false)
+    expect(isPositionCandidate(vol({ village: null }), { key: 'hub', villageId: null, circleId: null }, { scope: 'federation' })).toBe(true)
+  })
+})
+
 describe('candidateStatus', () => {
   const group = { key: '1', label: 'Barrington', villageId: '1', circleId: null }
   it('already holds -> disabled', () => {
-    expect(candidateStatus({ personId: '1', village: villages[0], associateVillages: [] }, group, vPos, holders, [])).toEqual({ disabled: true, reason: 'Already holds it' })
+    expect(candidateStatus({ personId: '1', village: villages[0], associateVillages: [] }, group, holders, [])).toEqual({ disabled: true, reason: 'Already holds it' })
   })
-  it('ineligible -> disabled with the reason and the fix', () => {
-    const s = candidateStatus({ personId: '2', village: villages[2], associateVillages: [] }, group, vPos, holders, [])
-    expect(s.disabled).toBe(true)
-    expect(s.reason).toBe('Home village is Warwick. To add them in Barrington, add it as an associate village in their volunteer form.')
+  it('already staged -> disabled', () => {
+    expect(candidateStatus({ personId: '3' }, group, [], [{ personId: '3', villageId: '1', circleId: null }]).disabled).toBe(true)
   })
-  it('associate village qualifies', () => {
-    expect(candidateStatus({ personId: '3', village: villages[2], associateVillages: [{ villageId: '1', name: 'Barrington' }] }, group, vPos, holders, []).disabled).toBe(false)
+  it('otherwise pickable', () => {
+    expect(candidateStatus({ personId: '3' }, group, holders, [])).toEqual({ disabled: false, reason: null })
   })
-  it('Hub volunteer reason', () => {
-    expect(candidateStatus({ personId: '4', village: null, associateVillages: [] }, group, vPos, [], []).reason).toMatch(/^Hub volunteer, no home village\./)
+})
+
+describe('candidateNote', () => {
+  it('names the village for a village group, and active volunteers otherwise', () => {
+    expect(candidateNote({ label: 'Barrington', villageId: '1' })).toBe('Lists active volunteers whose village or associate village is Barrington.')
+    expect(candidateNote({ label: 'Holders', villageId: null })).toBe('Lists active volunteers.')
   })
 })
 
