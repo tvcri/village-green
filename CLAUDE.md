@@ -253,6 +253,13 @@ about what someone sees on the road says **volunteer**. Dual-role people
 exist (member and volunteer both), which is why
 [village role counts overlap by design].
 
+**Volunteers are persons.** A person may belong to a village
+(`person.villageId`), so a volunteer may too: they are that village's
+volunteer ("village volunteer"). A volunteer with no village is the Hub's
+volunteer ("Hub volunteer"). These describe belonging, not different kinds
+of volunteer. Positions have their own scope (Hub, village); a village
+position requires the volunteer's village or an associate village.
+
 **Service requests are created and managed at the federation level.**
 Coordinators are not attached to a local village — they handle requests
 across all 13. Local coordination may be supported eventually; it is not
