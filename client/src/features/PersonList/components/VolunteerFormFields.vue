@@ -1,21 +1,13 @@
 <script setup>
-import { ref, watch } from 'vue'
 import MultiSelect from 'primevue/multiselect'
-import Select from 'primevue/select'
 import IftaLabel from 'primevue/iftalabel'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import DatePicker from 'primevue/datepicker'
-import Button from 'primevue/button'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
 
 const props = defineProps({
   capabilityOptions: { type: Array, required: true },
   villageOptions: { type: Array, required: true },
-  vettingTypeOptions: { type: Array, default: () => [] },
-  showVettings: { type: Boolean, default: false },
   uncertain: { type: Object, default: () => ({}) },
 })
 
@@ -28,67 +20,8 @@ const active = defineModel('active', { type: Boolean, default: true })
 const notes = defineModel('notes', { type: String, default: '' })
 const selectedCapabilityIds = defineModel('selectedCapabilityIds', { type: Array, required: true })
 const selectedAssociateVillageIds = defineModel('selectedAssociateVillageIds', { type: Array, required: true })
-const vettings = defineModel('vettings', { type: Array, default: () => [] })
 
 function uncertainText (field) { return sharedUncertainText(props.uncertain, field) }
-
-// Dates are exchanged with the API as 'YYYY-MM-DD' strings; PrimeVue's
-// DatePicker works in local Date objects. Convert at the edges, using local
-// (not UTC) fields so the picker's displayed day never shifts.
-function dateStringToDate (s) {
-  if (!s) return null
-  const [y, m, d] = s.split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-function dateToDateString (d) {
-  if (!d) return null
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-const newVettingTypeId = ref(null)
-const newDateEntered = ref(null)
-const newDateExpired = ref(null)
-const duplicateVettingError = ref('')
-
-watch([newVettingTypeId, newDateEntered], () => { duplicateVettingError.value = '' })
-
-function addVetting () {
-  if (!newVettingTypeId.value) return
-  const dateEntered = dateToDateString(newDateEntered.value)
-  const isDuplicate = vettings.value.some(v =>
-    v.vettingTypeId === newVettingTypeId.value && v.dateEntered === dateEntered)
-  if (isDuplicate) {
-    duplicateVettingError.value = 'This vetting type and date is already on the list.'
-    return
-  }
-  duplicateVettingError.value = ''
-  const type = props.vettingTypeOptions.find(t => t.vettingTypeId === newVettingTypeId.value)
-  const entry = {
-    vettingTypeId: newVettingTypeId.value,
-    name: type?.name,
-    dateEntered,
-    dateExpired: dateToDateString(newDateExpired.value),
-  }
-  vettings.value = [...vettings.value, entry]
-  newVettingTypeId.value = null
-  newDateEntered.value = null
-  newDateExpired.value = null
-}
-
-function removeVetting (index) {
-  const next = vettings.value.slice()
-  next.splice(index, 1)
-  vettings.value = next
-}
-
-function updateVettingDate (index, field, date) {
-  const next = vettings.value.slice()
-  next[index] = { ...next[index], [field]: dateToDateString(date) }
-  vettings.value = next
-}
 </script>
 
 <template>
@@ -137,48 +70,6 @@ function updateVettingDate (index, field, date) {
 
   </div>
 
-  <div v-if="showVettings" class="section">
-    <h3 class="section-header">Vettings</h3>
-    <div class="form-field span-4">
-      <DataTable :value="vettings" size="small">
-        <Column field="name" header="Type"></Column>
-        <Column header="Date Completed">
-          <template #body="{ data, index }">
-            <DatePicker :modelValue="dateStringToDate(data.dateEntered)"
-                        @update:modelValue="updateVettingDate(index, 'dateEntered', $event)"
-                        dateFormat="mm/dd/yy" placeholder="Select date" showIcon showButtonBar />
-          </template>
-        </Column>
-        <Column header="Date Expired">
-          <template #body="{ data, index }">
-            <DatePicker :modelValue="dateStringToDate(data.dateExpired)"
-                        @update:modelValue="updateVettingDate(index, 'dateExpired', $event)"
-                        dateFormat="mm/dd/yy" placeholder="Select date" showIcon showButtonBar />
-          </template>
-        </Column>
-        <Column header="">
-          <template #body="{ index }">
-            <Button type="button" icon="pi pi-trash" severity="danger" text
-                    @click="removeVetting(index)" aria-label="Remove vetting" />
-          </template>
-        </Column>
-        <template #empty>No vettings on record.</template>
-      </DataTable>
-
-      <div class="add-vetting-row">
-        <Select v-model="newVettingTypeId" :options="vettingTypeOptions"
-                optionLabel="name" optionValue="vettingTypeId"
-                placeholder="Select vetting type" class="add-vetting-type" />
-        <DatePicker v-model="newDateEntered" dateFormat="mm/dd/yy"
-                    placeholder="Date Completed" showIcon showButtonBar />
-        <DatePicker v-model="newDateExpired" dateFormat="mm/dd/yy"
-                    placeholder="Date Expired" showIcon showButtonBar />
-        <Button type="button" label="Add Vetting" icon="pi pi-plus"
-                :disabled="!newVettingTypeId" @click="addVetting" />
-      </div>
-      <p v-if="duplicateVettingError" class="duplicate-vetting-error">{{ duplicateVettingError }}</p>
-    </div>
-  </div>
 </template>
 
 <style scoped src="./formFields.css"></style>
@@ -197,23 +88,6 @@ function updateVettingDate (index, field, date) {
   margin: 0;
 }
 .form-field.span-4 { grid-column: 1 / -1; }
-/* Let the section panel's shade show through the vettings table. */
-.p-datatable {
-  --p-datatable-header-cell-background: transparent;
-  --p-datatable-row-background: transparent;
-}
-.add-vetting-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-.add-vetting-type { min-width: 14rem; }
-.duplicate-vetting-error {
-  color: var(--color-text-error);
-  font-size: 0.85rem;
-  margin: 0.5rem 0 0;
-}
 
 @media (max-width: 900px) {
   .section { grid-template-columns: 1fr 1fr; }

@@ -17,12 +17,22 @@ afterEach(() => cleanup())
 // runtime template compiler.
 function renderWith (initial) {
   const model = ref(initial)
+  const adding = ref(false)
   const utils = render({
     setup: () => () => h(VolunteerTrainingsFields, {
-      trainings: model.value, 'onUpdate:trainings': (v) => { model.value = v }, trainingOptions,
+      trainings: model.value, 'onUpdate:trainings': (v) => { model.value = v },
+      adding: adding.value, 'onUpdate:adding': (v) => { adding.value = v },
+      trainingOptions,
     }),
   }, { global: { plugins: [PrimeVue] } })
-  return { model, ...utils }
+  return { model, adding, ...utils }
+}
+
+// PrimeVue Select: a click on the combobox opens the overlay, and an option
+// is chosen on mousedown, not click.
+async function pickTraining (name) {
+  await fireEvent.click(screen.getByLabelText('New training'))
+  await fireEvent.mouseDown(screen.getByRole('option', { name }))
 }
 
 describe('VolunteerTrainingsFields', () => {
@@ -37,12 +47,41 @@ describe('VolunteerTrainingsFields', () => {
     expect(screen.getByDisplayValue('email')).toBeInTheDocument()
   })
 
-  it('rejects a duplicate date and a second undated record, and adds a new one', async () => {
-    const { model } = renderWith([{ trainingId: '4', name: 'LSC Training', completedDate: null, notes: null }])
-    await fireEvent.click(screen.getByLabelText('Add LSC Training'))
+  it('Add Training opens a pending row and reports adding; Cancel discards it', async () => {
+    const { model, adding } = renderWith([])
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Training' }))
+    expect(screen.getByLabelText('New training')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Training' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save new training' })).toBeDisabled()
+    expect(adding.value).toBe(true)
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel new training' }))
+    expect(screen.queryByLabelText('New training')).toBeNull()
+    expect(adding.value).toBe(false)
+    expect(model.value).toEqual([])
+  })
+
+  it('rejects a second undated record, and adds a different training', async () => {
+    const { model, adding } = renderWith([{ trainingId: '4', name: 'LSC Training', completedDate: null, notes: null }])
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Training' }))
+    await pickTraining('LSC Training')
+    await fireEvent.click(screen.getByRole('button', { name: 'Save new training' }))
     expect(screen.getByText('LSC Training already has an undated record. Give this one a date.')).toBeInTheDocument()
-    await fireEvent.click(screen.getByLabelText('Add Volunteer Training'))
+    expect(model.value).toHaveLength(1)
+    expect(adding.value).toBe(true)
+    await pickTraining('Volunteer Training')
+    expect(screen.queryByText(/already has an undated record/)).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: 'Save new training' }))
     expect(model.value).toHaveLength(2)
+    expect(adding.value).toBe(false)
+  })
+
+  it('carries the pending notes onto the added row', async () => {
+    const { model } = renderWith([])
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Training' }))
+    await pickTraining('LSC Training')
+    await fireEvent.update(screen.getByLabelText('New training notes'), '  refresher  ')
+    await fireEvent.click(screen.getByRole('button', { name: 'Save new training' }))
+    expect(model.value[0]).toMatchObject({ trainingId: '4', name: 'LSC Training', notes: 'refresher' })
   })
 
   // Fix round 1: a DatePicker writes on every keystroke that parses, so the
@@ -63,7 +102,9 @@ describe('VolunteerTrainingsFields', () => {
 
   it('gives an added row a key and sort snapshot', async () => {
     const { model } = renderWith([])
-    await fireEvent.click(screen.getByLabelText('Add LSC Training'))
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Training' }))
+    await pickTraining('LSC Training')
+    await fireEvent.click(screen.getByRole('button', { name: 'Save new training' }))
     expect(model.value[0]).toMatchObject({ trainingId: '4', completedDate: null, sortDate: null })
     expect(model.value[0].key).toEqual(expect.any(String))
   })

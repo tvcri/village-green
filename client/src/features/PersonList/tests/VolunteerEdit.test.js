@@ -119,17 +119,56 @@ describe('VolunteerEdit', () => {
     getPerson.mockResolvedValueOnce({ personId: '5', fullName: 'Quinn, Robert', village: null, volunteer: null })
     render(VolunteerEdit, { global: globalOpts })
     expect(await screen.findByText('Grant Volunteer Role')).toBeInTheDocument()
+    // Granting the role is the change: the button is live with nothing edited.
+    expect(screen.getByRole('button', { name: 'Grant Volunteer Role' })).toBeEnabled()
+    expect(screen.getByTestId('footer-note')).toHaveTextContent(/^$/)
     expect(screen.queryByText(/Set a home village/)).toBeNull()
   })
 
   it('sends trainings and positions on save', async () => {
     render(VolunteerEdit, { global: globalOpts })
-    await screen.findByDisplayValue('Existing notes')
+    await fireEvent.update(await screen.findByDisplayValue('Existing notes'), 'Edited')
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
     const body = patchVolunteer.mock.calls[0][1]
     expect(body.trainings).toEqual([{ trainingId: '1', completedDate: '2025-04-25', notes: 'email' }])
     expect(body.positions).toEqual([{ positionId: '3', villageId: '7', circleId: null }])
+  })
+
+  // An open "new" row is not part of the form until its ✓ is pressed, so Save
+  // waits rather than silently dropping it.
+  it('blocks Save while a new vetting, training or position row is open', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await fireEvent.update(await screen.findByDisplayValue('Existing notes'), 'Edited')
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBeEnabled()
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Position' }))
+    expect(save).toBeDisabled()
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('Finish or cancel the new position first.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Training' }))
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('Finish or cancel the new training and position first.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Vetting' }))
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('Finish or cancel the new vetting, training and position first.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel new position' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel new training' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel new vetting' }))
+    expect(save).toBeEnabled()
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('notes edited')
+  })
+
+  it('says "No changes" and disables Save until something changes, then summarizes', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await screen.findByDisplayValue('Existing notes')
+    const save = screen.getByRole('button', { name: 'Save' })
+    const note = screen.getByTestId('footer-note')
+    expect(note).toHaveTextContent('No changes')
+    expect(save).toBeDisabled()
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove Volunteer Training' }))
+    await fireEvent.update(screen.getByDisplayValue('Existing notes'), 'Edited')
+    expect(note).toHaveTextContent('1 training removed · notes edited')
+    expect(save).toBeEnabled()
+    await fireEvent.update(screen.getByDisplayValue('Edited'), 'Existing notes')
+    expect(note).toHaveTextContent('1 training removed')
   })
 
   // Review Focus 3: a position its villages no longer cover is left out of
@@ -145,6 +184,8 @@ describe('VolunteerEdit', () => {
     })
     render(VolunteerEdit, { global: globalOpts })
     expect(await screen.findByText('Will be removed on save: Warwick is no longer one of this volunteer’s villages.')).toBeInTheDocument()
+    // The pending removal is itself a change Save will make.
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('1 position removed')
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
     expect(patchVolunteer.mock.calls[0][1].positions).toEqual([])
@@ -166,6 +207,9 @@ describe('VolunteerEdit', () => {
     const option = (await screen.findAllByRole('option')).find(o => o.textContent.includes('Warwick'))
     await fireEvent.click(option)
     await waitFor(() => expect(screen.queryByText(/Will be removed on save/)).toBeNull())
+    // Back where it started: nothing to save until something else changes.
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('No changes')
+    await fireEvent.update(screen.getByDisplayValue('Existing notes'), 'Edited')
 
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
