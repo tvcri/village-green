@@ -1,6 +1,8 @@
 <script setup>
 // One village, circle or Hub group on a position's page (UI spec §5).
+import { ref, watch, nextTick } from 'vue'
 import Button from 'primevue/button'
+import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import VolunteerSearch from '../../../shared/components/VolunteerSearch.vue'
 
@@ -18,21 +20,32 @@ const props = defineProps({
   personById: { type: Function, required: true },
 })
 defineEmits(['toggle', 'select', 'remove', 'undo', 'unadd'])
+// Opening the search lengthens the card, often off the bottom of the page
+// (vacant villages sort last), so bring it into view and put the cursor in it.
+const search = ref(null)
+watch(() => props.open, async (open) => {
+  if (!open) return
+  await nextTick()
+  search.value?.querySelector('input')?.focus({ preventScroll: true })
+  search.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+})
 const empty = () => !props.group.rows.length && !props.group.adds.length
 </script>
 
 <template>
-  <section :class="['holder-group', { vacant: empty() }]">
-    <h3>
-      {{ group.label }} <span class="count">{{ empty() ? 'No holders' : group.rows.length }}</span>
-      <Button v-if="canWrite" class="add-btn" label="Add" icon="pi pi-plus" size="small" severity="secondary" outlined
+  <Panel :class="['holder-group', { vacant: empty(), closed: empty() && !open }]">
+    <template #header>
+      <h3>{{ group.label }} <span class="count">{{ empty() ? 'No holders' : group.rows.length }}</span></h3>
+    </template>
+    <template #icons>
+      <Button v-if="canWrite" label="Add" icon="pi pi-plus" size="small" severity="secondary" outlined
               :aria-label="group.villageId || group.circleId ? `Add a holder in ${group.label}` : 'Add a holder'" @click="$emit('toggle')" />
-    </h3>
-    <template v-if="open">
+    </template>
+    <div v-if="open" ref="search" class="add-search">
       <VolunteerSearch :candidates="candidates" :status="status" :label="`Add a volunteer in ${group.label}`"
                        :input-id="`add-${group.key}`" @select="p => $emit('select', p)" />
       <small v-if="candidateNote" class="candidate-note">{{ candidateNote }}</small>
-    </template>
+    </div>
     <table v-if="!empty()">
       <tbody>
         <tr v-for="h in group.rows" :key="h.volunteerPositionId" :class="{ removing: removeIds.has(h.volunteerPositionId), flash: flashIds.has(h.volunteerPositionId) }">
@@ -67,19 +80,30 @@ const empty = () => !props.group.rows.length && !props.group.adds.length
         </tr>
       </tbody>
     </table>
-  </section>
+  </Panel>
 </template>
 
 <style scoped>
-.holder-group { display: flex; flex-direction: column; gap: 0.4rem; }
+/* One card per group so villages don't run into each other. Rows run edge to edge.
+   No overflow: hidden here: it would clip the search's suggestion list. The header
+   rounds its own top corners instead. */
+.holder-group { --inner-radius: calc(var(--p-panel-border-radius) - 1px); }
+.holder-group :deep(.p-panel-header) { border-radius: var(--inner-radius) var(--inner-radius) 0 0; padding: 0.5rem 0.75rem 0.5rem 1rem; background: var(--p-content-hover-background); border-bottom: 1px solid var(--color-border-default); }
+.holder-group :deep(.p-panel-content) { padding: 0; }
+.holder-group.closed :deep(.p-panel-header) { border-bottom: none; }
+.holder-group.closed :deep(.p-panel-content-container) { display: none; }
+.holder-group.vacant :deep(.p-panel-header) { background: transparent; }
+.add-search { scroll-margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem; padding: 0.75rem 1rem; }
 .candidate-note { color: var(--color-text-dim); font-size: 0.8rem; }
-.holder-group.vacant { padding-bottom: 0.4rem; border-bottom: 1px dashed var(--color-border-default); }
-h3 { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1rem; }
-.vacant h3 { color: var(--color-text-dim); }
-.count { font-weight: 400; font-size: 0.85rem; color: var(--color-text-dim); }
-.add-btn { margin-left: auto; }
+h3 { margin: 0; font-size: 1rem; }
+.vacant h3 { color: var(--color-text-dim); font-weight: 600; }
+.count { font-weight: 400; font-size: 0.85rem; color: var(--color-text-dim); margin-left: 0.25rem; }
 table { width: 100%; border-collapse: collapse; }
 td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--color-border-default); }
+td:first-child { padding-left: 1rem; }
+tr:last-child td { border-bottom: none; }
+tr:last-child td:first-child { border-bottom-left-radius: var(--inner-radius); }
+tr:last-child td:last-child { border-bottom-right-radius: var(--inner-radius); }
 .name { width: 40%; }
 .state { width: 9rem; }
 .actions { width: 5rem; text-align: right; }

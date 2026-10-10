@@ -29,6 +29,7 @@ const bristol = { villageId: '3', name: 'Bristol-Warren' }
 beforeEach(() => {
   window.matchMedia = () => ({ matches: false, addEventListener () {}, removeEventListener () {} })
   globalThis.ResizeObserver = class { observe () {} unobserve () {} disconnect () {} }
+  Element.prototype.scrollIntoView = () => {} // jsdom has none
   getPositions.mockResolvedValue([{ positionId: '5', name: 'Local Service Coordinator', scope: 'village', trainingIds: ['4'], holderCount: 2 }])
   getTrainings.mockResolvedValue([{ trainingId: '4', name: 'LSC Training' }])
   getTrainingCompletions.mockResolvedValue([{ volunteerTrainingId: '9', completedDate: '2026-05-12', person: { personId: '1' } }])

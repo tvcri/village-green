@@ -49,6 +49,7 @@ const personRow = (p, first, last) => ({
 beforeEach(() => {
   window.matchMedia = () => ({ matches: false, addEventListener () {}, removeEventListener () {} })
   globalThis.ResizeObserver = class { observe () {} unobserve () {} disconnect () {} }
+  Element.prototype.scrollIntoView = () => {} // jsdom has none
   granted.clear()
   for (const p of ['volunteer:write', 'person:read_birth_date', 'person:read_demographics']) granted.add(p)
   getPositions.mockResolvedValue([{ positionId: '5', name: 'Local Service Coordinator', scope: 'village', trainingIds: ['4', '6'], holderCount: 3 }])

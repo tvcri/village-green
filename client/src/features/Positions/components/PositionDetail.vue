@@ -196,7 +196,7 @@ async function save () {
                  :person-by-id="personById" @toggle="openKey = openKey === g.key ? null : g.key" @select="p => select(g, p)"
                  @remove="markRemove" @undo="undo" @unadd="unadd" />
     <div v-if="dirty" class="form-footer">
-      <span class="summary">{{ [adds.length && `${adds.length} to add`, removeIds.size && `${removeIds.size} to remove`].filter(Boolean).join(', ') }}</span>
+      <span class="footer-note">{{ [adds.length && `${adds.length} to add`, removeIds.size && `${removeIds.size} to remove`].filter(Boolean).join(', ') }}</span>
       <Button label="Discard" severity="secondary" @click="discard" />
       <Button label="Save" :loading="saving" @click="save" />
     </div>
@@ -204,14 +204,14 @@ async function save () {
 </template>
 
 <style scoped>
-.position-detail { padding: 2rem; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+.position-detail { padding: 2rem; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
 h1 { margin: 0; }
 .title-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .stats { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; color: var(--color-text-dim); font-size: 0.9rem; }
 .filter { max-width: 16rem; }
 /* Pinned to the bottom of the viewport (UI spec §8). No ancestor may set overflow hidden/auto. */
 .form-footer { position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: flex-end; align-items: center; gap: 0.5rem;
-  padding: 0.75rem 0; background: var(--color-background-darkest); border-top: 1px solid var(--color-border-default); }
-.summary { margin-right: auto; }
+  padding: 0.75rem 0.75rem 0.75rem 1rem; background: var(--color-background-darkest); border-top: 1px solid var(--color-border-default); }
+.footer-note { margin-right: auto; color: var(--color-text-dim); font-size: 0.875rem; } /* as on the volunteer edit form */
 @media (max-width: 640px) { .position-detail { padding: 1rem; } }
 </style>
