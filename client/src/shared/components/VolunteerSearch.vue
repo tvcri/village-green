@@ -2,7 +2,7 @@
 // Name search shared by the training and position pages (UI spec §8). The
 // host page owns the rules: `status` says whether a person can be picked
 // (and why not); `meta` is the second line. This component only types and picks.
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import InputText from 'primevue/inputtext'
 
 const props = defineProps({
@@ -27,6 +27,28 @@ const matches = computed(() => {
     .map(p => ({ person: p, ...props.status(p) }))
     .sort((a, b) => (Number(!!a.disabled) - Number(!!b.disabled)) || a.person.fullName.localeCompare(b.person.fullName))
     .slice(0, 8)
+})
+
+// Open the list upward when it won't fit below the input but has more room
+// above (a search on the last card of a long page), and cap its height to the
+// side it opens on.
+const root = ref(null)
+const list = ref(null)
+const placement = ref({ up: false, maxHeight: null })
+
+watch([open, () => query.value.trim().length >= 2, () => matches.value.length], async () => {
+  await nextTick()
+  if (!list.value) return
+  const input = root.value.querySelector('input').getBoundingClientRect()
+  const viewport = window.visualViewport?.height ?? window.innerHeight
+  const below = viewport - input.bottom - 8
+  const above = input.top - 8
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize)
+  // max-height counts the list's border (border-box), scrollHeight doesn't.
+  const border = list.value.offsetHeight - list.value.clientHeight
+  const wanted = Math.min(Math.ceil(list.value.scrollHeight + border), 18 * rem) // the CSS max-height
+  const up = wanted > below && above > below
+  placement.value = { up, maxHeight: Math.min(wanted, up ? above : below) }
 })
 
 function defaultMeta (p) {
@@ -59,12 +81,13 @@ function onKeydown (e) {
 </script>
 
 <template>
-  <div class="volunteer-search">
+  <div ref="root" class="volunteer-search">
     <label :for="inputId" class="label">{{ label }}</label>
     <InputText :id="inputId" v-model="query" type="search" autocomplete="off" :placeholder="placeholder"
                class="w-full" role="combobox" :aria-expanded="open && matches.length > 0"
                @focus="open = true" @blur="open = false" @input="onInput" @keydown="onKeydown" />
-    <ul v-if="open && query.trim().length >= 2" class="suggestions" role="listbox">
+    <ul v-if="open && query.trim().length >= 2" ref="list" :class="['suggestions', { up: placement.up }]" role="listbox"
+        :style="placement.maxHeight ? { maxHeight: `${placement.maxHeight}px` } : null">
       <li v-for="(m, i) in matches" :key="m.person.personId" role="option"
           :aria-disabled="!!m.disabled" :aria-selected="i === highlighted"
           :class="{ highlighted: i === highlighted, disabled: m.disabled }" @mousedown.prevent="choose(m)">
@@ -82,6 +105,7 @@ function onKeydown (e) {
 .suggestions { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 0.25rem 0 0; padding: 0; list-style: none;
   background: var(--color-background-darkest); border: 1px solid var(--color-border-default); border-radius: 4px;
   box-shadow: var(--box-shadow-card); max-height: 18rem; overflow-y: auto; }
+.suggestions.up { top: auto; bottom: 100%; margin: 0 0 0.25rem; }
 .suggestions li { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; cursor: pointer; }
 .suggestions li.highlighted, .suggestions li:hover { background: var(--color-bg-hover); }
 .suggestions li.disabled { cursor: default; color: var(--color-text-dim); }
