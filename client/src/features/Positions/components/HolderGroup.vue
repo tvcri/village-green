@@ -53,7 +53,6 @@ const empty = () => !props.group.rows.length && !props.group.adds.length
             {{ h.person.fullName }}
             <span v-if="h.village && h.person.village?.villageId !== h.village.villageId" class="dim">(associate)</span>
           </td>
-          <td>{{ h.person.active ? 'Active' : 'Inactive' }}</td>
           <td v-if="showHint && !removeIds.has(h.volunteerPositionId)">
             <span v-for="m in hintFor(h.person.personId).missing" :key="m" class="hint warn">No record of {{ m }}</span>
             <span v-for="o in hintFor(h.person.personId).ok" :key="o" class="hint ok">{{ o }}</span>
@@ -68,7 +67,6 @@ const empty = () => !props.group.rows.length && !props.group.adds.length
         </tr>
         <tr v-for="a in group.adds" :key="a.key" class="adding">
           <td class="name">{{ personById(a.personId).fullName }}</td>
-          <td>{{ personById(a.personId).active ? 'Active' : 'Inactive' }}</td>
           <td v-if="showHint">
             <span v-for="m in hintFor(a.personId).missing" :key="m" class="hint warn">No record of {{ m }}</span>
             <span v-for="o in hintFor(a.personId).ok" :key="o" class="hint ok">{{ o }}</span>

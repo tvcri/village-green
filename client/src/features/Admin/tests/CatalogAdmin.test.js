@@ -55,6 +55,16 @@ describe('CatalogAdmin — positions', () => {
     expect(screen.getByLabelText('Delete Board of Directors')).not.toBeDisabled()
   })
 
+  it('inactive holders still block delete and scope, and show beside the count', async () => {
+    getPositions.mockResolvedValue([{ ...POSITIONS[2], holderCount: 0, inactiveHolderCount: 1 }])
+    render(CatalogAdmin, opts('position'))
+    await screen.findByText('Board of Directors')
+    expect(screen.getByText('+ 1 inactive')).toBeInTheDocument()
+    expect(screen.getByLabelText('Delete Board of Directors')).toBeDisabled()
+    await fireEvent.click(screen.getByLabelText('Edit Board of Directors'))
+    expect(await screen.findByText('Scope can’t change while 1 volunteer (1 inactive) holds this position.')).toBeInTheDocument()
+  })
+
   it('the locked-scope reason agrees with a single holder', async () => {
     getPositions.mockResolvedValue([{ ...POSITIONS[0], holderCount: 1 }])
     render(CatalogAdmin, opts('position'))

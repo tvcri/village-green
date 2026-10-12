@@ -5,11 +5,12 @@
 const dbUtils = require('./utils')
 const SmError = require('../utils/error')
 const AuditService = require('./audit/AuditService')
-const { scopeShapeError, isEligible, assertIdsExist } = require('./volunteerAssignments')
+const { scopeShapeError, isEligible, assertIdsExist, positionShownSql } = require('./volunteerAssignments')
 const { PERSON_COLUMNS, personFrom, scopePredicates } = require('./TrainingCompletionService')
 
 const s = (v) => (v === null || v === undefined ? '' : String(v))
 
+// Shown holders only: an inactive volunteer's positions are kept but hidden.
 async function listHolders (positionId, scope) {
   const where = scopePredicates(scope)
   const [rows] = await dbUtils.pool.query(
@@ -22,7 +23,7 @@ async function listHolders (positionId, scope) {
      LEFT JOIN village hv ON hv.id = p.villageId
      LEFT JOIN village pv ON pv.id = vp.villageId
      LEFT JOIN circle pc ON pc.id = vp.circleId
-     WHERE vp.positionId = ?${where.sql}
+     WHERE vp.positionId = ? AND ${positionShownSql('v')}${where.sql}
      ORDER BY pv.name, pc.name, p.fullName`,
     [positionId, ...where.binds])
   return rows.map(r => ({

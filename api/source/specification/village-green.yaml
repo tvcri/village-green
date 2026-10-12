@@ -2107,7 +2107,7 @@ paths:
       tags: [Position]
       operationId: getPositionHolders
       responses:
-        '200': { description: 'Holders by village or circle, then name', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PositionHolder' } } } } }
+        '200': { description: 'Active holders by village or circle, then name. Inactive volunteers keep their positions but are not listed.', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PositionHolder' } } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer:read ] } ]
     patch:
@@ -6029,13 +6029,14 @@ components:
     Position:
       additionalProperties: false
       type: object
-      required: [ positionId, name, description, scope, holderCount, trainingIds ]
+      required: [ positionId, name, description, scope, holderCount, inactiveHolderCount, trainingIds ]
       properties:
         positionId: { $ref: '#/components/schemas/PositionId' }
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
         scope: { $ref: '#/components/schemas/PositionScope' }
-        holderCount: { type: integer, minimum: 0, description: Volunteers holding this position anywhere }
+        holderCount: { type: integer, minimum: 0, description: 'Active volunteers holding this position anywhere, the ones its holders list shows' }
+        inactiveHolderCount: { type: integer, minimum: 0, description: 'Inactive volunteers who keep this position, hidden from its holders list. They still block delete and scope change.' }
         trainingIds:
           type: array
           description: Trainings expected before assignment. Reminders only; never enforced.

@@ -35,7 +35,7 @@ const barrington = { villageId: '1', name: 'Barrington' }
 const bristol = { villageId: '3', name: 'Bristol-Warren' }
 const warwick = { villageId: '7', name: 'Warwick' }
 const abbott = { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, active: true }
-const silva = { personId: '2', fullName: 'Silva, Maria', displayName: 'Maria Silva', village: warwick, active: false }
+const silva = { personId: '2', fullName: 'Silva, Maria', displayName: 'Maria Silva', village: warwick, active: true }
 const medeiros = { personId: '8', fullName: 'Medeiros, Anthony', displayName: 'Anthony Medeiros', village: bristol, active: true }
 
 const personRow = (p, first, last) => ({
@@ -93,12 +93,12 @@ describe('PositionDetail export', () => {
     expect(filename).toBe('local-service-coordinator-holders.csv')
     expect(getPersons).toHaveBeenCalledWith({ projection: ['detail'] })
     const header = lines[0].split(',')
-    expect(header.slice(0, 7)).toEqual(['Full Name', 'Where', 'Held Through', 'Status', 'LSC Training', 'CPR', 'First Name'])
+    expect(header.slice(0, 6)).toEqual(['Full Name', 'Where', 'Held Through', 'LSC Training', 'CPR', 'First Name'])
     expect(header).toContain('Birth Date')
     expect(lines).toHaveLength(4)
-    expect(lines[1]).toMatch(/^"Abbott, Lorraine",Barrington,Home,Active,2026-05-12,,Lorraine,,Abbott,/)
-    expect(lines[2]).toMatch(/^"Silva, Maria",Barrington,Associate,Inactive,No date,,Maria,,Silva,/)
-    expect(lines[3]).toMatch(/^"Medeiros, Anthony",Bristol-Warren,Home,Active,,2026-03-03,Anthony,,Medeiros,/)
+    expect(lines[1]).toMatch(/^"Abbott, Lorraine",Barrington,Home,2026-05-12,,Lorraine,,Abbott,/)
+    expect(lines[2]).toMatch(/^"Silva, Maria",Barrington,Associate,No date,,Maria,,Silva,/)
+    expect(lines[3]).toMatch(/^"Medeiros, Anthony",Bristol-Warren,Home,,2026-03-03,Anthony,,Medeiros,/)
     expect(lines[1]).toContain('lorraine@example.com,401-555-0100,,')
   })
 
@@ -129,9 +129,9 @@ describe('PositionDetail export', () => {
     const { lines, filename } = await clickDownload()
     expect(filename).toBe('hub-driver-lead-holders.csv')
     const header = lines[0].split(',')
-    expect(header.slice(0, 4)).toEqual(['Full Name', 'Where', 'Status', 'First Name'])
+    expect(header.slice(0, 3)).toEqual(['Full Name', 'Where', 'First Name'])
     for (const gated of ['Birth Date', 'Gender', 'Veteran']) expect(header).not.toContain(gated)
-    expect(lines[1]).toMatch(/^"Medeiros, Anthony",Hub,Active,Anthony,/)
+    expect(lines[1]).toMatch(/^"Medeiros, Anthony",Hub,Anthony,/)
   })
 
   it('creates a Google Sheet named for the position', async () => {

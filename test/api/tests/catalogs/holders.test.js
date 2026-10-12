@@ -105,3 +105,29 @@ test('a village-scoped writer: 403 adding or removing outside their village and 
     }
   }
 })
+
+// Caroline, 2026-10-12: an inactive volunteer keeps their positions, hidden
+// from the position's holders and counts until they are active again.
+test('an inactive holder is hidden from holders and holderCount, kept, and back on reactivation', async () => {
+  const positionId = await makePosition('federation')
+  const a = await makeVolunteer(uniq('Shown')); const b = await makeVolunteer(uniq('Away'))
+  await patch(positionId, { add: [{ personId: a }, { personId: b }] })
+  const counts = async () => (await vgCall('getPositions', {}, { token: staff })).json.find(p => p.positionId === positionId)
+  const holderIds = async () => (await vgCall('getPositionHolders', { positionId }, { token: staff })).json.map(h => h.person.personId)
+
+  assert.equal((await vgCall('patchPersonVolunteer', { personId: b }, { token: staff, body: { active: false } })).status, 200)
+  assert.deepEqual(await holderIds(), [a])
+  const c = await counts()
+  assert.equal(c.holderCount, 1)
+  assert.equal(c.inactiveHolderCount, 1)
+  const kept = (await vgCall('getPerson', { personId: b, projection: ['volunteer'] }, { token: staff })).json.volunteer.positions
+  assert.equal(kept.length, 1, 'the position is kept on the volunteer record')
+
+  const del = await vgCall('deletePosition', { positionId }, { token: admin })
+  assert.equal(del.status, 409, 'a hidden holder still blocks delete')
+  assert.match(del.json.detail, /1 of them inactive/)
+
+  await vgCall('patchPersonVolunteer', { personId: b }, { token: staff, body: { active: true } })
+  assert.deepEqual((await holderIds()).sort(), [a, b].sort())
+  assert.equal((await counts()).inactiveHolderCount, 0)
+})

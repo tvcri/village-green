@@ -184,6 +184,12 @@ async function positionChanges (personId, requested) {
 // D8 revocation: delete village-scoped positions whose village is neither
 // the home village nor a remaining associate village. Runs on the caller's
 // transaction, after the write that changed the association.
+// Whether a volunteer's positions show on position pages and in holder
+// counts. An inactive volunteer keeps their positions, hidden until they are
+// active again (Caroline, 2026-10-12). The one place that rule lives: a richer
+// volunteer status changes this predicate only. Never NULL, so NOT works.
+const positionShownSql = (volunteerAlias) => `(${volunteerAlias}.active <=> 1)`
+
 async function pruneIneligiblePositions (connection, volunteerId) {
   const [res] = await connection.query(
     `DELETE vp FROM volunteer_position vp
@@ -201,5 +207,5 @@ async function pruneIneligiblePositions (connection, volunteerId) {
 
 module.exports = {
   trainingKey, positionKey, findDuplicateKeys, diffTrainings, diffPositions, scopeShapeError, isEligible, assertIdsExist, applyTrainings,
-  applyPositions, positionChanges, pruneIneligiblePositions,
+  applyPositions, positionChanges, pruneIneligiblePositions, positionShownSql,
 }

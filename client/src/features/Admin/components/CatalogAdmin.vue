@@ -46,6 +46,10 @@ const positionsExpecting = (trainingId) => positions.value.filter(p => p.trainin
 const scopeOptions = ['federation', 'village', 'circle'].map(v => ({ value: v, label: scopeLabel(v) }))
 const trainingOptions = computed(() => [...trainings.value].sort((a, b) => a.name.localeCompare(b.name)))
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
+// Positions: inactive holders are hidden from the position's page but still
+// hold it, so they count toward every "held" rule here.
+const allHolders = (row) => (row?.holderCount ?? 0) + (row?.inactiveHolderCount ?? 0)
+const inactiveNote = (row) => (row?.inactiveHolderCount ? ` (${row.inactiveHolderCount} inactive)` : '')
 
 async function load () {
   const [t, p] = await Promise.all([getTrainings(), getPositions()])
@@ -61,7 +65,7 @@ const editing = ref(null) // the row being edited, or null when adding
 const form = reactive({ name: '', description: '', scope: null, trainingIds: [] })
 const nameError = ref('')
 const formError = ref('')
-const held = computed(() => (editing.value?.holderCount ?? 0) > 0)
+const held = computed(() => allHolders(editing.value) > 0)
 
 function openDialog (row) {
   editing.value = row
@@ -103,8 +107,8 @@ async function saveDialog () {
 
 // ---- delete ----
 function deleteReason (row) {
-  return row.holderCount > 0
-    ? `Held by ${plural(row.holderCount, 'volunteer')}. Remove it from their records first.`
+  return allHolders(row) > 0
+    ? `Held by ${plural(allHolders(row), 'volunteer')}${inactiveNote(row)}. Remove it from their records first.`
     : `Delete ${row.name}`
 }
 
@@ -162,14 +166,18 @@ function askDelete (row) {
           </template>
         </template>
       </Column>
-      <Column :header="cfg.countHeader" field="holderCount" class="num" />
+      <Column :header="cfg.countHeader" field="holderCount" class="num">
+        <template #body="{ data }">
+          {{ data.holderCount }}<span v-if="data.inactiveHolderCount" class="dim"> + {{ data.inactiveHolderCount }} inactive</span>
+        </template>
+      </Column>
       <Column header="">
         <template #body="{ data }">
           <div class="row-actions">
             <Button icon="pi pi-pencil" text rounded :aria-label="`Edit ${data.name}`" @click="openDialog(data)" />
             <span v-tooltip.top="deleteReason(data)">
               <Button icon="pi pi-trash" text rounded severity="danger" :aria-label="`Delete ${data.name}`"
-                      :disabled="data.holderCount > 0" @click="askDelete(data)" />
+                      :disabled="allHolders(data) > 0" @click="askDelete(data)" />
             </span>
           </div>
         </template>
@@ -185,7 +193,7 @@ function askDelete (row) {
           <small v-if="nameError" class="error">{{ nameError }}</small>
         </div>
         <p v-if="held" class="note">
-          {{ plural(editing.holderCount, 'volunteer') }} {{ editing.holderCount === 1 ? 'has' : 'have' }} this {{ cfg.singular }}.
+          {{ plural(allHolders(editing), 'volunteer') }}{{ inactiveNote(editing) }} {{ allHolders(editing) === 1 ? 'has' : 'have' }} this {{ cfg.singular }}.
           Updating the name will update every one of their records.
         </p>
         <div v-if="cfg.hasScope" class="field">
@@ -194,7 +202,7 @@ function askDelete (row) {
                   placeholder="Select scope" :disabled="held" />
           <small class="help">
             {{ held
-              ? `Scope can’t change while ${plural(editing.holderCount, 'volunteer')} ${editing.holderCount === 1 ? 'holds' : 'hold'} this position.`
+              ? `Scope can’t change while ${plural(allHolders(editing), 'volunteer')}${inactiveNote(editing)} ${allHolders(editing) === 1 ? 'holds' : 'hold'} this position.`
               : 'Hub: held for TVCRI as a whole. Village: held in one village. Circle: held in one circle.' }}
           </small>
         </div>

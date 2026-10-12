@@ -2,28 +2,36 @@
 const dbUtils = require('./utils')
 const SmError = require('../utils/error')
 const AuditService = require('./audit/AuditService')
-const { assertIdsExist } = require('./volunteerAssignments')
+const { assertIdsExist, positionShownSql } = require('./volunteerAssignments')
 
 // The two volunteer catalogs (trainings, positions; written only by Admin's '*') behave the
 // same apart from position.scope, so one factory serves both. Holder counts
 // are always included: the admin page needs them to explain a 409 before
-// the user clicks (spec §4.1).
+// the user clicks (spec §4.1). For positions, holderCount counts the holders
+// the position page shows and inactiveHolderCount the hidden ones; both still
+// block a delete or a scope change.
 function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) {
   const t = `\`${table}\``
+  const countHolders = (where) => `(SELECT COUNT(DISTINCT j.volunteerId) FROM \`${junction}\` j
+    JOIN volunteer v ON v.id = j.volunteerId WHERE j.${entityType}Id = c.id AND ${where})`
   const columns = [
     `CAST(c.id AS CHAR) AS ${idName}`, 'c.name', 'c.description',
     ...(hasScope ? ['c.scope'] : []),
-    `(SELECT COUNT(DISTINCT j.volunteerId) FROM \`${junction}\` j WHERE j.${entityType}Id = c.id) AS holderCount`,
+    ...(hasScope
+      ? [`${countHolders(positionShownSql('v'))} AS holderCount`, `${countHolders(`NOT ${positionShownSql('v')}`)} AS inactiveHolderCount`]
+      : [`${countHolders('TRUE')} AS holderCount`]),
     // Trainings only: newest dated completion, unscoped like holderCount.
     ...(hasScope ? [] : ["(SELECT DATE_FORMAT(MAX(vt.completedDate), '%Y-%m-%d') FROM volunteer_training vt WHERE vt.trainingId = c.id) AS lastCompletedDate"]),
     // Positions only: the trainings expected before assignment (UI spec §2.3).
     ...(hasScope ? [`COALESCE((SELECT JSON_ARRAYAGG(CAST(pt.trainingId AS CHAR)) FROM position_training pt WHERE pt.positionId = c.id), JSON_ARRAY()) AS trainingIds`] : []),
   ].join(', ')
 
-  async function holderCount (connection, id) {
+  // Every holder, shown or hidden, as the phrase a 409 uses.
+  async function holders (connection, id) {
     const [[row]] = await connection.query(
-      `SELECT COUNT(DISTINCT volunteerId) AS n FROM \`${junction}\` WHERE ${entityType}Id = ?`, [id])
-    return row.n
+      `SELECT COUNT(DISTINCT j.volunteerId) AS n${hasScope ? `, COUNT(DISTINCT IF(${positionShownSql('v')}, NULL, j.volunteerId)) AS hidden` : ''}
+       FROM \`${junction}\` j JOIN volunteer v ON v.id = j.volunteerId WHERE j.${entityType}Id = ?`, [id])
+    return { n: row.n, phrase: `${row.n} volunteer(s)${row.hidden ? `, ${row.hidden} of them inactive` : ''}` }
   }
 
   // Full replace of a position's expected trainings. Runs inside the
@@ -80,10 +88,10 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) 
           transactionFn: async (connection) => {
             if (fields.scope !== undefined) {
               const [[cur]] = await connection.query(`SELECT scope FROM ${t} WHERE id = ?`, [id])
-              const n = await holderCount(connection, id)
-              if (cur && cur.scope !== fields.scope && n > 0) {
+              const h = await holders(connection, id)
+              if (cur && cur.scope !== fields.scope && h.n > 0) {
                 throw new SmError.ConflictError(
-                  `This ${label} is held by ${n} volunteer(s); its scope can't change until they are unassigned.`)
+                  `This ${label} is held by ${h.phrase}; its scope can't change until they are unassigned.`)
               }
             }
             await AuditService.auditUpdate(connection, { entityType, entityId: id, userId },
@@ -100,10 +108,10 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) 
     async remove (id, userId) {
       await dbUtils.retryOnDeadlock2({
         transactionFn: async (connection) => {
-          const n = await holderCount(connection, id)
-          if (n > 0) {
+          const h = await holders(connection, id)
+          if (h.n > 0) {
             throw new SmError.ConflictError(
-              `This ${label} is held by ${n} volunteer(s). Remove it from them first, or rename it instead.`)
+              `This ${label} is held by ${h.phrase}. Remove it from them first, or rename it instead.`)
           }
           await AuditService.auditDelete(connection, { entityType, entityId: id, userId },
             () => connection.query(`DELETE FROM ${t} WHERE id = ?`, [id]))

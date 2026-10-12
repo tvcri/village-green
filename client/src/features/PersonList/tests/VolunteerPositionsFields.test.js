@@ -19,7 +19,7 @@ beforeEach(() => {
 })
 afterEach(() => cleanup())
 
-function renderWith ({ positions, associates = ['7'], trainings = [] }) {
+function renderWith ({ positions, associates = ['7'], trainings = [], active = true }) {
   const model = ref(positions)
   const adding = ref(false)
   const assoc = ref(associates)
@@ -29,7 +29,7 @@ function renderWith ({ positions, associates = ['7'], trainings = [] }) {
       positions: model.value, 'onUpdate:positions': (v) => { model.value = v },
       adding: adding.value, 'onUpdate:adding': (v) => { adding.value = v },
       positionOptions, homeVillage: { villageId: '1', name: 'Barrington' }, associateVillageIds: assoc.value,
-      villageOptions, circleOptions: [], trainings: tr.value, trainingOptions,
+      villageOptions, circleOptions: [], trainings: tr.value, trainingOptions, active,
     }),
   }, { global: { plugins: [PrimeVue] } })
   return { model, adding, assoc, tr, ...utils }
@@ -51,6 +51,20 @@ async function pick (label, option) {
 }
 
 describe('VolunteerPositionsFields', () => {
+  it('an inactive volunteer keeps their positions, with a note that they are hidden', () => {
+    renderWith({ positions: [bod], active: false })
+    expect(screen.getByText('Board of Directors')).toBeInTheDocument()
+    expect(screen.getByTestId('positions-hidden-note')).toHaveTextContent('kept but hidden from position pages')
+  })
+
+  it('no hidden note for an active volunteer, or an inactive one with no positions', () => {
+    renderWith({ positions: [bod] })
+    expect(screen.queryByTestId('positions-hidden-note')).toBeNull()
+    cleanup()
+    renderWith({ positions: [], active: false })
+    expect(screen.queryByTestId('positions-hidden-note')).toBeNull()
+  })
+
   it('shows the training hint and clears it when the training is added', async () => {
     const { tr } = renderWith({ positions: [ma('7', 'Warwick')] })
     expect(screen.getByText('No record of Ambassador Training')).toBeInTheDocument()
