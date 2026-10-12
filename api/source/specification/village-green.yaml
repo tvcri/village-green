@@ -1721,6 +1721,11 @@ paths:
       tags:
       - Volunteer
       operationId: getVolunteers
+      parameters:
+        - name: includeInactive
+          in: query
+          description: Include inactive volunteers. Honoured only for callers holding federation volunteer:read_inactive.
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: List of volunteers
@@ -1960,6 +1965,167 @@ paths:
                 items: { $ref: '#/components/schemas/VettingType' }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
+
+  /trainings:
+    get:
+      summary: List volunteer trainings
+      tags: [Training]
+      operationId: getTrainings
+      responses:
+        '200':
+          description: The training catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Training' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a training to the catalog (training:admin)
+      tags: [Training]
+      operationId: createTraining
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainingCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Training' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /trainings/{trainingId}:
+    parameters: [ { $ref: '#/components/parameters/TrainingIdPath' } ]
+    patch:
+      summary: Rename or redescribe a training (training:admin)
+      tags: [Training]
+      operationId: patchTraining
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainingPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Training' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a training nobody holds (training:admin); 409 when held
+      tags: [Training]
+      operationId: deleteTraining
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /trainings/{trainingId}/completions:
+    parameters: [ { $ref: '#/components/parameters/TrainingIdPath' } ]
+    get:
+      summary: Who completed this training, newest first
+      tags: [Training]
+      operationId: getTrainingCompletions
+      responses:
+        '200':
+          description: One row per completion
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TrainingCompletion' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer:read ] } ]
+    post:
+      summary: Record one completion date for several volunteers, optionally assigning a position
+      tags: [Training]
+      operationId: recordTrainingCompletions
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TrainingCompletionsRecord' } } }
+      responses:
+        '200': { description: What happened per person, content: { application/json: { schema: { $ref: '#/components/schemas/TrainingCompletionsResult' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /trainings/{trainingId}/completions/{volunteerTrainingId}:
+    parameters:
+      - $ref: '#/components/parameters/TrainingIdPath'
+      - name: volunteerTrainingId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/StringIntId' }
+    delete:
+      summary: Remove one completion record
+      tags: [Training]
+      operationId: deleteTrainingCompletion
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /positions:
+    get:
+      summary: List volunteer positions
+      tags: [Position]
+      operationId: getPositions
+      responses:
+        '200':
+          description: The position catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Position' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a position to the catalog (position:admin)
+      tags: [Position]
+      operationId: createPosition
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PositionCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Position' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /positions/{positionId}:
+    parameters: [ { $ref: '#/components/parameters/PositionIdPath' } ]
+    patch:
+      summary: Rename, redescribe or rescope a position (position:admin); scope is 409 while held
+      tags: [Position]
+      operationId: patchPosition
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PositionPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Position' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a position nobody holds (position:admin); 409 when held
+      tags: [Position]
+      operationId: deletePosition
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /positions/{positionId}/holders:
+    parameters: [ { $ref: '#/components/parameters/PositionIdPath' } ]
+    get:
+      summary: Who holds this position
+      tags: [Position]
+      operationId: getPositionHolders
+      parameters:
+        - name: includeInactive
+          in: query
+          description: Also list inactive holders, whose positions are kept but hidden. Honoured only for callers holding federation volunteer:read_inactive.
+          schema: { type: boolean, default: false }
+      responses:
+        '200': { description: 'Active holders by village or circle, then name. Inactive volunteers keep their positions but are not listed unless includeInactive is honoured.', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PositionHolder' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer:read ] } ]
+    patch:
+      summary: Add and remove holders in one transaction
+      tags: [Position]
+      operationId: patchPositionHolders
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PositionHoldersPatch' } } }
+      responses:
+        '200': { description: The holder list after the change, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PositionHolder' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
 
   /service-requests:
     get:
@@ -5787,6 +5953,18 @@ components:
         fullName:
           type: string
           maxLength: 200
+        displayName:
+          type: string
+          maxLength: 300
+        active:
+          type: boolean
+          nullable: true
+        village:
+          type: object
+          nullable: true
+          properties:
+            villageId: { $ref: '#/components/schemas/VillageId' }
+            name: { type: string }
         capabilities:
           type: array
           items:
@@ -5813,6 +5991,177 @@ components:
       properties:
         vettingTypeId: { $ref: '#/components/schemas/VettingTypeId' }
         name: { type: string, maxLength: 100 }
+    TrainingId:
+      $ref: '#/components/schemas/StringIntId'
+    CatalogName:
+      type: string
+      minLength: 1
+      maxLength: 100
+    CatalogDescription:
+      type: string
+      maxLength: 255
+      nullable: true
+    Training:
+      additionalProperties: false
+      type: object
+      required: [ trainingId, name, description, holderCount, lastCompletedDate ]
+      properties:
+        trainingId: { $ref: '#/components/schemas/TrainingId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        holderCount: { type: integer, minimum: 0, description: Volunteers holding at least one record of this training }
+        lastCompletedDate: { type: string, format: date, nullable: true, description: Newest dated completion of this training (null when none) }
+    TrainingCreate:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+    TrainingPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+    PositionId:
+      $ref: '#/components/schemas/StringIntId'
+    PositionScope:
+      type: string
+      enum: [ federation, village, circle ]
+      description: Where the position is held. The UI says "Hub" for federation.
+    Position:
+      additionalProperties: false
+      type: object
+      required: [ positionId, name, description, scope, holderCount, inactiveHolderCount, trainingIds ]
+      properties:
+        positionId: { $ref: '#/components/schemas/PositionId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        scope: { $ref: '#/components/schemas/PositionScope' }
+        holderCount: { type: integer, minimum: 0, description: 'Active volunteers holding this position anywhere, the ones its holders list shows' }
+        inactiveHolderCount: { type: integer, minimum: 0, description: 'Inactive volunteers who keep this position, hidden from its holders list. They still block delete and scope change.' }
+        trainingIds:
+          type: array
+          description: Trainings expected before assignment. Reminders only; never enforced.
+          items: { $ref: '#/components/schemas/TrainingId' }
+    PositionCreate:
+      additionalProperties: false
+      type: object
+      required: [ name, scope ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        scope: { $ref: '#/components/schemas/PositionScope' }
+        trainingIds:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/TrainingId' }
+    PositionPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        scope: { $ref: '#/components/schemas/PositionScope' }
+        trainingIds:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/TrainingId' }
+    VolunteerPersonRef:
+      additionalProperties: false
+      type: object
+      required: [ personId, fullName, displayName, village, active ]
+      properties:
+        personId: { $ref: '#/components/schemas/PersonId' }
+        fullName: { type: string }
+        displayName: { type: string }
+        village:
+          type: object
+          nullable: true
+          properties:
+            villageId: { $ref: '#/components/schemas/VillageId' }
+            name: { type: string }
+        active: { type: boolean, nullable: true }
+    TrainingCompletion:
+      additionalProperties: false
+      type: object
+      required: [ volunteerTrainingId, completedDate, notes, person ]
+      properties:
+        volunteerTrainingId: { $ref: '#/components/schemas/StringIntId' }
+        completedDate: { type: string, format: date, nullable: true }
+        notes: { type: string, nullable: true }
+        person: { $ref: '#/components/schemas/VolunteerPersonRef' }
+    TrainingCompletionsRecord:
+      additionalProperties: false
+      type: object
+      required: [ completedDate, personIds ]
+      properties:
+        completedDate: { type: string, format: date }
+        notes: { type: string, nullable: true }
+        personIds:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/PersonId' }
+        positionId:
+          allOf: [ { $ref: '#/components/schemas/StringIntIdNullable' } ]
+    TrainingCompletionsResult:
+      additionalProperties: false
+      type: object
+      required: [ recorded, skipped, assigned, notAssigned ]
+      properties:
+        recorded: { type: array, items: { $ref: '#/components/schemas/PersonId' } }
+        skipped: { type: array, items: { $ref: '#/components/schemas/PersonId' } }
+        assigned: { type: array, items: { $ref: '#/components/schemas/PersonId' } }
+        notAssigned:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [ personId, reason ]
+            properties:
+              personId: { $ref: '#/components/schemas/PersonId' }
+              reason: { type: string, enum: [ alreadyHolds, noHomeVillage ] }
+    PositionHolder:
+      additionalProperties: false
+      type: object
+      required: [ volunteerPositionId, village, circle, person ]
+      properties:
+        volunteerPositionId: { $ref: '#/components/schemas/StringIntId' }
+        village:
+          type: object
+          nullable: true
+          properties:
+            villageId: { $ref: '#/components/schemas/VillageId' }
+            name: { type: string }
+        circle:
+          type: object
+          nullable: true
+          properties:
+            circleId: { $ref: '#/components/schemas/CircleId' }
+            name: { type: string }
+        person: { $ref: '#/components/schemas/VolunteerPersonRef' }
+    PositionHoldersPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        add:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [ personId ]
+            properties:
+              personId: { $ref: '#/components/schemas/PersonId' }
+              villageId: { $ref: '#/components/schemas/VillageIdNullable' }
+              circleId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        remove:
+          type: array
+          items: { $ref: '#/components/schemas/StringIntId' }
     VolunteerVettingInput:
       additionalProperties: false
       type: object
@@ -5828,6 +6177,34 @@ components:
           type: string
           format: date
           nullable: true
+        additionalData:
+          type: string
+          maxLength: 100
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    VolunteerTrainingInput:
+      additionalProperties: false
+      type: object
+      required: [ trainingId ]
+      properties:
+        trainingId: { $ref: '#/components/schemas/TrainingId' }
+        completedDate:
+          type: string
+          format: date
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    VolunteerPositionInput:
+      additionalProperties: false
+      type: object
+      required: [ positionId ]
+      properties:
+        positionId: { $ref: '#/components/schemas/PositionId' }
+        villageId: { $ref: '#/components/schemas/VillageIdNullable' }
+        circleId: { $ref: '#/components/schemas/StringIntIdNullable' }
     VolunteerDetail:
       additionalProperties: false
       type: object
@@ -5878,6 +6255,48 @@ components:
                 type: string
                 format: date
                 nullable: true
+              additionalData:
+                type: string
+                maxLength: 100
+                nullable: true
+              notes:
+                type: string
+                nullable: true
+        trainings:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [ volunteerTrainingId, trainingId, name, completedDate, notes ]
+            properties:
+              volunteerTrainingId: { $ref: '#/components/schemas/StringIntId' }
+              trainingId: { $ref: '#/components/schemas/TrainingId' }
+              name: { type: string, maxLength: 100 }
+              completedDate: { type: string, format: date, nullable: true }
+              notes: { type: string, nullable: true }
+        positions:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [ volunteerPositionId, positionId, name, scope, village, circle ]
+            properties:
+              volunteerPositionId: { $ref: '#/components/schemas/StringIntId' }
+              positionId: { $ref: '#/components/schemas/PositionId' }
+              name: { type: string, maxLength: 100 }
+              scope: { $ref: '#/components/schemas/PositionScope' }
+              village:
+                type: object
+                nullable: true
+                properties:
+                  villageId: { $ref: '#/components/schemas/VillageId' }
+                  name: { type: string }
+              circle:
+                type: object
+                nullable: true
+                properties:
+                  circleId: { $ref: '#/components/schemas/CircleId' }
+                  name: { type: string }
     VolunteerId:
       $ref: '#/components/schemas/StringIntId'
     VolunteerPut:
@@ -5903,6 +6322,12 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+        trainings:
+          type: array
+          items: { $ref: '#/components/schemas/VolunteerTrainingInput' }
+        positions:
+          type: array
+          items: { $ref: '#/components/schemas/VolunteerPositionInput' }
         application:
           $ref: '#/components/schemas/ApplicationEnvelope'
           nullable: true
@@ -5930,6 +6355,12 @@ components:
         vettings:
           type: array
           items: { $ref: '#/components/schemas/VolunteerVettingInput' }
+        trainings:
+          type: array
+          items: { $ref: '#/components/schemas/VolunteerTrainingInput' }
+        positions:
+          type: array
+          items: { $ref: '#/components/schemas/VolunteerPositionInput' }
         application:
           $ref: '#/components/schemas/ApplicationEnvelope'
           nullable: true
@@ -6337,6 +6768,18 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/PersonId'
+    TrainingIdPath:
+      name: trainingId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/TrainingId'
+    PositionIdPath:
+      name: positionId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/PositionId'
     PersonProjectionQuery:
       name: projection
       in: query

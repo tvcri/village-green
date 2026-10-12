@@ -59,6 +59,22 @@ export function getHttpStatus(err) {
   return err?.status ?? null
 }
 
+/**
+ * The human-readable message from an API error. The API sends
+ * `{ error, code, detail }` (api/source/bootstrap/errorHandlers.js): `error`
+ * is the class message ("Conflict.", "Unprocessable Entity.") and `detail`
+ * the specific one when it is a string. Request-validation errors carry an
+ * array in `detail`, so those fall back to `error`.
+ * @param {unknown} err
+ * @param {string} fallback
+ * @returns {string}
+ */
+export function apiErrorMessage(err, fallback) {
+  const body = err?.body
+  if (typeof body?.detail === 'string' && body.detail) return body.detail
+  return body?.error || fallback
+}
+
 function safeJson(text) {
   try {
     return JSON.parse(text)

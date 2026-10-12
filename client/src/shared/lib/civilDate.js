@@ -32,3 +32,12 @@ export function isRealCivilDate (s) {
   const date = new Date(y, m - 1, d)
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// 'YYYY-MM-DD' -> 'Apr 25, 2025', for display. Splits the string; never a Date.
+export function formatCivilDate (s) {
+  if (!s) return ''
+  const [y, m, d] = s.split('-').map(Number)
+  return `${MONTHS[m - 1]} ${d}, ${y}`
+}

@@ -1,22 +1,28 @@
 'use strict';
 const VolunteerService = require('../service/VolunteerService')
-const MemberService = require('../service/MemberService')
 const PersonService = require('../service/PersonService')
 const SmError = require('../utils/error')
 const VillageService = require('../service/VillageService')
-const { hasPermission } = require('../utils/authz')
+const { hasPermission, canWritePosition } = require('../utils/authz')
+const volunteerReadScope = require('../utils/volunteerReadScope')
+const volunteerAssignments = require('../service/volunteerAssignments')
+
+// Each added or removed position is authorized against its own scope
+// (canWritePosition). Unchanged rows are not re-checked.
+async function authorizePositionChanges (req, personId, requested) {
+  const { added, removed } = await volunteerAssignments.positionChanges(personId, requested)
+  for (const p of [...added, ...removed]) {
+    if (!canWritePosition(req.userObject, p.scope, p.villageId)) throw new SmError.PrivilegeError()
+  }
+}
 
 module.exports.getVolunteers = async function getVolunteers (req, res, next) {
   try {
-    const villageIdsGranted = hasPermission(req.userObject, 'volunteer:read')
-      ? null // federation read: unrestricted
-      : Object.keys(req.userObject.grants).filter(
-          vid => hasPermission(req.userObject, 'volunteer:read', { villageId: vid })
-        )
-    if (villageIdsGranted && !villageIdsGranted.length) {
-      throw new SmError.PrivilegeError()
-    }
-    const response = await VillageService.getVolunteers({ villageIdsGranted })
+    const { villageIdsGranted, includeInactive } = volunteerReadScope(req.userObject)
+    const response = await VillageService.getVolunteers({
+      villageIdsGranted,
+      includeInactive: req.query.includeInactive === true && includeInactive,
+    })
     res.json(response)
   }
   catch (err) { next(err) }
@@ -29,12 +35,12 @@ module.exports.putPersonVolunteer = async function putPersonVolunteer (req, res,
     if (!person) throw new SmError.NotFoundError()
     // The volunteer role is granted against the person's home village, not a
     // body field — gate on the person record being mutated, same as Member.
+    // Unlike Member, no home village is required: a villageless person is a
+    // Hub volunteer, and the gate then needs a federation-level grant.
     if (!hasPermission(req.userObject, 'volunteer:write', { villageId: person.village?.villageId })) {
       throw new SmError.PrivilegeError()
     }
-    if (!(await MemberService.personHasHomeVillage(personId))) {
-      throw new SmError.UnprocessableError('Person must have a home village to hold a volunteer role.')
-    }
+    await authorizePositionChanges(req, personId, req.body.positions ?? [])
     const response = await VolunteerService.putVolunteer(personId, req.body, req.userObject)
     res.json(response)
   }
@@ -49,6 +55,12 @@ module.exports.patchPersonVolunteer = async function patchPersonVolunteer (req, 
     // Gate on the existing person's village, not the patch body's.
     if (!hasPermission(req.userObject, 'volunteer:write', { villageId: person.village?.villageId })) {
       throw new SmError.PrivilegeError()
+    }
+    if (req.body.positions !== undefined) await authorizePositionChanges(req, personId, req.body.positions)
+    // Without positions, an associate change revokes what it no longer covers
+    // (D8); those removals need the same per-scope authorization.
+    else if (req.body.associateVillageIds !== undefined) {
+      await volunteerAssignments.authorizeRevocations(req.userObject, personId, { associateVillageIds: req.body.associateVillageIds })
     }
     const response = await VolunteerService.patchVolunteer(personId, req.body, req.userObject)
     res.json(response)

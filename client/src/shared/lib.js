@@ -206,3 +206,6 @@ export function durationToNow(date) {
 
   return r.day > 0 ? `${r.day} d` : r.hour > 0 ? `${r.hour} h` : r.minute > 0 ? `${r.minute} m` : `now`
 }
+
+// "1 volunteer", "3 volunteers": regular English plurals only.
+export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`

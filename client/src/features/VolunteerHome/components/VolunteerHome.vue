@@ -8,10 +8,9 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import Button from 'primevue/button'
-import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Checkbox from 'primevue/checkbox'
+import TableFooter from '../../../components/TableFooter.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { serviceDateToDate, timeStringToLabel } from '../../ServiceRequestList/lib/timeFields.js'
 import { getVolunteerRequests, getVolunteerRequestVillages } from '../api/volunteerRequestApi.js'
@@ -279,13 +278,8 @@ function goToDetail(row) {
             :pt="{ bodyRow: { style: { cursor: 'pointer' } } }"
             @row-click="(event) => goToDetail(event.data)"
           >
-            <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
-              <div class="paginator-container">
-                <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
-                <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
-                <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-                <Select v-model="openPageRows" :options="[10, 25, 50, 100]" />
-              </div>
+            <template #paginatorcontainer="footer">
+              <TableFooter v-bind="footer" v-model="openPageRows" />
             </template>
             <template #empty>No open requests right now. Thanks for checking!</template>
             <Column field="serviceName" header="Service" sortable>
@@ -341,13 +335,8 @@ function goToDetail(row) {
             :pt="{ bodyRow: { style: { cursor: 'pointer' } } }"
             @row-click="(event) => goToDetail(event.data)"
           >
-            <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
-              <div class="paginator-container">
-                <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
-                <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
-                <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-                <Select v-model="myPageRows" :options="[10, 25, 50, 100]" />
-              </div>
+            <template #paginatorcontainer="footer">
+              <TableFooter v-bind="footer" v-model="myPageRows" />
             </template>
             <template #empty>You have no upcoming commitments.</template>
             <Column field="serviceName" header="Service" sortable>
@@ -405,13 +394,8 @@ function goToDetail(row) {
             :pt="{ bodyRow: { style: { cursor: 'pointer' } } }"
             @row-click="(event) => goToDetail(event.data)"
           >
-            <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
-              <div class="paginator-container">
-                <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
-                <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
-                <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-                <Select v-model="historyPageRows" :options="[10, 25, 50, 100]" />
-              </div>
+            <template #paginatorcontainer="footer">
+              <TableFooter v-bind="footer" v-model="historyPageRows" />
             </template>
             <template #empty>No completed requests yet.</template>
             <Column field="serviceName" header="Service" sortable>

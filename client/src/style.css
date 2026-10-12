@@ -209,7 +209,16 @@ textarea:focus {
   100% { background-color: transparent; }
 }
 
-.paginator-container { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; }
+/* Rows a save just added flash yellow once (position holders, training
+   completions). box-shadow inset rather than background-color: a
+   background-color keyframe on a <td> can leave a stale paint behind. */
+tr.row-saved-flash td { animation: row-saved-flash 2.4s ease-out; }
+@keyframes row-saved-flash {
+  0%, 40% { box-shadow: inset 0 0 0 999px rgba(250, 204, 21, 0.35); }
+  100%    { box-shadow: none; }
+}
+
+.paginator-container { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem; }
 .paginator-info { font-size: 0.9rem; color: var(--color-text-dim); min-width: 100px; text-align: center; }
 
 .privacy-modal-mask { backdrop-filter: blur(8px); }

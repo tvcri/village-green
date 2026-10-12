@@ -9,7 +9,8 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({ params: { personId: '5' } })
 }))
-vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
+const toastAdd = vi.hoisted(() => vi.fn())
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 vi.mock('../../../shared/composables/useRequirePermission.js', () => ({
   useRequirePermission: () => {}
 }))
@@ -23,15 +24,18 @@ vi.mock('../api/personApi.js', () => ({
       active: true,
       notes: 'Existing notes',
       capabilities: ['Driving'],
-      associateVillages: [],
-      vettings: []
+      vettings: [],
+      trainings: [{ volunteerTrainingId: '9', trainingId: '1', name: 'Volunteer Training', completedDate: '2025-04-25', notes: 'email' }],
+      positions: [{ volunteerPositionId: '3', positionId: '3', name: 'Member Ambassador', scope: 'village', village: { villageId: '7', name: 'Warwick' }, circle: null }],
+      associateVillages: [{ villageId: '7', name: 'Warwick' }],
     }
   }),
   getCapabilities: vi.fn().mockResolvedValue([
     { capabilityId: 1, name: 'Driving' },
     { capabilityId: 2, name: 'Errands' }
   ]),
-  getVettingTypes: vi.fn().mockResolvedValue([])
+  getVettingTypes: vi.fn().mockResolvedValue([]),
+  getCircles: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('../api/roleApi.js', () => ({
   putVolunteer: vi.fn().mockResolvedValue({}),
@@ -39,8 +43,10 @@ vi.mock('../api/roleApi.js', () => ({
   deleteVolunteer: vi.fn().mockResolvedValue({})
 }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({
-  getVillages: vi.fn().mockResolvedValue([{ villageId: '1', name: 'Testville' }])
+  getVillages: vi.fn().mockResolvedValue([{ villageId: '1', name: 'Testville' }, { villageId: '7', name: 'Warwick' }])
 }))
+vi.mock('../../Trainings/api/trainingApi.js', () => ({ getTrainings: vi.fn().mockResolvedValue([{ trainingId: '1', name: 'Volunteer Training' }]) }))
+vi.mock('../../Positions/api/positionApi.js', () => ({ getPositions: vi.fn().mockResolvedValue([{ positionId: '3', name: 'Member Ambassador', scope: 'village', trainingIds: [] }]) }))
 
 import { getPerson } from '../api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../api/roleApi.js'
@@ -70,8 +76,8 @@ const globalOpts = {
 }
 
 describe('VolunteerEdit', () => {
-  // A failed load leaves person null, so the no-home-village notice replaces
-  // the form: no Save or Grant button exists to PUT a new role over the stored one.
+  // A failed load leaves person null, so the Loading notice replaces the
+  // form: no Save or Grant button exists to PUT a new role over the stored one.
   it('a failed person load renders no save button, so it can never PUT a role', async () => {
     getPerson.mockRejectedValueOnce(new Error('down'))
     render(VolunteerEdit, { global: globalOpts })
@@ -107,5 +113,109 @@ describe('VolunteerEdit', () => {
     expect(personId).toBe('5')
     expect(body.notes).toBe('Updated notes')
     expect(body.active).toBe(false)
+  })
+
+  it('renders the form for a person with no home village (Hub volunteer)', async () => {
+    getPerson.mockResolvedValueOnce({ personId: '5', fullName: 'Quinn, Robert', village: null, volunteer: null })
+    render(VolunteerEdit, { global: globalOpts })
+    expect(await screen.findByText('Grant Volunteer Role')).toBeInTheDocument()
+    // Granting the role is the change: the button is live with nothing edited.
+    expect(screen.getByRole('button', { name: 'Grant Volunteer Role' })).toBeEnabled()
+    expect(screen.getByTestId('footer-note')).toHaveTextContent(/^$/)
+    expect(screen.queryByText(/Set a home village/)).toBeNull()
+  })
+
+  it('sends trainings and positions on save', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await fireEvent.update(await screen.findByDisplayValue('Existing notes'), 'Edited')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    const body = patchVolunteer.mock.calls[0][1]
+    expect(body.trainings).toEqual([{ trainingId: '1', completedDate: '2025-04-25', notes: 'email' }])
+    expect(body.positions).toEqual([{ positionId: '3', villageId: '7', circleId: null }])
+  })
+
+  // An open "new" row is not part of the form until its ✓ is pressed, so Save
+  // waits rather than silently dropping it.
+  it('blocks Save while a new vetting, training or position row is open', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await fireEvent.update(await screen.findByDisplayValue('Existing notes'), 'Edited')
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBeEnabled()
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Position' }))
+    expect(save).toBeDisabled()
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('Finish or cancel the new position first.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Training' }))
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('Finish or cancel the new training and position first.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add Vetting' }))
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('Finish or cancel the new vetting, training and position first.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel new position' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel new training' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel new vetting' }))
+    expect(save).toBeEnabled()
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('notes edited')
+  })
+
+  it('says "No changes" and disables Save until something changes, then summarizes', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await screen.findByDisplayValue('Existing notes')
+    const save = screen.getByRole('button', { name: 'Save' })
+    const note = screen.getByTestId('footer-note')
+    expect(note).toHaveTextContent('No changes')
+    expect(save).toBeDisabled()
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove Volunteer Training' }))
+    await fireEvent.update(screen.getByDisplayValue('Existing notes'), 'Edited')
+    expect(note).toHaveTextContent('1 training removed · notes edited')
+    expect(save).toBeEnabled()
+    await fireEvent.update(screen.getByDisplayValue('Edited'), 'Existing notes')
+    expect(note).toHaveTextContent('1 training removed')
+  })
+
+  // Review Focus 3: a position its villages no longer cover is left out of
+  // the PATCH (the server would 422 on it) and named in the toast.
+  it('leaves out a position whose village is no longer covered, so the save does not 422', async () => {
+    getPerson.mockResolvedValueOnce({
+      personId: '5', fullName: 'Smith, Alice', village: { villageId: '1' },
+      volunteer: {
+        providerType: null, active: true, notes: 'Existing notes', capabilities: [], vettings: [], trainings: [],
+        associateVillages: [], // Warwick already removed in this form session
+        positions: [{ volunteerPositionId: '3', positionId: '3', name: 'Member Ambassador', scope: 'village', village: { villageId: '7', name: 'Warwick' }, circle: null }],
+      },
+    })
+    render(VolunteerEdit, { global: globalOpts })
+    expect(await screen.findByText('Will be removed on save: Warwick is no longer one of this volunteer’s villages.')).toBeInTheDocument()
+    // The pending removal is itself a change Save will make.
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('1 position removed')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    expect(patchVolunteer.mock.calls[0][1].positions).toEqual([])
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      severity: 'success', detail: 'Volunteer role saved. Removed Member Ambassador, Warwick.',
+    }))
+  })
+
+  // Review Focus 3, second half: removing the associate village and re-adding
+  // it before save keeps the position, and the toast names no removal.
+  it('keeps a position when its associate village is removed and re-added before save', async () => {
+    const { container } = render(VolunteerEdit, { global: globalOpts })
+    await screen.findByDisplayValue('Existing notes')
+    const chip = [...container.querySelectorAll('.p-multiselect-chip-item')].find(e => e.textContent.includes('Warwick'))
+    await fireEvent.click(chip.querySelector('.p-chip-remove-icon'))
+    expect(await screen.findByText(/Will be removed on save: Warwick/)).toBeInTheDocument()
+
+    await fireEvent.click(container.querySelector('#associateVillages'))
+    const option = (await screen.findAllByRole('option')).find(o => o.textContent.includes('Warwick'))
+    await fireEvent.click(option)
+    await waitFor(() => expect(screen.queryByText(/Will be removed on save/)).toBeNull())
+    // Back where it started: nothing to save until something else changes.
+    expect(screen.getByTestId('footer-note')).toHaveTextContent('No changes')
+    await fireEvent.update(screen.getByDisplayValue('Existing notes'), 'Edited')
+
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    const body = patchVolunteer.mock.calls[0][1]
+    expect(body.associateVillageIds).toEqual(['7'])
+    expect(body.positions).toEqual([{ positionId: '3', villageId: '7', circleId: null }])
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', detail: 'Volunteer role saved' }))
   })
 })

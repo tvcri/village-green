@@ -4,10 +4,17 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import { getPerson, getCapabilities, getVettingTypes } from '../api/personApi.js'
+import { getPerson, getCapabilities, getVettingTypes, getCircles } from '../api/personApi.js'
 import { putVolunteer, patchVolunteer, deleteVolunteer } from '../api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { getTrainings } from '../../Trainings/api/trainingApi.js'
+import { getPositions } from '../../Positions/api/positionApi.js'
 import VolunteerFormFields from './VolunteerFormFields.vue'
+import VolunteerVettingsFields from './VolunteerVettingsFields.vue'
+import VolunteerTrainingsFields from './VolunteerTrainingsFields.vue'
+import VolunteerPositionsFields from './VolunteerPositionsFields.vue'
+import { isPositionEligible } from '../../../shared/lib/positionRules.js'
+import { volunteerSnapshot, summarizeVolunteerChanges } from '../lib/volunteerChanges.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
@@ -18,7 +25,15 @@ const personId = computed(() => route.params.personId)
 
 const person = ref(null)
 const hasVolunteer = ref(false)
-const hasHomeVillage = computed(() => !!person.value?.village?.villageId)
+// A person with no home village is a Hub volunteer: the role is allowed.
+// Person.village carries name with villageId; the villageOptions lookup is a
+// fallback so the help text never reads "undefined (home)".
+const homeVillage = computed(() => {
+  const v = person.value?.village
+  if (!v?.villageId) return null
+  const name = v.name ?? villageOptions.value.find(o => String(o.villageId) === String(v.villageId))?.name ?? null
+  return { villageId: v.villageId, name }
+})
 
 const capabilityOptions = ref([])   // [{ capabilityId, name }] from getCapabilities()
 const villageOptions = ref([])      // [{ villageId, name }] from getVillages()
@@ -28,16 +43,56 @@ const selectedAssociateVillageIds = ref([])
 const providerType = ref('')
 const active = ref(true)
 const notes = ref('')
-const vettings = ref([])
+const vettings = ref([])            // [{ key, vettingTypeId, name, dateEntered, dateExpired, additionalData, notes }]
+const trainingOptions = ref([])     // [{ trainingId, name }]
+const positionOptions = ref([])     // [{ positionId, name, scope, trainingIds }]
+const circleOptions = ref([])       // [{ circleId, name }]
+const trainings = ref([])           // [{ trainingId, name, completedDate, notes }]
+const positions = ref([])           // [{ positionId, name, scope, villageId, villageName, circleId, circleName }]
+// A new vetting, training or position row is outside the model until its ✓
+// is pressed, so Save waits for it rather than silently dropping it.
+const addingVetting = ref(false)
+const addingTraining = ref(false)
+const addingPosition = ref(false)
+const pendingRowsMessage = computed(() => {
+  const open = [addingVetting.value && 'vetting', addingTraining.value && 'training', addingPosition.value && 'position'].filter(Boolean)
+  if (!open.length) return ''
+  const list = open.length > 1 ? `${open.slice(0, -1).join(', ')} and ${open.at(-1)}` : open[0]
+  return `Finish or cancel the new ${list} first.`
+})
+
+// A village position the home and associate villages no longer cover would
+// 422 the whole save, so it is left out (and named in the toast). Re-adding
+// the associate village before saving keeps it.
+const keptPositions = computed(() => {
+  const homeId = person.value?.village?.villageId ?? null
+  return positions.value.filter(r => isPositionEligible({ scope: r.scope, villageId: r.villageId }, homeId, selectedAssociateVillageIds.value))
+})
+
+// The footer says what Save will do, measured against what is stored: the
+// form as loaded, with every position it loaded. The current side counts only
+// the positions Save will send, so an uncovered one reads as removed.
+const formState = (positionRows) => volunteerSnapshot({
+  active: active.value, notes: notes.value, capabilityIds: selectedCapabilityIds.value,
+  associateVillageIds: selectedAssociateVillageIds.value, vettings: vettings.value, trainings: trainings.value, positions: positionRows,
+})
+const loadedState = ref(null)
+const changes = computed(() => (loadedState.value ? summarizeVolunteerChanges(loadedState.value, formState(keptPositions.value)) : []))
+// Granting the role is itself the change, so only an existing role needs edits.
+const saveDisabled = computed(() => !!pendingRowsMessage.value || (hasVolunteer.value && !changes.value.length))
+const footerNote = computed(() => pendingRowsMessage.value || changes.value.join(' · ') || (hasVolunteer.value ? 'No changes' : ''))
 
 onMounted(async () => {
   try {
-    const [capabilities, vettingTypes, villages] = await Promise.all([
-      getCapabilities(), getVettingTypes(), getVillages(),
+    const [capabilities, vettingTypes, villages, trainingList, positionList, circles] = await Promise.all([
+      getCapabilities(), getVettingTypes(), getVillages(), getTrainings(), getPositions(), getCircles(),
     ])
     capabilityOptions.value = capabilities
     vettingTypeOptions.value = vettingTypes
     villageOptions.value = villages
+    trainingOptions.value = trainingList
+    positionOptions.value = positionList
+    circleOptions.value = circles
     const p = await getPerson(personId.value, ['volunteer'])
     person.value = p
     if (p.volunteer) {
@@ -50,8 +105,20 @@ onMounted(async () => {
       providerType.value = d.providerType ?? ''
       active.value = d.active ?? true
       notes.value = d.notes ?? ''
-      vettings.value = d.vettings ?? []
+      // key: stable row identity for the change summary (vettings carry no id); never sent.
+      vettings.value = (d.vettings ?? []).map((v, i) => ({ ...v, key: `vv${i}` }))
+      // key/sortDate: stable row identity and order for VolunteerTrainingsFields; never sent.
+      trainings.value = (d.trainings ?? []).map(t => ({
+        key: `vt${t.volunteerTrainingId}`, sortDate: t.completedDate,
+        trainingId: t.trainingId, name: t.name, completedDate: t.completedDate, notes: t.notes,
+      }))
+      positions.value = (d.positions ?? []).map(r => ({
+        positionId: r.positionId, name: r.name, scope: r.scope,
+        villageId: r.village?.villageId ?? null, villageName: r.village?.name ?? null,
+        circleId: r.circle?.circleId ?? null, circleName: r.circle?.name ?? null,
+      }))
     }
+    loadedState.value = formState(positions.value)
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load person', life: 3000 })
@@ -59,18 +126,27 @@ onMounted(async () => {
 })
 
 async function save () {
+  const kept = keptPositions.value
+  const dropped = positions.value.filter(r => !kept.includes(r))
   const body = {
     providerType: providerType.value || null,
     active: active.value,
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
     associateVillageIds: selectedAssociateVillageIds.value,
-    vettings: vettings.value.map(({ vettingTypeId, dateEntered, dateExpired }) => ({ vettingTypeId, dateEntered, dateExpired })),
+    vettings: vettings.value.map(({ vettingTypeId, dateEntered, dateExpired, additionalData, notes }) => ({ vettingTypeId, dateEntered, dateExpired, additionalData, notes })),
+    trainings: trainings.value.map(({ trainingId, completedDate, notes }) => ({ trainingId, completedDate: completedDate ?? null, notes: notes ?? null })),
+    positions: kept.map(({ positionId, villageId, circleId }) => ({ positionId, villageId: villageId ?? null, circleId: circleId ?? null })),
   }
   try {
     if (hasVolunteer.value) await patchVolunteer(personId.value, body)
     else await putVolunteer(personId.value, body)
-    toast.add({ severity: 'success', summary: 'Saved', detail: 'Volunteer role saved', life: 2000 })
+    toast.add({
+      severity: 'success',
+      summary: 'Saved',
+      detail: dropped.length ? `Volunteer role saved. Removed ${dropped.map(r => `${r.name}, ${r.villageName}`).join('; ')}.` : 'Volunteer role saved',
+      life: dropped.length ? 5000 : 2000,
+    })
     back()
   }
   catch {
@@ -96,10 +172,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
   <Card class="detail-card">
     <template #title>Volunteer Role — {{ person?.fullName }}</template>
     <template #content>
-      <div v-if="!hasHomeVillage" class="notice">
-        Set a home village on the person before granting a volunteer role.
-        <Button label="Back" severity="secondary" @click="back" />
-      </div>
+      <div v-if="!person" class="notice">Loading…</div>
 
       <!-- No submit button, so Enter in a text box never saves (browsers only
            submit implicitly when a form has one); @submit.prevent stays as a
@@ -111,17 +184,20 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           v-model:notes="notes"
           v-model:selected-capability-ids="selectedCapabilityIds"
           v-model:selected-associate-village-ids="selectedAssociateVillageIds"
-          v-model:vettings="vettings"
           :capability-options="capabilityOptions"
           :village-options="villageOptions"
-          :vetting-type-options="vettingTypeOptions"
-          show-vettings
         />
+        <VolunteerVettingsFields v-model:vettings="vettings" v-model:adding="addingVetting" :vetting-type-options="vettingTypeOptions" />
+        <VolunteerTrainingsFields v-model:trainings="trainings" v-model:adding="addingTraining" :training-options="trainingOptions" />
+        <VolunteerPositionsFields v-model:positions="positions" v-model:adding="addingPosition" :position-options="positionOptions" :home-village="homeVillage"
+                                  :associate-village-ids="selectedAssociateVillageIds" :village-options="villageOptions"
+                                  :circle-options="circleOptions" :trainings="trainings" :training-options="trainingOptions" :active="active" />
 
         <div class="form-footer">
+          <span class="footer-note" data-testid="footer-note">{{ footerNote }}</span>
           <Button v-if="hasVolunteer" type="button" label="Revoke Role" severity="danger" @click="revoke" />
           <Button type="button" label="Cancel" severity="secondary" @click="back" />
-          <Button type="button" :label="hasVolunteer ? 'Save' : 'Grant Volunteer Role'" @click="save" />
+          <Button type="button" :label="hasVolunteer ? 'Save' : 'Grant Volunteer Role'" :disabled="saveDisabled" @click="save" />
         </div>
       </form>
     </template>
@@ -158,11 +234,18 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
   bottom: 0;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 1.5rem;
   padding: 0.75rem 0;
   background: var(--p-card-background);
   border-top: 1px solid var(--color-border-default);
+}
+.footer-note {
+  margin-right: auto;
+  color: var(--color-text-dim);
+  font-size: 0.875rem;
 }
 </style>

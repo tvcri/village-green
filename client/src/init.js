@@ -143,6 +143,8 @@ async function handleNoParameters(redirectUri, hash) {
       // Storage unavailable: redirect without a hint.
     }
 
+    globalThis.VG && (globalThis.VG.navigatingAway = true)
+
     window.location.href = redirectOidc
     return false
   }
@@ -164,6 +166,7 @@ async function handleRedirectAndParameters(redirectUri, paramStr) {
   if (!params.state || params.state !== sessionStorage.getItem('oidcState')) {
     const reauthHref = window.location.origin + window.location.pathname
     console.log(`[init] State mismatch. Redirecting to ${reauthHref}.`)
+    globalThis.VG && (globalThis.VG.navigatingAway = true)
     window.location.href = reauthHref
     return false
   }
@@ -236,6 +239,7 @@ async function setupOidcWorker() {
         // reloadIfExpired) don't mistake the cleared token for staleness
         // while the end-session navigation is pending.
         this.isLoggingOut = true
+        globalThis.VG && (globalThis.VG.navigatingAway = true)
         window.location.href = response.redirect
       }
     },

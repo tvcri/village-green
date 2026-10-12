@@ -2,6 +2,7 @@
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
 const AuditService = require('./audit/AuditService')
+const volunteerAssignments = require('./volunteerAssignments')
 
 // Ensure a volunteer row exists for the person; return its id.
 async function ensureVolunteer (connection, personId) {
@@ -28,6 +29,15 @@ async function replaceCapabilities (connection, volunteerId, capabilityIds) {
   }
 }
 
+// D8 eligibility context: the home village plus the associate villages as
+// they stand inside this transaction (after this request's associate write).
+async function eligibilityContext (connection, personId, volunteerId) {
+  const [[person]] = await connection.query('SELECT villageId FROM person WHERE id = ?', [personId])
+  const [assoc] = await connection.query(
+    'SELECT villageId FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
+  return { homeVillageId: person?.villageId ?? null, associateVillageIds: assoc.map(a => a.villageId) }
+}
+
 // Full-array replace of associate villages for a volunteer.
 async function replaceAssociateVillages (connection, volunteerId, villageIds) {
   await connection.query(
@@ -47,9 +57,10 @@ async function replaceVettings (connection, volunteerId, vettings) {
     'DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId]
   )
   if (vettings?.length) {
-    const values = vettings.map(v => [volunteerId, v.vettingTypeId, v.dateEntered ?? null, v.dateExpired ?? null])
+    const values = vettings.map(v => [volunteerId, v.vettingTypeId, v.dateEntered ?? null, v.dateExpired ?? null,
+      v.additionalData ?? null, v.notes ?? null])
     await connection.query(
-      'INSERT INTO volunteer_vetting (volunteerId, vettingTypeId, dateEntered, dateExpired) VALUES ?', [values]
+      'INSERT INTO volunteer_vetting (volunteerId, vettingTypeId, dateEntered, dateExpired, additionalData, notes) VALUES ?', [values]
     )
   }
 }
@@ -62,7 +73,7 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], application } = {}, userObject) {
+module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], trainings = [], positions = [], application } = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
@@ -83,6 +94,9 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
           await replaceCapabilities(connection, volunteerId, capabilityIds)
           await replaceAssociateVillages(connection, volunteerId, associateVillageIds)
           await replaceVettings(connection, volunteerId, vettings)
+          await volunteerAssignments.applyTrainings(connection, volunteerId, trainings)
+          await volunteerAssignments.applyPositions(connection, volunteerId, positions,
+            await eligibilityContext(connection, personId, volunteerId))
           return volunteerId
         })
     },
@@ -118,6 +132,16 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
           if (body.vettings !== undefined) {
             await replaceVettings(connection, volunteerId, body.vettings)
           }
+          if (body.trainings !== undefined) {
+            await volunteerAssignments.applyTrainings(connection, volunteerId, body.trainings)
+          }
+          if (body.positions !== undefined) {
+            await volunteerAssignments.applyPositions(connection, volunteerId, body.positions,
+              await eligibilityContext(connection, personId, volunteerId))
+          }
+          if (body.associateVillageIds !== undefined && body.positions === undefined) {
+            await volunteerAssignments.pruneIneligiblePositions(connection, volunteerId)
+          }
           return volunteerId
         })
     },
@@ -129,6 +153,7 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
 module.exports.deleteVolunteer = async function (personId, userId) {
   // volunteer_capability and volunteer_village_associate cascade on volunteer delete
   // (associate has ON DELETE CASCADE; capability is cleared explicitly for safety).
+  // volunteer_vetting and volunteer_training are likewise cleared explicitly.
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [rows] = await connection.query(
@@ -140,6 +165,8 @@ module.exports.deleteVolunteer = async function (personId, userId) {
         async () => {
           await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
+          await connection.query('DELETE FROM volunteer_training WHERE volunteerId = ?', [volunteerId])
+          await connection.query('DELETE FROM volunteer_position WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
         })

@@ -18,6 +18,7 @@ import AccessTags from '../../../components/AccessTags.vue'
 import { accessSortString, matchesScopeFilter, HUB_FILTER } from '../../../shared/lib/accessTagHelpers.js'
 import { getVillages } from '../api/villageGrantApi.js'
 import ExportButton from '../../../components/ExportButton.vue'
+import TableFooter from '../../../components/TableFooter.vue'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { columnsForCsv, userRowsForCsv } from '../lib/userCsv.js'
@@ -192,18 +193,14 @@ async function onDeleteUser(user) {
       :row-class="rowClass"
       @row-click="onRowClick"
     >
-      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
-        <div class="paginator-container">
-          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
-          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
-          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+      <template #paginatorcontainer="footer">
+        <TableFooter v-bind="footer" v-model="pageRows">
           <ExportButton
             :disabled="isLoading || isCreatingSheet"
             @download="handleDownloadCsv"
             @export="handleCreateSheet"
           />
-        </div>
+        </TableFooter>
       </template>
 
       <Column field="username" header="Username" sortable></Column>

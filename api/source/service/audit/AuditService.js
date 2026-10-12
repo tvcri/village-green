@@ -16,7 +16,7 @@ function shapeFor (entityType) {
 // stays a Date and normalizes to a UTC instant string in the differ.
 function buildRowSql (shape) {
   const extras = (shape.extras ?? []).map(e => `, ${e.expr} AS \`${e.name}\``).join('')
-  return `SELECT t.*${extras} FROM ${shape.table} t WHERE t.\`${shape.idColumn ?? 'id'}\` = ?`
+  return `SELECT t.*${extras} FROM \`${shape.table}\` t WHERE t.\`${shape.idColumn ?? 'id'}\` = ?`
 }
 
 // Read the full audited shape of one entity ON THE CALLER'S TRANSACTION

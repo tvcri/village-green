@@ -33,3 +33,10 @@ test('expected non-elevated permissions exist', () => {
     assert.equal(catalog[key].requiresElevation, false)
   }
 })
+
+test('trainings/positions catalog permissions exist and are not elevated', () => {
+  for (const key of ['training:admin', 'position:admin']) {
+    assert.ok(catalog[key], `missing ${key}`)
+    assert.equal(catalog[key].requiresElevation, false)
+  }
+})

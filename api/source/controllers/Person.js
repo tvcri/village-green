@@ -3,6 +3,7 @@
 const PersonService = require('../service/PersonService')
 const SmError = require('../utils/error')
 const { hasPermission } = require('../utils/authz')
+const volunteerAssignments = require('../service/volunteerAssignments')
 
 // A read gate also governs WRITES of its columns: a caller who cannot see a
 // field must not be able to clear it by saving a form that never received it
@@ -106,6 +107,11 @@ module.exports.patchPerson = async function patchPerson (req, res, next) {
     if (Object.hasOwn(body, 'villageId') && body.villageId !== existing.village?.villageId
         && !hasPermission(req.userObject, 'person:write', { villageId: body.villageId })) {
       throw new SmError.PrivilegeError()
+    }
+    // A home-village change revokes the volunteer's village positions that no
+    // longer qualify (D8); each needs the per-scope position authorization.
+    if (Object.hasOwn(body, 'villageId') && body.villageId !== existing.village?.villageId) {
+      await volunteerAssignments.authorizeRevocations(req.userObject, personId, { homeVillageId: body.villageId })
     }
     stripHiddenFields(req, [existing.village?.villageId, ...(Object.hasOwn(body, 'villageId') ? [body.villageId] : [])])
 

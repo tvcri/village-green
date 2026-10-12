@@ -16,6 +16,8 @@ const props = defineProps({
   circles: { type: Array, default: () => [] },       // [{ circleId, name }] — the catalog
   circleNames: { type: Object, required: true },     // Set<name> — the person's circles
   disabilities: { type: Object, required: true },    // Map<name, note>
+  // Inline notice under Village when a change would remove positions (Edit Person).
+  villageWarning: { type: String, default: '' },
   showBirthDate: { type: Boolean, default: true },
   // person:read_demographics governs the Demographics section, like
   // showBirthDate governs Birth Date.
@@ -183,6 +185,7 @@ onMounted(() => {
         class="w-full"
         @update:modelValue="edited('villageId')"
       />
+      <small v-if="villageWarning" class="village-warning" role="alert">{{ villageWarning }}</small>
     </div>
 
     <div v-if="showCircles" class="form-field span-4">
@@ -574,6 +577,7 @@ onMounted(() => {
   grid-template-columns: repeat(6, 1fr);
 }
 
+.village-warning { color: var(--color-text-error); display: block; margin-top: 0.3rem; }
 .village-row {
   padding: 0;
   background: none;

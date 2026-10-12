@@ -3,6 +3,7 @@ const dbUtils = require('./utils')
 const { hasPermission } = require('../utils/authz')
 const AuditService = require('./audit/AuditService')
 const SmError = require('../utils/error')
+const volunteerAssignments = require('./volunteerAssignments')
 
 // Replacement-set rules that no constraint can express, checked before the
 // transaction opens so they surface as 400s rather than 500s:
@@ -305,7 +306,9 @@ function volunteerColumn ({ inactive }) {
               'vettingTypeId', CAST(vv.vettingTypeId AS CHAR),
               'name', vt.name,
               'dateEntered', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d'),
-              'dateExpired', DATE_FORMAT(vv.dateExpired, '%Y-%m-%d')
+              'dateExpired', DATE_FORMAT(vv.dateExpired, '%Y-%m-%d'),
+              'additionalData', vv.additionalData,
+              'notes', vv.notes
             ) ORDER BY vt.name, vv.dateEntered
           ), ']') AS JSON),
           JSON_ARRAY()
@@ -313,6 +316,43 @@ function volunteerColumn ({ inactive }) {
         FROM volunteer_vetting vv
         JOIN vetting_type vt ON vt.id = vv.vettingTypeId
         WHERE vv.volunteerId = vol3.id
+      ),
+      'trainings', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT(
+              'volunteerTrainingId', CAST(vtr.id AS CHAR),
+              'trainingId', CAST(vtr.trainingId AS CHAR),
+              'name', tr.name,
+              'completedDate', DATE_FORMAT(vtr.completedDate, '%Y-%m-%d'),
+              'notes', vtr.notes
+            ) ORDER BY tr.name, vtr.completedDate IS NULL, vtr.completedDate DESC
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_training vtr
+        JOIN training tr ON tr.id = vtr.trainingId
+        WHERE vtr.volunteerId = vol3.id
+      ),
+      'positions', (
+        SELECT COALESCE(
+          CAST(CONCAT('[', GROUP_CONCAT(
+            JSON_OBJECT(
+              'volunteerPositionId', CAST(vp.id AS CHAR),
+              'positionId', CAST(vp.positionId AS CHAR),
+              'name', pos.name,
+              'scope', pos.scope,
+              'village', IF(vp.villageId IS NULL, NULL, JSON_OBJECT('villageId', CAST(vp.villageId AS CHAR), 'name', pv.name)),
+              'circle', IF(vp.circleId IS NULL, NULL, JSON_OBJECT('circleId', CAST(vp.circleId AS CHAR), 'name', pc.name))
+            ) ORDER BY pos.name, pv.name, pc.name
+          ), ']') AS JSON),
+          JSON_ARRAY()
+        )
+        FROM volunteer_position vp
+        JOIN \`position\` pos ON pos.id = vp.positionId
+        LEFT JOIN village pv ON pv.id = vp.villageId
+        LEFT JOIN circle pc ON pc.id = vp.circleId
+        WHERE vp.volunteerId = vol3.id
       )
     ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``
 }
@@ -615,6 +655,16 @@ module.exports.patchPerson = async function (personId, body, userId) {
           }
           await writeSets(connection, personId, { races, languages, contacts }, { replace: true })
         })
+      // D8: a home-village change revokes village positions that no longer
+      // qualify. Positions are audited on the volunteer, so the prune gets
+      // its own volunteer auditUpdate; an empty prune diffs to nothing.
+      if ('villageId' in personFields) {
+        const [vol] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
+        if (vol.length) {
+          await AuditService.auditUpdate(connection, { entityType: 'volunteer', entityId: vol[0].id, userId },
+            () => volunteerAssignments.pruneIneligiblePositions(connection, vol[0].id))
+        }
+      }
     },
     statusObj: undefined
   })

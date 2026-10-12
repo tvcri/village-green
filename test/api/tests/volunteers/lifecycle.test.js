@@ -164,18 +164,26 @@ test('PATCH on a person with no volunteer role -> 404', async () => {
   assert.equal(status, 404)
 })
 
-test('PUT for a person with no home village -> 422', async () => {
-  // A villageless person is federation-scoped, so only staff/admin can create
-  // one; the volunteer role still requires a home village -> 422.
+test('PUT for a person with no home village -> 200 (a Hub volunteer)', async () => {
+  // Hub volunteers serve TVCRI rather than a village, so the volunteer role
+  // does not require a home village (the member role still does). A
+  // villageless person is federation-scoped, so only staff/admin can create
+  // one, and village users are already denied volunteer:write below.
   const res = await vgCall('createPerson', {}, {
     token: staff, body: { firstName: 'Throwaway', lastName: 'VNoVillage' },
   })
   assert.equal(res.status, 201, 'precondition: villageless person created')
-  const { status } = await vgCall('putPersonVolunteer', { personId: res.json.personId }, {
+  const personId = res.json.personId
+  const put = await vgCall('putPersonVolunteer', { personId }, {
     token: staff, body: { active: true },
   })
-  assert.equal(status, 422)
-  await vgCall('deletePerson', { personId: res.json.personId }, { token: staff })
+  assert.equal(put.status, 200)
+  assert.equal(put.json.village?.villageId ?? null, null, 'still villageless')
+  assert.equal(put.json.volunteer?.active, true)
+  const names = await listedNames(staff)
+  assert.ok(names.includes('VNoVillage, Throwaway'), 'federation readers list the Hub volunteer')
+  await vgCall('deletePersonVolunteer', { personId }, { token: staff })
+  await vgCall('deletePerson', { personId }, { token: staff })
 })
 
 // ---- village users cannot write volunteer roles (fixed by #56 — was RED finding #5) ----

@@ -131,14 +131,60 @@ const shapes = {
         table: 'volunteer_vetting',
         sourceColumns: ['id', 'volunteerId', 'vettingTypeId', 'dateEntered', 'dateExpired', 'additionalData', 'notes'],
         // Natural key mirrors UNIQUE(volunteerId, vettingTypeId, dateEntered).
-        // additionalData/notes are not rendered into diffs (they are also
-        // dropped by replaceVettings — pre-existing, see plan).
+        // additionalData/notes are not rendered into diffs.
         sql: `SELECT CONCAT(vt.name, ' ', DATE_FORMAT(vv.dateEntered, '%Y-%m-%d')) AS k,
                      vt.name AS vettingType,
                      DATE_FORMAT(vv.dateEntered, '%Y-%m-%d') AS dateEntered,
                      DATE_FORMAT(vv.dateExpired, '%Y-%m-%d') AS dateExpired
               FROM volunteer_vetting vv JOIN vetting_type vt ON vt.id = vv.vettingTypeId
               WHERE vv.volunteerId = ?`,
+      },
+      // Repeat completions are separate rows, so the key carries the date.
+      trainings: {
+        kind: 'keyed',
+        key: 'k',
+        table: 'volunteer_training',
+        sourceColumns: ['id', 'volunteerId', 'trainingId', 'completedDate', 'completedKey', 'notes'],
+        sql: `SELECT CONCAT(t.name, ' ', COALESCE(DATE_FORMAT(vt.completedDate, '%Y-%m-%d'), 'undated')) AS k,
+                     t.name AS training,
+                     DATE_FORMAT(vt.completedDate, '%Y-%m-%d') AS completedDate,
+                     vt.notes
+              FROM volunteer_training vt JOIN training t ON t.id = vt.trainingId
+              WHERE vt.volunteerId = ?`,
+      },
+      positions: {
+        kind: 'values',
+        table: 'volunteer_position',
+        sourceColumns: ['id', 'volunteerId', 'positionId', 'villageId', 'circleId', 'villageKey', 'circleKey'],
+        sql: `SELECT CONCAT(pos.name, COALESCE(CONCAT(' — ', v.name), CONCAT(' — ', c.name), '')) AS label
+              FROM volunteer_position vp
+              JOIN \`position\` pos ON pos.id = vp.positionId
+              LEFT JOIN village v ON v.id = vp.villageId
+              LEFT JOIN circle c ON c.id = vp.circleId
+              WHERE vp.volunteerId = ?`,
+      },
+    },
+  },
+
+  // Volunteer catalogs (trainings/positions spec). The volunteer-side
+  // junctions are folded into the volunteer shape, not here.
+  training: {
+    table: 'training',
+    // position_training's training FK: the link is recorded on the position.
+    relatedTables: ['volunteer_training', 'position_training'],
+    sets: {},
+  },
+  position: {
+    table: 'position',
+    relatedTables: ['volunteer_position'],
+    sets: {
+      trainings: {
+        kind: 'values',
+        table: 'position_training',
+        sourceColumns: ['positionId', 'trainingId'],
+        sql: `SELECT t.name AS label
+              FROM position_training pt JOIN training t ON t.id = pt.trainingId
+              WHERE pt.positionId = ?`,
       },
     },
   },

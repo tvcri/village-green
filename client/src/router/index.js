@@ -111,6 +111,18 @@ const routes = [
     meta: { requiresPermission: 'app:admin' },
   },
   {
+    path: '/admin/trainings',
+    name: 'admin-trainings',
+    component: () => import('../features/Admin/components/TrainingsAdmin.vue'),
+    meta: { requiresPermission: 'training:admin' },
+  },
+  {
+    path: '/admin/positions',
+    name: 'admin-positions',
+    component: () => import('../features/Admin/components/PositionsAdmin.vue'),
+    meta: { requiresPermission: 'position:admin' },
+  },
+  {
     path: '/meta',
     name: 'meta',
     component: () => import('../features/MetaVillage/components/MetaVillage.vue'),
@@ -136,6 +148,30 @@ const routes = [
     name: 'meta-service-request-edit',
     component: () => import('../features/ServiceRequestList/components/ServiceRequestCreateEdit.vue'),
     meta: { requiresPermission: 'sr:write' },
+  },
+  {
+    path: '/meta/trainings',
+    name: 'meta-trainings',
+    component: () => import('../features/Trainings/components/TrainingList.vue'),
+    meta: { requiresPermission: 'volunteer:read' },
+  },
+  {
+    path: '/meta/trainings/:trainingId',
+    name: 'meta-training-detail',
+    component: () => import('../features/Trainings/components/TrainingDetail.vue'),
+    meta: { requiresPermission: 'volunteer:read' },
+  },
+  {
+    path: '/meta/positions',
+    name: 'meta-positions',
+    component: () => import('../features/Positions/components/PositionList.vue'),
+    meta: { requiresPermission: 'volunteer:read' },
+  },
+  {
+    path: '/meta/positions/:positionId',
+    name: 'meta-position-detail',
+    component: () => import('../features/Positions/components/PositionDetail.vue'),
+    meta: { requiresPermission: 'volunteer:read' },
   },
   {
     path: '/meta/persons',

@@ -3,8 +3,7 @@ import { ref, computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import Button from 'primevue/button'
-import Select from 'primevue/select'
+import TableFooter from '../../../components/TableFooter.vue'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { formatServiceDate, serviceDateTimeSortKey } from '../lib/timeFields.js'
@@ -146,14 +145,10 @@ const rowClass = computed(() => {
       @row-click="(event) => emit('row-click', event)"
       @filter="trackEvent('filter_applied')"
     >
-      <template #paginatorcontainer="{ first, last, page, pageCount, prevPageCallback, nextPageCallback, totalRecords }">
-        <div class="paginator-container">
-          <Button icon="pi pi-chevron-left" text rounded @click="prevPageCallback" :disabled="page === 0" />
-          <span class="paginator-info">{{ first }}–{{ last }} of {{ totalRecords }}</span>
-          <Button icon="pi pi-chevron-right" text rounded @click="nextPageCallback" :disabled="page === pageCount - 1" />
-          <Select v-model="pageRows" :options="[10, 25, 50, 100]" />
+      <template #paginatorcontainer="footer">
+        <TableFooter v-bind="footer" v-model="pageRows">
           <slot name="paginator-extra" />
-        </div>
+        </TableFooter>
       </template>
 
       <Column field="serviceDate" header="Date" sortable style="width: 17%">

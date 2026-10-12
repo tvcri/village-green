@@ -1,0 +1,55 @@
+/* Shared rules for the row tables in VolunteerTrainingsFields.vue and
+   VolunteerPositionsFields.vue, loaded via `<style scoped src>` like
+   formFields.css. The add flow mirrors GrantsEditor: an "Add" button in the
+   section header opens a pending row at the top of the table. */
+
+.section-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Wide rows scroll inside the panel rather than widening the page. */
+.table-wrap {
+  grid-column: 1 / -1;
+  overflow-x: auto;
+}
+
+.rows {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--p-content-background);
+  border: 1px solid var(--color-border-default);
+}
+
+.rows th,
+.rows td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-default);
+  vertical-align: middle;
+}
+
+.rows th {
+  font-weight: 700;
+}
+
+.rows .actions-col {
+  width: 6.5rem;
+}
+
+.rows tr.pending td {
+  background: var(--p-highlight-background);
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.rows :deep(.p-select),
+.rows :deep(.p-datepicker) {
+  min-width: 11rem;
+}

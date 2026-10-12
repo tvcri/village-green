@@ -3,6 +3,8 @@ import { computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAsyncState } from '../shared/composables/useAsyncState.js'
 import { getVillages } from '../features/VillageList/api/villageApi.js'
+import { getTrainings } from '../features/Trainings/api/trainingApi.js'
+import { getPositions } from '../features/Positions/api/positionApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
 import { setPendingHighlight } from '../shared/lib/pendingHighlight.js'
@@ -51,8 +53,23 @@ const { state: adminUsers, execute: fetchAdminUsers } = useAsyncState(
   { immediate: false, onError: null }
 )
 
+const { state: trainingCatalog, execute: fetchTrainingCatalog } = useAsyncState(
+  () => getTrainings(),
+  { immediate: false, onError: null }
+)
+
+const { state: positionCatalog, execute: fetchPositionCatalog } = useAsyncState(
+  () => getPositions(),
+  { immediate: false, onError: null }
+)
+
 watch(() => route.name, (routeName) => {
   if (!routeName) return
+
+  // Refetched on every visit, not cached: an Admin rename or a newly added
+  // entry must reach the crumb, and both catalogs are small.
+  if (routeName === 'meta-training-detail') fetchTrainingCatalog()
+  if (routeName === 'meta-position-detail') fetchPositionCatalog()
 
   if (routeName === 'admin-user-grants' && adminUsers.value === null) {
     fetchAdminUsers()
@@ -92,6 +109,12 @@ const breadcrumbs = computed(() => {
         crumbs.push({ label: userName })
         break
       }
+      case 'admin-trainings':
+        crumbs.push({ label: 'Trainings' })
+        break
+      case 'admin-positions':
+        crumbs.push({ label: 'Positions' })
+        break
     }
     return crumbs
   }
@@ -140,6 +163,8 @@ const breadcrumbs = computed(() => {
   const META_SECTIONS = [
     { label: 'Metrics', name: 'meta-metrics' },
     { label: 'Persons', name: 'meta-persons' },
+    { label: 'Trainings', name: 'meta-trainings' },
+    { label: 'Positions', name: 'meta-positions' },
     { label: 'Service Requests', name: 'meta-service-requests' },
     { label: 'Friends', name: 'meta-friends' },
     { label: 'Mailing Labels', name: 'meta-mailing-labels' },
@@ -152,7 +177,7 @@ const breadcrumbs = computed(() => {
   const personName = route.params.personName
   const metaSiblings = villages.value?.length
     ? [
-        { label: 'Meta', route: { name: 'meta' } },
+        { label: 'Hub', route: { name: 'meta' } },
         ...villages.value.map(v => ({
           label: v.name,
           route: { name: 'village-detail', params: { villageId: v.villageId } }
@@ -162,60 +187,78 @@ const breadcrumbs = computed(() => {
 
   switch (route.name) {
     case 'meta':
-      crumbs.push({ label: 'Meta', siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', siblings: metaSiblings })
       break
     case 'meta-metrics':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Metrics', siblings: otherMetaSections('meta-metrics') })
       break
     case 'meta-service-requests':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Service Requests', siblings: otherMetaSections('meta-service-requests') })
       break
     case 'meta-service-request-create':
     case 'meta-service-request-edit':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Service Requests', route: { name: 'meta-service-requests' } })
       crumbs.push({ label: 'Request' })
       break
     case 'meta-persons':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', siblings: otherMetaSections('meta-persons') })
       break
+    case 'meta-trainings':
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Trainings', siblings: otherMetaSections('meta-trainings') })
+      break
+    case 'meta-training-detail':
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Trainings', route: { name: 'meta-trainings' } })
+      crumbs.push({ label: trainingCatalog.value?.find(t => t.trainingId === route.params.trainingId)?.name ?? 'Training' })
+      break
+    case 'meta-positions':
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Positions', siblings: otherMetaSections('meta-positions') })
+      break
+    case 'meta-position-detail':
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Positions', route: { name: 'meta-positions' } })
+      crumbs.push({ label: positionCatalog.value?.find(p => p.positionId === route.params.positionId)?.name ?? 'Position' })
+      break
     case 'meta-friends':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Friends', siblings: otherMetaSections('meta-friends') })
       break
     case 'meta-mailing-labels':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Mailing Labels', siblings: otherMetaSections('meta-mailing-labels') })
       break
     case 'friends':
       crumbs.push({ label: 'Friends', siblings: getSiblings('friends', { villageId: vId }) })
       break
     case 'meta-person-detail':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
       crumbs.push({ label: route.params.personName || 'Person' })
       break
     case 'meta-person-create':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
       crumbs.push({ label: 'New Person' })
       break
     case 'meta-person-edit':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
       crumbs.push({ label: 'Edit Person' })
       break
     case 'meta-person-member':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
       crumbs.push({ label: 'Person', route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
       crumbs.push({ label: 'Member' })
       break
     case 'meta-person-volunteer':
-      crumbs.push({ label: 'Meta', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
       crumbs.push({ label: 'Person', route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
       crumbs.push({ label: 'Volunteer' })
@@ -239,7 +282,7 @@ const breadcrumbs = computed(() => {
       break
     case 'service-request-detail':
       if (route.query.from === 'meta') {
-        crumbs.push({ label: 'Meta', route: { name: 'meta' } })
+        crumbs.push({ label: 'Hub', route: { name: 'meta' } })
         crumbs.push({ label: 'Service Requests', route: { name: 'meta-service-requests' } })
       } else {
         crumbs.push({ label: 'Service Requests', route: { name: 'service-requests', params: { villageId: vId } }, siblings: getSiblings('service-requests', { villageId: vId }) })

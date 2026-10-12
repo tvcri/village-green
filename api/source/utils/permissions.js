@@ -18,6 +18,8 @@ const catalog = {
   'volunteer:read':           { description: 'Read volunteer rosters', requiresElevation: false },
   'volunteer:write':          { description: 'Manage volunteer records (not VSS self-service)', requiresElevation: false },
   'volunteer:read_application': { description: 'See the stored application-form extraction on volunteer records (contains birth-date and demographic answers)', requiresElevation: false },
+  'training:admin':           { description: 'Manage the list of volunteer trainings', requiresElevation: false },
+  'position:admin':           { description: 'Manage the list of volunteer positions', requiresElevation: false },
   'sr:read':                  { description: 'Read service requests', requiresElevation: false },
   'sr:write':                 { description: 'Create/update/assign service requests', requiresElevation: false },
   'friend:read':              { description: 'Read Friendly Calls & Visits submissions', requiresElevation: false },

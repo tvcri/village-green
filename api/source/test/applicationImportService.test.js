@@ -353,3 +353,9 @@ test('assembleResponse carries the printed formDate on both variants; an unprint
   blank.application.formDate = ''
   assert.equal(svc.assembleResponse(blank, villages, usage).application.formDate, null)
 })
+
+test('Steering Committee is not an extractable capability (it is a position now)', () => {
+  assert.ok(!svc.CAPABILITY_NAME_ENUM.includes('Steering Committee'))
+  assert.deepEqual([...svc.CAPABILITY_NAME_ENUM].sort(), ['Errands', 'Friends', 'Home Help', 'Rides', 'Tech Support'])
+  assert.ok(!svc.EXTRACTION_PROMPT.includes('Steering Committee'))
+})

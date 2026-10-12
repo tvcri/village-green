@@ -84,4 +84,14 @@ function holdsAnyElevatable(userObject) {
   return federation.includes(WILDCARD) || federation.some(p => elevatable.has(p))
 }
 
-module.exports = { computeEffective, groupRoleDataByUser, hasPermission, hasElevatedPermission, holdsAnyElevatable }
+// Adding or removing a held position is authorized against the position's own
+// scope (trainings/positions spec §4.3 step 3): a village position needs
+// volunteer:write from a Hub grant or a grant in that village; Hub and circle
+// positions need it from a Hub grant.
+function canWritePosition(userObject, scope, villageId) {
+  return scope === 'village'
+    ? hasPermission(userObject, 'volunteer:write', { villageId })
+    : hasPermission(userObject, 'volunteer:write')
+}
+
+module.exports = { computeEffective, groupRoleDataByUser, hasPermission, hasElevatedPermission, holdsAnyElevatable, canWritePosition }

@@ -64,7 +64,7 @@ const volunteerPerson = {
 // envelope records which one the applicant filled in.
 const formDateField = { ...str, description: 'Month and year printed under the masthead, as YYYY-MM' }
 
-const CAPABILITY_NAME_ENUM = ['Rides', 'Errands', 'Home Help', 'Steering Committee', 'Tech Support', 'Friends']
+const CAPABILITY_NAME_ENUM = ['Rides', 'Errands', 'Home Help', 'Tech Support', 'Friends']
 
 const EXTRACTION_SCHEMA = {
   anyOf: [
@@ -231,7 +231,7 @@ For a membership application:
 - "uncertainFields": list ONLY fields whose values are genuinely ambiguous from the handwriting or scan quality — a digit that could be read two ways, a partially cut-off word, an ambiguous checkbox. For each, give the JSON path (e.g. "members[0].zip"), a short reason, and your best alternative reading ("" if none). Do not list fields you read confidently; an empty array means everything was clear.
 - For a volunteer application:
   - The same block-print case-inference, blank-field, address-line and emergency-contact rules above apply.
-  - "capabilityNames" lists every checked volunteer-opportunity option, using these exact names: "Rides", "Errands", "Home Help" (for "Light Household Maintenance"), "Steering Committee" (for "Steering Committee Member"), "Tech Support" (for "Technology Support"), "Friends" (for "Village Friends"). The form shows "Driver" as a parent checkbox with "Rides" and "Errands" as its own indented sub-checkboxes — read the Rides and Errands checkboxes directly; include each only if its own box is checked, regardless of whether the parent "Driver" box is checked or blank.
+  - "capabilityNames" lists every checked volunteer-opportunity option, using these exact names: "Rides", "Errands", "Home Help" (for "Light Household Maintenance"), "Tech Support" (for "Technology Support"), "Friends" (for "Village Friends"). The form shows "Driver" as a parent checkbox with "Rides" and "Errands" as its own indented sub-checkboxes — read the Rides and Errands checkboxes directly; include each only if its own box is checked, regardless of whether the parent "Driver" box is checked or blank.
   - "circleOfPrideJoin" is the form's "Would you like to support the Circle of Pride as a volunteer?" Yes/No answer.
   - Do NOT extract anything from the "Supplemental Section for Drivers" page (license restrictions, vehicle table, insurance company, signature, document checklist) — skip that entire page.
   - Do NOT extract the checkbox/dropdown answers from the "Supplemental Section for Village Friends Volunteers" page (service type, employment status, occupation, activity preferences). However, if that page's free-text boxes ("What activities..." or "Please supply any other relevant information") contain substantive, non-routine content — a real note about the volunteer's situation, needs, or support arrangements — extract that text verbatim into "notes". If those boxes are blank or contain only routine/no content, "notes" is "".
@@ -454,6 +454,7 @@ async function extractFromPdf (pdfBuffer) {
 }
 
 module.exports = {
+  CAPABILITY_NAME_ENUM,
   EXTRACTION_PROMPT,
   EXTRACTION_SCHEMA,
   EXTRACTION_SCHEMA_VERSION,
