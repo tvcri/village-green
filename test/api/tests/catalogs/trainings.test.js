@@ -92,9 +92,16 @@ test('staff can no longer write the training catalog (no Staff grant)', async ()
 })
 
 test('deleting an unheld training removes its position links instead of refusing', async () => {
-  const trainingId = (await vgCall('createTraining', {}, { token: admin, body: { name: uniq('Linked') } })).json.trainingId
+  const name = uniq('Linked')
+  const trainingId = (await vgCall('createTraining', {}, { token: admin, body: { name } })).json.trainingId
   const positionId = (await vgCall('createPosition', {}, { token: admin, body: { name: uniq('Uses it'), scope: 'federation', trainingIds: [trainingId] } })).json.positionId
+  const before = (await auditRows('position', positionId)).length
   assert.equal((await vgCall('deleteTraining', { trainingId }, { token: admin })).status, 204)
   const pos = (await vgCall('getPositions', {}, { token: admin })).json.find(p => p.positionId === positionId)
   assert.deepEqual(pos.trainingIds, [])
+  // The cascade changed the position's trainings set; its audit trail says so.
+  const rows = await auditRows('position', positionId)
+  assert.equal(rows.length, before + 1)
+  assert.equal(rows.at(-1).action, 'update')
+  assert.deepEqual(rows.at(-1).changes.diff.trainings.removed, [name])
 })

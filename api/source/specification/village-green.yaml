@@ -2106,8 +2106,13 @@ paths:
       summary: Who holds this position
       tags: [Position]
       operationId: getPositionHolders
+      parameters:
+        - name: includeInactive
+          in: query
+          description: Also list inactive holders, whose positions are kept but hidden. Honoured only for callers holding federation volunteer:read_inactive.
+          schema: { type: boolean, default: false }
       responses:
-        '200': { description: 'Active holders by village or circle, then name. Inactive volunteers keep their positions but are not listed.', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PositionHolder' } } } } }
+        '200': { description: 'Active holders by village or circle, then name. Inactive volunteers keep their positions but are not listed unless includeInactive is honoured.', content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PositionHolder' } } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer:read ] } ]
     patch:

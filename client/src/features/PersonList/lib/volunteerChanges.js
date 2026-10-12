@@ -5,7 +5,8 @@
 // what they are. Pass the positions that will actually be sent, so a row
 // marked "Will be removed on save" counts as removed.
 
-const str = (v) => (v === null || v === undefined ? '' : String(v))
+import { str } from '../../../shared/lib/positionRules.js'
+
 const idSet = (ids = []) => ids.map(str).sort().join(',')
 
 export function volunteerSnapshot ({ active, notes, capabilityIds, associateVillageIds, vettings, trainings, positions }) {

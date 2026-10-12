@@ -113,8 +113,14 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label }) 
             throw new SmError.ConflictError(
               `This ${label} is held by ${h.phrase}. Remove it from them first, or rename it instead.`)
           }
+          // Deleting a training cascades its position_training links, which
+          // changes each linked position's audited trainings set: record it
+          // on those positions too.
+          const [linked] = hasScope ? [[]] : await connection.query(
+            'SELECT positionId FROM position_training WHERE trainingId = ?', [id])
           await AuditService.auditDelete(connection, { entityType, entityId: id, userId },
-            () => connection.query(`DELETE FROM ${t} WHERE id = ?`, [id]))
+            () => AuditService.auditFanOut(connection, { entityType: 'position', entityIds: linked.map(r => r.positionId), userId },
+              () => connection.query(`DELETE FROM ${t} WHERE id = ?`, [id])))
           return id
         },
       })

@@ -65,6 +65,13 @@ describe('PositionDetail', () => {
     expect(screen.queryByText('Active')).toBeNull()
   })
 
+  it('an unknown or deleted position says so instead of rendering a blank page', async () => {
+    getPositions.mockResolvedValue([])
+    getPositionHolders.mockRejectedValue({ status: 404, body: { error: 'Resource not found.' } })
+    render(PositionDetail, { global: { ...opts.global, stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    expect(await screen.findByText('Position not found')).toBeInTheDocument()
+  })
+
   it('no hidden-holder line when none are inactive', async () => {
     render(PositionDetail, opts)
     await screen.findByText('Abbott, Lorraine')
@@ -110,8 +117,8 @@ describe('PositionDetail', () => {
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(patchPositionHolders).toHaveBeenCalled())
     expect(patchPositionHolders.mock.calls[0]).toEqual(['5', { add: [{ personId: '5', villageId: '1', circleId: null }], remove: ['21'] }])
-    await waitFor(() => expect(screen.getByText('Walsh, Bridget').closest('tr')).toHaveClass('flash'))
-    expect(screen.getByText('Abbott, Lorraine').closest('tr')).not.toHaveClass('flash')
+    await waitFor(() => expect(screen.getByText('Walsh, Bridget').closest('tr')).toHaveClass('row-saved-flash'))
+    expect(screen.getByText('Abbott, Lorraine').closest('tr')).not.toHaveClass('row-saved-flash')
   })
 
   it('Undo restores a holder marked for removal', async () => {

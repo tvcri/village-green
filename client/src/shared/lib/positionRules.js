@@ -3,7 +3,8 @@
 export const SCOPE_LABELS = { federation: 'Hub', village: 'Village', circle: 'Circle' }
 export const scopeLabel = (scope) => SCOPE_LABELS[scope] ?? scope
 
-const str = (v) => (v === null || v === undefined ? '' : String(v))
+// IDs compare as strings; null and undefined become ''.
+export const str = (v) => (v === null || v === undefined ? '' : String(v))
 
 export function eligibleVillageIds (homeVillageId, associateVillageIds = []) {
   return [...new Set([homeVillageId, ...associateVillageIds].map(str).filter(Boolean))]

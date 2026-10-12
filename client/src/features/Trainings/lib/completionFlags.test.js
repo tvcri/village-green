@@ -46,4 +46,11 @@ describe('batchSummary and resultMessage', () => {
       result: { recorded: ['1', '2'], skipped: ['3'], assigned: ['1'], notAssigned: [] },
     })).toBe('Recorded LSC Training on Oct 6, 2026 for 2 volunteers. 1 already had it for that date and was skipped. Assigned Local Service Coordinator to 1 volunteer.')
   })
+  it('says who was not assigned, and why', () => {
+    expect(resultMessage({
+      trainingName: 'LSC Training', date: '2026-10-06', positionName: 'Local Service Coordinator',
+      result: { recorded: ['1', '2', '3'], skipped: [], assigned: ['1'],
+        notAssigned: [{ personId: '2', reason: 'alreadyHolds' }, { personId: '3', reason: 'noHomeVillage' }] },
+    })).toBe('Recorded LSC Training on Oct 6, 2026 for 3 volunteers. Assigned Local Service Coordinator to 1 volunteer. Not assigned: 1 already holds it, 1 has no home village.')
+  })
 })

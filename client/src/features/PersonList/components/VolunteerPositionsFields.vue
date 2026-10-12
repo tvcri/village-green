@@ -10,7 +10,7 @@ import { ref, computed } from 'vue'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import { SCOPE_LABELS, scopeLabel, eligibleVillageIds, isPositionEligible, missingExpectedTrainings } from '../../../shared/lib/positionRules.js'
+import { SCOPE_LABELS, scopeLabel, eligibleVillageIds, isPositionEligible, missingExpectedTrainings, str } from '../../../shared/lib/positionRules.js'
 
 const props = defineProps({
   positionOptions: { type: Array, required: true },
@@ -27,7 +27,6 @@ const adding = defineModel('adding', { type: Boolean, default: false })
 
 const pending = ref(null) // { positionId, whereKey }
 
-const str = (v) => (v === null || v === undefined ? '' : String(v))
 const eligible = computed(() => eligibleVillageIds(props.homeVillage?.villageId, props.associateVillageIds))
 
 // Every place a position could be held, minus the ones this volunteer

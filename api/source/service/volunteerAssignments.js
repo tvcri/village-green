@@ -7,6 +7,7 @@
 
 const SmError = require('../utils/error')
 const dbUtils = require('./utils')
+const { canWritePosition } = require('../utils/authz')
 
 const s = (v) => (v === null || v === undefined ? '' : String(v))
 const nullIfEmpty = (v) => (v === undefined || v === '' ? null : v)
@@ -181,15 +182,40 @@ async function positionChanges (personId, requested) {
   }
 }
 
-// D8 revocation: delete village-scoped positions whose village is neither
-// the home village nor a remaining associate village. Runs on the caller's
-// transaction, after the write that changed the association.
 // Whether a volunteer's positions show on position pages and in holder
 // counts. An inactive volunteer keeps their positions, hidden until they are
 // active again (Caroline, 2026-10-12). The one place that rule lives: a richer
 // volunteer status changes this predicate only. Never NULL, so NOT works.
 const positionShownSql = (volunteerAlias) => `(${volunteerAlias}.active <=> 1)`
 
+// The positions a home-village or associate change would revoke (D8), read
+// before the write so the controller can authorize each removal against its
+// own scope, exactly as an explicit removal is. `change` carries
+// homeVillageId and/or associateVillageIds; the other comes from the DB.
+async function positionsRevokedBy (personId, change) {
+  const [vol] = await dbUtils.pool.query(
+    'SELECT v.id, p.villageId FROM volunteer v JOIN person p ON p.id = v.personId WHERE v.personId = ?', [personId])
+  if (!vol.length) return []
+  const [assoc] = await dbUtils.pool.query(
+    'SELECT villageId FROM volunteer_village_associate WHERE volunteerId = ?', [vol[0].id])
+  const context = {
+    homeVillageId: Object.hasOwn(change, 'homeVillageId') ? change.homeVillageId : vol[0].villageId,
+    associateVillageIds: change.associateVillageIds ?? assoc.map(a => a.villageId),
+  }
+  return (await loadPositions(dbUtils.pool, vol[0].id)).filter(p => !isEligible(p, p.scope, context))
+}
+
+async function authorizeRevocations (userObject, personId, change) {
+  for (const p of await positionsRevokedBy(personId, change)) {
+    if (!canWritePosition(userObject, p.scope, p.villageId)) {
+      throw new SmError.PrivilegeError('This change would remove a village position you are not allowed to change.')
+    }
+  }
+}
+
+// D8 revocation: delete village-scoped positions whose village is neither
+// the home village nor a remaining associate village. Runs on the caller's
+// transaction, after the write that changed the association.
 async function pruneIneligiblePositions (connection, volunteerId) {
   const [res] = await connection.query(
     `DELETE vp FROM volunteer_position vp
@@ -206,6 +232,6 @@ async function pruneIneligiblePositions (connection, volunteerId) {
 }
 
 module.exports = {
-  trainingKey, positionKey, findDuplicateKeys, diffTrainings, diffPositions, scopeShapeError, isEligible, assertIdsExist, applyTrainings,
-  applyPositions, positionChanges, pruneIneligiblePositions, positionShownSql,
+  s, trainingKey, positionKey, findDuplicateKeys, diffTrainings, diffPositions, scopeShapeError, isEligible, assertIdsExist, applyTrainings,
+  applyPositions, positionChanges, positionsRevokedBy, authorizeRevocations, pruneIneligiblePositions, positionShownSql,
 }

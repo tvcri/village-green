@@ -21,7 +21,19 @@ const newKey = () => `new${++seq}`
 const pending = ref(null) // { vettingTypeId, dateEntered, dateExpired }
 const error = ref('')
 
+// (type, date completed) is unique on the volunteer; the same rule for an
+// added row and for an edited date, as in VolunteerTrainingsFields.
+const DUPLICATE = 'This vetting type and date is already on the list.'
+function clashes (vettingTypeId, dateEntered, exceptIndex = -1) {
+  return vettings.value.some((v, i) => i !== exceptIndex && v.vettingTypeId === vettingTypeId && v.dateEntered === dateEntered)
+}
+
 function update (index, field, value) {
+  error.value = ''
+  if (field === 'dateEntered' && clashes(vettings.value[index].vettingTypeId, value, index)) {
+    error.value = DUPLICATE
+    return
+  }
   const next = vettings.value.slice()
   next[index] = { ...next[index], [field]: value }
   vettings.value = next
@@ -45,8 +57,8 @@ function save () {
   const type = props.vettingTypeOptions.find(t => t.vettingTypeId === pending.value.vettingTypeId)
   if (!type) return
   const { dateEntered, dateExpired } = pending.value
-  if (vettings.value.some(v => v.vettingTypeId === type.vettingTypeId && v.dateEntered === dateEntered)) {
-    error.value = 'This vetting type and date is already on the list.'
+  if (clashes(type.vettingTypeId, dateEntered)) {
+    error.value = DUPLICATE
     return
   }
   vettings.value = [...vettings.value, { key: newKey(), vettingTypeId: type.vettingTypeId, name: type.name, dateEntered, dateExpired }]

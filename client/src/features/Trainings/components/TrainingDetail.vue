@@ -1,6 +1,6 @@
 <script setup>
 // One training's page (UI spec §4): completions, and the record panel in place.
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
@@ -15,6 +15,7 @@ import ExportButton from '../../../components/ExportButton.vue'
 import { getTrainings, getTrainingCompletions, deleteTrainingCompletion } from '../api/trainingApi.js'
 import { getPositions } from '../../Positions/api/positionApi.js'
 import { getVolunteerRoster } from '../../VolunteerList/api/volunteerApi.js'
+import { apiErrorMessage } from '../../../shared/api/apiClient.js'
 import { formatCivilDate } from '../../../shared/lib/civilDate.js'
 import { personExportColumns } from '../../../shared/lib/personExport.js'
 import { withPersonDetail, exportSlug } from '../../PersonList/lib/personDetailExport.js'
@@ -31,12 +32,15 @@ const canWrite = computed(() => hasPermission('volunteer:write'))
 const trainingId = computed(() => route.params.trainingId)
 
 const training = ref(null)
+const missing = ref(false) // an unknown or deleted trainingId
 const positions = ref([])
 const completions = ref([])
 const roster = ref([])
 const recording = ref(false)
 const panelDirty = ref(false)
 const flashIds = ref(new Set())
+let flashTimer = null
+onBeforeUnmount(() => clearTimeout(flashTimer))
 const search = ref('')
 const villageFilter = ref(null)
 const pageRows = ref(25)
@@ -82,6 +86,7 @@ onMounted(async () => {
     const [list, pos] = await Promise.all([getTrainings(), getPositions()])
     training.value = list.find(t => t.trainingId === trainingId.value) ?? null
     positions.value = pos
+    if (!training.value) { missing.value = true; return }
     await loadCompletions()
   }
   catch {
@@ -90,8 +95,13 @@ onMounted(async () => {
 })
 
 async function openPanel () {
-  if (!roster.value.length) roster.value = await getVolunteerRoster()
-  recording.value = true
+  try {
+    if (!roster.value.length) roster.value = await getVolunteerRoster()
+    recording.value = true
+  }
+  catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: apiErrorMessage(err, 'Failed to load the volunteer list'), life: 4000 })
+  }
 }
 
 async function onSaved ({ result, date, message }) {
@@ -100,7 +110,8 @@ async function onSaved ({ result, date, message }) {
   flashIds.value = new Set(completions.value
     .filter(c => c.completedDate === date && result.recorded.includes(c.person.personId))
     .map(c => c.volunteerTrainingId))
-  setTimeout(() => { flashIds.value = new Set() }, 2500)
+  clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => { flashIds.value = new Set() }, 2500)
   toast.add({ severity: 'success', summary: 'Recorded', detail: message, life: 5000 })
 }
 
@@ -119,7 +130,7 @@ function askRemove (row) {
         toast.add({ severity: 'success', summary: 'Removed', detail: `Removed ${row.person.displayName}’s record.`, life: 2500 })
       }
       catch (err) {
-        toast.add({ severity: 'error', summary: 'Error', detail: err?.body?.error ?? 'Failed to remove the record', life: 3000 })
+        toast.add({ severity: 'error', summary: 'Error', detail: apiErrorMessage(err, 'Failed to remove the record'), life: 3000 })
       }
       await loadCompletions()
     },
@@ -152,7 +163,7 @@ function openPerson (row) { router.push({ name: 'meta-person-detail', params: { 
       <Select v-model="villageFilter" :options="villageOptions" placeholder="All villages" showClear aria-label="Village" />
     </div>
     <DataTable :value="shown" size="small" dataKey="volunteerTrainingId" paginator :rows="pageRows"
-               :rowClass="row => (flashIds.has(row.volunteerTrainingId) ? 'flash' : '')">
+               :rowClass="row => (flashIds.has(row.volunteerTrainingId) ? 'row-saved-flash' : '')">
       <template #paginatorcontainer="footer">
         <TableFooter v-bind="footer" v-model="pageRows">
           <ExportButton :disabled="exportBusy || !shown.length" @download="download" @export="exportSheet" />
@@ -175,6 +186,10 @@ function openPerson (row) { router.push({ name: 'meta-person-detail', params: { 
       <template #empty>{{ search || villageFilter ? 'No completions match.' : 'No completions recorded yet.' }}</template>
     </DataTable>
   </div>
+  <div v-else-if="missing" class="training-detail">
+    <h1>Training not found</h1>
+    <p class="subtitle">It may have been deleted. <RouterLink :to="{ name: 'meta-trainings' }">See all trainings</RouterLink></p>
+  </div>
 </template>
 
 <style scoped>
@@ -187,7 +202,5 @@ h2 { margin: 0.5rem 0 0; font-size: 1.1rem; }
 .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .link { color: var(--color-primary); cursor: pointer; }
 .dim { color: var(--color-text-dim); }
-:deep(tr.flash td) { animation: flash 2.4s ease-out; }
-@keyframes flash { 0%, 40% { box-shadow: inset 0 0 0 999px rgba(250, 204, 21, 0.35); } 100% { box-shadow: none; } }
 @media (max-width: 640px) { .training-detail { padding: 1rem; } }
 </style>

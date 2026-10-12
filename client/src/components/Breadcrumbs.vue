@@ -66,8 +66,10 @@ const { state: positionCatalog, execute: fetchPositionCatalog } = useAsyncState(
 watch(() => route.name, (routeName) => {
   if (!routeName) return
 
-  if (routeName === 'meta-training-detail' && trainingCatalog.value === null) fetchTrainingCatalog()
-  if (routeName === 'meta-position-detail' && positionCatalog.value === null) fetchPositionCatalog()
+  // Refetched on every visit, not cached: an Admin rename or a newly added
+  // entry must reach the crumb, and both catalogs are small.
+  if (routeName === 'meta-training-detail') fetchTrainingCatalog()
+  if (routeName === 'meta-position-detail') fetchPositionCatalog()
 
   if (routeName === 'admin-user-grants' && adminUsers.value === null) {
     fetchAdminUsers()

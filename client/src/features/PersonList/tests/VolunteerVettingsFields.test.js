@@ -76,4 +76,21 @@ describe('VolunteerVettingsFields', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Remove BCI' }))
     expect(model.value).toEqual([])
   })
+
+  // An edited date that collides with another row of the same type would hit
+  // the (type, date) unique key on Save as a 500; refuse it inline instead.
+  it('refuses editing a date into a duplicate of the same type', async () => {
+    const { model } = renderWith([
+      { key: 'vv0', vettingTypeId: '1', name: 'BCI', dateEntered: '2025-01-05', dateExpired: null },
+      { key: 'vv1', vettingTypeId: '1', name: 'BCI', dateEntered: '2026-01-05', dateExpired: null },
+      { key: 'vv2', vettingTypeId: '2', name: 'Driving record', dateEntered: '2024-03-01', dateExpired: null },
+    ])
+    await fireEvent.input(screen.getByDisplayValue('01/05/2026'), { target: { value: '01/05/2025' } })
+    expect(screen.getByText('This vetting type and date is already on the list.')).toBeInTheDocument()
+    expect(model.value[1].dateEntered).toBe('2026-01-05')
+    // a different type on that date is fine
+    await fireEvent.input(screen.getByDisplayValue('03/01/2024'), { target: { value: '01/05/2025' } })
+    expect(model.value[2].dateEntered).toBe('2025-01-05')
+    expect(screen.queryByText('This vetting type and date is already on the list.')).toBeNull()
+  })
 })

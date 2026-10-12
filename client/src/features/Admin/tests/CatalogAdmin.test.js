@@ -99,7 +99,7 @@ describe('CatalogAdmin — positions', () => {
   })
 
   it('shows a duplicate-name 409 inline under Name', async () => {
-    patchPosition.mockRejectedValue({ status: 409, body: { error: 'A position named "Steering Committee" already exists.' } })
+    patchPosition.mockRejectedValue({ status: 409, body: { error: 'Conflict.', detail: 'A position named "Steering Committee" already exists.' } })
     render(CatalogAdmin, opts('position'))
     await screen.findByText('Steering Committee')
     await fireEvent.click(screen.getByLabelText('Edit Board of Directors'))

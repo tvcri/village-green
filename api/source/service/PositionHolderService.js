@@ -5,13 +5,13 @@
 const dbUtils = require('./utils')
 const SmError = require('../utils/error')
 const AuditService = require('./audit/AuditService')
-const { scopeShapeError, isEligible, assertIdsExist, positionShownSql } = require('./volunteerAssignments')
+const { s, scopeShapeError, isEligible, assertIdsExist, positionShownSql } = require('./volunteerAssignments')
 const { PERSON_COLUMNS, personFrom, scopePredicates } = require('./TrainingCompletionService')
 
-const s = (v) => (v === null || v === undefined ? '' : String(v))
-
 // Shown holders only: an inactive volunteer's positions are kept but hidden.
-async function listHolders (positionId, scope) {
+// includeInactive also lists the hidden holders, for a caller that must know
+// who already holds the position (the record-completions panel).
+async function listHolders (positionId, scope, { includeInactive = false } = {}) {
   const where = scopePredicates(scope)
   const [rows] = await dbUtils.pool.query(
     `SELECT CAST(vp.id AS CHAR) AS volunteerPositionId,
@@ -23,7 +23,7 @@ async function listHolders (positionId, scope) {
      LEFT JOIN village hv ON hv.id = p.villageId
      LEFT JOIN village pv ON pv.id = vp.villageId
      LEFT JOIN circle pc ON pc.id = vp.circleId
-     WHERE vp.positionId = ? AND ${positionShownSql('v')}${where.sql}
+     WHERE vp.positionId = ? AND ${includeInactive ? 'TRUE' : positionShownSql('v')}${where.sql}
      ORDER BY pv.name, pc.name, p.fullName`,
     [positionId, ...where.binds])
   return rows.map(r => ({

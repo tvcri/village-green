@@ -15,6 +15,8 @@ import MultiSelect from 'primevue/multiselect'
 import Tag from 'primevue/tag'
 import { getTrainings, createTraining, patchTraining, deleteTraining } from '../../Trainings/api/trainingApi.js'
 import { getPositions, createPosition, patchPosition, deletePosition } from '../../Positions/api/positionApi.js'
+import { apiErrorMessage } from '../../../shared/api/apiClient.js'
+import { plural } from '../../../shared/lib.js'
 import { scopeLabel } from '../../../shared/lib/positionRules.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
@@ -45,7 +47,6 @@ const trainingName = (id) => trainings.value.find(t => t.trainingId === id)?.nam
 const positionsExpecting = (trainingId) => positions.value.filter(p => p.trainingIds.includes(trainingId))
 const scopeOptions = ['federation', 'village', 'circle'].map(v => ({ value: v, label: scopeLabel(v) }))
 const trainingOptions = computed(() => [...trainings.value].sort((a, b) => a.name.localeCompare(b.name)))
-const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 // Positions: inactive holders are hidden from the position's page but still
 // hold it, so they count toward every "held" rule here.
 const allHolders = (row) => (row?.holderCount ?? 0) + (row?.inactiveHolderCount ?? 0)
@@ -99,7 +100,7 @@ async function saveDialog () {
     await load()
   }
   catch (err) {
-    const message = err?.body?.error ?? 'Save failed.'
+    const message = apiErrorMessage(err, 'Save failed.')
     if (err?.status === 409 && /already exists/.test(message)) nameError.value = message
     else formError.value = message
   }
@@ -130,7 +131,7 @@ function askDelete (row) {
         toast.add({ severity: 'success', summary: 'Deleted', detail: `Deleted ${row.name}`, life: 2000 })
       }
       catch (err) {
-        toast.add({ severity: 'error', summary: 'Not deleted', detail: err?.body?.error ?? 'Delete failed.', life: 4000 })
+        toast.add({ severity: 'error', summary: 'Not deleted', detail: apiErrorMessage(err, 'Delete failed.'), life: 4000 })
       }
       await load()
     },

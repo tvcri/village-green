@@ -15,6 +15,7 @@ import { getVolunteerRoster } from '../../VolunteerList/api/volunteerApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getCircles } from '../../PersonList/api/personApi.js'
 import { holderGroups, isPositionCandidate, candidateStatus, candidateNote, buildHoldersPatch } from '../lib/holderStaging.js'
+import { apiErrorMessage, getHttpStatus } from '../../../shared/api/apiClient.js'
 import { scopeLabel, positionPlace } from '../../../shared/lib/positionRules.js'
 import { formatCivilDate } from '../../../shared/lib/civilDate.js'
 import { personExportColumns } from '../../../shared/lib/personExport.js'
@@ -42,6 +43,7 @@ const openKey = ref(null)
 const villageFilter = ref(null)
 const saving = ref(false)
 const loaded = ref(false)
+const missing = ref(false) // an unknown or deleted positionId
 const flashIds = ref(new Set())
 let flashTimer = null
 onBeforeUnmount(() => clearTimeout(flashTimer))
@@ -53,6 +55,7 @@ onMounted(async () => {
   try {
     const [positions, trainings, vs, cs, hs] = await Promise.all([getPositions(), getTrainings(), getVillages(), getCircles(), getPositionHolders(positionId.value)])
     const pos = positions.find(p => p.positionId === positionId.value) ?? null
+    if (!pos) { missing.value = true; return }
     const expected = pos?.trainingIds ?? []
     // The roster is a write-only extra: its failure must not hide the holders.
     const rosterP = canWrite.value
@@ -75,7 +78,9 @@ onMounted(async () => {
     position.value = pos
     loaded.value = true
   }
-  catch {
+  catch (err) {
+    // The holders request is the one that 404s for an unknown position.
+    if (getHttpStatus(err) === 404) { missing.value = true; return }
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load the position', life: 3000 })
   }
 })
@@ -164,7 +169,7 @@ async function save () {
     toast.add({ severity: 'success', summary: 'Saved', detail: `${position.value.name}: ${parts.join(', ')}.`, life: 4000 })
   }
   catch (err) {
-    toast.add({ severity: 'error', summary: 'Not saved', detail: err?.body?.error ?? 'Failed to save holders', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Not saved', detail: apiErrorMessage(err, 'Failed to save holders'), life: 5000 })
   }
   finally {
     saving.value = false
@@ -202,11 +207,16 @@ async function save () {
       <Button label="Save" :loading="saving" @click="save" />
     </div>
   </div>
+  <div v-else-if="missing" class="position-detail">
+    <h1>Position not found</h1>
+    <p class="subtitle">It may have been deleted. <RouterLink :to="{ name: 'meta-positions' }">See all positions</RouterLink></p>
+  </div>
 </template>
 
 <style scoped>
 .position-detail { padding: 2rem; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
 h1 { margin: 0; }
+.subtitle { margin: 0; color: var(--color-text-dim); }
 .title-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .stats { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; color: var(--color-text-dim); font-size: 0.9rem; }
 .filter { max-width: 16rem; }

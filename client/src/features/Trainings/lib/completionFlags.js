@@ -1,7 +1,6 @@
 // Per-person flags for the record-completions panel (UI spec §4). Pure.
 import { formatCivilDate } from '../../../shared/lib/civilDate.js'
-
-const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
+import { plural } from '../../../shared/lib.js'
 
 export function trainingFlag (personId, completions, date) {
   const mine = completions.filter(c => c.person.personId === personId)
@@ -40,5 +39,12 @@ export function resultMessage ({ trainingName, date, positionName, result }) {
   const n = result.skipped.length
   if (n) msg += ` ${n} already had it for that date and ${n === 1 ? 'was' : 'were'} skipped.`
   if (positionName) msg += ` Assigned ${positionName} to ${plural(result.assigned.length, 'volunteer')}.`
+  // The server has the last word on who was assigned: say who wasn't, and why.
+  const why = (reason) => (result.notAssigned ?? []).filter(n => n.reason === reason).length
+  const reasons = [
+    why('alreadyHolds') && `${why('alreadyHolds')} already ${why('alreadyHolds') === 1 ? 'holds' : 'hold'} it`,
+    why('noHomeVillage') && `${why('noHomeVillage')} ${why('noHomeVillage') === 1 ? 'has' : 'have'} no home village`,
+  ].filter(Boolean)
+  if (positionName && reasons.length) msg += ` Not assigned: ${reasons.join(', ')}.`
   return msg
 }

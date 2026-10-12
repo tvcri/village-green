@@ -67,7 +67,7 @@ describe('TrainingDetail', () => {
     await waitFor(() => expect(getVolunteerRoster).toHaveBeenCalled())
     await waitFor(() => expect(screen.getByLabelText('Add volunteers')).toBeInTheDocument())
     await fireEvent.click(screen.getByLabelText(/Local Service Coordinator \(Village\)/))
-    await waitFor(() => expect(getPositionHolders).toHaveBeenCalledWith('5'))
+    await waitFor(() => expect(getPositionHolders).toHaveBeenCalledWith('5', { includeInactive: true }))
     await addByName('nguy')
     await addByName('quinn')
     expect(screen.getByText('Will be assigned · Warwick')).toBeInTheDocument()
@@ -80,6 +80,46 @@ describe('TrainingDetail', () => {
     expect(body.personIds).toEqual(['3', '16'])
     expect(body.positionId).toBe('5')
     expect(body.completedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('keeps only the newest also-assign choice when an earlier holders request lands last', async () => {
+    getPositions.mockResolvedValue([
+      { positionId: '5', name: 'Local Service Coordinator', scope: 'village', trainingIds: ['4'], holderCount: 1 },
+      { positionId: '6', name: 'Board', scope: 'federation', trainingIds: ['4'], holderCount: 0 },
+    ])
+    let resolveSlow
+    getPositionHolders.mockImplementation((id) => id === '6'
+      ? Promise.resolve([])
+      // Nguyen holds the village position: if this answer won, Board would read "Already holds it".
+      : new Promise(r => { resolveSlow = () => r([{ volunteerPositionId: '20', village: { villageId: '7', name: 'Warwick' }, circle: null, person: { personId: '3' } }]) }))
+    render(TrainingDetail, opts)
+    await screen.findByText('Abbott, Lorraine')
+    await fireEvent.click(screen.getByText('Record completions'))
+    await waitFor(() => expect(screen.getByLabelText('Add volunteers')).toBeInTheDocument())
+    await addByName('nguy')
+    await fireEvent.click(screen.getByLabelText(/Local Service Coordinator \(Village\)/))
+    await fireEvent.click(screen.getByLabelText(/Board \(Hub\)/))
+    await waitFor(() => expect(getPositionHolders).toHaveBeenCalledWith('6', { includeInactive: true }))
+    resolveSlow()
+    await new Promise(r => setTimeout(r, 0))
+    expect(await screen.findByText('Will be assigned · Hub')).toBeInTheDocument()
+    expect(screen.queryByText('Already holds it')).toBeNull()
+  })
+
+  it('a failed roster load leaves the panel closed and says why', async () => {
+    getVolunteerRoster.mockRejectedValue({ status: 500, body: { error: 'Internal error' } })
+    render(TrainingDetail, opts)
+    await screen.findByText('Abbott, Lorraine')
+    await fireEvent.click(screen.getByText('Record completions'))
+    await waitFor(() => expect(getVolunteerRoster).toHaveBeenCalled())
+    expect(screen.queryByLabelText('Add volunteers')).toBeNull()
+  })
+
+  it('an unknown or deleted training says so instead of rendering a blank page', async () => {
+    getTrainings.mockResolvedValue([])
+    render(TrainingDetail, { global: { ...opts.global, stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    expect(await screen.findByText('Training not found')).toBeInTheDocument()
+    expect(getTrainingCompletions).not.toHaveBeenCalled()
   })
 
   // The guard callback useUnsavedChangesGuard registered; true = leave without asking.

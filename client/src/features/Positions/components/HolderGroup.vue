@@ -48,7 +48,7 @@ const empty = () => !props.group.rows.length && !props.group.adds.length
     </div>
     <table v-if="!empty()">
       <tbody>
-        <tr v-for="h in group.rows" :key="h.volunteerPositionId" :class="{ removing: removeIds.has(h.volunteerPositionId), flash: flashIds.has(h.volunteerPositionId) }">
+        <tr v-for="h in group.rows" :key="h.volunteerPositionId" :class="{ removing: removeIds.has(h.volunteerPositionId), 'row-saved-flash': flashIds.has(h.volunteerPositionId) }">
           <td class="name">
             {{ h.person.fullName }}
             <span v-if="h.village && h.person.village?.villageId !== h.village.villageId" class="dim">(associate)</span>
@@ -105,8 +105,6 @@ tr:last-child td:last-child { border-bottom-right-radius: var(--inner-radius); }
 .name { width: 40%; }
 .state { width: 9rem; }
 .actions { width: 5rem; text-align: right; }
-tr.flash td { animation: flash 2.4s ease-out; }
-@keyframes flash { 0%, 40% { box-shadow: inset 0 0 0 999px rgba(250, 204, 21, 0.35); } 100% { box-shadow: none; } }
 .removing td { color: var(--color-text-dim); }
 .removing .name { text-decoration: line-through; }
 .adding td { background: var(--p-primary-50); }

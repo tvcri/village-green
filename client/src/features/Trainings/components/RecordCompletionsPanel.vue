@@ -10,6 +10,7 @@ import Tag from 'primevue/tag'
 import VolunteerSearch from '../../../shared/components/VolunteerSearch.vue'
 import { getPositionHolders } from '../../Positions/api/positionApi.js'
 import { recordTrainingCompletions } from '../api/trainingApi.js'
+import { apiErrorMessage } from '../../../shared/api/apiClient.js'
 import { serviceDateToDate, dateToServiceDate, todayCivilDate } from '../../../shared/lib/civilDate.js'
 import { scopeLabel } from '../../../shared/lib/positionRules.js'
 import { trainingFlag, positionFlag, batchSummary, resultMessage } from '../lib/completionFlags.js'
@@ -32,7 +33,19 @@ const saving = ref(false)
 const error = ref('')
 
 const position = computed(() => props.linkedPositions.find(p => p.positionId === positionId.value) ?? null)
-watch(positionId, async (id) => { holders.value = id ? await getPositionHolders(id) : [] })
+// Inactive holders too: the server skips anyone who already holds it, shown or
+// not. Only the newest choice's answer is kept; a slower earlier one is dropped.
+watch(positionId, async (id) => {
+  holders.value = []
+  if (!id) return
+  try {
+    const rows = await getPositionHolders(id, { includeInactive: true })
+    if (id === positionId.value) holders.value = rows
+  }
+  catch (err) {
+    if (id === positionId.value) error.value = apiErrorMessage(err, 'Failed to load who holds this position.')
+  }
+})
 watch(attendeeIds, (ids) => { dirty.value = ids.length > 0 }, { deep: true })
 
 const attendees = computed(() => attendeeIds.value.map(id => props.roster.find(p => p.personId === id)).filter(Boolean))
@@ -72,7 +85,7 @@ async function save () {
     emit('saved', { result, date: date.value, message })
   }
   catch (err) {
-    error.value = err?.body?.error ?? 'Failed to record completions.'
+    error.value = apiErrorMessage(err, 'Failed to record completions.')
   }
   finally {
     saving.value = false

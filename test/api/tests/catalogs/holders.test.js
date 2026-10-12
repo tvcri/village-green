@@ -117,6 +117,9 @@ test('an inactive holder is hidden from holders and holderCount, kept, and back 
 
   assert.equal((await vgCall('patchPersonVolunteer', { personId: b }, { token: staff, body: { active: false } })).status, 200)
   assert.deepEqual(await holderIds(), [a])
+  // ...unless asked for: the record-completions panel must know who holds it.
+  const all = (await vgCall('getPositionHolders', { positionId, includeInactive: true }, { token: staff })).json
+  assert.deepEqual(all.map(h => h.person.personId).sort(), [a, b].sort())
   const c = await counts()
   assert.equal(c.holderCount, 1)
   assert.equal(c.inactiveHolderCount, 1)
