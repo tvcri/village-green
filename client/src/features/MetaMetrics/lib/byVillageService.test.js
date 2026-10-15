@@ -3,6 +3,9 @@ import { byVillageService, drilldownCategories, serviceSeries } from './byVillag
 
 const S = (completed, unmatched, memberCancelled, volunteerCancelled) =>
   ({ completed, unmatched, memberCancelled, volunteerCancelled })
+// Round trips of the non-completed outcomes are set too, so a reduction that
+// reads anything but roundTrips.completed shows up as a wrong number.
+const RT = completed => ({ completed, unmatched: 50, memberCancelled: 50, volunteerCancelled: 50 })
 
 const VILLAGES = [
   { villageId: '1', villageName: 'Quahog' },
@@ -11,12 +14,12 @@ const VILLAGES = [
 ]
 
 const CELLS = [
-  { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(10, 1, 2, 0), completedRoundTrips: 4 },
-  { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(5, 0, 0, 0), completedRoundTrips: 1 },
-  { villageId: '1', serviceName: 'Errand: Other', category: 'Errands', byStatus: S(3, 0, 0, 0), completedRoundTrips: 0 },
-  { villageId: '2', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(7, 0, 0, 0), completedRoundTrips: 0 },
-  { villageId: '2', serviceName: 'Tech Support', category: 'Tech Support', byStatus: S(9, 0, 0, 0), completedRoundTrips: 0 },
-  { villageId: '2', serviceName: 'Mystery', category: null, byStatus: S(99, 0, 0, 0), completedRoundTrips: 0 },
+  { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(10, 1, 2, 0), roundTrips: RT(4) },
+  { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(5, 0, 0, 0), roundTrips: RT(1) },
+  { villageId: '1', serviceName: 'Errand: Other', category: 'Errands', byStatus: S(3, 0, 0, 0), roundTrips: RT(0) },
+  { villageId: '2', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(7, 0, 0, 0), roundTrips: RT(0) },
+  { villageId: '2', serviceName: 'Tech Support', category: 'Tech Support', byStatus: S(9, 0, 0, 0), roundTrips: RT(0) },
+  { villageId: '2', serviceName: 'Mystery', category: null, byStatus: S(99, 0, 0, 0), roundTrips: RT(0) },
 ]
 
 describe('drilldownCategories', () => {
@@ -29,8 +32,8 @@ describe('drilldownCategories', () => {
   it('grows automatically as the vocabulary does', () => {
     const withFriends = [
       ...CELLS,
-      { villageId: '1', serviceName: 'Friends: Visit', category: 'Friends', byStatus: S(4, 0, 0, 0), completedRoundTrips: 0 },
-      { villageId: '1', serviceName: 'Friends: Call', category: 'Friends', byStatus: S(6, 0, 0, 0), completedRoundTrips: 0 },
+      { villageId: '1', serviceName: 'Friends: Visit', category: 'Friends', byStatus: S(4, 0, 0, 0), roundTrips: RT(0) },
+      { villageId: '1', serviceName: 'Friends: Call', category: 'Friends', byStatus: S(6, 0, 0, 0), roundTrips: RT(0) },
     ]
     expect(drilldownCategories(withFriends)).toContain('Friends')
     expect(drilldownCategories(withFriends)).toContain('Rides')
@@ -41,10 +44,10 @@ describe('drilldownCategories', () => {
     // requests and Errands ~5% — opening on Errands shows the reader the least
     // interesting slice of their data.
     const cells = [
-      { villageId: '1', serviceName: 'Errand: Shopping', category: 'Errands', byStatus: S(3, 0, 0, 0), completedRoundTrips: 0 },
-      { villageId: '1', serviceName: 'Errand: Other', category: 'Errands', byStatus: S(2, 0, 0, 0), completedRoundTrips: 0 },
-      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(80, 0, 0, 0), completedRoundTrips: 0 },
-      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(40, 0, 0, 0), completedRoundTrips: 0 },
+      { villageId: '1', serviceName: 'Errand: Shopping', category: 'Errands', byStatus: S(3, 0, 0, 0), roundTrips: RT(0) },
+      { villageId: '1', serviceName: 'Errand: Other', category: 'Errands', byStatus: S(2, 0, 0, 0), roundTrips: RT(0) },
+      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(80, 0, 0, 0), roundTrips: RT(0) },
+      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(40, 0, 0, 0), roundTrips: RT(0) },
     ]
     expect(drilldownCategories(cells)).toEqual(['Rides', 'Errands'])
   })
@@ -85,8 +88,8 @@ describe('serviceSeries', () => {
   // (50 vs 45) but the table prints Medical as the larger number (85 vs 50).
   it('ranks on the legs basis when legs are counted, matching the displayed values', () => {
     const cells = [
-      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(50, 0, 0, 0), completedRoundTrips: 0 },
-      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(45, 0, 0, 0), completedRoundTrips: 40 },
+      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(50, 0, 0, 0), roundTrips: RT(0) },
+      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(45, 0, 0, 0), roundTrips: RT(40) },
     ]
 
     expect(serviceSeries(cells, 'Rides', { legs: true }).map(s => s.key))
@@ -99,8 +102,8 @@ describe('serviceSeries', () => {
 
   it('hands the leading ramp colour to the service the table shows as largest', () => {
     const cells = [
-      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(50, 0, 0, 0), completedRoundTrips: 0 },
-      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(45, 0, 0, 0), completedRoundTrips: 40 },
+      { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(50, 0, 0, 0), roundTrips: RT(0) },
+      { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(45, 0, 0, 0), roundTrips: RT(40) },
     ]
     const [first] = serviceSeries(cells, 'Rides', { legs: true })
     const rows = byVillageService(cells, [{ villageId: '1', villageName: 'Quahog' }], 'Rides', { legs: true })
@@ -163,7 +166,7 @@ describe('service header abbreviations', () => {
   const ride = name => ({
     villageId: '1', serviceName: name, category: 'Rides',
     byStatus: { completed: 1, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
-    completedRoundTrips: 0,
+    roundTrips: RT(0),
   })
 
   it('shortens the multi-word ride services', () => {

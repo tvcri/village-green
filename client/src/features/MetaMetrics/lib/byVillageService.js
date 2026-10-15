@@ -56,7 +56,7 @@ export function drilldownCategories (cells, { legs = false } = {}) {
     }
     const entry = byCategory.get(cell.category)
     entry.names.add(cell.serviceName)
-    entry.completed += cell.byStatus.completed + (legs ? cell.completedRoundTrips : 0)
+    entry.completed += cell.byStatus.completed + (legs ? cell.roundTrips.completed : 0)
   }
   return [...byCategory.entries()]
     .filter(([, { names }]) => names.size > 1)
@@ -89,7 +89,7 @@ export function serviceSeries (cells, category, { legs = false } = {}) {
   for (const cell of cells) {
     if (cell.category !== category) continue
     const prior = totals.get(cell.serviceName) ?? 0
-    totals.set(cell.serviceName, prior + cell.byStatus.completed + (legs ? cell.completedRoundTrips : 0))
+    totals.set(cell.serviceName, prior + cell.byStatus.completed + (legs ? cell.roundTrips.completed : 0))
   }
 
   return [...totals.entries()]
@@ -138,7 +138,7 @@ export function byVillageService (cells, villages, category, { legs = false } = 
     const row = rows.get(cell.villageId)
     if (!row || !(cell.serviceName in row)) continue
 
-    const value = cell.byStatus.completed + (legs ? cell.completedRoundTrips : 0)
+    const value = cell.byStatus.completed + (legs ? cell.roundTrips.completed : 0)
     row[cell.serviceName] += value
     row.total += value
   }

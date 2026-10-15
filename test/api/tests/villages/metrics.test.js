@@ -31,34 +31,41 @@ test('byCategory: always all 4 categories in fixed order, zero-filled', async ()
 test('byCategory: per-status counts aggregate across serviceNames', async () => {
   const { byCategory } = await getMetrics()
   const rides = byCategory.find(c => c.category === 'Rides').byStatus
-  // srM1+srM2 Completed, srM3 Member cancelled
-  assert.deepEqual(rides, { ...ZERO, completed: 2, memberCancelled: 1 })
+  // srM1+srM2 Completed, srM3 Member cancelled, srM9 Unmatched
+  assert.deepEqual(rides, { ...ZERO, completed: 2, memberCancelled: 1, unmatched: 1 })
   const errands = byCategory.find(c => c.category === 'Errands').byStatus
   // srM8 completed round-trip errand; srM4 is Open and no longer counted
   assert.deepEqual(errands, { ...ZERO, completed: 1 })
 })
 
-test('completedRoundTrips counts completed round-trip RIDES only, at every site', async () => {
+test('roundTrips counts round-trip RIDES per status, at every site', async () => {
   const m = await getMetrics()
-  // srM1 is the only qualifying row: srM2 is One Way, srM3 isn't Completed,
-  // srM8 is a completed Round Trip but an Errand (the legacy counter never
-  // doubled non-ride round trips).
-  assert.equal(m.totals.completedRoundTrips, 1)
-  assert.equal(m.byCategory.find(c => c.category === 'Rides').completedRoundTrips, 1)
-  assert.equal(m.byCategory.find(c => c.category === 'Errands').completedRoundTrips, 0)
-  assert.equal(m.byCategory.find(c => c.category === 'Tech Support').completedRoundTrips, 0)
-  assert.equal(m.byServiceType.find(e => e.serviceName === 'Ride: Medical Appnt').completedRoundTrips, 1)
-  assert.equal(m.byServiceType.find(e => e.serviceName === 'Errand: Shopping').completedRoundTrips, 0)
-  // People sites carry it too (quahog member/volunteer share srM1)
+  // srM1 (Completed), srM3 (Member cancelled) and srM9 (Unmatched) qualify:
+  // every outcome doubles. srM2 is One Way; srM8 is a completed Round Trip
+  // but an Errand, and non-ride round trips are never doubled.
+  const RIDE_RT = { ...ZERO, completed: 1, memberCancelled: 1, unmatched: 1 }
+  assert.deepEqual(m.totals.roundTrips, RIDE_RT)
+  assert.deepEqual(m.byCategory.find(c => c.category === 'Rides').roundTrips, RIDE_RT)
+  assert.deepEqual(m.byCategory.find(c => c.category === 'Errands').roundTrips, ZERO)
+  assert.deepEqual(m.byCategory.find(c => c.category === 'Tech Support').roundTrips, ZERO)
+  assert.deepEqual(m.byServiceType.find(e => e.serviceName === 'Ride: Medical Appnt').roundTrips, RIDE_RT)
+  assert.deepEqual(m.byServiceType.find(e => e.serviceName === 'Errand: Shopping').roundTrips, ZERO)
+})
+
+test('people counts keep completedRoundTrips, Completed only', async () => {
+  const m = await getMetrics()
+  // quahog member/volunteer share srM1; srM3 and srM9 are round-trip rides
+  // too but not Completed, so they never reach a person count.
   assert.equal(m.byMember[0].completedRoundTrips, 1)
   assert.equal(m.byVolunteer[0].completedRoundTrips, 1)
+  assert.equal('roundTrips' in m.byMember[0], false)
 })
 
 test('byServiceType: per-status matrix, derived category, terminal non-Completed rows included', async () => {
   const { byServiceType } = await getMetrics()
   const medical = byServiceType.find(e => e.serviceName === 'Ride: Medical Appnt')
   assert.equal(medical.category, 'Rides')
-  assert.deepEqual(medical.byStatus, { ...ZERO, completed: 2, memberCancelled: 1 })
+  assert.deepEqual(medical.byStatus, { ...ZERO, completed: 2, memberCancelled: 1, unmatched: 1 })
   assert.equal('count' in medical, false)
   // srM4 (Open) is excluded; the group survives on srM8's completed round trip
   const errand = byServiceType.find(e => e.serviceName === 'Errand: Shopping')
@@ -70,10 +77,10 @@ test('byServiceType: per-status matrix, derived category, terminal non-Completed
 test('non-terminal and Hub cancelled rows are excluded from every section', async () => {
   const m = await getMetrics()
   assert.equal(m.totals.byStatus.completed, 4) // srM1, srM2, srM5, srM8
-  // srM1-3, srM5, srM8. srM6 is Hub cancelled and srM4 is Open — both invisible.
-  assert.equal(m.totals.totalRequests, 5)
+  // srM1-3, srM5, srM8, srM9. srM6 is Hub cancelled and srM4 is Open — both invisible.
+  assert.equal(m.totals.totalRequests, 6)
   const rides = m.byCategory.find(c => c.category === 'Rides').byStatus
-  assert.equal(Object.values(rides).reduce((a, b) => a + b, 0), 3)
+  assert.equal(Object.values(rides).reduce((a, b) => a + b, 0), 4)
 
   // totalRequests is derived from byStatus, so the strip always reconciles.
   const summed = Object.values(m.totals.byStatus).reduce((a, b) => a + b, 0)

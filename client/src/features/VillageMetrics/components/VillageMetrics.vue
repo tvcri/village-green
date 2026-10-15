@@ -128,7 +128,7 @@ const chartType = computed({
 })
 
 // ---- view state ----
-const legs = ref(true) // default ON: a completed round trip counts as 2 legs
+const legs = ref(true) // default ON: a round-trip ride counts as 2 legs, whatever its outcome
 const showLegsInfo = ref(false)
 const catStatus = ref('completed')
 const svcStatus = ref('completed')
@@ -497,9 +497,12 @@ const GUIDE_URL = `${globalThis.VG?.Env?.pathPrefix ?? '/'}guides/village-metric
       <p class="legs-info-body">
         Many health insurers count round-trip rides to medical appointments as
         TWO services even if the driver waited for the insured and provided the
-        return trip home. The "Round trip = 2 legs" toggle follows this
-        practice, counting each round-trip ride as two services. It is on by
-        default; turn it off to count each ride once.
+        return trip home. This dashboard follows that practice, and applies it
+        to every outcome, so a round-trip ride that went unmatched or was
+        cancelled also counts as two. Completed, cancelled and unmatched are
+        then counted on the same basis. The "Round trip = 2 legs" toggle turns
+        this on and off. It is on by default; turn it off to count each ride
+        once.
       </p>
     </Dialog>
   </div>

@@ -59,23 +59,24 @@ function byStatus (over = {}) {
   }
 }
 
-// totals: 10 completed + 4 round trips; 2 member-cancelled, 1 volunteer-cancelled.
+// totals: 10 completed (4 round trips); 2 member-cancelled (2 round trips),
+// 1 volunteer-cancelled (no round trip).
 const METRICS = {
   villageName: 'Testville',
   totals: {
     totalRequests: 13,
     byStatus: byStatus({ completed: 10, memberCancelled: 2, volunteerCancelled: 1 }),
-    completedRoundTrips: 4,
+    roundTrips: byStatus({ completed: 4, memberCancelled: 2 }),
   },
   byCategory: [
-    { category: 'Rides', byStatus: byStatus({ completed: 6 }), completedRoundTrips: 4 },
-    { category: 'Errands', byStatus: byStatus({ completed: 4 }), completedRoundTrips: 0 },
-    { category: 'Home Help', byStatus: byStatus(), completedRoundTrips: 0 },
-    { category: 'Tech Support', byStatus: byStatus(), completedRoundTrips: 0 },
+    { category: 'Rides', byStatus: byStatus({ completed: 6 }), roundTrips: byStatus({ completed: 4 }) },
+    { category: 'Errands', byStatus: byStatus({ completed: 4 }), roundTrips: byStatus() },
+    { category: 'Home Help', byStatus: byStatus(), roundTrips: byStatus() },
+    { category: 'Tech Support', byStatus: byStatus(), roundTrips: byStatus() },
   ],
   byServiceType: [
-    { serviceName: 'Ride: Medical', category: 'Rides', byStatus: byStatus({ completed: 6 }), completedRoundTrips: 4 },
-    { serviceName: 'Grocery run', category: 'Errands', byStatus: byStatus({ completed: 4 }), completedRoundTrips: 0 },
+    { serviceName: 'Ride: Medical', category: 'Rides', byStatus: byStatus({ completed: 6 }), roundTrips: byStatus({ completed: 4 }) },
+    { serviceName: 'Grocery run', category: 'Errands', byStatus: byStatus({ completed: 4 }), roundTrips: byStatus() },
   ],
   byMember: [
     { personId: 1, fullName: 'Ada Member', count: 6, completedRoundTrips: 4 },
@@ -193,11 +194,19 @@ describe('VillageMetrics container', () => {
 
   it('applies the legs bump to the summary strip by default (toggle ON)', async () => {
     await renderLoaded()
-    // requests 13 + 4 roundtrips = 17; completed 10 + 4 = 14; cancelled 2 + 1 = 3
-    expect(screen.getByText('17')).toBeTruthy()
+    // Every outcome doubles its round trips: requests 13 + 6 = 19;
+    // completed 10 + 4 = 14; cancelled 2 + 2 member round trips + 1 = 5
+    expect(screen.getByText('19')).toBeTruthy()
     expect(screen.getAllByText('14').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('3').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('5').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Rides').length).toBeGreaterThan(0) // top category
+  })
+
+  it('shows no percentage on the village summary strip', async () => {
+    const { container } = await renderLoaded()
+    const strip = container.querySelector('.summary-strip')
+    expect(strip).toBeTruthy()
+    expect(strip.textContent).not.toContain('%')
   })
 
   it('renders the categories pie legend with legs-adjusted completed counts', async () => {
@@ -213,9 +222,10 @@ describe('VillageMetrics container', () => {
     const input = container.querySelector('#legsToggle')
     expect(input).toBeTruthy()
     input.click()
-    // completed 10 (no bump), requests 13
+    // Nothing doubles: completed 10, requests 13, cancelled 2 + 1 = 3
     await waitFor(() => expect(screen.getByText('13')).toBeTruthy())
     expect(screen.getAllByText('10').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('3').length).toBeGreaterThan(0)
   })
 
   it('People panel shows legs-adjusted member counts and plain volunteer counts', async () => {

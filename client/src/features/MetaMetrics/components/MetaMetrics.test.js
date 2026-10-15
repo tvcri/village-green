@@ -57,20 +57,20 @@ const PAYLOAD = {
   cells: [
     { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides',
       byStatus: { completed: 8, unmatched: 5, memberCancelled: 2, volunteerCancelled: 1 },
-      completedRoundTrips: 2 },
+      roundTrips: { completed: 2, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 } },
     { villageId: '2', serviceName: 'Ride: Medical Appnt', category: 'Rides',
       byStatus: { completed: 10, unmatched: 1, memberCancelled: 3, volunteerCancelled: 0 },
-      completedRoundTrips: 3 },
+      roundTrips: { completed: 3, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 } },
     // A second category, so the Categories tab has a real mix to render rather
     // than one full-width Rides bar per village.
     { villageId: '1', serviceName: 'Errand: Pharmacy', category: 'Errands',
       byStatus: { completed: 4, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
-      completedRoundTrips: 0 },
+      roundTrips: { completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 } },
     // A second Ride service, so Rides is drillable on the Detail tab. Errands
     // has only one service here and so must NOT be offered.
     { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides',
       byStatus: { completed: 6, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 },
-      completedRoundTrips: 0 },
+      roundTrips: { completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 } },
   ],
 }
 

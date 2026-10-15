@@ -49,3 +49,16 @@ test('meta metrics: in-flight and Hub cancelled statuses never appear', async ()
     )
   }
 })
+
+test('meta metrics: roundTrips counts round-trip rides per status', async () => {
+  const { json } = await vgCall('getMetaMetrics', RANGE, { token: tokens.users.board })
+  const quahog = villages.quahog.id.toString()
+  const ride = json.cells.find(c => c.villageId === quahog && c.serviceName === 'Ride: Medical Appnt')
+  // srM1 Completed, srM3 Member cancelled, srM9 Unmatched: every outcome doubles.
+  assert.deepEqual(ride.roundTrips,
+    { completed: 1, unmatched: 1, memberCancelled: 1, volunteerCancelled: 0 })
+  // srM8 is a completed round-trip Errand: non-ride round trips never double.
+  const errand = json.cells.find(c => c.villageId === quahog && c.serviceName === 'Errand: Shopping')
+  assert.deepEqual(errand.roundTrips,
+    { completed: 0, unmatched: 0, memberCancelled: 0, volunteerCancelled: 0 })
+})

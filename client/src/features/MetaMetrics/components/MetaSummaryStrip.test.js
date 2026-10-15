@@ -30,11 +30,25 @@ describe('MetaSummaryStrip', () => {
     expect(container.textContent).toContain('5,161')
   })
 
-  it('shows each outcome’s share of requests', () => {
+  it('shows each outcome’s percentage with its base', () => {
     const { container } = mountStrip()
     const shares = [...container.querySelectorAll('.stat-share')].map(s => s.textContent)
-    // 5161/6026, 614/6026, 251/6026
-    expect(shares).toEqual(['85.6%', '10.2%', '4.2%'])
+    // 5161/6026, 614/6026 of all; 251/(251 + 5161) of not cancelled
+    expect(shares).toEqual(['85.6% of all', '10.2% of all', '4.6% of not cancelled'])
+  })
+
+  it('explains the unmatched rate on hover', () => {
+    const { container } = mountStrip()
+    const unmatched = [...container.querySelectorAll('.stat-share')].at(-1)
+    expect(unmatched.getAttribute('title')).toMatch(/unmatched \+ completed/i)
+  })
+
+  it('renders no unmatched rate when nothing completed or went unmatched', () => {
+    const { container } = mountStrip([
+      { villageId: '1', villageName: 'A', completed: 0, cancelled: 7, unmatched: 0, total: 7 },
+    ])
+    const shares = [...container.querySelectorAll('.stat-share')].map(s => s.textContent)
+    expect(shares).toEqual(['0.0% of all', '100.0% of all'])
   })
 
   it('gives no share to Villages or Requests, which have no denominator', () => {

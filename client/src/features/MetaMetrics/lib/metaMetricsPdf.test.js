@@ -19,7 +19,8 @@ const report = (over = {}) => ({
   end: '2026-08-21',
   strip: {
     villages: 13, requests: 6026, completed: 5161, cancelled: 614, unmatched: 251,
-    completedPct: 85.6, cancelledPct: 10.2, unmatchedPct: 4.2,
+    completedPct: 85.6, cancelledPct: 10.2, unmatchedPct: 7.3,
+    completedPctBase: 'of all', cancelledPctBase: 'of all', unmatchedPctBase: 'of not cancelled',
   },
   view: 'counts',
   sections: [

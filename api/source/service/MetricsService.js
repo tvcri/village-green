@@ -11,21 +11,20 @@ const dbUtils = require('./utils')
 // Returns one cell per village x serviceName. Every other breakdown the client
 // draws (by village, by service type, by category) is a reduction of these
 // cells, so the payload is sent once and never refetched on a chart switch.
-const statusJson = (alias) => `JSON_OBJECT(
-  'completed',          COALESCE(SUM(${alias}.status = 'Completed'), 0),
-  'unmatched',          COALESCE(SUM(${alias}.status = 'Unmatched'), 0),
-  'memberCancelled',    COALESCE(SUM(${alias}.status = 'Member cancelled'), 0),
-  'volunteerCancelled', COALESCE(SUM(${alias}.status = 'Volunteer cancelled'), 0)
+const statusJson = (alias, and = '') => `JSON_OBJECT(
+  'completed',          COALESCE(SUM(${alias}.status = 'Completed'${and}), 0),
+  'unmatched',          COALESCE(SUM(${alias}.status = 'Unmatched'${and}), 0),
+  'memberCancelled',    COALESCE(SUM(${alias}.status = 'Member cancelled'${and}), 0),
+  'volunteerCancelled', COALESCE(SUM(${alias}.status = 'Volunteer cancelled'${and}), 0)
 )`
 
 module.exports.getMetaMetrics = async function ({ villageIds, start, end }) {
   const ridePrefix = dbUtils.SERVICE_CATEGORIES.find(c => c.category === 'Rides').match.prefix
-  // Legacy "2 legs" basis, identical to getVillageMetrics: completed
-  // round-trip RIDES only. The legacy counter never doubled non-ride round
-  // trips, which do exist in live data.
-  const roundTripSum = `COALESCE(SUM(sr.status = 'Completed'
-    AND sr.transportationType = 'Round Trip'
-    AND sr.serviceName LIKE '${ridePrefix}%'), 0)`
+  // "2 legs" basis, identical to getVillageMetrics: round-trip RIDES only,
+  // counted per status so every outcome doubles. Non-ride round trips exist
+  // in live data and are never doubled.
+  const roundTripJson = statusJson('sr',
+    ` AND sr.transportationType = 'Round Trip' AND sr.serviceName LIKE '${ridePrefix}%'`)
   const categoryCase = dbUtils.buildServiceNameCategoryCase('sr.serviceName')
 
   // villageIds === null means a federation read: no village restriction.
@@ -46,7 +45,7 @@ module.exports.getMetaMetrics = async function ({ villageIds, start, end }) {
        sr.serviceName,
        ${categoryCase} AS category,
        ${statusJson('sr')} AS byStatus,
-       ${roundTripSum} AS completedRoundTrips
+       ${roundTripJson} AS roundTrips
      FROM service_request sr
      WHERE sr.villageId IN (?)
        AND ${dbUtils.sqlTerminalStatus('sr.status')}

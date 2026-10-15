@@ -83,7 +83,7 @@ export function byVillageCategory (cells, villages, { legs = false } = {}) {
     // bucketed — inventing a fifth category would be a lie about the data.
     if (!row || cell.category === null || !(cell.category in row)) continue
 
-    const bump = legs ? cell.completedRoundTrips : 0
+    const bump = legs ? cell.roundTrips.completed : 0
     const value = cell.byStatus.completed + bump
     row[cell.category] += value
     row.total += value
