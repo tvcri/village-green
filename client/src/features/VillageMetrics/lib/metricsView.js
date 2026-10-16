@@ -52,10 +52,10 @@ const SERVICE_COLOR_RAMP = ['#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899
 const OTHER_COLOR = '#94a3b8'
 
 const OUTCOME_SPECS = [
-  { label: 'Completed', statusKey: 'completed', color: '#22c55e', legs: true },
-  { label: 'Member cancelled', statusKey: 'memberCancelled', color: '#f59e0b', legs: false },
-  { label: 'Volunteer cancelled', statusKey: 'volunteerCancelled', color: '#ef4444', legs: false },
-  { label: 'Unmatched', statusKey: 'unmatched', color: '#94a3b8', legs: false },
+  { label: 'Completed', statusKey: 'completed', color: '#22c55e' },
+  { label: 'Member cancelled', statusKey: 'memberCancelled', color: '#f59e0b' },
+  { label: 'Volunteer cancelled', statusKey: 'volunteerCancelled', color: '#ef4444' },
+  { label: 'Unmatched', statusKey: 'unmatched', color: '#94a3b8' },
 ]
 
 // sel 'all' -> sum of every status key in STATUS_ORDER; else the single key.
@@ -66,15 +66,12 @@ export function statusCount (byStatus, sel) {
   return byStatus[sel]
 }
 
-// The legs (completedRoundTrips) adjustment only applies where the displayed number
-// includes completed requests: selection 'completed' or 'all'.
-export function legsApply (sel, legs) {
-  return !!legs && (sel === 'all' || sel === 'completed')
-}
-
+// Legs on: a round-trip ride counts as two services whatever its outcome, so
+// every status adds its own round trips (entry.roundTrips, shaped like byStatus).
+// A payload without roundTrips (version skew) counts once rather than NaN.
 export function adjustedCount (entry, sel, legs) {
   const base = statusCount(entry.byStatus, sel)
-  return base + (legsApply(sel, legs) ? (entry.completedRoundTrips ?? 0) : 0)
+  return base + (legs && entry.roundTrips ? statusCount(entry.roundTrips, sel) : 0)
 }
 
 export function categoryChart (byCategory, sel, legs) {
@@ -143,7 +140,7 @@ export function serviceChart (byServiceType, sel, cat, legs, otherPct = 0.02) {
 export function outcomesChart (totals, legs) {
   const rows = OUTCOME_SPECS.map(spec => ({
     label: spec.label,
-    value: totals.byStatus[spec.statusKey] + (spec.legs && legs ? (totals.completedRoundTrips ?? 0) : 0),
+    value: adjustedCount(totals, spec.statusKey, legs),
     color: spec.color,
   }))
   const total = rows.reduce((sum, r) => sum + r.value, 0)
@@ -156,13 +153,12 @@ export function outcomesChart (totals, legs) {
 
 export function stripStats (metrics, legs) {
   const { totals } = metrics
-  const legsBump = legs ? (totals.completedRoundTrips ?? 0) : 0
+  const count = key => adjustedCount(totals, key, legs)
 
-  const requests = totals.totalRequests + legsBump
-  const completed = totals.byStatus.completed + legsBump
-  // Neither of these includes completed requests, so the legs bump never applies.
-  const unmatched = totals.byStatus.unmatched
-  const cancelled = totals.byStatus.memberCancelled + totals.byStatus.volunteerCancelled
+  const requests = count('all')
+  const completed = count('completed')
+  const unmatched = count('unmatched')
+  const cancelled = count('memberCancelled') + count('volunteerCancelled')
 
   return { requests, completed, unmatched, cancelled }
 }

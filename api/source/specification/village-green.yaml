@@ -5744,7 +5744,7 @@ components:
             - serviceName
             - category
             - byStatus
-            - completedRoundTrips
+            - roundTrips
             properties:
               villageId:
                 $ref: '#/components/schemas/VillageId'
@@ -5757,8 +5757,8 @@ components:
                 nullable: true
               byStatus:
                 $ref: '#/components/schemas/MetricsStatusCounts'
-              completedRoundTrips:
-                type: integer
+              roundTrips:
+                $ref: '#/components/schemas/MetricsStatusCounts'
     VillageMetrics:
       type: object
       additionalProperties: false
@@ -5795,14 +5795,14 @@ components:
           required:
           - totalRequests
           - byStatus
-          - completedRoundTrips
+          - roundTrips
           properties:
             totalRequests:
               type: integer
             byStatus:
               $ref: '#/components/schemas/MetricsStatusCounts'
-            completedRoundTrips:
-              type: integer
+            roundTrips:
+              $ref: '#/components/schemas/MetricsStatusCounts'
         byCategory:
           type: array
           items:
@@ -5811,15 +5811,15 @@ components:
             required:
             - category
             - byStatus
-            - completedRoundTrips
+            - roundTrips
             properties:
               category:
                 type: string
                 maxLength: 40
               byStatus:
                 $ref: '#/components/schemas/MetricsStatusCounts'
-              completedRoundTrips:
-                type: integer
+              roundTrips:
+                $ref: '#/components/schemas/MetricsStatusCounts'
         byServiceType:
           type: array
           items:
@@ -5829,7 +5829,7 @@ components:
             - serviceName
             - category
             - byStatus
-            - completedRoundTrips
+            - roundTrips
             properties:
               serviceName:
                 type: string
@@ -5840,8 +5840,8 @@ components:
                 nullable: true
               byStatus:
                 $ref: '#/components/schemas/MetricsStatusCounts'
-              completedRoundTrips:
-                type: integer
+              roundTrips:
+                $ref: '#/components/schemas/MetricsStatusCounts'
         byMember:
           type: array
           items:

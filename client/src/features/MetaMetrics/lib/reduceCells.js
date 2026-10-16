@@ -3,8 +3,8 @@
 // status change never refetches.
 //
 // Verified against the dev DB: every field in a cell is additive — summing
-// completedRoundTrips per cell equals the grand total — so these plain sums are
-// safe, drilldowns included.
+// roundTrips per cell equals the grand total — so these plain sums are safe,
+// drilldowns included.
 
 // Must stay in step with SERVICE_CATEGORIES in api/source/service/utils.js,
 // which is the vocabulary's source of truth.
@@ -39,16 +39,17 @@ function blank (extra) {
 }
 
 // `legs` is a parameter with exactly ONE caller pinning it to true, on purpose.
-// The federation counts a completed round trip as two services and will not
-// count differently, so Meta Metrics ships no toggle. Keeping the arithmetic
-// parameterised means restoring a toggle for a future multi-village-grant user
-// is wiring a ref to an existing parameter, not a rework. Do not inline it.
-function accumulate (row, byStatus, completedRoundTrips, legs) {
-  const bump = legs ? completedRoundTrips : 0
-  row.completed += byStatus.completed + bump
-  row.cancelled += byStatus.memberCancelled + byStatus.volunteerCancelled
-  row.unmatched += byStatus.unmatched
-  row.total += cellTotal(byStatus) + bump
+// The federation counts a round-trip ride as two services, whatever its
+// outcome, and will not count differently, so Meta Metrics ships no toggle.
+// Keeping the arithmetic parameterised means restoring a toggle for a future
+// multi-village-grant user is wiring a ref to an existing parameter, not a
+// rework. Do not inline it.
+function accumulate (row, byStatus, roundTrips, legs) {
+  const count = key => byStatus[key] + (legs ? roundTrips[key] : 0)
+  row.completed += count('completed')
+  row.cancelled += count('memberCancelled') + count('volunteerCancelled')
+  row.unmatched += count('unmatched')
+  row.total += cellTotal(byStatus) + (legs ? cellTotal(roundTrips) : 0)
 }
 
 const byTotalDesc = (a, b) => b.total - a.total
@@ -61,7 +62,7 @@ export function byVillage (cells, villages, { legs = false } = {}) {
   )
   for (const c of cells) {
     const row = rows.get(c.villageId)
-    if (row) accumulate(row, c.byStatus, c.completedRoundTrips, legs)
+    if (row) accumulate(row, c.byStatus, c.roundTrips, legs)
   }
   return [...rows.values()].sort(byTotalDesc)
 }

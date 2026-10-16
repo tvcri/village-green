@@ -206,9 +206,10 @@ const dark = computed(() => {
 })
 
 // ---- derived views ----
-// legs is pinned TRUE: the federation counts a completed round trip as two
-// services and will not count differently, so this page ships no toggle. The
-// parameter stays for a future multi-village-grant user.
+// legs is pinned TRUE: the federation counts a round-trip ride as two
+// services, whatever its outcome, and will not count differently, so this
+// page ships no toggle. The parameter stays for a future multi-village-grant
+// user.
 const villageRows = computed(() => {
   if (!payload.value) return []
   const { cells, villages } = payload.value
@@ -364,7 +365,7 @@ const showCountingInfo = ref(false)
       </div>
       <p class="exclusion-note">
         Hub-cancelled requests are excluded from all counts.
-        Completed round-trip rides count as two services.
+        Round-trip rides count as two services.
         <Button
           icon="pi pi-info-circle"
           text
@@ -504,8 +505,10 @@ const showCountingInfo = ref(false)
       <p class="info-body">
         Many health insurers count round-trip rides to medical appointments as
         TWO services even if the driver waited for the insured and provided the
-        return trip home. The Hub follows this practice, so every completed
-        round-trip ride counts as two services throughout this dashboard.
+        return trip home. This dashboard follows that practice, and applies it
+        to every outcome, so a round-trip ride that went unmatched or was
+        cancelled also counts as two. Completed, cancelled and unmatched are
+        then counted on the same basis.
       </p>
     </Dialog>
   </div>

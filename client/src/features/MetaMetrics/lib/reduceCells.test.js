@@ -11,9 +11,9 @@ const VILLAGES = [
 ]
 
 const CELLS = [
-  { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides',       byStatus: S(10, 1, 2, 0), completedRoundTrips: 4 },
-  { villageId: '1', serviceName: 'Errand: Shopping',    category: 'Errands',     byStatus: S(3, 0, 1, 1),  completedRoundTrips: 0 },
-  { villageId: '2', serviceName: 'Ride: Medical Appnt', category: 'Rides',       byStatus: S(5, 2, 0, 0),  completedRoundTrips: 1 },
+  { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides',       byStatus: S(10, 1, 2, 0), roundTrips: S(4, 1, 2, 0) },
+  { villageId: '1', serviceName: 'Errand: Shopping',    category: 'Errands',     byStatus: S(3, 0, 1, 1),  roundTrips: S(0, 0, 0, 0) },
+  { villageId: '2', serviceName: 'Ride: Medical Appnt', category: 'Rides',       byStatus: S(5, 2, 0, 0),  roundTrips: S(1, 1, 0, 0) },
 ]
 
 describe('cellTotal', () => {
@@ -48,18 +48,21 @@ describe('byVillage', () => {
 
 
 describe('byVillage with legs', () => {
-  it('adds completedRoundTrips to completed when legs is true', () => {
+  it('adds each outcome\'s own round trips when legs is true', () => {
     const rows = byVillage(CELLS, VILLAGES, { legs: true })
     const quahog = rows.find(r => r.villageId === '1')
-    // completed 10+3 = 13, roundTrips 4+0 = 4
-    expect(quahog.completed).toBe(17)
+    expect(quahog.completed).toBe(17) // 13 + 4
+    expect(quahog.unmatched).toBe(2)  // 1 + 1
+    expect(quahog.cancelled).toBe(6)  // 4 + 2 member-cancelled round trips
+    const innsmouth = rows.find(r => r.villageId === '2')
+    expect(innsmouth.unmatched).toBe(3) // 2 + 1
   })
 
-  it('bumps total by the same amount so percentages stay coherent', () => {
+  it('bumps total by every round trip so percentages stay coherent', () => {
     const rows = byVillage(CELLS, VILLAGES, { legs: true })
     const quahog = rows.find(r => r.villageId === '1')
-    // base total 13+1+3+1 = 18, plus 4 legs
-    expect(quahog.total).toBe(22)
+    // base total 13+1+3+1 = 18, plus 4+1+2 round trips
+    expect(quahog.total).toBe(25)
     expect(quahog.completed + quahog.cancelled + quahog.unmatched).toBe(quahog.total)
   })
 
@@ -67,6 +70,8 @@ describe('byVillage with legs', () => {
     const rows = byVillage(CELLS, VILLAGES, { legs: false })
     const quahog = rows.find(r => r.villageId === '1')
     expect(quahog.completed).toBe(13)
+    expect(quahog.unmatched).toBe(1)
+    expect(quahog.cancelled).toBe(4)
     expect(quahog.total).toBe(18)
   })
 

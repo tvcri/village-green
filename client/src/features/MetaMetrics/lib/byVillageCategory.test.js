@@ -3,6 +3,9 @@ import { byVillageCategory, CATEGORY_SERIES, buildCategorySeries } from './byVil
 
 const S = (completed, unmatched, memberCancelled, volunteerCancelled) =>
   ({ completed, unmatched, memberCancelled, volunteerCancelled })
+// Round trips of the non-completed outcomes are set too, so a reduction that
+// reads anything but roundTrips.completed shows up as a wrong number.
+const RT = completed => ({ completed, unmatched: 50, memberCancelled: 50, volunteerCancelled: 50 })
 
 const VILLAGES = [
   { villageId: '1', villageName: 'Quahog' },
@@ -11,12 +14,12 @@ const VILLAGES = [
 ]
 
 const CELLS = [
-  { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(10, 1, 2, 0), completedRoundTrips: 4 },
-  { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(5, 0, 0, 0), completedRoundTrips: 1 },
-  { villageId: '1', serviceName: 'Errand: Pharmacy', category: 'Errands', byStatus: S(3, 0, 1, 1), completedRoundTrips: 0 },
-  { villageId: '2', serviceName: 'Tech Support: Phone', category: 'Tech Support', byStatus: S(7, 2, 0, 0), completedRoundTrips: 0 },
+  { villageId: '1', serviceName: 'Ride: Medical Appnt', category: 'Rides', byStatus: S(10, 1, 2, 0), roundTrips: RT(4) },
+  { villageId: '1', serviceName: 'Ride: Shopping', category: 'Rides', byStatus: S(5, 0, 0, 0), roundTrips: RT(1) },
+  { villageId: '1', serviceName: 'Errand: Pharmacy', category: 'Errands', byStatus: S(3, 0, 1, 1), roundTrips: RT(0) },
+  { villageId: '2', serviceName: 'Tech Support: Phone', category: 'Tech Support', byStatus: S(7, 2, 0, 0), roundTrips: RT(0) },
   // A serviceName matching no category prefix. Must not be bucketed anywhere.
-  { villageId: '2', serviceName: 'Mystery', category: null, byStatus: S(99, 0, 0, 0), completedRoundTrips: 0 },
+  { villageId: '2', serviceName: 'Mystery', category: null, byStatus: S(99, 0, 0, 0), roundTrips: RT(0) },
 ]
 
 describe('CATEGORY_SERIES', () => {

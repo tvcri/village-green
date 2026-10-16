@@ -3,29 +3,32 @@ defineProps({
   stats: {
     type: Object,
     required: true,
-    // { villages, requests, completed, cancelled, unmatched }
+    // { villages, requests, completed, cancelled, unmatched,
+    //   <outcome>Pct, <outcome>PctBase } — see metaStripStats
   },
 })
 
 defineOptions({ name: 'MetaSummaryStrip' })
 
-// `pct` names the share key where one exists. Villages and Requests have no
-// denominator, so they carry none — "5,161 completed" does not read as a rate
-// at a glance, but "13 villages" needs no help.
+// `pct` names the percentage key where one exists. Villages and Requests have
+// no denominator, so they carry none — "5,161 completed" does not read as a
+// rate at a glance, but "13 villages" needs no help.
 const CARDS = [
   { label: 'Villages', key: 'villages' },
   { label: 'Requests', key: 'requests' },
   { label: 'Completed', key: 'completed', pct: 'completedPct' },
   { label: 'Cancelled', key: 'cancelled', pct: 'cancelledPct' },
-  { label: 'Unmatched', key: 'unmatched', pct: 'unmatchedPct' },
+  { label: 'Unmatched', key: 'unmatched', pct: 'unmatchedPct',
+    title: 'Unmatched ÷ (unmatched + completed). Cancelled requests are left out.' },
 ]
 
-// One decimal, matching the tables. A share is only rendered when the stats
-// carry a number for it — an empty range yields null, and "0.0%" there would
-// look like a measurement rather than an absence.
+// One decimal, matching the tables, followed by its base ("of all", "of not
+// cancelled"): the cards do not share a denominator, so each names its own.
+// Only rendered when the stats carry a number — an empty range yields null,
+// and "0.0%" there would look like a measurement rather than an absence.
 function shareFor (card, stats) {
   const value = card.pct ? stats[card.pct] : null
-  return typeof value === 'number' ? `${value.toFixed(1)}%` : ''
+  return typeof value === 'number' ? `${value.toFixed(1)}% ${stats[`${card.pct}Base`]}` : ''
 }
 </script>
 
@@ -35,7 +38,7 @@ function shareFor (card, stats) {
       <label class="stat-label">{{ card.label }}</label>
       <div class="stat-value">
         {{ stats[card.key].toLocaleString() }}
-        <span v-if="shareFor(card, stats)" class="stat-share">{{ shareFor(card, stats) }}</span>
+        <span v-if="shareFor(card, stats)" class="stat-share" :title="card.title">{{ shareFor(card, stats) }}</span>
       </div>
     </div>
   </div>
@@ -74,7 +77,10 @@ function shareFor (card, stats) {
      rather than centring against its full height. */
   display: flex;
   align-items: baseline;
-  gap: 0.4rem;
+  /* "7.3% of not cancelled" is wider than a narrow card can hold beside the
+     number; let it drop to its own line rather than squeeze the count. */
+  flex-wrap: wrap;
+  column-gap: 0.4rem;
 }
 
 /* Deliberately quiet: the count is the headline and the share is the gloss on

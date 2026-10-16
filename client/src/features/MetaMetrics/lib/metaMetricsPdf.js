@@ -106,9 +106,9 @@ function drawStrip (page, fonts, strip) {
   const cards = [
     { label: 'Villages', value: strip.villages, pct: null },
     { label: 'Requests', value: strip.requests, pct: null },
-    { label: 'Completed', value: strip.completed, pct: strip.completedPct },
-    { label: 'Cancelled', value: strip.cancelled, pct: strip.cancelledPct },
-    { label: 'Unmatched', value: strip.unmatched, pct: strip.unmatchedPct },
+    { label: 'Completed', value: strip.completed, pct: strip.completedPct, base: strip.completedPctBase },
+    { label: 'Cancelled', value: strip.cancelled, pct: strip.cancelledPct, base: strip.cancelledPctBase },
+    { label: 'Unmatched', value: strip.unmatched, pct: strip.unmatchedPct, base: strip.unmatchedPctBase },
   ]
   const gap = 8
   const w = (CONTENT_W - gap * (cards.length - 1)) / cards.length
@@ -121,7 +121,7 @@ function drawStrip (page, fonts, strip) {
     drawText(page, card.value.toLocaleString(), x + 8, top - 34, 14, fonts.bold, INK)
     if (typeof card.pct === 'number') {
       const numberW = fonts.bold.widthOfTextAtSize(card.value.toLocaleString(), 14)
-      drawText(page, `${card.pct.toFixed(1)}%`, x + 12 + numberW, top - 34, 7.5, fonts.helv, MUTED)
+      drawText(page, `${card.pct.toFixed(1)}% ${card.base}`, x + 12 + numberW, top - 34, 7.5, fonts.helv, MUTED)
     }
     x += w + gap
   }
@@ -284,7 +284,7 @@ function drawHeader (page, fonts, report) {
   drawText(page, formatRange(report.start, report.end), MARGIN, PAGE_H - MARGIN - 24, 9, fonts.helv, MUTED)
   drawText(
     page,
-    'Hub-cancelled requests are excluded. Completed round-trip rides count as two services.',
+    'Hub-cancelled requests are excluded from all counts. Round-trip rides count as two services.',
     MARGIN, PAGE_H - MARGIN - 38, 7.5, fonts.helv, MUTED,
   )
 }

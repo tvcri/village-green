@@ -213,10 +213,11 @@ export const serviceRequests = {
     transportationType: 'One Way',
     serviceDate: '2026-06-02', finishTime: '09:00:00',
   },
-  srM3: {
+  srM3: { // member-cancelled round-trip RIDE: doubles like a completed one
     id: 6, villageId: villages.quahog.id, requestNumber: 104,
     memberPersonId: persons.quahogMember.id, volunteerPersonId: null,
     status: 'Member cancelled', serviceName: 'Ride: Medical Appnt', destination: 'Clinic',
+    transportationType: 'Round Trip',
     serviceDate: '2026-06-03', finishTime: null,
   },
   srM4: {
@@ -248,13 +249,20 @@ export const serviceRequests = {
     serviceDate: '2025-01-15', finishTime: '11:00:00',
   },
   srM8: { // completed round-trip ERRAND: live data has these (404 rows) and
-    // the legacy legs rule (rides only) must NOT count it — load-bearing for
-    // the completedRoundTrips ride condition.
+    // the legs rule (rides only) must NOT count it — load-bearing for the
+    // roundTrips ride condition.
     id: 11, villageId: villages.quahog.id, requestNumber: 109,
     memberPersonId: persons.quahogMember.id, volunteerPersonId: persons.quahogVolunteer.id,
     status: 'Completed', serviceName: 'Errand: Shopping', destination: 'Market',
     transportationType: 'Round Trip',
     serviceDate: '2026-06-07', finishTime: '12:00:00',
+  },
+  srM9: { // unmatched round-trip RIDE: doubles like a completed one
+    id: 12, villageId: villages.quahog.id, requestNumber: 110,
+    memberPersonId: persons.quahogMember.id, volunteerPersonId: null,
+    status: 'Unmatched', serviceName: 'Ride: Medical Appnt', destination: 'Clinic',
+    transportationType: 'Round Trip',
+    serviceDate: '2026-06-08', finishTime: null,
   },
 }
 
