@@ -207,8 +207,9 @@ const dark = computed(() => {
 
 // ---- derived views ----
 // legs is pinned TRUE: the federation counts a round-trip ride as two
-// services, whatever its outcome, and will not count differently, so this page ships no toggle. The
-// parameter stays for a future multi-village-grant user.
+// services, whatever its outcome, and will not count differently, so this
+// page ships no toggle. The parameter stays for a future multi-village-grant
+// user.
 const villageRows = computed(() => {
   if (!payload.value) return []
   const { cells, villages } = payload.value

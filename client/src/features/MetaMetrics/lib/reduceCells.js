@@ -40,9 +40,10 @@ function blank (extra) {
 
 // `legs` is a parameter with exactly ONE caller pinning it to true, on purpose.
 // The federation counts a round-trip ride as two services, whatever its
-// outcome, and will not count differently, so Meta Metrics ships no toggle. Keeping the arithmetic
-// parameterised means restoring a toggle for a future multi-village-grant user
-// is wiring a ref to an existing parameter, not a rework. Do not inline it.
+// outcome, and will not count differently, so Meta Metrics ships no toggle.
+// Keeping the arithmetic parameterised means restoring a toggle for a future
+// multi-village-grant user is wiring a ref to an existing parameter, not a
+// rework. Do not inline it.
 function accumulate (row, byStatus, roundTrips, legs) {
   const count = key => byStatus[key] + (legs ? roundTrips[key] : 0)
   row.completed += count('completed')
