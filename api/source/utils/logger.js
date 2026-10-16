@@ -89,7 +89,7 @@ function serializeRequest (req) {
     method: req.method,
     url: req.originalUrl,
     headers: req.headers,
-    body: req.query.elevate === true ||  req.query.elevate === 'true' || config.log.level === 4 ? req.body : undefined
+    body: config.log.level === 4 ? req.body : undefined
   }
 }
 
@@ -106,19 +106,6 @@ function requestLogger (req, res, next) {
   res.svcStatus = {}
   req.requestId = randomUUID()
   
-  // Response body length for appinfo and content for privileged requests
-  let responseBody
-  responseBody = ''
-  if (req.query.elevate) {
-    const originalSend = res.send
-    res.send = function (chunk) {
-      if (chunk !== undefined) {
-        responseBody += chunk
-      }
-      originalSend.apply(res, arguments)
-    }
-  }
-
   // record request start
   recordStartTime.call(req)
 
@@ -165,7 +152,6 @@ function requestLogger (req, res, next) {
           clientTerminated: res.destroyed ? true : undefined,
           headers: res.finished ? res.getHeaders() : undefined,
           errorBody: res.errorBody,
-          responseBody,
         },
         operationStats
       })  
@@ -176,7 +162,6 @@ function requestLogger (req, res, next) {
         status: res.statusCode,
         headers: res.getHeaders(),
         errorBody: res.errorBody,
-        responseBody,
         operationStats
       })  
     }
