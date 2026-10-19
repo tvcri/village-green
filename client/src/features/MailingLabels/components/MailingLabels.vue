@@ -341,7 +341,7 @@ onMounted(() => {
           <ExportButton
             label="Download CSV"
             size="small"
-            :disabled="exportBusy || !sortedLabels.length"
+            :disabled="isLoading || exportBusy || !sortedLabels.length"
             @download="download"
             @export="exportSheet"
           />
