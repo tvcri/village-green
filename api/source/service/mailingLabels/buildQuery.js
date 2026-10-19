@@ -3,7 +3,7 @@ const dbUtils = require('../utils')
 const { AUDIENCE_RULES } = require('./audienceRules')
 
 // Every mailing answers the same question — "who gets an envelope" — and so
-// returns the same eight columns from the same base table. Only the role
+// returns the same nine columns from the same base table. Only the role
 // join/predicate and the audience predicate differ.
 //
 // person.fullName is generated "Last, First, Suffix" — NOT label order;
@@ -17,6 +17,7 @@ const SELECT_HEAD = `
       p.firstName,
       p.lastName,
       p.suffix,
+      p.nickname,
       p.street,
       p.unit,
       p.city,

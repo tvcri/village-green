@@ -4,10 +4,14 @@ import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
+import ExportButton from '../../../components/ExportButton.vue'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getMailingLabels } from '../api/mailingLabelApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { generateLabelPdf } from '../lib/generateLabelPdf.js'
+import { labelCsvColumns, labelRowsForCsv } from '../lib/labelsCsv.js'
+import { exportSlug } from '../../PersonList/lib/personDetailExport.js'
+import { useExportActions } from '../../../shared/composables/useExportActions.js'
 
 // The audience is the population definition — the kind of mailing. Values are
 // the API enum. Monthly runs are the common case, so the full-roster sweep
@@ -213,6 +217,15 @@ async function regenerate () {
 
 watch([sortedLabels, startPosition, nudgeX, nudgeY], regenerate)
 
+// The CSV/Sheet is the same envelopes in the same order as the PDF preview, so
+// mail-merged letters pair one-to-one with the printed labels.
+const { busy: exportBusy, download, exportSheet } = useExportActions({
+  buildRows: async () => labelRowsForCsv(sortedLabels.value),
+  columns: labelCsvColumns,
+  filename: () => `${exportSlug(composedTitle.value)}.csv`,
+  sheetTitle: () => composedTitle.value,
+})
+
 onBeforeUnmount(() => {
   // A PDF build still in flight must lose the generation race, or it would
   // mint a fresh object URL after this revoke that nothing ever revokes.
@@ -325,9 +338,15 @@ onMounted(() => {
             size="small"
             class="sort-select"
           />
+          <ExportButton
+            label="Download CSV"
+            size="small"
+            :disabled="isLoading || exportBusy || !sortedLabels.length"
+            @download="download"
+            @export="exportSheet"
+          />
           <span class="note ribbon-note">
-            Print from the preview at 100% scale ("Actual size") with
-            "fit to page" turned off.
+            Print at "Actual size" (100%), not "Fit to page".
           </span>
           <Button
             icon="pi pi-cog"
@@ -469,6 +488,12 @@ h1 {
 .sort-select {
   width: 10rem;
   flex-shrink: 0;
+}
+
+/* The ribbon note is the flexible item; the export button keeps its one-line label. */
+.ribbon :deep(.export-button) {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .ribbon-note {

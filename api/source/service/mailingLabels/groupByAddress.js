@@ -65,6 +65,54 @@ function composeName (recipients) {
     : `${fullName(first)} and ${fullName(second)}`
 }
 
+// Salutations: the names a letter for this envelope greets, in three forms,
+// for a Word mail merge. Names only, never "Dear" or the trailing comma —
+// the greeting wording belongs to the letter template. Unlike the label line
+// they name everyone (a greeting cannot say "and others"), in the same byName
+// order as composeName so a letter reads in the same order as its envelope.
+//
+// Some first names carry a nickname typed in parentheses ("Anne (Nancy)").
+// It is removed everywhere and, when the nickname column is empty, used as
+// the nickname.
+const PAREN_NICKNAME = /\s*\(([^)]*)\)/
+
+function givenName (row) {
+  return (row.firstName ?? '').replace(PAREN_NICKNAME, '').trim()
+}
+
+function nickname (row) {
+  return (row.nickname ?? '').trim()
+    || (row.firstName ?? '').match(PAREN_NICKNAME)?.[1].trim()
+    || givenName(row)
+}
+
+function listNames (names) {
+  return names.length > 1
+    ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+    : names.join('')
+}
+
+function composeSalutations (recipients) {
+  const sorted = [...recipients].sort(byName)
+  const formal = row => [givenName(row), row.lastName, row.suffix].filter(Boolean).join(' ').trim()
+  // A missing first name falls back to the person's full name, never a blank.
+  const orFormal = pick => row => pick(row) || formal(row)
+
+  // Shared surname compresses to "Harry, Judith and Mike Iannotti" — the
+  // composeName rule, including that any suffix spells everyone out.
+  const lastName = normalizePart(sorted[0]?.lastName)
+  const sameSurname = sorted.length > 1 && lastName.length > 0
+    && sorted.every(r => normalizePart(r.lastName) === lastName && !r.suffix)
+
+  return {
+    firstName: listNames(sorted.map(orFormal(givenName))),
+    nickname: listNames(sorted.map(orFormal(nickname))),
+    fullName: sameSurname
+      ? `${listNames(sorted.map(orFormal(givenName)))} ${sorted.at(-1).lastName}`
+      : listNames(sorted.map(formal)),
+  }
+}
+
 function groupByAddress (rows) {
   const mailable = []
   const unmailable = []
@@ -84,6 +132,7 @@ function groupByAddress (rows) {
     const [sample] = [...recipients].sort(byName)
     return {
       name: composeName(recipients),
+      salutations: composeSalutations(recipients),
       street: sample.street,
       unit: sample.unit ?? null,
       city: sample.city,
@@ -112,4 +161,4 @@ function groupByAddress (rows) {
   }
 }
 
-module.exports = { normalizeAddress, composeName, groupByAddress }
+module.exports = { normalizeAddress, composeName, composeSalutations, groupByAddress }
