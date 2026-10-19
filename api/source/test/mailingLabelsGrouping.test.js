@@ -2,7 +2,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const {
-  normalizeAddress, composeName, groupByAddress,
+  normalizeAddress, composeName, composeSalutations, groupByAddress,
 } = require('../service/mailingLabels/groupByAddress')
 
 const at = (firstName, lastName, street, extra = {}) => ({
@@ -63,6 +63,66 @@ test('composeName: three or more collapses to "and others"', () => {
     at('John', 'Smith', 'x'), at('Jane', 'Smith', 'x'), at('Kim', 'Smith', 'x'),
   ])
   assert.equal(out, 'Jane Smith and others')
+})
+
+test('composeSalutations: one recipient', () => {
+  assert.deepEqual(composeSalutations([at('Harry', 'Iannotti', 'x')]),
+    { firstName: 'Harry', nickname: 'Harry', fullName: 'Harry Iannotti' })
+})
+
+test('composeSalutations: names only, no greeting word or punctuation', () => {
+  // "Dear" and the comma belong to the letter template in Word.
+  const out = composeSalutations([at('Robert', 'Miller', 'x'), at('Barbara', 'Miller', 'x')])
+  assert.deepEqual(out, {
+    firstName: 'Barbara and Robert',
+    nickname: 'Barbara and Robert',
+    fullName: 'Barbara and Robert Miller',
+  })
+})
+
+test('composeSalutations: differing surnames spell out each full name', () => {
+  const out = composeSalutations([at('Lora', 'Urbanelli', 'x'), at('Bill', 'Rae', 'x')])
+  assert.equal(out.firstName, 'Bill and Lora')
+  assert.equal(out.fullName, 'Bill Rae and Lora Urbanelli')
+})
+
+test('composeSalutations: three or more names everyone', () => {
+  // The label collapses to "and others"; a greeting cannot.
+  const out = composeSalutations([
+    at('Mike', 'Iannotti', 'x'), at('Harry', 'Iannotti', 'x'), at('Judith', 'Iannotti', 'x', { nickname: 'Judy' }),
+  ])
+  assert.equal(out.firstName, 'Harry, Judith and Mike')
+  assert.equal(out.nickname, 'Harry, Judy and Mike')
+  assert.equal(out.fullName, 'Harry, Judith and Mike Iannotti')
+})
+
+test('composeSalutations: a suffix blocks the shared-surname compression', () => {
+  const out = composeSalutations([at('John', 'Smith', 'x', { suffix: 'Jr.' }), at('Jane', 'Smith', 'x')])
+  assert.equal(out.fullName, 'Jane Smith and John Smith Jr.')
+})
+
+test('composeSalutations: nickname column wins over the first name', () => {
+  const out = composeSalutations([at('Robert', 'Miller', 'x', { nickname: 'Bob' })])
+  assert.equal(out.firstName, 'Robert')
+  assert.equal(out.nickname, 'Bob')
+})
+
+test('composeSalutations: a "(nickname)" typed into firstName is removed, and used as the nickname', () => {
+  const out = composeSalutations([at('Anne (Nancy)', 'Smith', 'x')])
+  assert.deepEqual(out, { firstName: 'Anne', nickname: 'Nancy', fullName: 'Anne Smith' })
+})
+
+test('composeSalutations: the nickname column beats a parenthesized one', () => {
+  const out = composeSalutations([at('Marcia (Marcy)', 'Miller', 'x', { nickname: 'Marce' })])
+  assert.equal(out.nickname, 'Marce')
+})
+
+test('composeSalutations: a blank nickname falls back to the first name', () => {
+  assert.equal(composeSalutations([at('Robert', 'Miller', 'x', { nickname: '  ' })]).nickname, 'Robert')
+})
+
+test('composeSalutations: a missing first name falls back to the full name', () => {
+  assert.equal(composeSalutations([at('', 'Smith', 'x')]).firstName, 'Smith')
 })
 
 test('groupByAddress merges same address, counts merges', () => {
@@ -127,4 +187,13 @@ test('groupByAddress sortLastName is the byName-first surname for a household', 
   assert.equal(result.labels.length, 1)
   assert.equal(result.labels[0].name, 'Jane and John Smith')
   assert.equal(result.labels[0].sortLastName, 'Smith')
+})
+
+test('groupByAddress gives each label the salutations for its recipients', () => {
+  const result = groupByAddress([
+    at('John', 'Smith', '123 Main St'),
+    at('Jane', 'Smith', '123 Main St'),
+    at('Pat', 'Jones', '456 Oak Ave', { zip: '05999' }),
+  ])
+  assert.deepEqual(result.labels.map(l => l.salutations.firstName), ['Jane and John', 'Pat'])
 })

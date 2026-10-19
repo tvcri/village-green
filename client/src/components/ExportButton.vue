@@ -3,8 +3,10 @@ import { computed, ref, onMounted } from 'vue'
 import SplitButton from 'primevue/splitbutton'
 import { useAnalytics } from '../shared/composables/useAnalytics.js'
 
-defineProps({
-  disabled: Boolean
+const props = defineProps({
+  disabled: Boolean,
+  // Where "Download" alone is ambiguous (e.g. beside a PDF preview), name the format.
+  label: { type: String, default: 'Download' }
 })
 
 const emit = defineEmits(['download', 'export'])
@@ -19,7 +21,7 @@ onMounted(() => {
   })
 })
 
-const buttonLabel = computed(() => isMobile.value ? '' : 'Download')
+const buttonLabel = computed(() => isMobile.value ? '' : props.label)
 
 const menuItems = computed(() => [
   {

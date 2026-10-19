@@ -3107,6 +3107,24 @@ paths:
                       properties:
                         name:
                           type: string
+                        salutations:
+                          type: object
+                          description: >-
+                            The names a letter for this envelope greets, in
+                            three forms, for mail-merging letters that match
+                            the labels. Names only (no "Dear", no
+                            punctuation), naming every recipient at the
+                            address.
+                          properties:
+                            firstName:
+                              type: string
+                              description: First names, e.g. "Barbara and Robert"
+                            nickname:
+                              type: string
+                              description: Nicknames where recorded, else first names, e.g. "Barb and Bob"
+                            fullName:
+                              type: string
+                              description: Full names, sharing a common surname, e.g. "Barbara and Robert Miller"
                         street:
                           type: string
                         unit:
