@@ -114,12 +114,10 @@ const csvName = (list) => peopleCsvFilename({
 
     <div v-else-if="payload" class="people-grid">
       <section class="people-members">
-        <h3>Members <span class="people-count">({{ members.length }})</span></h3>
-        <MetaPeopleTable :rows="members" nameHeader="Member" :showVillage="showVillage" :villageNames="villageNames" :csvFilename="csvName('members')" />
+        <MetaPeopleTable title="Members" :rows="members" nameHeader="Member" :showVillage="showVillage" :villageNames="villageNames" :csvFilename="csvName('members')" />
       </section>
       <section class="people-volunteers">
-        <h3>Volunteers <span class="people-count">({{ volunteers.length }})</span></h3>
-        <MetaPeopleTable :rows="volunteers" nameHeader="Volunteer" :showVillage="showVillage" :villageNames="villageNames" :csvFilename="csvName('volunteers')" />
+        <MetaPeopleTable title="Volunteers" :rows="volunteers" nameHeader="Volunteer" :showVillage="showVillage" :villageNames="villageNames" :csvFilename="csvName('volunteers')" />
       </section>
     </div>
   </div>
@@ -148,8 +146,6 @@ const csvName = (list) => peopleCsvFilename({
   gap: 1.5rem;
   align-items: start;
 }
-.people-grid h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-.people-count { color: var(--color-text-muted, #6b7280); font-weight: normal; }
 
 @media (max-width: 900px) {
   .people-grid { grid-template-columns: minmax(0, 1fr); }

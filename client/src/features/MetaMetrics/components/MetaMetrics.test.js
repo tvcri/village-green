@@ -600,6 +600,18 @@ describe('People tab', () => {
     }
   })
 
+  it('puts each list\'s download on its heading line', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    for (const [cls, title] of [['.people-members', 'Members'], ['.people-volunteers', 'Volunteers']]) {
+      const heading = [...container.querySelectorAll(`${cls} h3`)].find(h => h.textContent.includes(title))
+      expect(heading, `${title} heading`).toBeTruthy()
+      const button = [...container.querySelectorAll(`${cls} button`)].find(x => /download csv/i.test(x.textContent))
+      expect(button.parentElement, `${title} download shares the heading's row`).toBe(heading.parentElement)
+    }
+  })
+
   it('downloads the list as shown: its village, bucket and order', async () => {
     mockRoute.query = peopleQuery({ village: 'all', activity: '1-50' })
     const { container } = await mountLoaded()

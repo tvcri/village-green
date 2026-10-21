@@ -6,6 +6,8 @@ import { completedCount, isInactive, sortPeople, statusOf, peopleCsvColumns, peo
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 
 const props = defineProps({
+  // The list's heading ("Members"); shares a line with its download.
+  title: { type: String, required: true },
   rows: { type: Array, required: true },
   nameHeader: { type: String, required: true },
   // Only meaningful under "All villages"; a single village would repeat itself.
@@ -52,7 +54,8 @@ function onDownloadCsv () {
 </script>
 
 <template>
-  <div class="table-actions">
+  <div class="list-head">
+    <h3>{{ title }} <span class="list-count">({{ rows.length }})</span></h3>
     <Button
       icon="pi pi-download"
       label="Download CSV"
@@ -98,11 +101,15 @@ function onDownloadCsv () {
 </template>
 
 <style scoped>
-.table-actions {
+.list-head {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   margin-bottom: 0.25rem;
 }
+.list-head h3 { margin: 0; font-size: 1rem; }
+.list-count { color: var(--color-text-muted, #6b7280); font-weight: normal; }
 
 /* Styled with the semantic tokens: the --p-datatable-* variables exist only
    once some DataTable has mounted. Fixed layout so the columns hold. */
