@@ -1,7 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import Tag from 'primevue/tag'
-import { completedCount, isInactive, sortPeople } from '../lib/peopleRows.js'
+import Button from 'primevue/button'
+import { completedCount, isInactive, sortPeople, statusOf, peopleCsvColumns, peopleCsvRows } from '../lib/peopleRows.js'
+import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 
 const props = defineProps({
   rows: { type: Array, required: true },
@@ -9,6 +11,7 @@ const props = defineProps({
   // Only meaningful under "All villages"; a single village would repeat itself.
   showVillage: { type: Boolean, default: false },
   villageNames: { type: Map, required: true },
+  csvFilename: { type: String, required: true },
 })
 
 defineOptions({ name: 'MetaPeopleTable' })
@@ -41,11 +44,24 @@ function ariaSort (field) {
 
 const sorted = computed(() => sortPeople(props.rows, sortField.value, sortDir.value, props.villageNames))
 
-// Members carry their status word (Dropped, ...); volunteers have only a flag.
-const inactiveLabel = (row) => ('status' in row ? (row.status ?? 'Inactive') : 'Inactive')
+// Exactly the list on screen, in its current order: village, bucket and sort
+// are what the reader chose to look at.
+function onDownloadCsv () {
+  downloadCsv(toCsv(peopleCsvRows(sorted.value, props.villageNames), peopleCsvColumns(props.nameHeader)), props.csvFilename)
+}
 </script>
 
 <template>
+  <div class="table-actions">
+    <Button
+      icon="pi pi-download"
+      label="Download CSV"
+      text
+      size="small"
+      :disabled="!sorted.length"
+      @click="onDownloadCsv"
+    />
+  </div>
   <table class="people-table">
     <colgroup>
       <col>
@@ -69,7 +85,7 @@ const inactiveLabel = (row) => ('status' in row ? (row.status ?? 'Inactive') : '
       <tr v-for="row in sorted" :key="row.personId">
         <td>
           <span class="person-name">{{ row.fullName }}</span>
-          <Tag v-if="isInactive(row)" class="inactive-tag" :value="inactiveLabel(row)" severity="secondary" />
+          <Tag v-if="isInactive(row)" class="inactive-tag" :value="statusOf(row)" severity="secondary" />
         </td>
         <td v-if="showVillage">{{ villageNames.get(row.villageId) ?? '—' }}</td>
         <td class="count-col">{{ completedCount(row) }}</td>
@@ -82,6 +98,12 @@ const inactiveLabel = (row) => ('status' in row ? (row.status ?? 'Inactive') : '
 </template>
 
 <style scoped>
+.table-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.25rem;
+}
+
 /* Styled with the semantic tokens: the --p-datatable-* variables exist only
    once some DataTable has mounted. Fixed layout so the columns hold. */
 .people-table {

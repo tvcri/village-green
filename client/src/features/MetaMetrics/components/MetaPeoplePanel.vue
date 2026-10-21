@@ -6,7 +6,7 @@ import SelectButton from 'primevue/selectbutton'
 import { useToast } from 'primevue/usetoast'
 import MetaPeopleTable from './MetaPeopleTable.vue'
 import { getMetaMetricsPersons } from '../api/metaMetricsApi.js'
-import { ACTIVITY_OPTIONS, ACTIVITY_VALUES, completedCount, inActivity } from '../lib/peopleRows.js'
+import { ACTIVITY_OPTIONS, ACTIVITY_VALUES, completedCount, inActivity, peopleCsvFilename } from '../lib/peopleRows.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 
 const props = defineProps({
@@ -70,6 +70,14 @@ const filtered = (rows) => (rows ?? []).filter(r => inActivity(completedCount(r)
 const members = computed(() => filtered(payload.value?.members))
 const volunteers = computed(() => filtered(payload.value?.volunteers))
 const showVillage = computed(() => village.value === 'all')
+
+const csvName = (list) => peopleCsvFilename({
+  villageName: village.value === 'all' ? 'All villages' : villageNames.value.get(village.value),
+  list,
+  activity: activity.value,
+  start: props.start,
+  end: props.end,
+})
 </script>
 
 <template>
@@ -107,11 +115,11 @@ const showVillage = computed(() => village.value === 'all')
     <div v-else-if="payload" class="people-grid">
       <section class="people-members">
         <h3>Members <span class="people-count">({{ members.length }})</span></h3>
-        <MetaPeopleTable :rows="members" nameHeader="Member" :showVillage="showVillage" :villageNames="villageNames" />
+        <MetaPeopleTable :rows="members" nameHeader="Member" :showVillage="showVillage" :villageNames="villageNames" :csvFilename="csvName('members')" />
       </section>
       <section class="people-volunteers">
         <h3>Volunteers <span class="people-count">({{ volunteers.length }})</span></h3>
-        <MetaPeopleTable :rows="volunteers" nameHeader="Volunteer" :showVillage="showVillage" :villageNames="villageNames" />
+        <MetaPeopleTable :rows="volunteers" nameHeader="Volunteer" :showVillage="showVillage" :villageNames="villageNames" :csvFilename="csvName('volunteers')" />
       </section>
     </div>
   </div>

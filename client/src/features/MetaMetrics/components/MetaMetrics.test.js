@@ -35,11 +35,19 @@ vi.mock('../lib/metaMetricsPdf.js', async (importOriginal) => ({
   buildMetaMetricsPdf: vi.fn(async () => new Uint8Array()),
 }))
 
+// Only the browser download is replaced; toCsv stays real so a test can read
+// the file contents it was handed.
+vi.mock('../../../shared/lib/csvUtils.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  downloadCsv: vi.fn(),
+}))
+
 const toastAdd = vi.fn()
 vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 
 import { getMetaMetrics, getMetaMetricsPersons } from '../api/metaMetricsApi.js'
 import { buildMetaMetricsPdf } from '../lib/metaMetricsPdf.js'
+import { downloadCsv } from '../../../shared/lib/csvUtils.js'
 import MetaMetrics from './MetaMetrics.vue'
 
 // The bars live IN the table rows, so there is no chart to stub and no chart
@@ -127,6 +135,7 @@ beforeEach(() => {
   getMetaMetricsPersons.mockReset()
   getMetaMetricsPersons.mockResolvedValue(PERSONS)
   buildMetaMetricsPdf.mockClear()
+  downloadCsv.mockClear()
 })
 
 afterEach(() => cleanup())
@@ -579,6 +588,33 @@ describe('People tab', () => {
     await waitFor(() => expect(getMetaMetricsPersons).toHaveBeenCalledTimes(1))
     mockRoute.query = { ...mockRoute.query, start: '2025-01-01', end: '2025-12-31' }
     await waitFor(() => expect(getMetaMetricsPersons).toHaveBeenLastCalledWith('2025-01-01', '2025-12-31', '1'))
+  })
+
+  it('offers one download per list', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    for (const cls of ['.people-members', '.people-volunteers']) {
+      expect([...container.querySelector(cls).querySelectorAll('button')]
+        .filter(b => /download csv/i.test(b.textContent))).toHaveLength(1)
+    }
+  })
+
+  it('downloads the list as shown: its village, bucket and order', async () => {
+    mockRoute.query = peopleQuery({ village: 'all', activity: '1-50' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container)).toEqual(['Busy, Bo', 'Gone, Gus']))
+    const button = [...container.querySelector('.people-members').querySelectorAll('button')]
+      .find(b => /download csv/i.test(b.textContent))
+    await fireEvent.click(button)
+    expect(downloadCsv).toHaveBeenCalledTimes(1)
+    const [csv, filename] = downloadCsv.mock.calls[0]
+    expect(csv.split('\n')).toEqual([
+      'Member,Village,Status,Completed',
+      '"Busy, Bo",Barrington,Active,15',
+      '"Gone, Gus",Warwick,Dropped,2',
+    ])
+    expect(filename).toBe('tvcri-people-all-villages-members-1-50-2026-01-01-2026-12-31.csv')
   })
 
   it('hides the Counts/Percent toggle and the tab-strip CSV', async () => {

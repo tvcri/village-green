@@ -7,14 +7,13 @@ export function completedCount (row) {
   return row.count + row.completedRoundTrips
 }
 
-// Ranges Caroline asked for. '0' is the one that matters: people on the active
-// roster with no completed requests in range.
+// Caroline's buckets after trying the tab: '0' is the one that matters
+// (people on the active roster with no completed requests in range). Every
+// count lands in exactly one.
 export const ACTIVITY_OPTIONS = [
   { value: 'all', label: 'All', test: () => true },
   { value: '0', label: '0', test: n => n === 0 },
-  { value: '1-9', label: '1–9', test: n => n >= 1 && n <= 9 },
-  { value: '10-19', label: '10–19', test: n => n >= 10 && n <= 19 },
-  { value: '20-50', label: '20–50', test: n => n >= 20 && n <= 50 },
+  { value: '1-50', label: '1–50', test: n => n >= 1 && n <= 50 },
   { value: 'gt50', label: '>50', test: n => n > 50 },
 ]
 export const ACTIVITY_VALUES = ACTIVITY_OPTIONS.map(o => o.value)
@@ -38,4 +37,41 @@ export function sortPeople (rows, field, dir, villageNames) {
   }[field] ?? byName
   // Ties fall back to name ascending whichever way the column runs.
   return [...rows].sort((a, b) => sign * compare(a, b) || byName(a, b))
+}
+
+// ---- CSV ----
+// The download is for working with the list in a spreadsheet, so every row
+// says its village and status even when the screen omits them.
+export function peopleCsvColumns (nameHeader) {
+  return [
+    { header: nameHeader, key: 'fullName' },
+    { header: 'Village', key: 'village' },
+    { header: 'Status', key: 'status' },
+    { header: 'Completed', key: 'completed' },
+  ]
+}
+
+// Members carry their status word (Dropped, ...); volunteers only a flag.
+export const statusOf = (row) => ('status' in row
+  ? (row.status ?? 'Inactive')
+  : (row.active === true ? 'Active' : 'Inactive'))
+
+export function peopleCsvRows (rows, villageNames) {
+  return rows.map(r => ({
+    fullName: r.fullName,
+    village: villageNames.get(r.villageId) ?? '',
+    status: statusOf(r),
+    completed: completedCount(r),
+  }))
+}
+
+const slug = (text) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
+// The village and bucket are in the filename because they are baked into
+// the contents.
+export function peopleCsvFilename ({ villageName, list, activity, start, end }) {
+  const parts = ['tvcri-people', slug(villageName), list]
+  if (activity && activity !== 'all') parts.push(activity)
+  parts.push(start, end)
+  return `${parts.join('-')}.csv`
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ACTIVITY_OPTIONS, completedCount, inActivity, isInactive, sortPeople } from './peopleRows.js'
+import { ACTIVITY_OPTIONS, completedCount, inActivity, isInactive, sortPeople, peopleCsvColumns, peopleCsvRows, peopleCsvFilename } from './peopleRows.js'
 
 const row = (over) => ({ personId: '1', fullName: 'A', villageId: '1', count: 0, completedRoundTrips: 0, ...over })
 
@@ -10,19 +10,24 @@ describe('completedCount', () => {
 })
 
 describe('inActivity', () => {
-  it('offers All, 0, 1–9, 10–19, 20–50 and >50, in that order', () => {
-    expect(ACTIVITY_OPTIONS.map(o => o.label)).toEqual(['All', '0', '1–9', '10–19', '20–50', '>50'])
+  it('offers All, 0, 1–50 and >50, in that order', () => {
+    expect(ACTIVITY_OPTIONS.map(o => o.label)).toEqual(['All', '0', '1–50', '>50'])
   })
 
   it.each([
     ['all', 0, true], ['all', 99, true],
     ['0', 0, true], ['0', 1, false],
-    ['1-9', 1, true], ['1-9', 9, true], ['1-9', 10, false],
-    ['10-19', 10, true], ['10-19', 19, true], ['10-19', 20, false],
-    ['20-50', 20, true], ['20-50', 50, true], ['20-50', 51, false],
+    ['1-50', 0, false], ['1-50', 1, true], ['1-50', 50, true], ['1-50', 51, false],
     ['gt50', 50, false], ['gt50', 51, true],
   ])('%s holds %i: %s', (bucket, n, expected) => {
     expect(inActivity(n, bucket)).toBe(expected)
+  })
+
+  it('leaves no count outside every bucket', () => {
+    const buckets = ACTIVITY_OPTIONS.filter(o => o.value !== 'all').map(o => o.value)
+    for (let n = 0; n <= 200; n++) {
+      expect(buckets.filter(b => inActivity(n, b))).toHaveLength(1)
+    }
   })
 })
 
@@ -64,5 +69,35 @@ describe('sortPeople', () => {
     const before = ids(rows)
     sortPeople(rows, 'count', 'desc', names)
     expect(ids(rows)).toEqual(before)
+  })
+})
+
+describe('people CSV', () => {
+  const names = new Map([['1', 'Warwick']])
+
+  it('carries name, village, status and the doubled completed count', () => {
+    const rows = peopleCsvRows([
+      row({ fullName: 'Brown, Ann', villageId: '1', status: 'Dropped', count: 3, completedRoundTrips: 1 }),
+      row({ fullName: 'Cole, Cy', villageId: '1', active: true, count: 0 }),
+    ], names)
+    expect(peopleCsvColumns('Member').map(c => c.header)).toEqual(['Member', 'Village', 'Status', 'Completed'])
+    expect(rows).toEqual([
+      { fullName: 'Brown, Ann', village: 'Warwick', status: 'Dropped', completed: 4 },
+      { fullName: 'Cole, Cy', village: 'Warwick', status: 'Active', completed: 0 },
+    ])
+  })
+
+  it('names an inactive volunteer Inactive', () => {
+    expect(peopleCsvRows([row({ active: false })], names)[0].status).toBe('Inactive')
+  })
+
+  it('puts the village, list, bucket and range in the filename', () => {
+    expect(peopleCsvFilename({ villageName: 'Bristol-Warren', list: 'members', activity: '0', start: '2026-01-01', end: '2026-10-21' }))
+      .toBe('tvcri-people-bristol-warren-members-0-2026-01-01-2026-10-21.csv')
+  })
+
+  it('leaves the bucket out when every count is shown', () => {
+    expect(peopleCsvFilename({ villageName: 'All villages', list: 'volunteers', activity: 'all', start: '2026-01-01', end: '2026-10-21' }))
+      .toBe('tvcri-people-all-villages-volunteers-2026-01-01-2026-10-21.csv')
   })
 })
