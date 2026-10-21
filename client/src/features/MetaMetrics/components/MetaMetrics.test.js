@@ -569,8 +569,8 @@ describe('People tab', () => {
     mockRoute.query = peopleQuery({ village: 'all' })
     await mountLoaded()
     await waitFor(() => expect(getMetaMetricsPersons).toHaveBeenCalledTimes(1))
-    await fireEvent.click(screen.getByText('>50'))
-    await waitFor(() => expect(mockRoute.query.activity).toBe('gt50'))
+    await fireEvent.click(screen.getByText('50+'))
+    await waitFor(() => expect(mockRoute.query.activity).toBe('50plus'))
     expect(getMetaMetricsPersons).toHaveBeenCalledTimes(1)
   })
 
@@ -613,7 +613,7 @@ describe('People tab', () => {
   })
 
   it('downloads the list as shown: its village, bucket and order', async () => {
-    mockRoute.query = peopleQuery({ village: 'all', activity: '1-50' })
+    mockRoute.query = peopleQuery({ village: 'all', activity: '1-49' })
     const { container } = await mountLoaded()
     await waitFor(() => expect(memberNames(container)).toEqual(['Busy, Bo', 'Gone, Gus']))
     const button = [...container.querySelector('.people-members').querySelectorAll('button')]
@@ -626,7 +626,7 @@ describe('People tab', () => {
       '"Busy, Bo",Barrington,Active,15',
       '"Gone, Gus",Warwick,Dropped,2',
     ])
-    expect(filename).toBe('tvcri-people-all-villages-members-1-50-2026-01-01-2026-12-31.csv')
+    expect(filename).toBe('tvcri-people-all-villages-members-1-49-2026-01-01-2026-12-31.csv')
   })
 
   it('hides the Counts/Percent toggle and the tab-strip CSV', async () => {

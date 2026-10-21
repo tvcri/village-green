@@ -10,15 +10,15 @@ describe('completedCount', () => {
 })
 
 describe('inActivity', () => {
-  it('offers All, 0, 1–50 and >50, in that order', () => {
-    expect(ACTIVITY_OPTIONS.map(o => o.label)).toEqual(['All', '0', '1–50', '>50'])
+  it('offers All, 0, 1–49 and 50+, in that order', () => {
+    expect(ACTIVITY_OPTIONS.map(o => o.label)).toEqual(['All', '0', '1–49', '50+'])
   })
 
   it.each([
     ['all', 0, true], ['all', 99, true],
     ['0', 0, true], ['0', 1, false],
-    ['1-50', 0, false], ['1-50', 1, true], ['1-50', 50, true], ['1-50', 51, false],
-    ['gt50', 50, false], ['gt50', 51, true],
+    ['1-49', 0, false], ['1-49', 1, true], ['1-49', 49, true], ['1-49', 50, false],
+    ['50plus', 49, false], ['50plus', 50, true], ['50plus', 51, true],
   ])('%s holds %i: %s', (bucket, n, expected) => {
     expect(inActivity(n, bucket)).toBe(expected)
   })

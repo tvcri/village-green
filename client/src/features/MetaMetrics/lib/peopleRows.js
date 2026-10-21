@@ -13,8 +13,8 @@ export function completedCount (row) {
 export const ACTIVITY_OPTIONS = [
   { value: 'all', label: 'All', test: () => true },
   { value: '0', label: '0', test: n => n === 0 },
-  { value: '1-50', label: '1–50', test: n => n >= 1 && n <= 50 },
-  { value: 'gt50', label: '>50', test: n => n > 50 },
+  { value: '1-49', label: '1–49', test: n => n >= 1 && n <= 49 },
+  { value: '50plus', label: '50+', test: n => n >= 50 },
 ]
 export const ACTIVITY_VALUES = ACTIVITY_OPTIONS.map(o => o.value)
 
