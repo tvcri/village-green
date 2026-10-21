@@ -25,12 +25,29 @@ vi.mock('vue-router', () => ({
 
 vi.mock('../api/metaMetricsApi.js', () => ({
   getMetaMetrics: vi.fn(),
+  getMetaMetricsPersons: vi.fn(),
+}))
+
+// Only the builder is replaced, so a test can read the sections it was handed;
+// everything else in the module stays real.
+vi.mock('../lib/metaMetricsPdf.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  buildMetaMetricsPdf: vi.fn(async () => new Uint8Array()),
+}))
+
+// Only the browser download is replaced; toCsv stays real so a test can read
+// the file contents it was handed.
+vi.mock('../../../shared/lib/csvUtils.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  downloadCsv: vi.fn(),
 }))
 
 const toastAdd = vi.fn()
 vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
 
-import { getMetaMetrics } from '../api/metaMetricsApi.js'
+import { getMetaMetrics, getMetaMetricsPersons } from '../api/metaMetricsApi.js'
+import { buildMetaMetricsPdf } from '../lib/metaMetricsPdf.js'
+import { downloadCsv } from '../../../shared/lib/csvUtils.js'
 import MetaMetrics from './MetaMetrics.vue'
 
 // The bars live IN the table rows, so there is no chart to stub and no chart
@@ -74,6 +91,20 @@ const PAYLOAD = {
   ],
 }
 
+// GET /metrics/persons. Villages match PAYLOAD: 1 Warwick, 2 Barrington.
+const PERSONS = {
+  range: { start: '2026-01-01', end: '2026-12-31' },
+  members: [
+    { personId: '11', fullName: 'Idle, Ida', villageId: '1', status: 'Active', count: 0, completedRoundTrips: 0 },
+    { personId: '12', fullName: 'Busy, Bo', villageId: '2', status: 'Active', count: 12, completedRoundTrips: 3 },
+    { personId: '13', fullName: 'Gone, Gus', villageId: '1', status: 'Dropped', count: 2, completedRoundTrips: 0 },
+  ],
+  volunteers: [
+    { personId: '21', fullName: 'Driver, Dee', villageId: '2', active: true, count: 40, completedRoundTrips: 20 },
+    { personId: '22', fullName: 'Former, Fay', villageId: '1', active: false, count: 1, completedRoundTrips: 0 },
+  ],
+}
+
 const mountPage = () => render(MetaMetrics, {
   global: { plugins: [PrimeVue], stubs: { MetricsRangePicker: true } },
 })
@@ -101,6 +132,10 @@ beforeEach(() => {
   toastAdd.mockClear()
   getMetaMetrics.mockReset()
   getMetaMetrics.mockResolvedValue(PAYLOAD)
+  getMetaMetricsPersons.mockReset()
+  getMetaMetricsPersons.mockResolvedValue(PERSONS)
+  buildMetaMetricsPdf.mockClear()
+  downloadCsv.mockClear()
 })
 
 afterEach(() => cleanup())
@@ -454,5 +489,161 @@ describe('MetaMetrics page shell', () => {
       await Promise.resolve()
       expect(toastAdd).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('People tab', () => {
+  const peopleQuery = (extra = {}) => ({ start: '2026-01-01', end: '2026-12-31', tab: 'people', ...extra })
+  const memberNames = (container) =>
+    [...container.querySelectorAll('.people-members tbody tr td:first-child .person-name')].map(td => td.textContent.trim())
+  const volunteerNames = (container) =>
+    [...container.querySelectorAll('.people-volunteers tbody tr td:first-child .person-name')].map(td => td.textContent.trim())
+
+  it('offers a People tab', async () => {
+    await mountLoaded()
+    expect(screen.getByRole('tab', { name: 'People' })).toBeInTheDocument()
+  })
+
+  it('fetches nothing until a village is chosen, and says so', async () => {
+    mockRoute.query = peopleQuery()
+    await mountLoaded()
+    expect(screen.getByText(/choose a village/i, { selector: 'p.notice' })).toBeInTheDocument()
+    expect(getMetaMetricsPersons).not.toHaveBeenCalled()
+  })
+
+  it('never fetches persons while another tab is showing', async () => {
+    mockRoute.query = { start: '2026-01-01', end: '2026-12-31', village: '1' }
+    await mountLoaded()
+    expect(getMetaMetricsPersons).not.toHaveBeenCalled()
+  })
+
+  it('fetches one village when one is chosen', async () => {
+    mockRoute.query = peopleQuery({ village: '1' })
+    await mountLoaded()
+    await waitFor(() => expect(getMetaMetricsPersons).toHaveBeenCalledWith('2026-01-01', '2026-12-31', '1'))
+  })
+
+  it('fetches every village for All, and adds a Village column', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(getMetaMetricsPersons).toHaveBeenCalledWith('2026-01-01', '2026-12-31', undefined))
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    expect(container.querySelector('.people-members thead').textContent).toMatch(/village/i)
+    expect(container.querySelector('.people-members tbody').textContent).toContain('Barrington')
+  })
+
+  it('omits the Village column for a single village', async () => {
+    mockRoute.query = peopleQuery({ village: '1' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    expect(container.querySelector('.people-members thead').textContent).not.toMatch(/village/i)
+  })
+
+  it('lists members and volunteers, busiest first, round trips counted twice', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    expect(memberNames(container)).toEqual(['Busy, Bo', 'Gone, Gus', 'Idle, Ida'])
+    expect(volunteerNames(container)).toEqual(['Driver, Dee', 'Former, Fay'])
+    // 12 + 3 round trips
+    expect(container.querySelector('.people-members tbody tr').textContent).toContain('15')
+  })
+
+  it('reverses the order on a second header click', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    const header = container.querySelector('.people-members th.count-col')
+    await fireEvent.click(header)
+    expect(memberNames(container)).toEqual(['Idle, Ida', 'Gone, Gus', 'Busy, Bo'])
+  })
+
+  it('narrows both lists to the chosen activity range', async () => {
+    mockRoute.query = peopleQuery({ village: 'all', activity: '0' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container)).toEqual(['Idle, Ida']))
+    expect(volunteerNames(container)).toEqual([])
+  })
+
+  it('writes the activity range to the URL without refetching', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    await mountLoaded()
+    await waitFor(() => expect(getMetaMetricsPersons).toHaveBeenCalledTimes(1))
+    await fireEvent.click(screen.getByText('50+'))
+    await waitFor(() => expect(mockRoute.query.activity).toBe('50plus'))
+    expect(getMetaMetricsPersons).toHaveBeenCalledTimes(1)
+  })
+
+  it('tags people who are no longer active', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    expect(container.querySelector('.people-members').textContent).toContain('Dropped')
+    expect(container.querySelector('.people-volunteers').textContent).toContain('Inactive')
+  })
+
+  it('refetches when the range changes', async () => {
+    mockRoute.query = peopleQuery({ village: '1' })
+    await mountLoaded()
+    await waitFor(() => expect(getMetaMetricsPersons).toHaveBeenCalledTimes(1))
+    mockRoute.query = { ...mockRoute.query, start: '2025-01-01', end: '2025-12-31' }
+    await waitFor(() => expect(getMetaMetricsPersons).toHaveBeenLastCalledWith('2025-01-01', '2025-12-31', '1'))
+  })
+
+  it('offers one download per list', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    for (const cls of ['.people-members', '.people-volunteers']) {
+      expect([...container.querySelector(cls).querySelectorAll('button')]
+        .filter(b => /download csv/i.test(b.textContent))).toHaveLength(1)
+    }
+  })
+
+  it('puts each list\'s download on its heading line', async () => {
+    mockRoute.query = peopleQuery({ village: 'all' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container).length).toBe(3))
+    for (const [cls, title] of [['.people-members', 'Members'], ['.people-volunteers', 'Volunteers']]) {
+      const heading = [...container.querySelectorAll(`${cls} h3`)].find(h => h.textContent.includes(title))
+      expect(heading, `${title} heading`).toBeTruthy()
+      const button = [...container.querySelectorAll(`${cls} button`)].find(x => /download csv/i.test(x.textContent))
+      expect(button.parentElement, `${title} download shares the heading's row`).toBe(heading.parentElement)
+    }
+  })
+
+  it('downloads the list as shown: its village, bucket and order', async () => {
+    mockRoute.query = peopleQuery({ village: 'all', activity: '1-49' })
+    const { container } = await mountLoaded()
+    await waitFor(() => expect(memberNames(container)).toEqual(['Busy, Bo', 'Gone, Gus']))
+    const button = [...container.querySelector('.people-members').querySelectorAll('button')]
+      .find(b => /download csv/i.test(b.textContent))
+    await fireEvent.click(button)
+    expect(downloadCsv).toHaveBeenCalledTimes(1)
+    const [csv, filename] = downloadCsv.mock.calls[0]
+    expect(csv.split('\n')).toEqual([
+      'Member,Village,Status,Completed',
+      '"Busy, Bo",Barrington,Active,15',
+      '"Gone, Gus",Warwick,Dropped,2',
+    ])
+    expect(filename).toBe('tvcri-people-all-villages-members-1-49-2026-01-01-2026-12-31.csv')
+  })
+
+  it('hides the Counts/Percent toggle and the tab-strip CSV', async () => {
+    mockRoute.query = peopleQuery()
+    const { container } = await mountLoaded()
+    expect(screen.queryByText('Percent')).toBeNull()
+    expect(container.querySelector('.tabs-csv')).toBeNull()
+  })
+
+  it('leaves the PDF to the three matrix tabs', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    URL.revokeObjectURL = vi.fn()
+    mockRoute.query = peopleQuery()
+    await mountLoaded()
+    await fireEvent.click(screen.getByText(/download pdf/i))
+    await waitFor(() => expect(buildMetaMetricsPdf).toHaveBeenCalled())
+    const keys = buildMetaMetricsPdf.mock.calls[0][0].sections.map(s => s.key)
+    expect(keys).toEqual(['outcomes', 'categories', 'detail'])
   })
 })

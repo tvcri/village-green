@@ -2514,6 +2514,45 @@ paths:
       security:
       - oauth:
         - vg:village:read
+  /metrics/persons:
+    get:
+      summary: Per-person Completed-request counts over a serviceDate range, scoped to the caller's grants
+      description: >-
+        Lists active members and volunteers, plus inactive ones with at least
+        one Completed request in range. A person's count spans every village
+        in the caller's scope, not only the person's own village. Rows are
+        scoped by person.villageId. Village scope follows getMetaMetrics: a
+        federation-scope sr:read sees every village; otherwise the villages
+        the caller holds sr:read on, and 403 when that set is empty or when
+        villageId names a village outside it.
+      tags:
+      - Metrics
+      operationId: getMetaMetricsPersons
+      parameters:
+      - $ref: '#/components/parameters/MetricsStartQuery'
+      - $ref: '#/components/parameters/MetricsEndQuery'
+      - name: villageId
+        in: query
+        required: false
+        description: Limit rows to persons belonging to this village. Omit for every village in scope.
+        schema:
+          $ref: '#/components/schemas/VillageId'
+      responses:
+        '200':
+          description: Per-person counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetaMetricsPersons'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - oauth:
+        - vg:village:read
   /villages:
     get:
       summary: List villages
@@ -5777,6 +5816,85 @@ components:
                 $ref: '#/components/schemas/MetricsStatusCounts'
               roundTrips:
                 $ref: '#/components/schemas/MetricsStatusCounts'
+    MetaMetricsPersons:
+      type: object
+      additionalProperties: false
+      required:
+      - range
+      - members
+      - volunteers
+      properties:
+        range:
+          type: object
+          additionalProperties: false
+          required:
+          - start
+          - end
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetaMetricsMemberCount'
+        volunteers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetaMetricsVolunteerCount'
+    MetaMetricsMemberCount:
+      type: object
+      additionalProperties: false
+      required:
+      - personId
+      - fullName
+      - villageId
+      - status
+      - count
+      - completedRoundTrips
+      properties:
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        fullName:
+          type: string
+          maxLength: 200
+        villageId:
+          $ref: '#/components/schemas/VillageId'
+        status:
+          type: string
+          maxLength: 50
+          nullable: true
+        count:
+          type: integer
+        completedRoundTrips:
+          type: integer
+    MetaMetricsVolunteerCount:
+      type: object
+      additionalProperties: false
+      required:
+      - personId
+      - fullName
+      - villageId
+      - active
+      - count
+      - completedRoundTrips
+      properties:
+        personId:
+          $ref: '#/components/schemas/PersonId'
+        fullName:
+          type: string
+          maxLength: 200
+        villageId:
+          $ref: '#/components/schemas/VillageIdNullable'
+        active:
+          type: boolean
+        count:
+          type: integer
+        completedRoundTrips:
+          type: integer
     VillageMetrics:
       type: object
       additionalProperties: false

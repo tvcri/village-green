@@ -12,6 +12,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import MetaOutcomesCard from './MetaOutcomesCard.vue'
 import MetaSummaryStrip from './MetaSummaryStrip.vue'
+import MetaPeoplePanel from './MetaPeoplePanel.vue'
 import { getMetaMetrics } from '../api/metaMetricsApi.js'
 import { byVillage, STATUS_SERIES } from '../lib/reduceCells.js'
 import { byVillageCategory, CATEGORY_SERIES } from '../lib/byVillageCategory.js'
@@ -114,13 +115,18 @@ function urlState (param, values, fallback) {
   })
 }
 
-const TAB_VALUES = ['outcomes', 'categories', 'detail']
+// The matrix tabs share one card, the view toggle, the strip CSV and the PDF.
+// People is a different kind of tab (person lists, its own fetch) and takes
+// part in none of those.
+const MATRIX_TABS = ['outcomes', 'categories', 'detail']
+const TAB_VALUES = [...MATRIX_TABS, 'people']
 const tab = urlState('tab', TAB_VALUES, 'outcomes')
 
-const TAB_LABELS = { outcomes: 'Outcomes', categories: 'Categories', detail: 'Detail' }
+const TAB_LABELS = { outcomes: 'Outcomes', categories: 'Categories', detail: 'Detail', people: 'People' }
 
 const isCategories = computed(() => tab.value === 'categories')
 const isDetail = computed(() => tab.value === 'detail')
+const isPeople = computed(() => tab.value === 'people')
 
 // Only categories with more than one service are worth drilling into — Home
 // Help and Tech Support have exactly one each today, so their detail table
@@ -334,7 +340,7 @@ async function onDownloadPdf () {
       end: range.value.end,
       strip: strip.value,
       view: view.value,
-      sections: TAB_VALUES.map(sectionFor).filter(Boolean),
+      sections: MATRIX_TABS.map(sectionFor).filter(Boolean),
     })
     const blob = new Blob([bytes], { type: 'application/pdf' })
     const url = URL.createObjectURL(blob)
@@ -401,6 +407,7 @@ const showCountingInfo = ref(false)
            that tab no longer exists, and all three now support both views. -->
       <div class="view-bar">
         <SelectButton
+          v-if="!isPeople"
           v-model="view"
           :options="VIEW_OPTIONS"
           optionLabel="label"
@@ -412,7 +419,7 @@ const showCountingInfo = ref(false)
              what the toggle DOES. Inside the card it explained a control that
              lives outside it, and read as stray helper text while costing the
              table a line of vertical space. -->
-        <p class="scale-note">{{ scaleNote }}</p>
+        <p v-if="!isPeople" class="scale-note">{{ scaleNote }}</p>
 
         <!-- PAGE level, beside the toggle, because that is its scope: the
              document covers all three tabs AND the summary strip. Download CSV
@@ -443,7 +450,7 @@ const showCountingInfo = ref(false)
              space. A SIBLING of the tablist, not a child: PrimeVue's only
              TabList slot is inside role="tablist", where a button would be
              announced as a tab. -->
-        <div class="tabs-csv">
+        <div v-if="!isPeople" class="tabs-csv">
           <Button
             icon="pi pi-download"
             label="Download CSV"
@@ -456,7 +463,7 @@ const showCountingInfo = ref(false)
           <!-- Both panels render the same card; only the series and the scale
                note differ, so the markup is shared rather than duplicated.
                `lazy` on Tabs means only the active one mounts. -->
-          <TabPanel v-for="value in TAB_VALUES" :key="value" :value="value">
+          <TabPanel v-for="value in MATRIX_TABS" :key="value" :value="value">
             <!-- Only genuinely per-tab controls live here. Outcomes and
                  Categories have none; Detail has its category selector, which
                  is deliberately offered with no "all" option — every service at
@@ -489,6 +496,9 @@ const showCountingInfo = ref(false)
               :emptyMessage="emptyMessage"
               @update:sort="onSortUpdate"
             />
+          </TabPanel>
+          <TabPanel value="people">
+            <MetaPeoplePanel :start="range.start" :end="range.end" :villages="payload.villages" />
           </TabPanel>
         </TabPanels>
       </Tabs>
