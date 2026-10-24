@@ -6,6 +6,15 @@ on:
   push:
     branches:
       - main
+    # Publish only when something the image is built from changes. The
+    # Dockerfile copies just client/ and api/source/, and every publish
+    # restarts prod via the Docker Hub -> Azure webhook. Keep this list in
+    # step with the Dockerfile's COPY lines.
+    paths:
+      - 'client/**'
+      - 'api/source/**'
+      - 'Dockerfile'
+      - '.github/workflows/pub-docker.yml'
 jobs:
   build-push:
     name: Build and push
