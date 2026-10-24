@@ -20,6 +20,11 @@ unwanted is effort spent on an environment that does not exist: hedging
 migrations against other installs, fleet-safe rollout plans, or security
 findings about inert scaffold.
 
+User-facing PDFs (guides) go in `client/public/guides/`, linked via
+`VG.Env.pathPrefix`, never under `/docs/`. The `/docs` mount and the
+Dockerfile's `.dockerignore` comment are dead scaffold; no `.dockerignore`
+exists.
+
 ## Plans & specs go in `scratch/`
 
 Superpowers artifacts — brainstorming specs, implementation plans, handoffs —
@@ -41,28 +46,70 @@ builds a container, Docker Hub fires an Azure webhook, and the app restarts on
 the new image. There is no staging tier, no release train, no separate deploy
 step to schedule or wait for.
 
+Only merges that touch the image's inputs publish: `pub-docker.yml` filters on
+`client/**`, `api/source/**`, `Dockerfile` and the workflow itself. A merge
+that only touches `CLAUDE.md`, `test/`, `data/` or `docs/` builds nothing and
+restarts nothing. If the Dockerfile ever copies a new path, add it to that
+filter; a missing entry means a real change silently doesn't deploy.
+
 Two consequences. **Merge date == production date** — when dating a feature's
 go-live for reporting, the PR merge date is the answer. And **merging is the
 risky moment**, not some later ceremony: a merged regression is live
 immediately, which is why review happens before the merge rather than before a
 release.
 
+**Prod config is outside the merge.** A PR that adds a new `process.env.*`
+read needs its App Service app setting in place at merge time. No test,
+review or CI gate catches a missing one: PR #119 shipped with
+`VG_GOOGLE_PLACES_REFERER` unset, and every Places lookup returned "No
+matches". Any App Service config write (app settings, diagnostic settings,
+health check path) **restarts the prod container**, so tell @csmig before
+making one and batch changes into a single write.
+
+**Merge procedure** (when the user asks for a merge):
+1. `git update-ref refs/archive/<branch> <branch>` **first**. Archive refs
+   are local only, and `--delete-branch` deletes the local branch too.
+2. `gh pr merge N --squash --delete-branch --subject "<PR title> (#N)" --body ""`.
+   The squash message is one line; the PR body carries the prose.
+3. `git checkout main && git pull --ff-only`.
+
+Never `git merge` into local `main`.
+
 ## Interaction rules
 
 **Questions are questions, not commands.** When the user asks a question — including "why", "how", "is this possible", "does X work" — answer it and stop. Do not make code changes, propose fixes, or begin implementation. The user will use imperative language ("fix", "change", "add", "update") when they want action.
 
-## Project board draft issues
+**A named deliverable frames the conversation; it is not a work order.** "I
+want a report for tomorrow" means discuss it. Draft, write files or publish
+only on an explicit imperative ("build it", "give me a draft").
 
-When the user asks to **add a project draft issue** (or "add this to the
-board", "make a draft issue", or similar) for the tvcri project board
-(<https://github.com/orgs/tvcri/projects/1>), use the **`/add-draft-issue`**
-slash command. Its instructions cover titling, field triage, and the helper
-script — follow them rather than hand-writing GraphQL.
+## Project board
 
-The board's backlog originates from `.claude/todo.md`. Adding a draft issue via
-the command affects the **board only**; it does not edit `todo.md`. Keep
-`todo.md` as the human-maintained backlog and add items there separately when
-the user wants them tracked in the file too.
+The tvcri project board (<https://github.com/orgs/tvcri/projects/1>) is the
+**system of record** for Village Green work. The team sets its sequence at a
+weekly review run by the project manager. A card on the board is official, so
+its Status must match reality.
+
+- **Adding items:** when the user asks to add a draft issue ("add this to the
+  board", "make a draft issue", or similar), use the **`/add-draft-issue`**
+  slash command. Follow its titling, field triage and helper script; don't
+  hand-write GraphQL. Bodies get a **bold** lead sentence, blank-line
+  paragraphs and `-` bullets, never a wall of text. Show the body to the user
+  before running the helper.
+- **Keeping Status current:** when a session works a tracked item, move it
+  along `Unrefined → Refining → Refined → Scheduled → In Progress → In Review
+  → Merged`. Set In Progress when work starts, In Review when the PR opens,
+  and Merged at merge, or when existing code is confirmed to cover the item.
+  Don't invent Status changes for work with no card, and don't rename or
+  reorder the Status options.
+- **Some cards are real Issues, not drafts.** The helper's `--show` prints an
+  empty body for them and can't edit it. Check the content `__typename`
+  first and use `gh issue` for those; field moves through the helper still
+  work.
+
+`.claude/todo.md` is a **frozen pre-board backlog**. Don't add to it or treat
+it as current. Items in it that have no card get raised with the user during
+board cleanup.
 
 ## Database migrations & the fresh-install scaffold
 
@@ -112,6 +159,19 @@ went missing until PR #69 (every `role_grant` insert hit
 `fk_role_grant_role`). Per-install *data migrations* (e.g. 0013's
 `role_grant` / `village_grant` backfill) stay out of the list: dumping them
 would ship one deployment's rows to every other.
+
+Any edited SQL string in `api/source` is run once against the orch `vg`
+database before commit. That covers app SELECTs, not just DDL; substitute
+literal values for the binds. Never write dev-DB state into specs or plans.
+
+**Scheduled jobs act as a task user.** A system-initiated write (a MySQL
+EVENT) is audited under a real `user_data` row with `status: 'unavailable'`,
+looked up by `taskName`, never by id. `user_data` can't go in
+`static_data_tables`, so `generateSchema.sh` appends that seed INSERT by
+hand. Keep it in step with the migration. **MySQL does not wrap an EVENT body
+in a transaction:** write `START TRANSACTION`/`COMMIT` with an `EXIT HANDLER
+… ROLLBACK; RESIGNAL`. Create DB objects that land in the dump using the
+pool's collation (`utf8mb4_0900_ai_ci`).
 
 ### The orch database container and production dumps
 
@@ -253,12 +313,15 @@ about what someone sees on the road says **volunteer**. Dual-role people
 exist (member and volunteer both), which is why
 [village role counts overlap by design].
 
-**Volunteers are persons.** A person may belong to a village
-(`person.villageId`), so a volunteer may too: they are that village's
-volunteer ("village volunteer"). A volunteer with no village is the Hub's
-volunteer ("Hub volunteer"). These describe belonging, not different kinds
-of volunteer. Positions have their own scope (Hub, village); a village
-position requires the volunteer's village or an associate village.
+**Volunteers are persons, and the vocabulary is simple.** A volunteer with no
+village is just a **volunteer**. A volunteer with a village
+(`person.villageId`) is a **village volunteer**, and one who belongs to a
+circle can be called a **circle volunteer**. These describe belonging, not
+different kinds of volunteer; don't coin more terms. Positions have their own
+scope (Hub, village); a village position requires the volunteer's village or
+an associate village. Associate villages are a VG invention, so when staff say
+"volunteers from the village", read it as *eligible*: home village or an
+associate village.
 
 **Service requests are created and managed at the federation level.**
 Coordinators are not attached to a local village — they handle requests
@@ -325,6 +388,18 @@ features end to end.
   `member` or `volunteer` must end with the corresponding
   `CREATE OR REPLACE VIEW active_... AS SELECT * FROM ...` or the new
   column reads as NULL through the view with no error.
+- **`?projection=X` adds an optional root property named `X`.** It never
+  reshapes or swaps the row schema (no `oneOf`). Fields already on the base
+  row stay out of it.
+- **Audit registry:** new columns on audited entity tables are captured
+  automatically. A new column on a set-source table (`role_grant`, vettings,
+  …), or a new table referencing an audited entity, must be declared, folded
+  or listed in `relatedTables` in `service/audit/shapes.js`. Otherwise boot
+  validation fails and the API serves 503.
+- **`VG.Env`** is generated at startup and served as `GET /Env.js`
+  (`getClientEnv()` in `bootstrap/client.js`). To expose a variable, add it
+  in `utils/config.js` and then in the `getClientEnv()` template. It needs
+  an API restart.
 
 ## RBAC permission naming
 
@@ -346,6 +421,10 @@ one-line `UPDATE role_permission SET permission = ...` in a migration, plus
 the catalog key and its call sites. Already-applied seeding migrations
 (0013) are never edited; the new migration carries the change forward.
 
+Admin holds the `'*'` wildcard (`WILDCARD` in `permissions.js`), which is
+checked before specific keys. A new catalog key reaches Admin as soon as it
+exists, so only narrower roles need a grant migration.
+
 ## MySQL / OAS traps
 
 - `JSON_ARRAYAGG(DISTINCT ...)` is MariaDB-only; MySQL throws
@@ -366,3 +445,9 @@ the catalog key and its call sites. Already-applied seeding migrations
   Path/query params with typed schemas are always coerced by
   express-openapi-validator — never write `=== 'true'`-style string
   comparisons for them in controllers.
+- `JSON_EXTRACT(col, '$.id') = ?` bound to a **string** matches zero rows,
+  silently (`vgCall` ids are strings). Bind `Number(id)`, and confirm that a
+  positive case counts a real row before trusting a negative assertion.
+- OAS 3.0 `nullable: true` does **not** let NULL pass an `enum`; add `null`
+  as a literal enum member. This bites every new nullable enum column, since
+  old rows are NULL.
