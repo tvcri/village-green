@@ -30,7 +30,6 @@ run()
 async function run() {
   try {
     client.serveClient(app)
-    docs.serveDocs(app)
     docs.serveApiDocs(app)
     await startServer(app, startTime)
   }

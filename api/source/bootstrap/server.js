@@ -69,7 +69,6 @@ async function startServer(app, startTime) {
       port: config.http.port,
       api: '/api',
       client: config.client.disabled ? undefined : '/',
-      documentation: config.docs.disabled ? undefined : '/docs',
       swagger: config.swaggerUi.enabled ? '/api-docs' : undefined
     })
     await initializeDependencies()

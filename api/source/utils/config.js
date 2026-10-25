@@ -57,10 +57,6 @@ const config = {
             link: process.env.VG_CLIENT_WELCOME_LINK || ""
         }
     },
-    docs: {
-        disabled: process.env.VG_DOCS_DISABLED  === "true",
-        docsDirectory: process.env.VG_DOCS_DIRECTORY || '../../docs/_build/html',
-    },    
     http: {
         address: process.env.VG_API_ADDRESS || "0.0.0.0",
         port: process.env.VG_API_PORT || 54000,

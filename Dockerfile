@@ -1,17 +1,4 @@
 # Village Green
-#
-# COPY commands assume the following lines in .dockerignore
-# **/node_modules
-# **/state.json
-# **/README.md
-# **/.git
-# **/.gitignore
-# **/data
-# **/docs
-# **/test
-# **/uploads
-# **/docker
-
 ARG BASE_IMAGE="node:lts-alpine"
 
 # Build stage: compile Vue client

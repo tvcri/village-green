@@ -5,9 +5,8 @@
 Village Green serves **one customer** as **one deployment**. @csmig is the sole
 developer. There is no fleet, no second install, no other team.
 
-**This is not STIG Manager.** The two share a parent directory, a
-Node/Express + MySQL + OIDC stack, and about four lines of inherited dead
-scaffold (the `/docs` Sphinx mount). Nothing else. Do not import STIG
+**This is not STIG Manager.** The two share a parent directory and a
+Node/Express + MySQL + OIDC stack. Nothing else. Do not import STIG
 Manager's assumptions — multi-deployment compatibility, fleet upgrade paths,
 multi-developer coordination, hundreds of installs. Those are correct there
 and actively wrong here. Reason about *this* deployment: the one snapshot
@@ -21,9 +20,8 @@ migrations against other installs, fleet-safe rollout plans, or security
 findings about inert scaffold.
 
 User-facing PDFs (guides) go in `client/public/guides/`, linked via
-`VG.Env.pathPrefix`, never under `/docs/`. The `/docs` mount and the
-Dockerfile's `.dockerignore` comment are dead scaffold; no `.dockerignore`
-exists.
+`VG.Env.pathPrefix`. The API serves nothing at `/docs`; Swagger UI is at
+`/api-docs`.
 
 ## Plans & specs go in `scratch/`
 

@@ -1,25 +1,10 @@
 
-const express = require('express')
 const path = require('path')
 const fs = require('fs')
 const logger = require('../utils/logger')
 const config = require('../utils/config')
 const swaggerUi = require('swagger-ui-express')
 const jsyaml = require('js-yaml')
-
-function serveDocs(app) {
-    if (config.docs.disabled) {
-        logger.writeDebug('serveDocs', 'client', {message: 'documentation disabled'})
-        return
-    }
-    try {
-        app.use('/docs', express.static(path.join(__dirname, "../", config.docs.docsDirectory)))
-        logger.writeDebug('serveDocs', 'client', {message: 'succeeded setting up documentation'})
-    }
-    catch (err) {
-        logger.writeError('serveDocs', 'client', {message: err.message, stack: err.stack})
-    }
-}
 
 function serveApiDocs(app) {
     const oasDoc = getOAS()
@@ -58,4 +43,4 @@ function configureSwaggerUI(app, oasDoc){
     logger.writeDebug('configureSwaggerUI', 'client', {message: 'succeeded setting up swagger-ui'})
 }
 
-module.exports = { serveDocs, serveApiDocs }
+module.exports = { serveApiDocs }
