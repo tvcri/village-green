@@ -36,15 +36,6 @@ exports.setConfigurationItem = async function (key, value) {
   return true
 }
 
-exports.getCeDump = async function() {
-  const sql = `SELECT ceDumpTime FROM ce_dump LIMIT 1`
-  const [rows] = await dbUtils.pool.query(sql)
-  if (rows.length === 0) {
-    return null
-  }
-  return rows[0].ceDumpTime
-}
-
 /**
  * getAppData - streams JSONL records to the response. The JSONL are either
  * data records from a MySQL table (always an array) or metadata records (always an object).

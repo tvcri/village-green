@@ -5,9 +5,8 @@
 Village Green serves **one customer** as **one deployment**. @csmig is the sole
 developer. There is no fleet, no second install, no other team.
 
-**This is not STIG Manager.** The two share a parent directory, a
-Node/Express + MySQL + OIDC stack, and about four lines of inherited dead
-scaffold (the `/docs` Sphinx mount). Nothing else. Do not import STIG
+**This is not STIG Manager.** The two share a parent directory and a
+Node/Express + MySQL + OIDC stack. Nothing else. Do not import STIG
 Manager's assumptions — multi-deployment compatibility, fleet upgrade paths,
 multi-developer coordination, hundreds of installs. Those are correct there
 and actively wrong here. Reason about *this* deployment: the one snapshot
@@ -21,9 +20,8 @@ migrations against other installs, fleet-safe rollout plans, or security
 findings about inert scaffold.
 
 User-facing PDFs (guides) go in `client/public/guides/`, linked via
-`VG.Env.pathPrefix`, never under `/docs/`. The `/docs` mount and the
-Dockerfile's `.dockerignore` comment are dead scaffold; no `.dockerignore`
-exists.
+`VG.Env.pathPrefix`. The API serves nothing at `/docs`; Swagger UI is at
+`/api-docs`.
 
 ## Plans & specs go in `scratch/`
 
@@ -98,10 +96,14 @@ its Status must match reality.
   before running the helper.
 - **Keeping Status current:** when a session works a tracked item, move it
   along `Unrefined → Refining → Refined → Scheduled → In Progress → In Review
-  → Merged`. Set In Progress when work starts, In Review when the PR opens,
-  and Merged at merge, or when existing code is confirmed to cover the item.
+  → Done`. Set In Progress when work starts, In Review when the PR opens,
+  and Done at merge, or when existing code is confirmed to cover the item.
   Don't invent Status changes for work with no card, and don't rename or
   reorder the Status options.
+- **Refined means no remaining questions.** A card with any open question
+  stays in Refining, whatever its priority, and nothing with open questions
+  sits right of Refined. Urgency is Priority (P0 = this round's focus), never
+  Status.
 - **Some cards are real Issues, not drafts.** The helper's `--show` prints an
   empty body for them and can't edit it. Check the content `__typename`
   first and use `gh issue` for those; field moves through the helper still

@@ -57,10 +57,6 @@ const config = {
             link: process.env.VG_CLIENT_WELCOME_LINK || ""
         }
     },
-    docs: {
-        disabled: process.env.VG_DOCS_DISABLED  === "true",
-        docsDirectory: process.env.VG_DOCS_DIRECTORY || '../../docs/_build/html',
-    },    
     http: {
         address: process.env.VG_API_ADDRESS || "0.0.0.0",
         port: process.env.VG_API_PORT || 54000,
@@ -119,14 +115,6 @@ const config = {
             privilegesRaw: process.env.VG_JWT_PRIVILEGES_CLAIM || "realm_access.roles",
             email: process.env.VG_JWT_EMAIL_CLAIM || "email",
             assertion: process.env.VG_JWT_ASSERTION_CLAIM || "jti"
-        }
-    },
-    webhook: {
-        key: process.env.VG_SYNC_WEBHOOK_KEY,
-        toJSON: function () {
-            const {key, ...props} = this
-            props.key = !!key
-            return props
         }
     },
     log: {

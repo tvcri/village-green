@@ -465,63 +465,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /op/ce-dump:
-    get:
-      tags:
-      - Operation
-      operationId: getCeDump
-      summary: Get the time of the most recent CE dump
-      description: Returns the time of the most recent CE dump in ISO 8601 UTC format
-      responses:
-        '200':
-          description: Time of the most recent CE dump
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CeDump'
-        default:
-          description: unexpected error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      security:
-      - oauth:
-        - vg:op:read
-  /op/ce-dump-updated:
-    post:
-      summary: Notify API of CE Dump sync completion
-      description: Updates the API with the CE Dump sync completion timestamp from an external sync service
-      tags:
-      - Operation
-      operationId: ceDumpUpdated
-      security:
-      - webhookBearer: []
-      responses:
-        '200':
-          description: Sync update received
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CeDump'
-        '401':
-          description: Unauthorized - invalid webhook key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        default:
-          description: unexpected error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
   /op/analytics/events:
     post:
       tags:
@@ -3496,15 +3439,6 @@ components:
               type: string
             next:
               type: string
-    CeDump:
-      type: object
-      additionalProperties: false
-      properties:
-        ceDumpTime:
-          type: string
-          format: date-time
-          nullable: true
-          description: Current time in ISO 8601 UTC format
     Error:
       type: object
       properties:
@@ -7128,7 +7062,3 @@ components:
     oauth:
       type: openIdConnect
       openIdConnectUrl: http://localhost:8080/realms/village-green/.well-known/openid-configuration
-    webhookBearer:
-      type: http
-      scheme: bearer
-      description: "Webhook API key for CE Dump sync updates"

@@ -191,6 +191,7 @@ const SECRET_ENV = /(PASSWORD|PASSPHRASE|SECRET|TOKEN)$/i
 const SECRET_ENV_EXACT = new Set([
   'VG_ANTHROPIC_API_KEY',
   'VG_ENROLL_SIDECAR_KEY',
+  // No longer read, but still set in prod until the app setting is deleted.
   'VG_SYNC_WEBHOOK_KEY',
 ])
 
