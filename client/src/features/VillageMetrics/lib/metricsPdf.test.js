@@ -218,6 +218,13 @@ describe('metricsPdf', () => {
       expect(winAnsi('日本', font)).toBe('??')
       expect(winAnsi('Ünicode, Zoë — 日本', font)).toBe('Ünicode, Zoë — ??')
     })
+
+    it('falls back to the base letter for accents WinAnsi lacks', async () => {
+      const pdf = await PDFDocument.create()
+      const font = await pdf.embedFont(StandardFonts.Helvetica)
+      // ő and ễ are outside WinAnsi; é and ë are inside and stay precomposed.
+      expect(winAnsi('Erdős Nguyễn José Zoë', font)).toBe('Erdos Nguyen José Zoë')
+    })
   })
 
   // ---- chart geometry ----

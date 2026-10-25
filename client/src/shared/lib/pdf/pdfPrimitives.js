@@ -65,18 +65,20 @@ function isEncodable (s, font) {
 
 // The standard PDF fonts are WinAnsi-encoded and pdf-lib throws on anything
 // outside it. Asks the font itself what it can encode rather than keeping a
-// hand-maintained character table.
-//
-// KNOWN LIMITATION: an unencodable character degrades to '?' rather than being
-// NFKD-decomposed, so 'José' would render 'Jos?' instead of 'Jose'. Village and
-// service names are all ASCII, and the meta document contains no person names
-// at all; the village report's People section is where this could bite.
+// hand-maintained character table. An unencodable character falls back to its
+// NFKD base letter ('ő' -> 'o') and only then to '?'. Decompose per character,
+// never the whole string: WinAnsi already covers most precomposed accents
+// ('ë', 'é'), and stripping the marks from those would flatten them.
 export function winAnsi (text, font) {
   const s = String(text ?? '')
   if (isEncodable(s, font)) return s
 
   let out = ''
-  for (const ch of s) out += isEncodable(ch, font) ? ch : '?'
+  for (const ch of s) {
+    if (isEncodable(ch, font)) { out += ch; continue }
+    const base = ch.normalize('NFKD').replace(/\p{M}/gu, '')
+    out += base && isEncodable(base, font) ? base : '?'
+  }
   return out
 }
 
