@@ -117,14 +117,6 @@ const config = {
             assertion: process.env.VG_JWT_ASSERTION_CLAIM || "jti"
         }
     },
-    webhook: {
-        key: process.env.VG_SYNC_WEBHOOK_KEY,
-        toJSON: function () {
-            const {key, ...props} = this
-            props.key = !!key
-            return props
-        }
-    },
     log: {
         level: parseInt(process.env.VG_LOG_LEVEL) || 3,
         mode: process.env.VG_LOG_MODE || 'combined',

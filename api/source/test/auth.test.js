@@ -201,34 +201,3 @@ test('allowlist matching is exact: wrong method or extended path stays blocked',
     assert.ok(err instanceof SmError.PrivacyAckRequiredError, `${method} ${path}`)
   }
 })
-
-// ---------------------------------------------------------------------------
-// validateWebhookBearer
-// ---------------------------------------------------------------------------
-
-const bearerReq = header => ({ headers: header ? { authorization: header } : {} })
-
-test('validateWebhookBearer accepts the configured key (scheme case-insensitive)', () => {
-  const saved = config.webhook.key
-  try {
-    config.webhook.key = 'hook-key'
-    assert.equal(auth.validateWebhookBearer(bearerReq('Bearer hook-key')), true)
-    assert.equal(auth.validateWebhookBearer(bearerReq('bearer hook-key')), true)
-  } finally {
-    config.webhook.key = saved
-  }
-})
-
-test('validateWebhookBearer rejects wrong key, missing header, and unconfigured key', () => {
-  const saved = config.webhook.key
-  try {
-    config.webhook.key = 'hook-key'
-    assert.throws(() => auth.validateWebhookBearer(bearerReq('Bearer wrong')), SmError.UnauthorizedError)
-    assert.throws(() => auth.validateWebhookBearer(bearerReq()), SmError.UnauthorizedError)
-    // fail-closed when no key is configured, even if the request omits one too
-    config.webhook.key = undefined
-    assert.throws(() => auth.validateWebhookBearer(bearerReq('Bearer anything')), SmError.UnauthorizedError)
-  } finally {
-    config.webhook.key = saved
-  }
-})
