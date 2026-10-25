@@ -119,25 +119,6 @@ module.exports.deleteUser = async function deleteUser (req, res, next) {
   }
 }
 
-module.exports.exportUsers = async function exportUsers (projection, elevate, userObject) {
-  if (elevate) {
-    return await UserService.getUsers(null, null, null, projection, userObject )
-  }
-  else {
-    throw new SmError.PrivilegeError()
-  }
-}
-
-module.exports.exportUserGroups = async function exportUserGroups (projections, elevate) {
-
-  if (elevate) {
-    return await UserService.queryUserGroups({projections})
-  }
-  else {
-    throw new SmError.PrivilegeError()    
-  }
-}
-
 module.exports.getUser = async function getUser (req, res, next) {
   try {
     // privacyStatus is always included (not opt-in): the privacy-ack gate
