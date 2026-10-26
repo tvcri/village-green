@@ -30,6 +30,7 @@ const navigateToPrivacy = () => {
       <Button label="Privacy Agreement" @click="navigateToPrivacy" />
       <Button v-if="hasPermission('training:admin')" label="Trainings" @click="router.push({ name: 'admin-trainings' })" />
       <Button v-if="hasPermission('position:admin')" label="Positions" @click="router.push({ name: 'admin-positions' })" />
+      <Button v-if="hasPermission('drop_reason:admin')" label="Drop Reasons" @click="router.push({ name: 'admin-drop-reasons' })" />
     </div>
   </div>
 </template>

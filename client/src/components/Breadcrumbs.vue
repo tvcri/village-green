@@ -115,6 +115,9 @@ const breadcrumbs = computed(() => {
       case 'admin-positions':
         crumbs.push({ label: 'Positions' })
         break
+      case 'admin-drop-reasons':
+        crumbs.push({ label: 'Drop Reasons' })
+        break
     }
     return crumbs
   }
