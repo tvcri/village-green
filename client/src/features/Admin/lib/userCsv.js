@@ -2,6 +2,7 @@
 // separate from UserList.vue so the Access flattening is unit-testable.
 import { buildAccessTags } from '../../../shared/lib/accessTagHelpers.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
+import { privacyAckStatus } from './userAdminHelpers.js'
 
 export const columnsForCsv = [
   { header: 'Username', key: 'username' },
@@ -9,6 +10,8 @@ export const columnsForCsv = [
   { header: 'Access', key: 'access' },
   { header: 'VSS', key: 'vss' },
   { header: 'Status', key: 'status' },
+  { header: 'Privacy', key: 'privacy' },
+  { header: 'Privacy Acknowledged', key: 'privacyAcknowledged' },
   { header: 'Last Access', key: 'lastAccess' },
 ]
 
@@ -22,6 +25,8 @@ export function userRowsForCsv(users) {
     access: buildAccessTags(u).map(t => t.text).join('; '),
     vss: u.isVolunteer ? 'Yes' : 'No',
     status: u.status ?? '',
+    privacy: privacyAckStatus(u.privacyStatus) ?? '',
+    privacyAcknowledged: u.privacyStatus?.lastAcknowledgedAt ? formatLocalDateTime(u.privacyStatus.lastAcknowledgedAt) : '',
     lastAccess: u.lastAccess ? formatLocalDateTime(u.lastAccess * 1000) : '',
   }))
 }

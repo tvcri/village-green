@@ -13,7 +13,7 @@ import Tag from 'primevue/tag'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { formatLocalDateTime } from '../../../shared/lib/dateUtils.js'
 import { getUsersWithGrants, deleteUser } from '../../../shared/api/userApi.js'
-import { getDeleteConfirmCopy, extractApiErrorMessage } from '../lib/userAdminHelpers.js'
+import { getDeleteConfirmCopy, extractApiErrorMessage, privacyAckStatus } from '../lib/userAdminHelpers.js'
 import AccessTags from '../../../components/AccessTags.vue'
 import { accessSortString, matchesScopeFilter, HUB_FILTER } from '../../../shared/lib/accessTagHelpers.js'
 import { getVillages } from '../api/villageGrantApi.js'
@@ -73,6 +73,15 @@ const filteredUsers = computed(() => {
 // status indicator; the table has no Status column. The CSV/Sheet export
 // does add one, since dimming cannot survive a flat file.
 const rowClass = (data) => (data.status === 'available' ? '' : 'row-unavailable')
+
+const PRIVACY_SEVERITY = { Acknowledged: 'success', Pending: 'warn', Never: 'secondary' }
+const PRIVACY_SORT = { Acknowledged: 1, Pending: 2, Never: 3 }
+const privacySortValue = (row) => PRIVACY_SORT[privacyAckStatus(row.privacyStatus)] ?? 4
+
+function privacyTitle(privacyStatus) {
+  const at = privacyStatus?.lastAcknowledgedAt
+  return at ? `Last acknowledged ${formatLocalDateTime(at)}` : 'No acknowledgement on record'
+}
 
 function goToCreate() {
   router.push({ name: 'admin-user-create' })
@@ -213,6 +222,17 @@ async function onDeleteUser(user) {
             <AccessTags :user="data" />
             <Tag v-if="data.isVolunteer" value="VSS" severity="warn" title="Eligible for Volunteer Self-Signup" />
           </div>
+        </template>
+      </Column>
+      <Column header="Privacy" sortable :sort-field="privacySortValue">
+        <template #body="{ data }">
+          <Tag
+            v-if="privacyAckStatus(data.privacyStatus)"
+            :value="privacyAckStatus(data.privacyStatus)"
+            :severity="PRIVACY_SEVERITY[privacyAckStatus(data.privacyStatus)]"
+            :title="privacyTitle(data.privacyStatus)"
+          />
+          <template v-else>—</template>
         </template>
       </Column>
       <Column field="lastAccess" header="Last Access" sortable>

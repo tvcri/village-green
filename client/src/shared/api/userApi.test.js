@@ -35,12 +35,12 @@ describe('userApi', () => {
     expect(result).toEqual({ userId: 5, status: 'unavailable' })
   })
 
-  it('getUsersWithGrants requests the grants and volunteer projections', async () => {
+  it('getUsersWithGrants requests the grants, volunteer and privacyStatus projections', async () => {
     apiCall.mockResolvedValue([])
     await getUsersWithGrants()
     expect(apiCall).toHaveBeenCalledWith(
       'getUsers',
-      expect.objectContaining({ projection: ['grants', 'volunteer'] })
+      expect.objectContaining({ projection: ['grants', 'volunteer', 'privacyStatus'] })
     )
   })
 })
