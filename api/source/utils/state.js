@@ -39,6 +39,14 @@ class State extends EventEmitter {
   #changeTimeoutId
 
   /**
+   * Whether the one-time boot checks have passed. A gate on `available`, not a
+   * dependency: unlike db and oidc it cannot become false again, so it stays
+   * out of dependencyStatus and apiState.
+   * @type {boolean}
+   */
+  #bootComplete = false
+
+  /**
    * Creates an instance of State.
    * @param {Object} options - Options for initializing the state.
    * @param {StateString} [options.initialState='starting'] - The initial state of the API.
@@ -79,7 +87,7 @@ class State extends EventEmitter {
    * @private
    */
   #setStateFromDependencyStatus() {
-    if (this.#dependencyStatus.db && this.#dependencyStatus.oidc) {
+    if (this.#bootComplete && this.#dependencyStatus.db && this.#dependencyStatus.oidc) {
       this.setState('available')
     }
     else {
@@ -97,6 +105,16 @@ class State extends EventEmitter {
     this.#currentState = state
     this.#stateDate = new Date()
     this.#emitStateChangedEvent()
+  }
+
+  /**
+   * Marks the one-time boot checks as passed, so the API can become available
+   * once db and oidc are up. Until then their flips leave it 'starting'.
+   */
+  setBootComplete() {
+    if (this.#bootComplete) return
+    this.#bootComplete = true
+    this.#setStateFromDependencyStatus()
   }
 
   /**

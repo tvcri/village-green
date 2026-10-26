@@ -21,6 +21,10 @@ async function initializeDependencies() {
         await UserService.ensureBootstrapAdmin(config.settings.bootstrapAdmin)
         logger.writeInfo('bootstrap', 'bootstrapAdmin', { username: config.settings.bootstrapAdmin })
       }
+
+      // db and oidc flipped true inside the Promise.all above; the API becomes
+      // available only now, after the boot checks.
+      state.setBootComplete()
   }
   catch (e) {
     logger.writeError('dependencies', 'fail', {message:'Unable to setup dependencies', error: serializeError(e)})
