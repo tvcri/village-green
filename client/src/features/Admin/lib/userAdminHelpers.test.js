@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDuplicateUsername, getDeleteConfirmCopy, extractApiErrorMessage } from './userAdminHelpers.js'
+import { isDuplicateUsername, getDeleteConfirmCopy, extractApiErrorMessage, privacyAckStatus } from './userAdminHelpers.js'
 
 describe('isDuplicateUsername', () => {
   it('returns true for a case-insensitive match against existing usernames', () => {
@@ -48,5 +48,27 @@ describe('extractApiErrorMessage', () => {
 
   it('falls back when err itself is missing body entirely', () => {
     expect(extractApiErrorMessage({}, 'fallback')).toBe('fallback')
+  })
+})
+
+describe('privacyAckStatus', () => {
+  const ps = (o) => ({ needsAck: true, pendingRulesId: 2, lastAckedRulesId: null, lastAcknowledgedAt: null, ...o })
+
+  it('is Acknowledged when no ack is needed', () => {
+    expect(privacyAckStatus(ps({ needsAck: false, lastAckedRulesId: 2, lastAcknowledgedAt: '2026-05-01T12:00:00Z' }))).toBe('Acknowledged')
+  })
+
+  it('is Pending when an older version, or an expired ack, is on record', () => {
+    expect(privacyAckStatus(ps({ lastAckedRulesId: 1, lastAcknowledgedAt: '2026-05-01T12:00:00Z' }))).toBe('Pending')
+    expect(privacyAckStatus(ps({ lastAckedRulesId: 2, lastAcknowledgedAt: '2025-01-01T12:00:00Z' }))).toBe('Pending')
+  })
+
+  it('is Never when the user has no ack on record', () => {
+    expect(privacyAckStatus(ps())).toBe('Never')
+  })
+
+  it('is null when no rules are published, or the projection is absent', () => {
+    expect(privacyAckStatus(ps({ needsAck: false, pendingRulesId: null }))).toBe(null)
+    expect(privacyAckStatus(undefined)).toBe(null)
   })
 })

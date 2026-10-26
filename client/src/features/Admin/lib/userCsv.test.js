@@ -65,6 +65,17 @@ describe('userRowsForCsv', () => {
     expect(without.lastAccess).toBe('')
   })
 
+  it('carries the privacy-ack status and the date of the last ack', () => {
+    const [acked, never] = userRowsForCsv([
+      { ...villageLsc, privacyStatus: { needsAck: false, pendingRulesId: 1, lastAckedRulesId: 1, lastAcknowledgedAt: '2026-05-01T12:00:00Z' } },
+      { ...villageLsc, privacyStatus: { needsAck: true, pendingRulesId: 1, lastAckedRulesId: null, lastAcknowledgedAt: null } },
+    ])
+    expect(acked.privacy).toBe('Acknowledged')
+    expect(acked.privacyAcknowledged).toMatch(/\d{2}\/\d{2}\/\d{4}/)
+    expect(never.privacy).toBe('Never')
+    expect(never.privacyAcknowledged).toBe('')
+  })
+
   it('tolerates a null user list', () => {
     expect(userRowsForCsv(null)).toEqual([])
   })
@@ -72,6 +83,6 @@ describe('userRowsForCsv', () => {
   it('produces a CSV whose header matches the declared columns', () => {
     const csv = toCsv(userRowsForCsv([villageLsc]), columnsForCsv)
     const [header] = csv.split('\n')
-    expect(header).toBe('Username,Display Name,Access,VSS,Status,Last Access')
+    expect(header).toBe('Username,Display Name,Access,VSS,Status,Privacy,Privacy Acknowledged,Last Access')
   })
 })

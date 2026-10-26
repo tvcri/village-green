@@ -24,3 +24,13 @@ export function getDeleteConfirmCopy(user) {
 export function extractApiErrorMessage(err, fallback) {
   return err?.body?.detail || fallback
 }
+
+// Privacy-ack status from the getUsers privacyStatus projection. Pending means
+// an ack is on record but no longer counts: an older rules version, or older
+// than the ack interval. The user is re-prompted at next sign-in either way.
+// null when no rules are published, so there is nothing to acknowledge.
+export function privacyAckStatus(privacyStatus) {
+  if (!privacyStatus || privacyStatus.pendingRulesId == null) return null
+  if (!privacyStatus.needsAck) return 'Acknowledged'
+  return privacyStatus.lastAckedRulesId == null ? 'Never' : 'Pending'
+}
