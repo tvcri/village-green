@@ -4063,6 +4063,7 @@ components:
       type: object
       required:
       - personId
+      - deceased
       - fullName
       - circles
       - disabilities
@@ -4145,6 +4146,11 @@ components:
           type: string
           format: date
           nullable: true
+        deceased:
+          type: boolean
+        openServiceRequestCount:
+          type: integer
+          minimum: 0
         deceasedDate:
           type: string
           format: date
@@ -4266,6 +4272,7 @@ components:
       additionalProperties: false
       type: object
       required:
+      - deceased
       - circles
       - disabilities
       - languages
@@ -4330,6 +4337,8 @@ components:
           type: string
           format: date
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
@@ -4449,6 +4458,8 @@ components:
           type: string
           maxLength: 30
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
@@ -4559,6 +4570,8 @@ components:
           type: string
           maxLength: 30
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
