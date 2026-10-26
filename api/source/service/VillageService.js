@@ -327,12 +327,12 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
         FROM service_request sr
         WHERE sr.villageId = v.id
           AND ${dbUtils.sqlTerminalStatus('sr.status')}
-          AND sr.serviceDate BETWEEN ? AND ?) AS byStatus,
+          AND sr.serviceDate BETWEEN :start AND :end) AS byStatus,
       (SELECT ${roundTripJson('sr')}
         FROM service_request sr
         WHERE sr.villageId = v.id
           AND ${dbUtils.sqlTerminalStatus('sr.status')}
-          AND sr.serviceDate BETWEEN ? AND ?) AS totalsRoundTrips,
+          AND sr.serviceDate BETWEEN :start AND :end) AS totalsRoundTrips,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
             value: `JSON_OBJECT('serviceName', t.serviceName, 'category', t.category, 'byStatus', t.statusCounts, 'roundTrips', t.rt)`,
@@ -343,7 +343,7 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
               WHERE sr.villageId = v.id
                 AND ${dbUtils.sqlTerminalStatus('sr.status')}
                 AND sr.serviceName IS NOT NULL
-                AND sr.serviceDate BETWEEN ? AND ?
+                AND sr.serviceDate BETWEEN :start AND :end
               GROUP BY sr.serviceName) t) AS byServiceType,
       (SELECT COALESCE(
           ${dbUtils.jsonArrayAgg({
@@ -355,7 +355,7 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
               WHERE sr.villageId = v.id
                 AND ${dbUtils.sqlTerminalStatus('sr.status')}
                 AND sr.serviceName IS NOT NULL
-                AND sr.serviceDate BETWEEN ? AND ?
+                AND sr.serviceDate BETWEEN :start AND :end
               GROUP BY 1
               HAVING category IS NOT NULL) t) AS byCategoryRaw,
       (SELECT COALESCE(
@@ -368,7 +368,7 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
               WHERE sr.villageId = v.id
                 AND sr.status = 'Completed'
                 AND sr.memberPersonId IS NOT NULL
-                AND sr.serviceDate BETWEEN ? AND ?
+                AND sr.serviceDate BETWEEN :start AND :end
               GROUP BY sr.memberPersonId) t
         JOIN person p ON p.id = t.pid) AS byMember,
       (SELECT COALESCE(
@@ -381,14 +381,17 @@ module.exports.getVillageMetrics = async function (villageId, start, end) {
               WHERE sr.villageId = v.id
                 AND sr.status = 'Completed'
                 AND sr.volunteerPersonId IS NOT NULL
-                AND sr.serviceDate BETWEEN ? AND ?
+                AND sr.serviceDate BETWEEN :start AND :end
               GROUP BY sr.volunteerPersonId) t
         JOIN person p ON p.id = t.pid) AS byVolunteer
     FROM village v
-    WHERE v.id = ?
+    WHERE v.id = :villageId
   `
-  const binds = [start, end, start, end, start, end, start, end, start, end, start, end, villageId]
-  const [rows] = await dbUtils.pool.query(sql, binds)
+  // namedPlaceholders is set per query, not on the pool: the rest of the API
+  // binds positionally.
+  const [rows] = await dbUtils.pool.query({
+    sql, values: { start, end, villageId }, namedPlaceholders: true
+  })
   if (!rows[0]) return null
   const row = rows[0]
   // Fixed 5-entry byCategory in vocabulary order, zero-filled: chart colors
