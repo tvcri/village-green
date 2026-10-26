@@ -52,7 +52,7 @@ watch([open, () => query.value.trim().length >= 2, () => matches.value.length], 
 })
 
 function defaultMeta (p) {
-  return `${p.village?.name ?? 'Hub volunteer'} · ${p.active ? 'Active' : 'Inactive'}`
+  return `${p.village?.name ?? 'Hub volunteer'} · ${p.deceased ? 'Deceased' : (p.active ? 'Active' : 'Inactive')}`
 }
 
 function choose (m) {

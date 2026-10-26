@@ -73,6 +73,14 @@ const globalOpts = {
 }
 
 describe('MemberEdit', () => {
+  it('shows the read-only note for a deceased person', async () => {
+    getPerson.mockResolvedValueOnce({ personId: '5', fullName: 'Smith, Alice', village: { villageId: '1' }, deceased: true, deceasedDate: null })
+    render(MemberEdit, { global: globalOpts })
+    expect(await screen.findByText(/This person is marked deceased\. Their member and volunteer records can't be changed\./)).toBeInTheDocument()
+    expect(screen.queryByText('Grant Member Role')).toBeNull()
+    expect(screen.queryByText('Save')).toBeNull()
+  })
+
   // A failed load leaves person null, so the no-home-village notice replaces
   // the form: no Save or Grant button exists to PUT a new role over the stored one.
   it('a failed person load renders no save button, so it can never PUT a role', async () => {

@@ -119,7 +119,7 @@ const copyEmail = async (email) => {
         <div class="title-tags">
           <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
           <Tag v-for="circle in person.circles ?? []" :key="circle.circleId" :value="circle.name" severity="secondary" class="village-tag" />
-          <Tag v-if="person.deceasedDate" value="Deceased" severity="contrast" class="village-tag" />
+          <Tag v-if="person.deceased" value="Deceased" severity="contrast" class="village-tag" />
         </div>
       </div>
     </template>
@@ -185,15 +185,15 @@ const copyEmail = async (email) => {
           </div>
         </div>
 
-        <div v-if="person.birthDate || person.deceasedDate" class="subgroup span-2">
+        <div v-if="person.birthDate || person.deceased" class="subgroup span-2">
           <h4 class="subsection-header">Dates</h4>
           <div v-if="person.birthDate" class="detail-field">
             <span class="label">Birth Date</span>
             <span class="value">{{ person.birthDate }}</span>
           </div>
-          <div v-if="person.deceasedDate" class="detail-field">
+          <div v-if="person.deceased" class="detail-field">
             <span class="label">Deceased Date</span>
-            <span class="value">{{ person.deceasedDate }}</span>
+            <span class="value">{{ person.deceasedDate ?? 'Date unknown' }}</span>
           </div>
         </div>
 
@@ -275,7 +275,7 @@ const copyEmail = async (email) => {
 
         <div v-if="person.status" class="detail-field">
           <span class="label">Status</span>
-          <span class="value">{{ person.status }}</span>
+          <span class="value">{{ person.deceased ? 'Deceased' : person.status }}</span>
         </div>
 
         <div v-if="person.status === 'Dropped' && person.dropReasonName" class="detail-field">
@@ -377,7 +377,7 @@ const copyEmail = async (email) => {
 
         <div v-if="person.active != null" class="detail-field">
           <span class="label">Active</span>
-          <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
+          <span class="value">{{ person.deceased ? 'Deceased' : (person.active ? 'Yes' : 'No') }}</span>
         </div>
         <template v-if="person.vettings?.length">
           <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">

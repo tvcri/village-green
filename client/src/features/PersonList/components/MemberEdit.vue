@@ -4,6 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
+import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import MemberFormFields from './MemberFormFields.vue'
 import { getPerson, getCircles } from '../api/personApi.js'
 import { getMemberDropReasons } from '../../Admin/api/dropReasonApi.js'
@@ -159,7 +161,12 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
   <Card class="detail-card">
     <template #title>Member Role — {{ person?.fullName }}</template>
     <template #content>
-      <div v-if="!hasHomeVillage" class="notice">
+      <Message v-if="person?.deceased" severity="info" :closable="false">
+        {{ DECEASED_ROLE_NOTE }}
+        <Button label="Back" severity="secondary" @click="back" />
+      </Message>
+
+      <div v-else-if="!hasHomeVillage" class="notice">
         Set a home village on the person before granting a member role.
         <Button label="Back" severity="secondary" @click="back" />
       </div>

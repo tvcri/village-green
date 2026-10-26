@@ -17,13 +17,14 @@ import {
   getPersons, createPerson, getDisabilities, getCapabilities,
 } from '../../PersonList/api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../../PersonList/api/roleApi.js'
+import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const props = defineProps({
   extraction: { type: Object, required: true },
 })
-const emit = defineEmits(['volunteer-done'])
+const emit = defineEmits(['volunteer-done', 'volunteer-skipped'])
 const toast = useToast()
 const { hasPermission } = useCurrentUser()
 
@@ -142,6 +143,11 @@ async function submit () {
     const created = await createPerson(payload)
     createdPersonId = created.personId
     createdPersonName = created.fullName
+    // A person created as deceased gets no role.
+    if (personFields.deceased) {
+      emit('volunteer-skipped', { personId: createdPersonId, fullName: createdPersonName })
+      return
+    }
     await grantVolunteerRole(created.personId)
   }
   catch {
@@ -160,9 +166,11 @@ async function submit () {
       <ul class="dup-list">
         <li v-for="p in duplicates" :key="p.personId">
           {{ p.fullName }} <span v-if="p.village?.name">({{ p.village.name }})</span>
-          <Button label="Use This Person" size="small" link @click="useExisting(p)" />
+          <span v-if="p.deceased" class="dup-deceased">Deceased</span>
+          <Button v-else label="Use This Person" size="small" link @click="useExisting(p)" />
         </li>
       </ul>
+      <p v-if="duplicates.some(p => p.deceased)">{{ DECEASED_ROLE_NOTE }}</p>
     </Message>
 
     <form @submit.prevent="submit">
@@ -215,7 +223,7 @@ async function submit () {
         :village-options="villages"
       />
       <div class="step-footer">
-        <Button type="submit" label="Create Person & Grant Volunteer Role" :loading="saving" />
+        <Button type="submit" :label="personFields.deceased ? 'Create Person' : 'Create Person & Grant Volunteer Role'" :loading="saving" />
       </div>
     </form>
   </div>
@@ -223,5 +231,6 @@ async function submit () {
 
 <style scoped>
 .dup-list { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.dup-deceased { margin-left: 0.5rem; font-style: italic; }
 .step-footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; }
 </style>

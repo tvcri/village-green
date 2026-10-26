@@ -74,6 +74,12 @@ function onVolunteerDone ({ personId, fullName }) {
   stepIndex.value++
 }
 
+// A deceased person: created or found, but no role is granted.
+function onRoleSkipped ({ personId, fullName } = {}) {
+  if (personId) created.value.push({ personId, fullName, existing: false, role: 'volunteer', roleGranted: false })
+  stepIndex.value++
+}
+
 function requestCancel () {
   if (created.value.length === 0) return exit()
   cancelVisible.value = true
@@ -112,10 +118,10 @@ function restart () {
         :personId="created[currentStep.memberIndex].personId"
         :primaryPersonId="currentStep.memberIndex > 0 ? created[0].personId : null"
         :primaryPersonName="currentStep.memberIndex > 0 ? created[0].fullName : ''"
-        @member-done="onMemberDone" />
+        @member-done="onMemberDone" @member-skipped="onRoleSkipped" />
       <VolunteerStep v-else-if="currentStep.key === 'volunteer'"
         :extraction="extraction"
-        @volunteer-done="onVolunteerDone" />
+        @volunteer-done="onVolunteerDone" @volunteer-skipped="onRoleSkipped" />
       <DoneStep v-else-if="currentStep.key === 'done'" :created="created" @restart="restart" />
 
       <div class="wizard-footer">

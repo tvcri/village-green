@@ -71,7 +71,7 @@ const { busy: exportBusy, download, exportSheet } = useExportActions({
     personId: c.person.personId,
     fullName: c.person.fullName,
     villageName: c.person.village?.name ?? 'Hub volunteer',
-    status: c.person.active ? 'Active' : 'Inactive',
+    status: c.person.deceased ? 'Deceased' : (c.person.active ? 'Active' : 'Inactive'),
     completedDate: c.completedDate ?? '',
     notes: c.notes ?? '',
   })), row => row.personId),
@@ -173,7 +173,7 @@ function openPerson (row) { router.push({ name: 'meta-person-detail', params: { 
         <template #body="{ data }"><a class="link" @click="openPerson(data)">{{ data.person.fullName }}</a></template>
       </Column>
       <Column header="Village"><template #body="{ data }">{{ data.person.village?.name ?? 'Hub volunteer' }}</template></Column>
-      <Column header="Status"><template #body="{ data }">{{ data.person.active ? 'Active' : 'Inactive' }}</template></Column>
+      <Column header="Status"><template #body="{ data }">{{ data.person.deceased ? 'Deceased' : (data.person.active ? 'Active' : 'Inactive') }}</template></Column>
       <Column header="Completed">
         <template #body="{ data }">{{ data.completedDate ? formatCivilDate(data.completedDate) : 'No date' }}</template>
       </Column>

@@ -4,6 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
+import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import { getPerson, getCapabilities, getVettingTypes, getCircles } from '../api/personApi.js'
 import { putVolunteer, patchVolunteer, deleteVolunteer } from '../api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
@@ -173,6 +175,11 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
     <template #title>Volunteer Role — {{ person?.fullName }}</template>
     <template #content>
       <div v-if="!person" class="notice">Loading…</div>
+
+      <Message v-else-if="person.deceased" severity="info" :closable="false">
+        {{ DECEASED_ROLE_NOTE }}
+        <Button label="Back" severity="secondary" @click="back" />
+      </Message>
 
       <!-- No submit button, so Enter in a text box never saves (browsers only
            submit implicitly when a form has one); @submit.prevent stays as a

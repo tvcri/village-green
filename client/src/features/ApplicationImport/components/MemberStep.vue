@@ -4,6 +4,7 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
+import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import MemberFormFields from '../../PersonList/components/MemberFormFields.vue'
 import {
   mapMemberForm, uncertainMapForMember, composeNotes, buildApplicationEnvelope, mergeCirclePreferences,
@@ -21,7 +22,7 @@ const props = defineProps({
   primaryPersonId: { type: [Number, String], default: null },
   primaryPersonName: { type: String, default: '' },
 })
-const emit = defineEmits(['member-done'])
+const emit = defineEmits(['member-done', 'member-skipped'])
 const toast = useToast()
 
 // Full member-form shape (matches MemberEdit) with import prefills merged in.
@@ -39,6 +40,9 @@ const form = reactive({
 const uncertain = reactive(uncertainMapForMember(props.extraction, props.memberIndex))
 const errors = reactive({})
 const hasMember = ref(false)
+// The person (an existing one chosen in the person step, or one just created
+// with Deceased ticked) is deceased: no role is granted.
+const deceased = ref(false)
 const saving = ref(false)
 const needsVillage = ref(false)
 const villages = ref([])
@@ -61,6 +65,8 @@ onMounted(async () => {
     // A chosen existing person may already hold a member role: load it and
     // switch to patch semantics, keeping only the notes dump from the import.
     const p = await getPerson(props.personId, ['member'])
+    deceased.value = !!p.deceased
+    if (deceased.value) return
     if (p.member) {
       hasMember.value = true
       const d = p.member
@@ -154,7 +160,13 @@ async function saveVillageAndRetry () {
 </script>
 
 <template>
-  <div>
+  <div v-if="deceased">
+    <Message severity="info" :closable="false">{{ DECEASED_ROLE_NOTE }}</Message>
+    <div class="step-footer">
+      <Button label="Continue" @click="emit('member-skipped')" />
+    </div>
+  </div>
+  <div v-else>
     <Message v-if="hasMember" severity="info" :closable="false">
       This person already has a member role — saving will update it.
     </Message>

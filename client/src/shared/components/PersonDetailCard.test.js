@@ -22,13 +22,26 @@ function mount (person, personType = 'member') {
 }
 
 describe('PersonDetailCard — 0027 fields', () => {
-  it('shows a Deceased tag only when deceasedDate is set', () => {
-    mount({ ...base, deceasedDate: '2026-08-01' })
-    expect(screen.getByText('Deceased')).toBeInTheDocument()
+  it('Deceased tag follows the flag, not the date', () => {
+    mount({ ...base, deceased: true, deceasedDate: '2026-08-01' })
+    expect(screen.getByText('Deceased', { selector: '.p-tag-label' })).toBeInTheDocument()
     expect(screen.getByText('2026-08-01')).toBeInTheDocument()
     cleanup()
-    mount(base)
+    mount({ ...base, deceased: true, deceasedDate: null })
+    expect(screen.getByText('Deceased', { selector: '.p-tag-label' })).toBeInTheDocument()
+    expect(screen.getByText('Date unknown')).toBeInTheDocument()
+    cleanup()
+    mount({ ...base, deceased: false, deceasedDate: null })
     expect(screen.queryByText('Deceased')).toBeNull()
+    expect(screen.queryByText('Date unknown')).toBeNull()
+  })
+
+  it('a deceased person shows Deceased in place of the member status and volunteer active line', () => {
+    mount({ ...base, deceased: true, deceasedDate: null, status: 'Active' }, 'member')
+    expect(screen.getByText('Status').nextElementSibling.textContent).toBe('Deceased')
+    cleanup()
+    mount({ ...base, deceased: true, deceasedDate: null, active: true, capabilities: ['Driving'] }, 'volunteer')
+    expect(screen.getByText('Active').nextElementSibling.textContent).toBe('Deceased')
   })
 
   it('lists languages with the preferred one marked', () => {
