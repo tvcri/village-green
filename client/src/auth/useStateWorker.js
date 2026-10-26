@@ -24,7 +24,12 @@ export function setupStateHandler() {
     }
     // explicit state error messages from the worker
     if (eventMessage.type === 'state-error') {
-      error.value = eventMessage.data
+      try {
+        error.value = JSON.parse(eventMessage.data)
+      }
+      catch {
+        error.value = { message: String(eventMessage.data) }
+      }
     }
   })
 }

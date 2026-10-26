@@ -24,3 +24,22 @@ describe('generateLabelPdf name wrapping', () => {
     expect(truncated[0].printed.endsWith('…')).toBe(true)
   })
 })
+
+describe('generateLabelPdf character encoding', () => {
+  // A unit line leaves no room to wrap, so the overlong name is truncated and
+  // its printed text comes back in the report.
+  const longName = 'Zoë Ünal — Erdős and Anne McAuliffe-O\'Donnell-Smythe'
+
+  it('prints WinAnsi accents and dashes intact, decomposing only what it lacks', async () => {
+    const { truncated } = await generateLabelPdf([
+      { ...base, name: longName, unit: 'Apt. 314' },
+    ])
+    expect(truncated).toHaveLength(1)
+    expect(truncated[0].printed.startsWith('Zoë Ünal — Erdos and')).toBe(true)
+  })
+
+  it('does not throw on characters with no WinAnsi form', async () => {
+    const { blob } = await generateLabelPdf([{ ...base, name: '日本 Tanaka', unit: null }])
+    expect(blob.size).toBeGreaterThan(0)
+  })
+})

@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { PAGE, LABELS_PER_SHEET, cellOrigin, usableTextWidth } from './avery5160'
+import { winAnsi } from '../../../shared/lib/pdf/pdfPrimitives.js'
 
 const FONT_SIZE = 10
 const LINE_HEIGHT = 11
@@ -20,16 +21,6 @@ function labelLines (label) {
   ].filter(Boolean).join(' ')
 
   return [label.name, label.unit, label.street, cityLine].filter(Boolean)
-}
-
-// Standard Helvetica encodes WinAnsi only; one character outside it makes
-// drawText throw and kills the whole PDF. The dev data is pure ASCII, so this
-// is insurance: strip diacritics, replace anything else with '?'.
-function toWinAnsiSafe (text) {
-  return text
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^\x20-\x7E]/g, '?')
 }
 
 // A 1in label at 11pt leading holds four lines comfortably; five would eat
@@ -101,7 +92,8 @@ export async function generateLabelPdf (labels, options = {}) {
     const source = labelLines(label)
     const drawLines = []
     source.forEach((line, sourceIndex) => {
-      const safe = toWinAnsiSafe(line)
+      // Standard Helvetica is WinAnsi-only; one stray character kills the PDF.
+      const safe = winAnsi(line, font)
       const isName = sourceIndex === 0
       if (isName && source.length < MAX_LINES
           && font.widthOfTextAtSize(safe, FONT_SIZE) > usableTextWidth()) {
