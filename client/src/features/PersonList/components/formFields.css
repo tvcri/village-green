@@ -169,3 +169,10 @@
   font-size: 0.8rem;
   margin-top: 0.25rem;
 }
+
+.field-hint {
+  display: block;
+  color: var(--color-text-muted, inherit);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}

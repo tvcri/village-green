@@ -43,6 +43,14 @@ vi.mock('../../MemberList/api/memberApi.js', () => ({
   getVillageMembers: vi.fn().mockResolvedValue([])
 }))
 
+vi.mock('../../Admin/api/dropReasonApi.js', () => ({
+  getMemberDropReasons: vi.fn().mockResolvedValue([
+    { memberDropReasonId: '1', name: 'Moved', retired: true },
+    { memberDropReasonId: '2', name: 'Quit', retired: false },
+  ]),
+}))
+
+import { getMemberDropReasons } from '../../Admin/api/dropReasonApi.js'
 import { getPerson } from '../api/personApi.js'
 import { putMember, patchMember } from '../api/roleApi.js'
 
@@ -269,4 +277,62 @@ describe('MemberEdit', () => {
       expect(putMember).not.toHaveBeenCalled()
     })
   })
+
+  describe('drop reason', () => {
+    const memberWith = (over) => ({
+      personId: '5', fullName: 'Smith, Alice', village: { villageId: '1' },
+      member: {
+        memberNumber: 'M100', memberLevel: 'Primary', status: 'Active', joinDate: '2024-01-01',
+        printedNewsletter: false, createdDate: '2023-06-15', ...over,
+      },
+    })
+    const optionNames = () => [...document.getElementById(document.querySelector('#dropReasonId [role=combobox]').getAttribute('aria-controls'))
+      .querySelectorAll('.p-select-option')].map(o => o.getAttribute('aria-label'))
+
+    it('empty catalog shows the hint when status is Dropped', async () => {
+      getPerson.mockResolvedValueOnce(memberWith({ status: 'Dropped' }))
+      getMemberDropReasons.mockResolvedValueOnce([])
+      render(MemberEdit, { global: globalOpts })
+      await screen.findByText('Save')
+      expect(screen.getByText('No drop reasons yet. An administrator adds them under Admin › Drop Reasons.')).toBeTruthy()
+    })
+
+    it('retired current reason is offered and an unchanged save sends no reason', async () => {
+      getPerson.mockResolvedValueOnce(memberWith({ status: 'Dropped', dropReasonId: '1', dropReasonName: 'Moved' }))
+      render(MemberEdit, { global: globalOpts })
+      await screen.findByText('Save')
+      await fireEvent.click(document.querySelector('#dropReasonId [role=combobox]'))
+      expect(optionNames()).toEqual(['Moved (retired)', 'Quit'])
+      await fireEvent.update(screen.getByDisplayValue('M100'), 'M101')
+      await fireEvent.click(screen.getByText('Save'))
+      await waitFor(() => expect(patchMember).toHaveBeenCalled())
+      expect(patchMember.mock.calls[0][1]).toEqual({ memberNumber: 'M101' })
+    })
+
+    it('legacy dropped member saves without choosing a reason', async () => {
+      getPerson.mockResolvedValueOnce(memberWith({ status: 'Dropped' }))
+      render(MemberEdit, { global: globalOpts })
+      await fireEvent.update(await screen.findByDisplayValue('M100'), 'M101')
+      await fireEvent.click(screen.getByText('Save'))
+      await waitFor(() => expect(patchMember).toHaveBeenCalled())
+      expect('dropReasonId' in patchMember.mock.calls[0][1]).toBe(false)
+    })
+
+    it('dropping requires a reason, then sends it with the status', async () => {
+      getPerson.mockResolvedValueOnce(memberWith({}))
+      render(MemberEdit, { global: globalOpts })
+      await screen.findByText('Save')
+      await fireEvent.click(document.querySelector('#status'))
+      await fireEvent.mouseDown(screen.getByRole('option', { name: 'Dropped' }))
+      await fireEvent.click(screen.getByText('Save'))
+      expect(await screen.findByText('A drop reason is required')).toBeTruthy()
+      expect(patchMember).not.toHaveBeenCalled()
+      await fireEvent.click(document.querySelector('#dropReasonId [role=combobox]'))
+      await fireEvent.mouseDown(screen.getByRole('option', { name: 'Quit' }))
+      await fireEvent.click(screen.getByText('Save'))
+      await waitFor(() => expect(patchMember).toHaveBeenCalled())
+      expect(patchMember.mock.calls[0][1]).toMatchObject({ status: 'Dropped', dropReasonId: '2' })
+    })
+  })
+
 })

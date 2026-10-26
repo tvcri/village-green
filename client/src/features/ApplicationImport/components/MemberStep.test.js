@@ -15,6 +15,7 @@ vi.mock('../../PersonList/api/roleApi.js', () => ({
   putMember: vi.fn().mockResolvedValue({}),
   patchMember: vi.fn().mockResolvedValue({}),
 }))
+vi.mock('../../Admin/api/dropReasonApi.js', () => ({ getMemberDropReasons: vi.fn().mockResolvedValue([]) }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({ getVillages: vi.fn().mockResolvedValue([]) }))
 vi.mock('../../MemberList/api/memberApi.js', () => ({ getVillageMembers: vi.fn().mockResolvedValue([]) }))
 

@@ -278,9 +278,9 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.status }}</span>
         </div>
 
-        <div v-if="person.status === 'Dropped' && person.dropReason" class="detail-field">
+        <div v-if="person.status === 'Dropped' && person.dropReasonName" class="detail-field">
           <span class="label">Drop Reason</span>
-          <span class="value">{{ person.dropReason }}</span>
+          <span class="value">{{ person.dropReasonName }}</span>
         </div>
 
         <div v-if="person.householdSize != null" class="detail-field">
