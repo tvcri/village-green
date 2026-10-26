@@ -112,7 +112,9 @@ function reconnectSSE() {
     addListeners()
   }
   eventSource.onerror = function (error) {
-    stateWorkerChannel.postMessage({ type: 'state-error', data: { message: `Cannot connect to ${error.target.url}` } })
+    // data is a JSON string, like the SSE events' MessageEvent.data, so consumers
+    // can JSON.parse every message on this channel.
+    stateWorkerChannel.postMessage({ type: 'state-error', data: JSON.stringify({ message: `Cannot connect to ${error.target.url}` }) })
     eventSource.close() // Close the failed connection
     // Delay before retrying
     setTimeout(() => {
