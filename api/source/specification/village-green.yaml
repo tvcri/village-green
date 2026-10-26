@@ -3940,8 +3940,7 @@ components:
           type: string
           enum: [Active, Pending, Dropped]
         dropReasonId:
-          $ref: '#/components/schemas/StringIntId'
-          nullable: true
+          $ref: '#/components/schemas/StringIntIdNullable'
         householdSize:
           type: integer
           nullable: true
@@ -3987,8 +3986,7 @@ components:
         joinDate:        { type: string, format: date }
         status:          { type: string, enum: [Active, Pending, Dropped] }
         dropReasonId:
-          $ref: '#/components/schemas/StringIntId'
-          nullable: true
+          $ref: '#/components/schemas/StringIntIdNullable'
         householdSize:   { type: integer }
         circlePreferences:
           type: array
@@ -4077,8 +4075,7 @@ components:
           maxLength: 50
           nullable: true
         dropReasonId:
-          $ref: '#/components/schemas/StringIntId'
-          nullable: true
+          $ref: '#/components/schemas/StringIntIdNullable'
         dropReasonName:
           type: string
           nullable: true
@@ -5850,6 +5847,7 @@ components:
       - fullName
       - villageId
       - status
+      - deceased
       - count
       - completedRoundTrips
       properties:
@@ -5864,6 +5862,8 @@ components:
           type: string
           maxLength: 50
           nullable: true
+        deceased:
+          type: boolean
         count:
           type: integer
         completedRoundTrips:
@@ -5876,6 +5876,7 @@ components:
       - fullName
       - villageId
       - active
+      - deceased
       - count
       - completedRoundTrips
       properties:
@@ -5887,6 +5888,8 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageIdNullable'
         active:
+          type: boolean
+        deceased:
           type: boolean
         count:
           type: integer
@@ -6092,6 +6095,9 @@ components:
         active:
           type: boolean
           nullable: true
+        deceased:
+          description: Returned by the all-volunteers list only.
+          type: boolean
         village:
           type: object
           nullable: true
@@ -6234,7 +6240,7 @@ components:
     VolunteerPersonRef:
       additionalProperties: false
       type: object
-      required: [ personId, fullName, displayName, village, active ]
+      required: [ personId, fullName, displayName, village, active, deceased ]
       properties:
         personId: { $ref: '#/components/schemas/PersonId' }
         fullName: { type: string }
@@ -6246,6 +6252,7 @@ components:
             villageId: { $ref: '#/components/schemas/VillageId' }
             name: { type: string }
         active: { type: boolean, nullable: true }
+        deceased: { type: boolean }
     TrainingCompletion:
       additionalProperties: false
       type: object

@@ -184,9 +184,12 @@ async function positionChanges (personId, requested) {
 
 // Whether a volunteer's positions show on position pages and in holder
 // counts. An inactive volunteer keeps their positions, hidden until they are
-// active again (Caroline, 2026-10-12). The one place that rule lives: a richer
-// volunteer status changes this predicate only. Never NULL, so NOT works.
-const positionShownSql = (volunteerAlias) => `(${volunteerAlias}.active <=> 1)`
+// active again (Caroline, 2026-10-12). A deceased person's positions are hidden
+// the same way, whatever the active bit says (death never writes a role status).
+// The one place that rule lives: a richer volunteer status changes this
+// predicate only. Never NULL, so NOT works.
+const positionShownSql = (volunteerAlias) =>
+  `(${volunteerAlias}.active <=> 1 AND NOT EXISTS (SELECT 1 FROM person dp WHERE dp.id = ${volunteerAlias}.personId AND dp.deceased))`
 
 // The positions a home-village or associate change would revoke (D8), read
 // before the write so the controller can authorize each removal against its

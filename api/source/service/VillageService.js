@@ -254,6 +254,7 @@ module.exports.getVolunteers = async function ({ villageIdsGranted, includeInact
     'CAST(vol.id AS CHAR) AS volunteerId',
     'CAST(vol.personId AS CHAR) AS personId',
     'vol.active',
+    'p.deceased AS deceased',
     `(SELECT JSON_OBJECT('villageId', CAST(hv.id AS CHAR), 'name', hv.name) FROM village hv WHERE hv.id = p.villageId) AS village`,
     `COALESCE(CAST(
       CONCAT('[', GROUP_CONCAT(CONCAT('"',c.name,'"') ORDER BY c.name), ']')
