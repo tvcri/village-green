@@ -74,6 +74,7 @@ const heldPositions = ref([])
 const associateIds = ref([])
 const originalVillageId = ref(null)
 const personDisplayName = ref('')
+const openRequestCount = ref(0)
 
 const lostPositions = computed(() => isEdit.value && String(form.villageId ?? '') !== String(originalVillageId.value ?? '')
   ? positionsLostOnVillageChange({ positions: heldPositions.value, associateVillageIds: associateIds.value, newHomeVillageId: form.villageId })
@@ -117,6 +118,7 @@ onMounted(async () => {
       heldPositions.value = p.volunteer?.positions ?? []
       associateIds.value = (p.volunteer?.associateVillages ?? []).map(v => v.villageId)
       personDisplayName.value = p.displayName
+      openRequestCount.value = p.openServiceRequestCount ?? 0
       circleNames.value = new Set(p.circles.map(c => c.name))
       disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
       Object.assign(personFields, personFormFromApi(p))
@@ -154,7 +156,7 @@ function buildPayload () {
 
 async function handleSubmit () {
   if (!loaded.value) return
-  if (!validatePersonForm(form, errors, { deceasedDate: personFields.deceasedDate })) {
+  if (!validatePersonForm(form, errors, { deceased: personFields.deceased, deceasedDate: personFields.deceasedDate, dateUnknown: personFields.dateUnknown })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
@@ -240,7 +242,9 @@ function cancel () {
           v-model:emergency-contact-email="form.emergencyContactEmail"
           v-model:suffix="personFields.suffix"
           v-model:pronouns="personFields.pronouns"
+          v-model:deceased="personFields.deceased"
           v-model:deceased-date="personFields.deceasedDate"
+          v-model:date-unknown="personFields.dateUnknown"
           v-model:preferred-contact-method-id="personFields.preferredContactMethodId"
           v-model:gender-id="personFields.genderId"
           v-model:ethnicity-id="personFields.ethnicityId"
@@ -249,6 +253,8 @@ function cancel () {
           v-model:language-ids="personFields.languageIds"
           v-model:preferred-language-id="personFields.preferredLanguageId"
           :lookups="lookups"
+          :open-request-count="openRequestCount"
+          :display-name="personDisplayName"
           :show-demographics="showDemographics"
           :errors="errors"
           :villages="villages"

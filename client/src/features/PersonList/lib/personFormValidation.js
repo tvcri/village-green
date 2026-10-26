@@ -24,7 +24,9 @@ export function validatePersonForm (form, errors, extra = {}) {
 
   if (form.birthDate && !isRealCivilDate(form.birthDate))
     errors.birthDate = 'Enter a valid date (YYYY-MM-DD)'
-  if (extra.deceasedDate && !isRealCivilDate(extra.deceasedDate))
+  if (extra.deceased && !extra.deceasedDate && !extra.dateUnknown)
+    errors.deceasedDate = 'Enter the date, or tick Date unknown'
+  else if (extra.deceasedDate && !isRealCivilDate(extra.deceasedDate))
     errors.deceasedDate = 'Enter a valid date (YYYY-MM-DD)'
 
   if (form.zip && !ZIP_RE.test(form.zip))

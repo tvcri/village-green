@@ -38,4 +38,20 @@ describe('validatePersonForm', () => {
     expect(errors.deceasedDate).toBe('Enter a valid date (YYYY-MM-DD)')
     expect(validatePersonForm({ ...base(), birthDate: '1952-02-29' }, {}, { deceasedDate: '2026-04-30' })).toBe(true)
   })
+
+  it('deceased with neither date nor unknown is invalid', () => {
+    const errors = {}
+    expect(validatePersonForm(base(), errors, { deceased: true, deceasedDate: '', dateUnknown: false })).toBe(false)
+    expect(errors.deceasedDate).toBe('Enter the date, or tick Date unknown')
+  })
+
+  it('deceased + dateUnknown is valid', () => {
+    expect(validatePersonForm(base(), {}, { deceased: true, deceasedDate: '', dateUnknown: true })).toBe(true)
+  })
+
+  it('deceased + bad date invalid', () => {
+    const errors = {}
+    expect(validatePersonForm(base(), errors, { deceased: true, deceasedDate: '2026-13-45', dateUnknown: false })).toBe(false)
+    expect(errors.deceasedDate).toBe('Enter a valid date (YYYY-MM-DD)')
+  })
 })

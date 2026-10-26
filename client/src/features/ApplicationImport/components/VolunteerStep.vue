@@ -126,7 +126,7 @@ async function useExisting (person) {
 }
 
 async function submit () {
-  if (!validatePersonForm(form, errors, { deceasedDate: personFields.deceasedDate })) {
+  if (!validatePersonForm(form, errors, { deceased: personFields.deceased, deceasedDate: personFields.deceasedDate, dateUnknown: personFields.dateUnknown })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
@@ -193,7 +193,9 @@ async function submit () {
         :show-demographics="showDemographics" :lookups="lookups"
         v-model:suffix="personFields.suffix"
         v-model:pronouns="personFields.pronouns"
+        v-model:deceased="personFields.deceased"
         v-model:deceased-date="personFields.deceasedDate"
+        v-model:date-unknown="personFields.dateUnknown"
         v-model:preferred-contact-method-id="personFields.preferredContactMethodId"
         v-model:gender-id="personFields.genderId"
         v-model:ethnicity-id="personFields.ethnicityId"
