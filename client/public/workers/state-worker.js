@@ -65,7 +65,7 @@ function initialize(options) {
     // If the first message doesn't arrive in 5 seconds, treat as error (e.g., buffered SSE endpoint)
     timeoutId = setTimeout(() => {
       eventSource.removeEventListener('state-report', onFirstMessage)
-      stateWorkerChannel.postMessage({ type: 'state-error', data: 'Timeout waiting for first SSE message' })
+      stateWorkerChannel.postMessage({ type: 'state-error', data: JSON.stringify({ message: 'Timeout waiting for first SSE message' }) })
       resolve({ success: false, error: `Timeout waiting for API state event stream.<br><br>
         A reverse proxy may be buffering responses from ${eventSource.url}.<br><br>
         To disable using event stream, set VG_CLIENT_STATE_EVENTS=false` })

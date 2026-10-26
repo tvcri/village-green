@@ -343,6 +343,11 @@ async function setupStateWorker() {
   SW.workerChannel = new BroadcastChannel(response.channelName)
   SW.workerChannel.onmessage = (event) => {
     console.log(`[init] [${SW.workerChannel.name}] Received message:`, event.data)
+    // state-error data is the worker's own { message }, not an API state
+    if (event.data.type === 'state-error') {
+      SW.state = null
+      return
+    }
     try {
       SW.state = JSON.parse(event.data.data)
     }
@@ -370,6 +375,7 @@ async function setupStateWorker() {
   if (needsWait(SW.state)) {
     await new Promise((resolve) => {
       function checkReady(event) {
+        if (event.data.type === 'state-error') { return }
         let stateObj
         try {
           stateObj = JSON.parse(event.data.data)
