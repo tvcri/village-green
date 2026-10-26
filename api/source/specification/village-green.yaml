@@ -1932,7 +1932,7 @@ paths:
       responses:
         '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReason' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-      security: [ { oauth: [ vg:volunteer ] } ]
+      security: [ { oauth: [ vg:member ] } ]
 
   /member-drop-reasons/{memberDropReasonId}:
     parameters: [ { $ref: '#/components/parameters/MemberDropReasonIdPath' } ]
@@ -1946,7 +1946,7 @@ paths:
       responses:
         '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReason' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-      security: [ { oauth: [ vg:volunteer ] } ]
+      security: [ { oauth: [ vg:member ] } ]
     delete:
       summary: Remove a drop reason no member uses (drop_reason:admin); 409 when in use
       tags: [MemberDropReason]
@@ -1954,7 +1954,7 @@ paths:
       responses:
         '204': { description: Deleted }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-      security: [ { oauth: [ vg:volunteer ] } ]
+      security: [ { oauth: [ vg:member ] } ]
 
   /trainings:
     get:
@@ -3938,11 +3938,9 @@ components:
           format: date
         status:
           type: string
-          maxLength: 50
-          nullable: true
-        dropReason:
-          type: string
-          maxLength: 100
+          enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntId'
           nullable: true
         householdSize:
           type: integer
@@ -3987,8 +3985,10 @@ components:
         secondaryType:   { type: string, maxLength: 50 }
         serviceNotes:    { type: string }
         joinDate:        { type: string, format: date }
-        status:          { type: string, maxLength: 50 }
-        dropReason:      { type: string, maxLength: 100 }
+        status:          { type: string, enum: [Active, Pending, Dropped] }
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntId'
+          nullable: true
         householdSize:   { type: integer }
         circlePreferences:
           type: array
@@ -4076,10 +4076,13 @@ components:
           type: string
           maxLength: 50
           nullable: true
-        dropReason:
-          type: string
-          maxLength: 100
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntId'
           nullable: true
+        dropReasonName:
+          type: string
+          nullable: true
+          readOnly: true
         householdSize:
           type: integer
           nullable: true

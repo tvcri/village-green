@@ -258,7 +258,8 @@ function memberColumn ({ financial, scNote, inactive }) {
       'joinDate', DATE_FORMAT(m2.joinDate, '%Y-%m-%d'),
       'createdDate', DATE_FORMAT(m2.createdDate, '%Y-%m-%d'),
       'status', m2.status,
-      'dropReason', m2.dropReason,
+      'dropReasonId', CAST(m2.dropReasonId AS CHAR),
+      'dropReasonName', (SELECT mdr.name FROM member_drop_reason mdr WHERE mdr.id = m2.dropReasonId),
       'householdSize', m2.householdSize,
       ${financial ? `'quickbooksKey', m2.quickbooksKey,` : ''}
       'printedNewsletter', m2.printedNewsletter != 0,

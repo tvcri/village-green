@@ -4,8 +4,9 @@ const SmError = require('../utils/error')
 const AuditService = require('./audit/AuditService')
 const { assertIdsExist, positionShownSql } = require('./volunteerAssignments')
 
-// The two volunteer catalogs (trainings, positions; written only by Admin's '*') behave the
-// same apart from position.scope, so one factory serves both. Holder counts
+// The three catalogs (trainings, positions, member drop reasons; written only by
+// Admin's '*') behave the same apart from position.scope and the member-reason
+// holder count, so one factory serves all of them. Holder counts
 // are always included: the admin page needs them to explain a 409 before
 // the user clicks (spec §4.1). For positions, holderCount counts the holders
 // the position page shows and inactiveHolderCount the hidden ones; both still
