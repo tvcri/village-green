@@ -1909,6 +1909,53 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
 
+  /member-drop-reasons:
+    get:
+      summary: List member drop reasons
+      tags: [MemberDropReason]
+      operationId: getMemberDropReasons
+      responses:
+        '200':
+          description: The drop-reason catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MemberDropReason' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a drop reason to the catalog (drop_reason:admin)
+      tags: [MemberDropReason]
+      operationId: createMemberDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReasonCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /member-drop-reasons/{memberDropReasonId}:
+    parameters: [ { $ref: '#/components/parameters/MemberDropReasonIdPath' } ]
+    patch:
+      summary: Rename, redescribe or retire a drop reason (drop_reason:admin)
+      tags: [MemberDropReason]
+      operationId: patchMemberDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReasonPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a drop reason no member uses (drop_reason:admin); 409 when in use
+      tags: [MemberDropReason]
+      operationId: deleteMemberDropReason
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
   /trainings:
     get:
       summary: List volunteer trainings
@@ -6108,6 +6155,34 @@ components:
       properties:
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
+    MemberDropReasonId:
+      $ref: '#/components/schemas/StringIntId'
+    MemberDropReason:
+      additionalProperties: false
+      type: object
+      required: [ memberDropReasonId, name, description, retired, holderCount ]
+      properties:
+        memberDropReasonId: { $ref: '#/components/schemas/MemberDropReasonId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean, description: Retired reasons stay on existing members but can't be newly chosen }
+        holderCount: { type: integer, minimum: 0, description: Members dropped with this reason }
+    MemberDropReasonCreate:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
+    MemberDropReasonPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
     PositionId:
       $ref: '#/components/schemas/StringIntId'
     PositionScope:
@@ -6851,6 +6926,12 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/PersonId'
+    MemberDropReasonIdPath:
+      name: memberDropReasonId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/MemberDropReasonId'
     TrainingIdPath:
       name: trainingId
       in: path
