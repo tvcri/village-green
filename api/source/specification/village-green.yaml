@@ -1765,6 +1765,31 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer ] } ]
 
+  /persons/{personId}/volunteer/pause:
+    put:
+      summary: Pause or replace the pause on an Active volunteer
+      tags: [Volunteer]
+      operationId: putPersonVolunteerPause
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VolunteerPausePut' }
+      responses:
+        '200': { description: The stored pause, content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerPause' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a volunteer's pause (idempotent)
+      tags: [Volunteer]
+      operationId: deletePersonVolunteerPause
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      responses:
+        '204': { description: Pause removed or none existed }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
   /circles:
     get:
       summary: List all circles
@@ -6144,6 +6169,8 @@ components:
         status:
           type: string
           enum: [Active, Pending, Dropped]
+        pause:
+          $ref: '#/components/schemas/VolunteerPause'
         deceased:
           description: Returned by the all-volunteers list only.
           type: boolean
@@ -6450,6 +6477,24 @@ components:
         positionId: { $ref: '#/components/schemas/PositionId' }
         villageId: { $ref: '#/components/schemas/VillageIdNullable' }
         circleId: { $ref: '#/components/schemas/StringIntIdNullable' }
+    VolunteerPause:
+      description: A volunteer's pause rule; null when not paused.
+      type: object
+      nullable: true
+      additionalProperties: false
+      required: [startDate, endDate, scope]
+      properties:
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        scope: { type: string, enum: [all, window] }
+    VolunteerPausePut:
+      type: object
+      additionalProperties: false
+      required: [startDate, endDate, scope]
+      properties:
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        scope: { type: string, enum: [all, window] }
     VolunteerDetail:
       additionalProperties: false
       type: object
@@ -6480,6 +6525,8 @@ components:
         statusChangeNotes:
           type: string
           nullable: true
+        pause:
+          $ref: '#/components/schemas/VolunteerPause'
         capabilities:
           type: array
           items:

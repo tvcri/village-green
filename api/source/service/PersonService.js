@@ -4,6 +4,7 @@ const { hasPermission } = require('../utils/authz')
 const AuditService = require('./audit/AuditService')
 const SmError = require('../utils/error')
 const volunteerAssignments = require('./volunteerAssignments')
+const { pauseJsonSql } = require('./volunteerPause')
 
 // Replacement-set rules that no constraint can express, checked before the
 // transaction opens so they surface as 400s rather than 500s:
@@ -292,6 +293,7 @@ function volunteerColumn ({ inactive }) {
       'dropReasonId', CAST(vol3.dropReasonId AS CHAR),
       'dropReasonName', (SELECT vdr.name FROM volunteer_drop_reason vdr WHERE vdr.id = vol3.dropReasonId),
       'statusChangeNotes', vol3.statusChangeNotes,
+      'pause', ${pauseJsonSql('vol3')},
       'capabilities', (
         SELECT COALESCE(
           CAST(CONCAT('[', GROUP_CONCAT(CONCAT('"', c.name, '"') ORDER BY c.name), ']') AS JSON),

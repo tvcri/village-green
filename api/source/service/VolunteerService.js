@@ -4,6 +4,7 @@ const PersonService = require('./PersonService')
 const AuditService = require('./audit/AuditService')
 const volunteerAssignments = require('./volunteerAssignments')
 const { applyDropReasonRules } = require('./dropReasonRules')
+const SmError = require('../utils/error')
 
 // Ensure a volunteer row exists for the person; return its id.
 async function ensureVolunteer (connection, personId, status) {
@@ -66,6 +67,13 @@ async function replaceVettings (connection, volunteerId, vettings) {
   }
 }
 
+// A pause belongs to an Active volunteer only: any write that sends a status
+// other than Active removes it, and re-activating does not bring it back.
+async function clearPauseUnlessActive (connection, volunteerId, status) {
+  if (status === undefined || status === 'Active') return
+  await connection.query('DELETE FROM volunteer_pause WHERE volunteerId = ?', [volunteerId])
+}
+
 module.exports.volunteerExists = async function (personId) {
   const [rows] = await dbUtils.pool.query(
     'SELECT id FROM volunteer WHERE personId = ?', [personId]
@@ -97,6 +105,7 @@ module.exports.putVolunteer = async function (personId, { providerType = null, s
           if ('dropReasonId' in dropFields) putFields.dropReasonId = dropFields.dropReasonId
           if (statusChangeNotes !== undefined) putFields.statusChangeNotes = statusChangeNotes
           await connection.query('UPDATE volunteer SET ? WHERE id = ?', [putFields, volunteerId])
+          await clearPauseUnlessActive(connection, volunteerId, status)
           // Written only when sent: a PUT from the volunteer form (which never
           // carries it) must not null the stored application.
           if (application !== undefined) {
@@ -139,6 +148,7 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
           if (Object.keys(fields).length) {
             await connection.query('UPDATE volunteer SET ? WHERE id = ?', [fields, volunteerId])
           }
+          await clearPauseUnlessActive(connection, volunteerId, body.status)
           if (body.capabilityIds !== undefined) {
             await replaceCapabilities(connection, volunteerId, body.capabilityIds)
           }
@@ -179,12 +189,69 @@ module.exports.deleteVolunteer = async function (personId, userId) {
       const volunteerId = rows[0].id
       await AuditService.auditDelete(connection, { entityType: 'volunteer', entityId: volunteerId, userId },
         async () => {
+          await connection.query('DELETE FROM volunteer_pause WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_capability WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_village_associate WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_training WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_position WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer_vetting WHERE volunteerId = ?', [volunteerId])
           await connection.query('DELETE FROM volunteer WHERE id = ?', [volunteerId])
+        })
+    },
+    statusObj: undefined
+  })
+}
+
+async function readPause (personId) {
+  const [rows] = await dbUtils.pool.query(
+    `SELECT DATE_FORMAT(vp.startDate, '%Y-%m-%d') AS startDate,
+            DATE_FORMAT(vp.endDate, '%Y-%m-%d') AS endDate, vp.scope
+     FROM volunteer_pause vp JOIN volunteer v ON v.id = vp.volunteerId
+     WHERE v.personId = ?`, [personId])
+  return rows[0] ?? null
+}
+
+// Create or replace the pause. The controller has already 404'd a missing
+// volunteer; rules are checked in the order the spec lists them.
+module.exports.putVolunteerPause = async function (personId, { startDate = null, endDate = null, scope }, userObject) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [[vol]] = await connection.query('SELECT id, status FROM volunteer WHERE personId = ?', [personId])
+      if (!vol) throw new SmError.NotFoundError()
+      if (vol.status !== 'Active') throw new SmError.UnprocessableError('Only an Active volunteer can be paused.')
+      if (scope === 'window' && (!startDate || !endDate)) {
+        throw new SmError.UnprocessableError('A date-window pause needs a start and an end date.')
+      }
+      if (startDate && endDate && startDate > endDate) {
+        throw new SmError.UnprocessableError('The start date must be on or before the end date.')
+      }
+      await AuditService.auditUpdate(connection,
+        { entityType: 'volunteer', entityId: vol.id, userId: userObject.userId },
+        async () => {
+          await connection.query(
+            `INSERT INTO volunteer_pause (volunteerId, startDate, endDate, scope) VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE startDate = VALUES(startDate), endDate = VALUES(endDate), scope = VALUES(scope)`,
+            [vol.id, startDate, endDate, scope])
+          return vol.id
+        })
+    },
+    statusObj: undefined
+  })
+  return await readPause(personId)
+}
+
+// Idempotent: audited only when a row existed.
+module.exports.deleteVolunteerPause = async function (personId, userId) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [[vol]] = await connection.query(
+        `SELECT v.id, EXISTS (SELECT 1 FROM volunteer_pause vp WHERE vp.volunteerId = v.id) AS paused
+         FROM volunteer v WHERE v.personId = ?`, [personId])
+      if (!vol || !vol.paused) return
+      await AuditService.auditUpdate(connection, { entityType: 'volunteer', entityId: vol.id, userId },
+        async () => {
+          await connection.query('DELETE FROM volunteer_pause WHERE volunteerId = ?', [vol.id])
+          return vol.id
         })
     },
     statusObj: undefined

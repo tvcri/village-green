@@ -102,3 +102,34 @@ test('volunteer delete snapshot preserves a non-empty capability set when delete
 
   await vgCall('deletePerson', { personId }, { token: tokens.users.staff })
 })
+
+test('pause changes are audited on the volunteer', async () => {
+  const person = await vgCall('createPerson', {}, {
+    token: tokens.users.staff,
+    body: { villageId: scratch, firstName: 'Pat', lastName: 'PauseAudit' },
+  })
+  assert.equal(person.status, 201)
+  const personId = person.json.personId
+  assert.equal((await vgCall('putPersonVolunteer', { personId }, {
+    token: tokens.users.staff, body: { status: 'Active' },
+  })).status, 200)
+  const volunteerId = await volunteerIdFor(personId)
+  const before = (await auditRows('volunteer', volunteerId)).length
+
+  const put = await vgCall('putPersonVolunteerPause', { personId }, {
+    token: tokens.users.staff, body: { startDate: '2027-03-01', endDate: null, scope: 'all' },
+  })
+  assert.equal(put.status, 200)
+  const del = await vgCall('deletePersonVolunteerPause', { personId }, { token: tokens.users.staff })
+  assert.equal(del.status, 204)
+  // A second delete finds nothing to remove and writes no event.
+  assert.equal((await vgCall('deletePersonVolunteerPause', { personId }, { token: tokens.users.staff })).status, 204)
+
+  const rows = (await auditRows('volunteer', volunteerId)).slice(before)
+  assert.equal(rows.length, 2)
+  assert.deepEqual(rows.map(r => r.action), ['update', 'update'])
+  assert.ok(rows[0].changes.diff.pause.added.length === 1, 'pause set added')
+  assert.ok(rows[1].changes.diff.pause.removed.length === 1, 'pause set removed')
+
+  await vgCall('deletePerson', { personId }, { token: tokens.users.staff }) // best-effort cleanup
+})
