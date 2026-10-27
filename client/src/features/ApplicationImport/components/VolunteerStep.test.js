@@ -92,7 +92,7 @@ describe('VolunteerStep', () => {
   })
 
   it('an existing match is patched, not replaced, and named by its own record', async () => {
-    getPersons.mockResolvedValue([{ personId: '9', fullName: 'Brown, Nicole K.', village: { name: 'Barrington' } }])
+    getPersons.mockResolvedValueOnce([{ personId: '9', fullName: 'Brown, Nicole K.', village: { name: 'Barrington' } }])
     const { emitted } = mount()
     await fireEvent.click(await screen.findByText('Use This Person'))
     await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
@@ -114,8 +114,8 @@ describe('VolunteerStep', () => {
   })
 
   it('existing volunteer keeps its status on import', async () => {
-    getPersons.mockResolvedValue([{ personId: '9', fullName: 'Brown, Nicole K.', village: { name: 'Barrington' } }])
-    getPerson.mockResolvedValue({ personId: '9', volunteer: { status: 'Active', dropReasonId: null } })
+    getPersons.mockResolvedValueOnce([{ personId: '9', fullName: 'Brown, Nicole K.', village: { name: 'Barrington' } }])
+    getPerson.mockResolvedValueOnce({ personId: '9', volunteer: { status: 'Active', dropReasonId: null } })
     mount()
     await fireEvent.click(await screen.findByText('Use This Person'))
     await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
@@ -124,6 +124,33 @@ describe('VolunteerStep', () => {
     expect(body.status).toBe('Active')
     expect('dropReasonId' in body).toBe(false)
     expect('active' in body).toBe(false)
+  })
+
+  it('a stored Dropped volunteer with a reason keeps both, sending no dropReasonId', async () => {
+    getPersons.mockResolvedValueOnce([{ personId: '9', fullName: 'Brown, Nicole K.', village: { name: 'Barrington' } }])
+    getPerson.mockResolvedValueOnce({ personId: '9', volunteer: { status: 'Dropped', dropReasonId: '1', statusChangeNotes: 'Moved away' } })
+    mount()
+    await fireEvent.click(await screen.findByText('Use This Person'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    const body = patchVolunteer.mock.calls[0][1]
+    expect(body.status).toBe('Dropped')
+    expect('dropReasonId' in body).toBe(false)
+  })
+
+  it('a failed Use This Person leaves the form alone, so Create still sends Pending', async () => {
+    getPersons.mockResolvedValueOnce([{ personId: '9', fullName: 'Brown, Nicole K.', village: { name: 'Barrington' } }])
+    getPerson.mockResolvedValueOnce({ personId: '9', volunteer: { status: 'Dropped', dropReasonId: '1', statusChangeNotes: 'Moved away' } })
+    patchVolunteer.mockRejectedValueOnce({ body: { error: 'down' } })
+    mount()
+    await fireEvent.click(await screen.findByText('Use This Person'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByText('Female')).toBeInTheDocument())
+    await fireEvent.click(screen.getByText('Create Person & Grant Volunteer Role'))
+    await waitFor(() => expect(putVolunteer).toHaveBeenCalled())
+    const body = putVolunteer.mock.calls[0][1]
+    expect(body.status).toBe('Pending')
+    expect('dropReasonId' in body).toBe(false)
+    expect('statusChangeNotes' in body).toBe(false)
   })
 
   it('omits demographics from the create without person:read_demographics', async () => {
@@ -137,7 +164,7 @@ describe('VolunteerStep', () => {
   })
 
   it('a deceased match is listed without a way to use it', async () => {
-    getPersons.mockResolvedValue([{ personId: '9', fullName: 'Brown, Nicole K.', deceased: true, village: { name: 'Barrington' } }])
+    getPersons.mockResolvedValueOnce([{ personId: '9', fullName: 'Brown, Nicole K.', deceased: true, village: { name: 'Barrington' } }])
     mount()
     await screen.findByText(/Brown, Nicole K\./)
     expect(screen.queryByText('Use This Person')).toBeNull()
@@ -146,7 +173,7 @@ describe('VolunteerStep', () => {
   })
 
   it('a new person ticked Deceased is created without a volunteer role', async () => {
-    getPersons.mockResolvedValue([])
+    getPersons.mockResolvedValueOnce([])
     const { emitted } = mount()
     await screen.findByDisplayValue('Brown')
     await fireEvent.click(screen.getByLabelText('Deceased'))

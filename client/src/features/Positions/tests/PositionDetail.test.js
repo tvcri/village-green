@@ -75,7 +75,7 @@ describe('PositionDetail', () => {
   it('no hidden-holder line when none are inactive', async () => {
     render(PositionDetail, opts)
     await screen.findByText('Abbott, Lorraine')
-    expect(screen.queryByText(/hidden until active again/)).toBeNull()
+    expect(screen.queryByText(/keeps? this position, hidden/)).toBeNull()
   })
 
   // Agreed with staff 2026-10-08: the add search lists only who can hold it

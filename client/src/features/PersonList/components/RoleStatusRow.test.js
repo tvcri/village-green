@@ -71,4 +71,11 @@ describe('RoleStatusRow', () => {
     await fireEvent.mouseDown(screen.getByRole('option', { name: 'Active' }))
     expect(utils.emitted().edited).toEqual([['status']])
   })
+
+  it('emits edited(dropReasonId) when the drop reason changes', async () => {
+    const utils = mount({ status: 'Dropped', reasons: [{ memberDropReasonId: '1', name: 'Moved' }] })
+    await fireEvent.click(utils.container.querySelector('#dropReasonId'))
+    await fireEvent.mouseDown(screen.getByRole('option', { name: 'Moved' }))
+    expect(utils.emitted().edited).toEqual([['dropReasonId']])
+  })
 })

@@ -103,16 +103,20 @@ function onEdited (field) {
   delete uncertain[field]
 }
 
-async function grantVolunteerRole (personId, { isExisting = false } = {}) {
+// `stored` overrides the form's status fields for an existing volunteer, so
+// the form refs stay untouched if the PATCH fails and the coordinator then
+// creates a new person from the same form.
+async function grantVolunteerRole (personId, { isExisting = false, stored = null } = {}) {
+  const eff = stored ?? { status: status.value, dropReasonId: dropReasonId.value, statusChangeNotes: statusChangeNotes.value, loaded: loaded.value }
   const body = {
     providerType: providerType.value || null,
-    status: status.value,
+    status: eff.status,
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
     application: buildApplicationEnvelope(props.extraction, null),
   }
-  if (statusChangeNotes.value) body.statusChangeNotes = statusChangeNotes.value
-  if (dropReasonSent({ status: status.value, dropReasonId: dropReasonId.value }, loaded.value)) body.dropReasonId = dropReasonId.value
+  if (eff.statusChangeNotes) body.statusChangeNotes = eff.statusChangeNotes
+  if (dropReasonSent({ status: eff.status, dropReasonId: eff.dropReasonId }, eff.loaded)) body.dropReasonId = eff.dropReasonId
   // A PATCH that carries associateVillageIds prunes village positions held at
   // associate villages, so an existing person's PATCH must omit it entirely.
   if (!isExisting) body.associateVillageIds = []
@@ -139,21 +143,22 @@ async function useExisting (person) {
   createdPersonName = person.fullName
   saving.value = true
   try {
-    // An existing volunteer keeps its stored status and reason: they replace
-    // the form's before the PATCH, so an Active volunteer stays Active.
+    // An existing volunteer keeps its stored status and reason, passed as
+    // overrides so an Active volunteer stays Active.
     const p = await getPerson(person.personId, ['volunteer'])
-    if (p.volunteer) {
-      status.value = p.volunteer.status
-      dropReasonId.value = p.volunteer.dropReasonId ?? null
-      statusChangeNotes.value = p.volunteer.statusChangeNotes ?? ''
-      loaded.value = { status: status.value, dropReasonId: dropReasonId.value }
-    }
-    else loaded.value = {}
-    if (!validateVolunteerForm({ status: status.value, dropReasonId: dropReasonId.value }, volunteerErrors, loaded.value)) {
+    const stored = p.volunteer
+      ? {
+          status: p.volunteer.status,
+          dropReasonId: p.volunteer.dropReasonId ?? null,
+          statusChangeNotes: p.volunteer.statusChangeNotes ?? '',
+        }
+      : { status: status.value, dropReasonId: dropReasonId.value, statusChangeNotes: statusChangeNotes.value }
+    stored.loaded = p.volunteer ? { status: stored.status, dropReasonId: stored.dropReasonId } : {}
+    if (!validateVolunteerForm({ status: stored.status, dropReasonId: stored.dropReasonId }, volunteerErrors, stored.loaded)) {
       toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
       return
     }
-    await grantVolunteerRole(person.personId, { isExisting: true })
+    await grantVolunteerRole(person.personId, { isExisting: true, stored })
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load the existing volunteer role', life: 3000 })

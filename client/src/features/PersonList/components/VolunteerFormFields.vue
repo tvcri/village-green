@@ -13,6 +13,7 @@ const props = defineProps({
   dropReasons: { type: Array, default: () => [] },       // volunteer drop-reason catalog rows
   loadedDropReasonId: { type: String, default: null },   // stored reason, offered even when retired
 })
+const emit = defineEmits(['edited'])
 
 // providerType has no control in this panel (set/edited by the parent) but is
 // still declared as a model so the panel's v-model:provider-type contract
@@ -26,6 +27,12 @@ const notes = defineModel('notes', { type: String, default: '' })
 const selectedCapabilityIds = defineModel('selectedCapabilityIds', { type: Array, required: true })
 const selectedAssociateVillageIds = defineModel('selectedAssociateVillageIds', { type: Array, required: true })
 
+// Clear a field's validation error as soon as the user changes it.
+function edited (field) {
+  delete props.errors[field]
+  emit('edited', field)
+}
+
 function uncertainText (field) { return sharedUncertainText(props.uncertain, field) }
 </script>
 
@@ -35,7 +42,7 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
 
     <RoleStatusRow v-model:status="status" v-model:dropReasonId="dropReasonId" idKey="volunteerDropReasonId"
                    :reasons="dropReasons" :loadedDropReasonId="loadedDropReasonId"
-                   :errors="errors" :uncertain="uncertain" />
+                   :errors="errors" :uncertain="uncertain" @edited="edited" />
 
     <div class="form-field span-4">
       <IftaLabel>

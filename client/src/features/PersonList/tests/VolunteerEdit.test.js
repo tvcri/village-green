@@ -149,6 +149,18 @@ describe('VolunteerEdit', () => {
     expect(patchVolunteer).not.toHaveBeenCalled()
   })
 
+  it('picking a reason clears the drop-reason error', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await screen.findByDisplayValue('Existing notes')
+    await fireEvent.click(document.querySelector('#status'))
+    await fireEvent.mouseDown(await screen.findByRole('option', { name: 'Dropped' }))
+    await fireEvent.click(screen.getByText('Save'))
+    expect(await screen.findByText('A drop reason is required')).toBeInTheDocument()
+    await fireEvent.click(await screen.findByLabelText('Select drop reason'))
+    await fireEvent.mouseDown(await screen.findByRole('option', { name: 'Too busy' }))
+    await waitFor(() => expect(screen.queryByText('A drop reason is required')).toBeNull())
+  })
+
   it('legacy dropped volunteer saves without choosing a reason', async () => {
     getPerson.mockResolvedValueOnce({
       personId: '5', fullName: 'Smith, Alice', village: { villageId: '1' },

@@ -31,7 +31,6 @@ import CatalogAdmin from './CatalogAdmin.vue'
    catalog table into white-on-white. Let the page's grey show through so the
    table reads like Positions and Trainings. */
 .drop-reasons-tabs :deep(.p-tabpanels),
-.drop-reasons-tabs :deep(.p-tabs),
 .drop-reasons-tabs :deep(.p-tablist-tab-list) {
   background: transparent;
 }

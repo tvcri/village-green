@@ -2,7 +2,6 @@
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
 const AuditService = require('./audit/AuditService')
-const SmError = require('../utils/error')
 const { applyDropReasonRules } = require('./dropReasonRules')
 
 // A member is welcomed when they genuinely become Active. Prior 'Active' is the
