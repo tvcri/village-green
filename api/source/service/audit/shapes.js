@@ -163,6 +163,16 @@ const shapes = {
               LEFT JOIN circle c ON c.id = vp.circleId
               WHERE vp.volunteerId = ?`,
       },
+      // One rule per volunteer; PK is volunteerId (no id column).
+      pause: {
+        kind: 'values',
+        table: 'volunteer_pause',
+        sourceColumns: ['volunteerId', 'startDate', 'endDate', 'scope'],
+        sql: `SELECT CONCAT(vp.scope, ' ', COALESCE(DATE_FORMAT(vp.startDate, '%Y-%m-%d'), '…'),
+                            ' to ', COALESCE(DATE_FORMAT(vp.endDate, '%Y-%m-%d'), '…')) AS label
+              FROM volunteer_pause vp
+              WHERE vp.volunteerId = ?`,
+      },
     },
   },
 

@@ -833,6 +833,23 @@ CREATE TABLE `volunteer_drop_reason` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `volunteer_pause`
+--
+
+DROP TABLE IF EXISTS `volunteer_pause`;
+CREATE TABLE `volunteer_pause` (
+  `volunteerId` int NOT NULL,
+  `startDate` date DEFAULT NULL,
+  `endDate` date DEFAULT NULL,
+  `scope` varchar(20) NOT NULL,
+  PRIMARY KEY (`volunteerId`),
+  CONSTRAINT `volunteer_pause_volunteer_fk` FOREIGN KEY (`volunteerId`) REFERENCES `volunteer` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_volunteer_pause_order` CHECK (((`startDate` is null) or (`endDate` is null) or (`startDate` <= `endDate`))),
+  CONSTRAINT `chk_volunteer_pause_scope` CHECK ((`scope` in (_utf8mb4'all',_utf8mb4'window'))),
+  CONSTRAINT `chk_volunteer_pause_window` CHECK (((`scope` <> _utf8mb4'window') or ((`startDate` is not null) and (`endDate` is not null))))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `volunteer_position`
 --
 
@@ -1025,4 +1042,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-27 18:22:57
+-- Dump completed on 2026-10-27 22:25:02
