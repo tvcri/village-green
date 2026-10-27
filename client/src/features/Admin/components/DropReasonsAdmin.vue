@@ -1,23 +1,7 @@
 <script setup>
-// Drop reasons admin. Member is the only list today; the Volunteer list adds
-// a second tab here.
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
+// Drop reasons admin. Member is the only list today, so the page renders it
+// like Positions and Trainings; when the Volunteer list arrives, wrap the two
+// in Tabs (Member, Volunteer).
 import CatalogAdmin from './CatalogAdmin.vue'
 </script>
-
-<template>
-  <Tabs value="member">
-    <TabList>
-      <Tab value="member">Member</Tab>
-    </TabList>
-    <TabPanels>
-      <TabPanel value="member">
-        <CatalogAdmin kind="memberDropReason" />
-      </TabPanel>
-    </TabPanels>
-  </Tabs>
-</template>
+<template><CatalogAdmin kind="memberDropReason" /></template>

@@ -24,11 +24,11 @@ function mount (person, personType = 'member') {
 describe('PersonDetailCard — 0027 fields', () => {
   it('Deceased tag follows the flag, not the date', () => {
     mount({ ...base, deceased: true, deceasedDate: '2026-08-01' })
-    expect(screen.getByText('Deceased', { selector: '.p-tag-label' })).toBeInTheDocument()
+    expect(screen.getByText('Deceased', { selector: '.title-tags .p-tag-label' })).toBeInTheDocument()
     expect(screen.getByText('2026-08-01')).toBeInTheDocument()
     cleanup()
     mount({ ...base, deceased: true, deceasedDate: null })
-    expect(screen.getByText('Deceased', { selector: '.p-tag-label' })).toBeInTheDocument()
+    expect(screen.getByText('Deceased', { selector: '.title-tags .p-tag-label' })).toBeInTheDocument()
     expect(screen.getByText('Date unknown')).toBeInTheDocument()
     cleanup()
     mount({ ...base, deceased: false, deceasedDate: null })
@@ -38,10 +38,20 @@ describe('PersonDetailCard — 0027 fields', () => {
 
   it('a deceased person shows Deceased in place of the member status and volunteer active line', () => {
     mount({ ...base, deceased: true, deceasedDate: null, status: 'Active' }, 'member')
-    expect(screen.getByText('Status').nextElementSibling.textContent).toBe('Deceased')
+    const header = screen.getByText('Member Information').parentElement
+    expect(header.querySelector('.p-tag-label').textContent).toBe('Deceased')
+    expect(screen.queryByText('Active')).toBeNull()
     cleanup()
     mount({ ...base, deceased: true, deceasedDate: null, active: true, capabilities: ['Driving'] }, 'volunteer')
     expect(screen.getByText('Active').nextElementSibling.textContent).toBe('Deceased')
+  })
+
+  it('shows the member status as a tag in the Member Information header', () => {
+    mount({ ...base, status: 'Dropped', dropReasonName: 'Moved' }, 'member')
+    const header = screen.getByText('Member Information').parentElement
+    expect(header.querySelector('.p-tag-label').textContent).toBe('Dropped')
+    expect(screen.queryByText('Status')).toBeNull()
+    expect(screen.getByText('Drop Reason').nextElementSibling.textContent).toBe('Moved')
   })
 
   it('lists languages with the preferred one marked', () => {

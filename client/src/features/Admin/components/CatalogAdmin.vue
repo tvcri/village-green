@@ -268,6 +268,8 @@ h1 { margin: 0 0 0.25rem; color: var(--color-text-primary); }
 .chip { margin: 0.1rem 0.25rem 0.1rem 0; }
 .row-actions { display: flex; justify-content: flex-end; }
 :deep(.num) { text-align: right; font-variant-numeric: tabular-nums; }
+/* The header's label sits in a flex div, so text-align alone leaves it left. */
+:deep(th.num .p-datatable-column-header-content) { justify-content: flex-end; }
 .dialog-body { display: flex; flex-direction: column; gap: 1rem; }
 .field { display: flex; flex-direction: column; gap: 0.3rem; }
 .field label { font-size: 0.85rem; font-weight: 600; color: var(--color-text-dim); }

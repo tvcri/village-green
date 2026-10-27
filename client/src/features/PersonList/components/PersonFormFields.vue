@@ -464,7 +464,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="subgroup span-2">
+    <!-- span-4 keeps Birth Date, Deceased and Deceased Date on one row. -->
+    <div class="subgroup span-4">
       <h4 class="subsection-header">Dates</h4>
 
       <div v-if="showBirthDate" class="form-field">
@@ -666,7 +667,7 @@ onMounted(() => {
 }
 
 /* Languages opens its own row so it pairs with Disabilities, not with the
-   Civic information and Dates pair above (2 + 2 + 2 would fill that row). */
+   Civic information and Dates pair above. */
 .subgroup.row-start {
   grid-column: 1 / span 2;
 }
