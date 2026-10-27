@@ -62,9 +62,9 @@ export function buildMembership (plan, content, rng) {
     // volunteers
     for (const personId of [...new Set(volunteers)]) {
       vId += 1
-      // ~5% flip to inactive in the post-pass below
+      // ~5% flip to Pending/Dropped in the post-pass below
       volunteer.push({
-        id: vId, personId: personId, providerType: rng.pick(['Individual', 'Couple', 'Agency']), active: 1,
+        id: vId, personId: personId, providerType: rng.pick(['Individual', 'Couple', 'Agency']), status: 'Active',
         notes: volunteerNotes.length && rng.bool(0.5) ? rng.pick(volunteerNotes) : null,
       })
       // 1-3 capabilities
@@ -89,7 +89,9 @@ export function buildMembership (plan, content, rng) {
     r.status = rng.pick(['Inactive', 'Dropped'])
     r.dropReason = rng.pick(dropReasons)
   }
-  for (const r of fillerFirst(volunteer).slice(0, Math.round(volunteer.length * 0.05))) r.active = 0
+  fillerFirst(volunteer).slice(0, Math.round(volunteer.length * 0.05))
+    .forEach((r, i) => { r.status = i % 2 ? 'Dropped' : 'Pending' })
+  // Dropped rows carry no dropReasonId: the drop-reason list starts empty (0030)
 
   // ~handful of disabilities across members
   const memberPersonIds = [...new Set(member.map(m => m.personId))]
