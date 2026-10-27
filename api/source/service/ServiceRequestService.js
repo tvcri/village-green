@@ -342,7 +342,10 @@ module.exports.createServiceRequest = async function (payload, userId) {
         createdUserId: userId
       }
 
-      await assertNotPaused(connection, insertFields.volunteerPersonId, insertFields.serviceDate)
+      // A terminal write records the past; only in-flight rows are lined up.
+      if (!isEndState(resolvedStatus)) {
+        await assertNotPaused(connection, insertFields.volunteerPersonId, insertFields.serviceDate)
+      }
 
       const [result] = await connection.query(
         'INSERT INTO service_request SET ?, createdAt = NOW()',
@@ -442,14 +445,6 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
         )
       }
 
-      // Pause rule: checked only when the volunteer or the date changes, so
-      // an ordinary edit of a request whose volunteer paused later still saves.
-      const dateChanged = payload.serviceDate !== undefined && payload.serviceDate !== current.serviceDate
-      if (volunteerChanged || dateChanged) {
-        await assertNotPaused(connection, newVolunteerPersonId,
-          payload.serviceDate !== undefined ? payload.serviceDate : current.serviceDate)
-      }
-
       // Absence must never imply an operation on a terminal row: omitting
       // status means "leave it alone", not "recompute". Non-terminal rows are
       // untouched — they still derive from volunteer presence exactly as
@@ -461,6 +456,14 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
         ? current.status
         : deriveStatus(payload.status, newVolunteerPersonId)
       updateFields.status = resolvedStatus
+
+      // Pause rule: checked only when the volunteer or the date changes, so
+      // an ordinary edit of a request whose volunteer paused later still saves. A terminal write records the past and is never blocked.
+      const dateChanged = payload.serviceDate !== undefined && payload.serviceDate !== current.serviceDate
+      if ((volunteerChanged || dateChanged) && !isEndState(resolvedStatus)) {
+        await assertNotPaused(connection, newVolunteerPersonId,
+          payload.serviceDate !== undefined ? payload.serviceDate : current.serviceDate)
+      }
 
       // Rule 3: a Completed request must credit a volunteer. deriveStatus
       // passes an explicit Completed through untouched, so without this a

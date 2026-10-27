@@ -121,3 +121,12 @@ test('unchanged volunteer and date save despite a pause', async () => {
   const res = await patch(json.serviceRequestId, { instructions: 'x', volunteerPersonId: v, serviceDate: '2030-03-10' })
   assert.equal(res.status, 200)
 })
+
+test('recording a paused volunteer on a Completed request is allowed', async () => {
+  const v = await makeVolunteer('PACompletedPatch')
+  await setPause(v, { startDate: null, endDate: null, scope: 'all' })
+  const { json } = await create(null, '2030-03-10')
+  const res = await patch(json.serviceRequestId, { status: 'Completed', volunteerPersonId: v })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.status, 'Completed')
+})
