@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
+import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
@@ -41,6 +43,9 @@ const hasMemberDetail = computed(() => !!person.value?.member)
 const hasVolunteerDetail = computed(() => !!person.value?.volunteer)
 
 const canDelete = computed(() => !(person.value?.activeAs ?? []).length)
+const deleteBlockedTip = computed(() => person.value?.deceased
+  ? 'Untick Deceased on the person form to change their roles, then remove them before deleting.'
+  : 'Remove member and volunteer roles before deleting this person')
 
 const flatPerson = computed(() => {
   if (!person.value) return null
@@ -82,16 +87,17 @@ function removePerson () {
            role's editor (pencil, like Edit Person); without one it opens the
            same form, whose submit grants the role. hasMember/VolunteerDetail
            is the test MemberEdit/VolunteerEdit use to pick Save vs Grant. -->
-      <Button v-if="canWriteMember" :label="hasMemberDetail ? 'Edit Member' : 'Add Member Role'"
+      <Button v-if="canWriteMember && !person?.deceased" :label="hasMemberDetail ? 'Edit Member' : 'Add Member Role'"
               :icon="hasMemberDetail ? 'pi pi-pencil' : 'pi pi-plus'"
               :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
-      <Button v-if="canWriteVolunteer" :label="hasVolunteerDetail ? 'Edit Volunteer' : 'Add Volunteer Role'"
+      <Button v-if="canWriteVolunteer && !person?.deceased" :label="hasVolunteerDetail ? 'Edit Volunteer' : 'Add Volunteer Role'"
               :icon="hasVolunteerDetail ? 'pi pi-pencil' : 'pi pi-plus'"
               :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
-      <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
+      <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : deleteBlockedTip">
         <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="!canDelete" @click="removePerson" />
       </span>
     </div>
+    <Message v-if="person?.deceased" severity="info" :closable="false" class="deceased-note">{{ DECEASED_ROLE_NOTE }}</Message>
     <PersonDetailCard
       v-if="flatPerson"
       :person="flatPerson"

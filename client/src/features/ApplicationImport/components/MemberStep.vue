@@ -4,14 +4,16 @@ import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
+import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import MemberFormFields from '../../PersonList/components/MemberFormFields.vue'
 import {
   mapMemberForm, uncertainMapForMember, composeNotes, buildApplicationEnvelope, mergeCirclePreferences,
 } from '../lib/importMapping.js'
 import { getPerson, patchPerson, getCircles } from '../../PersonList/api/personApi.js'
+import { getMemberDropReasons } from '../../Admin/api/dropReasonApi.js'
 import { putMember, patchMember } from '../../PersonList/api/roleApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
-import { validateMemberForm } from '../../PersonList/lib/memberFormValidation.js'
+import { validateMemberForm, dropReasonSent } from '../../PersonList/lib/memberFormValidation.js'
 
 const props = defineProps({
   extraction: { type: Object, required: true },
@@ -20,7 +22,7 @@ const props = defineProps({
   primaryPersonId: { type: [Number, String], default: null },
   primaryPersonName: { type: String, default: '' },
 })
-const emit = defineEmits(['member-done'])
+const emit = defineEmits(['member-done', 'member-skipped'])
 const toast = useToast()
 
 // Full member-form shape (matches MemberEdit) with import prefills merged in.
@@ -30,7 +32,7 @@ const toast = useToast()
 const form = reactive({
   memberNumber: '', memberLevel: '', memberType: '', primaryPersonId: '',
   serviceNotes: '', joinDate: '',
-  status: 'Pending', dropReason: '', householdSize: null, householdDues: null,
+  status: 'Pending', dropReasonId: null, householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   scNotes: '', statusChangeNotes: '', miscNotes: '',
   ...mapMemberForm(props.extraction, props.memberIndex, props.primaryPersonId),
@@ -38,12 +40,19 @@ const form = reactive({
 const uncertain = reactive(uncertainMapForMember(props.extraction, props.memberIndex))
 const errors = reactive({})
 const hasMember = ref(false)
+// The person (an existing one chosen in the person step, or one just created
+// with Deceased ticked) is deceased: no role is granted.
+const deceased = ref(false)
 const saving = ref(false)
 const needsVillage = ref(false)
 const villages = ref([])
 const selectedVillageId = ref(null)
 const savingVillage = ref(false)
 const allCircles = ref([])
+const dropReasons = ref([])
+// Stored status and reason of an existing member ({} for a new one, where
+// Dropped always needs a reason).
+const loaded = ref({})
 const circlePreferences = ref([])
 // The stored set, known before the catalog loads: an existing member's PATCH
 // sends preferences only when they differ from it, so a catalog failure (the
@@ -56,9 +65,12 @@ onMounted(async () => {
     // A chosen existing person may already hold a member role: load it and
     // switch to patch semantics, keeping only the notes dump from the import.
     const p = await getPerson(props.personId, ['member'])
+    deceased.value = !!p.deceased
+    if (deceased.value) return
     if (p.member) {
       hasMember.value = true
       const d = p.member
+      loaded.value = { status: d.status, dropReasonId: d.dropReasonId ?? null }
       Object.keys(form).forEach(k => {
         if (k === 'primaryPersonId') form.primaryPersonId = d.primaryPerson?.personId ?? ''
         else if (d[k] != null) form[k] = d[k]
@@ -66,6 +78,8 @@ onMounted(async () => {
       const dump = composeNotes(props.extraction, props.memberIndex)
       form.miscNotes = form.miscNotes ? `${form.miscNotes}\n\n${dump}` : dump
     }
+    try { dropReasons.value = await getMemberDropReasons() }
+    catch { toast.add({ severity: 'warn', summary: 'Drop reasons unavailable', detail: 'A drop reason cannot be chosen right now', life: 3000 }) }
     const existing = (p.member?.circlePreferences ?? []).map(c => c.circleId)
     storedPreferences = existing
     circlePreferences.value = [...existing]
@@ -91,6 +105,7 @@ function payload () {
     if (v === '' || v === null) return
     out[k] = v
   })
+  if (!dropReasonSent(form, loaded.value)) delete out.dropReasonId
   out.application = buildApplicationEnvelope(props.extraction, props.memberIndex)
   if (!hasMember.value || !sameSet(circlePreferences.value, storedPreferences)) {
     out.circlePreferences = [...circlePreferences.value]
@@ -99,7 +114,7 @@ function payload () {
 }
 
 async function submit () {
-  if (!validateMemberForm(form, errors)) return
+  if (!validateMemberForm(form, errors, loaded.value)) return
   saving.value = true
   needsVillage.value = false
   try {
@@ -145,7 +160,13 @@ async function saveVillageAndRetry () {
 </script>
 
 <template>
-  <div>
+  <div v-if="deceased">
+    <Message severity="info" :closable="false">{{ DECEASED_ROLE_NOTE }}</Message>
+    <div class="step-footer">
+      <Button label="Continue" @click="emit('member-skipped')" />
+    </div>
+  </div>
+  <div v-else>
     <Message v-if="hasMember" severity="info" :closable="false">
       This person already has a member role — saving will update it.
     </Message>
@@ -168,7 +189,7 @@ async function saveVillageAndRetry () {
         v-model:member-level="form.memberLevel"
         v-model:primary-person-id="form.primaryPersonId"
         v-model:join-date="form.joinDate"
-        v-model:drop-reason="form.dropReason"
+        v-model:drop-reason-id="form.dropReasonId"
         v-model:household-size="form.householdSize"
         v-model:household-dues="form.householdDues"
         v-model:quickbooks-key="form.quickbooksKey"
@@ -178,6 +199,8 @@ async function saveVillageAndRetry () {
         v-model:status-change-notes="form.statusChangeNotes"
         v-model:misc-notes="form.miscNotes"
         :errors="errors"
+        :drop-reasons="dropReasons"
+        :loaded-drop-reason-id="loaded.dropReasonId"
         :uncertain="uncertain"
         :primary-person-name="primaryPersonName"
         v-model:circle-preferences="circlePreferences"

@@ -58,10 +58,10 @@ describe('PositionDetail', () => {
   })
 
   // Caroline, 2026-10-12: inactive holders keep the position, hidden from this page.
-  it('says how many inactive volunteers keep the position, hidden', async () => {
+  it('says how many inactive or deceased volunteers keep the position, hidden', async () => {
     getPositions.mockResolvedValue([{ positionId: '5', name: 'Local Service Coordinator', scope: 'village', trainingIds: ['4'], holderCount: 2, inactiveHolderCount: 1 }])
     render(PositionDetail, opts)
-    expect(await screen.findByText('1 inactive volunteer keeps this position, hidden until active again')).toBeInTheDocument()
+    expect(await screen.findByText('1 inactive or deceased volunteer keeps this position, hidden')).toBeInTheDocument()
     expect(screen.queryByText('Active')).toBeNull()
   })
 

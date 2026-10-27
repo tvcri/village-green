@@ -44,10 +44,10 @@ test('suffix lands in displayName and trails the inverted fullName, never in las
 test('deceasedDate and preferredContactMethod round-trip', async () => {
   const cms = (await vgCall('getContactMethods', {}, { token: staff })).json
   const cell = cms.find(c => c.name === 'Cell').contactMethodId
-  const p = await create({ firstName: 'Dee', lastName: 'Ceased', deceasedDate: '2026-01-31', preferredContactMethodId: cell })
+  const p = await create({ firstName: 'Dee', lastName: 'Ceased', deceased: true, deceasedDate: '2026-01-31', preferredContactMethodId: cell })
   assert.equal(p.deceasedDate, '2026-01-31')
   assert.deepEqual(p.preferredContactMethod, { contactMethodId: cell, name: 'Cell' })
-  const cleared = await vgCall('patchPerson', { personId: p.personId }, { token: staff, body: { deceasedDate: null, preferredContactMethodId: null } })
+  const cleared = await vgCall('patchPerson', { personId: p.personId }, { token: staff, body: { deceased: false, deceasedDate: null, preferredContactMethodId: null } })
   assert.equal(cleared.json.deceasedDate, null)
   assert.equal(cleared.json.preferredContactMethod, null)
 })

@@ -23,6 +23,7 @@ export function inActivity (n, bucket) {
 }
 
 export function isInactive (row) {
+  if (row.deceased) return true
   return 'status' in row ? row.status !== 'Active' : row.active !== true
 }
 
@@ -52,7 +53,7 @@ export function peopleCsvColumns (nameHeader) {
 }
 
 // Members carry their status word (Dropped, ...); volunteers only a flag.
-export const statusOf = (row) => ('status' in row
+export const statusOf = (row) => row.deceased ? 'Deceased' : ('status' in row
   ? (row.status ?? 'Inactive')
   : (row.active === true ? 'Active' : 'Inactive'))
 

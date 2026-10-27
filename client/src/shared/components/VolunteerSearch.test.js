@@ -50,4 +50,25 @@ describe('VolunteerSearch', () => {
     await fireEvent.keyDown(input, { key: 'Enter' })
     expect(emitted().select[0][0].personId).toBe('3')
   })
+
+  it('deceased candidate is disabled', async () => {
+    const dead = [{ personId: '9', fullName: 'Ghost, Gail', displayName: 'Gail Ghost', village: null, active: true, deceased: true }]
+    const status = (p) => p.deceased ? { disabled: true, reason: 'Deceased' } : { disabled: false, reason: null }
+    const { emitted } = render(VolunteerSearch, { props: { candidates: dead, status }, global: { plugins: [PrimeVue] } })
+    const input = screen.getByRole('combobox')
+    await fireEvent.focus(input)
+    await fireEvent.update(input, 'gh')
+    expect(screen.getByText('Deceased')).toBeInTheDocument()
+    await fireEvent.mouseDown(screen.getByText('Ghost, Gail'))
+    expect(emitted().select).toBeUndefined()
+  })
+
+  it('default meta says Deceased, not Active, for a deceased candidate', async () => {
+    const dead = [{ personId: '9', fullName: 'Ghost, Gail', displayName: 'Gail Ghost', village: null, active: true, deceased: true }]
+    render(VolunteerSearch, { props: { candidates: dead }, global: { plugins: [PrimeVue] } })
+    const input = screen.getByRole('combobox')
+    await fireEvent.focus(input)
+    await fireEvent.update(input, 'gh')
+    expect(screen.getByText('Hub volunteer · Deceased')).toBeInTheDocument()
+  })
 })

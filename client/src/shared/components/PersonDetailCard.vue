@@ -88,6 +88,15 @@ const titleAside = computed(() => [
   props.person.nickname ? `“${props.person.nickname}”` : null,
   props.person.pronouns,
 ].filter(Boolean).join(' · '))
+// The member status tag in the Member Information header. A deceased
+// person's tag says Deceased, whatever the stored status.
+const MEMBER_STATUS_SEVERITY = { Active: 'success', Pending: 'secondary', Dropped: 'warn' }
+const memberStatusTag = computed(() => {
+  if (props.person.deceased) return { value: 'Deceased', severity: 'contrast' }
+  const status = props.person.status
+  return status ? { value: status, severity: MEMBER_STATUS_SEVERITY[status] ?? 'secondary' } : null
+})
+
 const hasContact = computed(() => !!(props.person.email || props.person.phone || props.person.cell
   || props.person.preferredContactMethod))
 
@@ -119,7 +128,7 @@ const copyEmail = async (email) => {
         <div class="title-tags">
           <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
           <Tag v-for="circle in person.circles ?? []" :key="circle.circleId" :value="circle.name" severity="secondary" class="village-tag" />
-          <Tag v-if="person.deceasedDate" value="Deceased" severity="contrast" class="village-tag" />
+          <Tag v-if="person.deceased" value="Deceased" severity="contrast" class="village-tag" />
         </div>
       </div>
     </template>
@@ -185,15 +194,15 @@ const copyEmail = async (email) => {
           </div>
         </div>
 
-        <div v-if="person.birthDate || person.deceasedDate" class="subgroup span-2">
+        <div v-if="person.birthDate || person.deceased" class="subgroup span-2">
           <h4 class="subsection-header">Dates</h4>
           <div v-if="person.birthDate" class="detail-field">
             <span class="label">Birth Date</span>
             <span class="value">{{ person.birthDate }}</span>
           </div>
-          <div v-if="person.deceasedDate" class="detail-field">
+          <div v-if="person.deceased" class="detail-field">
             <span class="label">Deceased Date</span>
-            <span class="value">{{ person.deceasedDate }}</span>
+            <span class="value">{{ person.deceasedDate ?? 'Date unknown' }}</span>
           </div>
         </div>
 
@@ -237,7 +246,10 @@ const copyEmail = async (email) => {
 
       <!-- Member-specific Section -->
       <div v-if="isMember" class="section">
-        <h3 class="section-header">Member Information</h3>
+        <div class="section-header-row">
+          <h3 class="section-header">Member Information</h3>
+          <Tag v-if="memberStatusTag" :value="memberStatusTag.value" :severity="memberStatusTag.severity" class="member-status-tag" />
+        </div>
         <div v-if="person.memberNumber" class="detail-field">
           <span class="label">Member #</span>
           <span class="value">{{ person.memberNumber }}</span>
@@ -273,14 +285,9 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.secondaryType }}</span>
         </div>
 
-        <div v-if="person.status" class="detail-field">
-          <span class="label">Status</span>
-          <span class="value">{{ person.status }}</span>
-        </div>
-
-        <div v-if="person.status === 'Dropped' && person.dropReason" class="detail-field">
+        <div v-if="person.status === 'Dropped' && person.dropReasonName" class="detail-field">
           <span class="label">Drop Reason</span>
-          <span class="value">{{ person.dropReason }}</span>
+          <span class="value">{{ person.dropReasonName }}</span>
         </div>
 
         <div v-if="person.householdSize != null" class="detail-field">
@@ -377,7 +384,7 @@ const copyEmail = async (email) => {
 
         <div v-if="person.active != null" class="detail-field">
           <span class="label">Active</span>
-          <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
+          <span class="value">{{ person.deceased ? 'Deceased' : (person.active ? 'Yes' : 'No') }}</span>
         </div>
         <template v-if="person.vettings?.length">
           <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
@@ -527,6 +534,13 @@ const copyEmail = async (email) => {
   font-size: 1.15rem;
   font-weight: 600;
   color: var(--color-text-primary);
+}
+
+.section-header-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .subgroup {

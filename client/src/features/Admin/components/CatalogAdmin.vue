@@ -1,6 +1,7 @@
 <script setup>
-// Admin list pages for the two volunteer catalogs (UI spec §3). One
-// component, configured by `kind`; positions add Scope and expected trainings.
+// Admin list pages for the catalogs (UI spec §3). One component, configured
+// by `kind`; positions add Scope and expected trainings, drop reasons add a
+// Retired toggle.
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
@@ -13,14 +14,16 @@ import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Tag from 'primevue/tag'
+import Checkbox from 'primevue/checkbox'
 import { getTrainings, createTraining, patchTraining, deleteTraining } from '../../Trainings/api/trainingApi.js'
 import { getPositions, createPosition, patchPosition, deletePosition } from '../../Positions/api/positionApi.js'
+import { getMemberDropReasons, createMemberDropReason, patchMemberDropReason, deleteMemberDropReason } from '../api/dropReasonApi.js'
 import { apiErrorMessage } from '../../../shared/api/apiClient.js'
 import { plural } from '../../../shared/lib.js'
 import { scopeLabel } from '../../../shared/lib/positionRules.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
-const props = defineProps({ kind: { type: String, required: true } }) // 'training' | 'position'
+const props = defineProps({ kind: { type: String, required: true } }) // 'training' | 'position' | 'memberDropReason'
 
 const CONFIG = {
   training: {
@@ -33,15 +36,22 @@ const CONFIG = {
     subtitle: 'Positions record what volunteers do in the organization. They don’t grant access to Village Green; access comes from roles, under Users.',
     create: createPosition, patch: patchPosition, remove: deletePosition,
   },
+  memberDropReason: {
+    title: 'Drop Reasons', singular: 'drop reason', idKey: 'memberDropReasonId', countHeader: 'Members', hasScope: false,
+    holderNoun: 'member', permission: 'drop_reason:admin', hasRetired: true,
+    subtitle: 'The reasons staff can choose when they mark a member Dropped. Retire a reason to stop offering it; members who already have it keep it.',
+    create: createMemberDropReason, patch: patchMemberDropReason, remove: deleteMemberDropReason,
+  },
 }
 const cfg = computed(() => CONFIG[props.kind])
-useRequirePermission(`${props.kind}:admin`)
+useRequirePermission(cfg.value.permission ?? `${props.kind}:admin`)
 
 const confirm = useConfirm()
 const toast = useToast()
 const trainings = ref([])
 const positions = ref([])
-const rows = computed(() => [...(props.kind === 'training' ? trainings.value : positions.value)]
+const dropReasons = ref([])
+const rows = computed(() => [...({ training: trainings, position: positions, memberDropReason: dropReasons }[props.kind].value)]
   .sort((a, b) => a.name.localeCompare(b.name)))
 const trainingName = (id) => trainings.value.find(t => t.trainingId === id)?.name
 const positionsExpecting = (trainingId) => positions.value.filter(p => p.trainingIds.includes(trainingId))
@@ -53,6 +63,7 @@ const allHolders = (row) => (row?.holderCount ?? 0) + (row?.inactiveHolderCount 
 const inactiveNote = (row) => (row?.inactiveHolderCount ? ` (${row.inactiveHolderCount} inactive)` : '')
 
 async function load () {
+  if (props.kind === 'memberDropReason') { dropReasons.value = await getMemberDropReasons(); return }
   const [t, p] = await Promise.all([getTrainings(), getPositions()])
   trainings.value = t
   positions.value = p
@@ -106,10 +117,21 @@ async function saveDialog () {
   }
 }
 
+// ---- retire ----
+async function setRetired (row, retired) {
+  try {
+    await cfg.value.patch(row[cfg.value.idKey], { retired })
+  }
+  catch (err) {
+    toast.add({ severity: 'error', summary: 'Not saved', detail: apiErrorMessage(err, 'Save failed.'), life: 4000 })
+  }
+  await load()
+}
+
 // ---- delete ----
 function deleteReason (row) {
   return allHolders(row) > 0
-    ? `Held by ${plural(allHolders(row), 'volunteer')}${inactiveNote(row)}. Remove it from their records first.`
+    ? `Held by ${plural(allHolders(row), cfg.value.holderNoun ?? 'volunteer')}${inactiveNote(row)}. ${cfg.value.hasRetired ? 'Retire it instead.' : 'Remove it from their records first.'}`
     : `Delete ${row.name}`
 }
 
@@ -117,7 +139,7 @@ function askDelete (row) {
   const linked = props.kind === 'training' ? positionsExpecting(row.trainingId).map(p => p.name) : []
   const tail = linked.length
     ? ` It will also be removed from the expected trainings of ${linked.join(' and ')}.`
-    : ' No volunteer has it, so nothing else changes.'
+    : ` No ${cfg.value.holderNoun ?? 'volunteer'} has it, so nothing else changes.`
   confirm.require({
     header: `Delete ${cfg.value.singular}?`,
     message: `Delete ${row.name}?${tail}`,
@@ -155,7 +177,7 @@ function askDelete (row) {
       <Column header="Description">
         <template #body="{ data }"><span class="dim">{{ data.description || '—' }}</span></template>
       </Column>
-      <Column :header="cfg.hasScope ? 'Expected trainings' : 'Expected for'">
+      <Column v-if="!cfg.hasRetired" :header="cfg.hasScope ? 'Expected trainings' : 'Expected for'">
         <template #body="{ data }">
           <template v-if="cfg.hasScope">
             <Tag v-for="id in data.trainingIds" :key="id" :value="trainingName(id)" severity="secondary" class="chip" />
@@ -165,6 +187,12 @@ function askDelete (row) {
             <Tag v-for="p in positionsExpecting(data.trainingId)" :key="p.positionId" :value="p.name" severity="secondary" class="chip" />
             <span v-if="!positionsExpecting(data.trainingId).length" class="dim">—</span>
           </template>
+        </template>
+      </Column>
+      <Column v-if="cfg.hasRetired" header="Retired">
+        <template #body="{ data }">
+          <Checkbox binary :modelValue="data.retired" :aria-label="`Retired: ${data.name}`"
+                    @update:modelValue="setRetired(data, $event)" />
         </template>
       </Column>
       <Column :header="cfg.countHeader" field="holderCount" class="num">
@@ -194,7 +222,7 @@ function askDelete (row) {
           <small v-if="nameError" class="error">{{ nameError }}</small>
         </div>
         <p v-if="held" class="note">
-          {{ plural(allHolders(editing), 'volunteer') }}{{ inactiveNote(editing) }} {{ allHolders(editing) === 1 ? 'has' : 'have' }} this {{ cfg.singular }}.
+          {{ plural(allHolders(editing), cfg.holderNoun ?? 'volunteer') }}{{ inactiveNote(editing) }} {{ allHolders(editing) === 1 ? 'has' : 'have' }} this {{ cfg.singular }}.
           Updating the name will update every one of their records.
         </p>
         <div v-if="cfg.hasScope" class="field">
@@ -240,6 +268,8 @@ h1 { margin: 0 0 0.25rem; color: var(--color-text-primary); }
 .chip { margin: 0.1rem 0.25rem 0.1rem 0; }
 .row-actions { display: flex; justify-content: flex-end; }
 :deep(.num) { text-align: right; font-variant-numeric: tabular-nums; }
+/* The header's label sits in a flex div, so text-align alone leaves it left. */
+:deep(th.num .p-datatable-column-header-content) { justify-content: flex-end; }
 .dialog-body { display: flex; flex-direction: column; gap: 1rem; }
 .field { display: flex; flex-direction: column; gap: 0.3rem; }
 .field label { font-size: 0.85rem; font-weight: 600; color: var(--color-text-dim); }

@@ -5,7 +5,7 @@ const { catalog, WILDCARD, elevatable, keys } = require('../utils/permissions')
 
 test('catalog keys are domain:action format', () => {
   for (const key of keys) {
-    assert.match(key, /^[a-z]+:[a-z_]+$/, `bad key format: ${key}`)
+    assert.match(key, /^[a-z_]+:[a-z_]+$/, `bad key format: ${key}`)
   }
 })
 

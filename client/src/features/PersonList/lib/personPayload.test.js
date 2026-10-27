@@ -17,7 +17,7 @@ const apiPerson = {
 describe('personFormFromApi', () => {
   it('flattens lookup objects to ids and splits languages into ids + preferred', () => {
     expect(personFormFromApi(apiPerson)).toEqual({
-      suffix: 'Jr.', pronouns: 'he/him', deceasedDate: '',
+      suffix: 'Jr.', pronouns: 'he/him', deceased: false, deceasedDate: '', dateUnknown: false,
       preferredContactMethodId: '2', genderId: '2', ethnicityId: null,
       isVeteran: false, raceIds: ['5'],
       languageIds: ['1', '4'], preferredLanguageId: '4',
@@ -43,11 +43,24 @@ describe('addPersonFields', () => {
 
   it('nulls cleared scalars on edit and omits them on create', () => {
     const edit = addPersonFields({}, emptyPersonFields(), opts())
-    expect(edit).toMatchObject({ suffix: null, pronouns: null, deceasedDate: null, preferredContactMethodId: null, genderId: null, ethnicityId: null, isVeteran: null })
+    expect(edit).toMatchObject({ suffix: null, pronouns: null, deceased: false, deceasedDate: null, preferredContactMethodId: null, genderId: null, ethnicityId: null, isVeteran: null })
     const create = addPersonFields({}, emptyPersonFields(), opts({ isEdit: false }))
-    for (const k of ['suffix', 'pronouns', 'deceasedDate', 'preferredContactMethodId', 'genderId', 'ethnicityId', 'isVeteran']) {
+    for (const k of ['suffix', 'pronouns', 'deceased', 'deceasedDate', 'preferredContactMethodId', 'genderId', 'ethnicityId', 'isVeteran']) {
       expect(k in create).toBe(false)
     }
+  })
+
+  it('sends deceased and deceasedDate together, nulling the date when unticked', () => {
+    const untick = addPersonFields({}, { ...emptyPersonFields(), deceased: false, deceasedDate: '2026-03-04' }, opts())
+    expect(untick).toMatchObject({ deceased: false, deceasedDate: null })
+    const dated = addPersonFields({}, { ...emptyPersonFields(), deceased: true, deceasedDate: '2026-03-04' }, opts())
+    expect(dated).toMatchObject({ deceased: true, deceasedDate: '2026-03-04' })
+    const unknown = addPersonFields({}, { ...emptyPersonFields(), deceased: true, deceasedDate: '2026-03-04', dateUnknown: true }, opts())
+    expect(unknown).toMatchObject({ deceased: true, deceasedDate: null })
+  })
+
+  it('loads a deceased person without a date as Date unknown', () => {
+    expect(personFormFromApi({ deceased: true, deceasedDate: null, languages: [] })).toMatchObject({ deceased: true, dateUnknown: true })
   })
 
   it('omits every demographic key without the permission, even with loaded values', () => {

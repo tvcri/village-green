@@ -68,3 +68,11 @@ describe('buildHoldersPatch', () => {
       .toEqual({ add: [{ personId: '3', villageId: '1', circleId: null }], remove: ['20'] })
   })
 })
+
+describe('candidateStatus — deceased', () => {
+  it('a deceased candidate is disabled with Deceased, ahead of any other reason', () => {
+    const grp = { villageId: '1', circleId: null }
+    expect(candidateStatus({ personId: '9', deceased: true, active: true }, grp, [], [])).toEqual({ disabled: true, reason: 'Deceased' })
+    expect(candidateStatus({ personId: '1', deceased: true }, grp, holders, [])).toEqual({ disabled: true, reason: 'Deceased' })
+  })
+})

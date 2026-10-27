@@ -9,7 +9,7 @@ const AuditService = require('./audit/AuditService')
 
 // Person columns shared with PositionHolderService; `hv` = home village.
 const PERSON_COLUMNS = `CAST(p.id AS CHAR) AS personId, p.fullName, p.displayName,
-  CAST(p.villageId AS CHAR) AS homeVillageId, hv.name AS homeVillageName, v.active`
+  CAST(p.villageId AS CHAR) AS homeVillageId, hv.name AS homeVillageName, v.active, p.deceased`
 
 function personFrom (r) {
   return {
@@ -18,6 +18,7 @@ function personFrom (r) {
     displayName: r.displayName,
     village: r.homeVillageId ? { villageId: r.homeVillageId, name: r.homeVillageName } : null,
     active: r.active,
+    deceased: r.deceased === true,
   }
 }
 
@@ -26,7 +27,7 @@ function scopePredicates ({ villageIdsGranted, includeInactive }) {
   const statements = []
   const binds = []
   if (villageIdsGranted) { statements.push('p.villageId IN (?)'); binds.push(villageIdsGranted) }
-  if (!includeInactive) statements.push('v.active = 1')
+  if (!includeInactive) statements.push('v.active = 1', 'NOT p.deceased')
   return { sql: statements.map(s => ` AND ${s}`).join(''), binds }
 }
 

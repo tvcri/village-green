@@ -42,6 +42,7 @@ DROP TABLE IF EXISTS `active_member`;
  1 AS `createdDate`,
  1 AS `status`,
  1 AS `dropReason`,
+ 1 AS `dropReasonId`,
  1 AS `householdSize`,
  1 AS `householdDues`,
  1 AS `quickbooksKey`,
@@ -61,8 +62,9 @@ DROP TABLE IF EXISTS `active_volunteer`;
  1 AS `id`,
  1 AS `personId`,
  1 AS `providerType`,
+ 1 AS `active`,
  1 AS `notes`,
- 1 AS `active`*/;
+ 1 AS `application`*/;
 
 --
 -- Table structure for table `analytics_events`
@@ -269,8 +271,9 @@ CREATE TABLE `member` (
   `serviceNotes` text,
   `joinDate` date DEFAULT NULL,
   `createdDate` date DEFAULT NULL,
-  `status` varchar(50) DEFAULT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'Pending',
   `dropReason` varchar(100) DEFAULT NULL,
+  `dropReasonId` int DEFAULT NULL,
   `householdSize` tinyint DEFAULT NULL,
   `householdDues` decimal(10,2) DEFAULT NULL,
   `quickbooksKey` varchar(50) DEFAULT NULL,
@@ -282,8 +285,11 @@ CREATE TABLE `member` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `person_id` (`personId`),
   KEY `member_primary_person_fk` (`primaryPersonId`),
+  KEY `member_drop_reason_fk` (`dropReasonId`),
+  CONSTRAINT `member_drop_reason_fk` FOREIGN KEY (`dropReasonId`) REFERENCES `member_drop_reason` (`id`),
   CONSTRAINT `member_ibfk_1` FOREIGN KEY (`personId`) REFERENCES `person` (`id`),
-  CONSTRAINT `member_primary_person_fk` FOREIGN KEY (`primaryPersonId`) REFERENCES `person` (`id`)
+  CONSTRAINT `member_primary_person_fk` FOREIGN KEY (`primaryPersonId`) REFERENCES `person` (`id`),
+  CONSTRAINT `chk_member_drop_reason_status` CHECK (((`dropReasonId` is null) or (`status` = _utf8mb4'Dropped')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -300,6 +306,20 @@ CREATE TABLE `member_circle_preference` (
   KEY `mcp_circle_fk` (`circleId`),
   CONSTRAINT `mcp_circle_fk` FOREIGN KEY (`circleId`) REFERENCES `circle` (`id`),
   CONSTRAINT `mcp_member_fk` FOREIGN KEY (`memberId`) REFERENCES `member` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `member_drop_reason`
+--
+
+DROP TABLE IF EXISTS `member_drop_reason`;
+CREATE TABLE `member_drop_reason` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `retired` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `member_drop_reason_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -354,6 +374,7 @@ CREATE TABLE `person` (
   `smartphone` bit(1) DEFAULT NULL,
   `birthDate` date DEFAULT NULL,
   `deceasedDate` date DEFAULT NULL,
+  `deceased` bit(1) NOT NULL DEFAULT b'0',
   `emergencyContactName` varchar(200) DEFAULT NULL,
   `emergencyContactRelationship` varchar(100) DEFAULT NULL,
   `emergencyContactPhone` varchar(50) DEFAULT NULL,
@@ -373,6 +394,7 @@ CREATE TABLE `person` (
   CONSTRAINT `person_ethnicity_fk` FOREIGN KEY (`ethnicityId`) REFERENCES `ethnicity` (`id`),
   CONSTRAINT `person_gender_fk` FOREIGN KEY (`genderId`) REFERENCES `gender` (`id`),
   CONSTRAINT `person_ibfk_1` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
+  CONSTRAINT `chk_person_deceased_date` CHECK (((`deceasedDate` is null) or (`deceased` = 1))),
   CONSTRAINT `person_first_name_not_blank` CHECK (((`firstName` is null) or (`firstName` <> _utf8mb4''))),
   CONSTRAINT `person_last_name_non_empty` CHECK ((`lastName` <> _utf8mb4''))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -961,7 +983,7 @@ DELIMITER ;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50001 VIEW `active_member` AS select `member`.`id` AS `id`,`member`.`personId` AS `personId`,`member`.`memberNumber` AS `memberNumber`,`member`.`memberLevel` AS `memberLevel`,`member`.`memberType` AS `memberType`,`member`.`primaryPersonId` AS `primaryPersonId`,`member`.`secondaryType` AS `secondaryType`,`member`.`serviceNotes` AS `serviceNotes`,`member`.`joinDate` AS `joinDate`,`member`.`createdDate` AS `createdDate`,`member`.`status` AS `status`,`member`.`dropReason` AS `dropReason`,`member`.`householdSize` AS `householdSize`,`member`.`householdDues` AS `householdDues`,`member`.`quickbooksKey` AS `quickbooksKey`,`member`.`printedNewsletter` AS `printedNewsletter`,`member`.`scNotes` AS `scNotes`,`member`.`statusChangeNotes` AS `statusChangeNotes`,`member`.`miscNotes` AS `miscNotes`,`member`.`application` AS `application` from `member` where (`member`.`status` = 'Active') */;
+/*!50001 VIEW `active_member` AS select `m`.`id` AS `id`,`m`.`personId` AS `personId`,`m`.`memberNumber` AS `memberNumber`,`m`.`memberLevel` AS `memberLevel`,`m`.`memberType` AS `memberType`,`m`.`primaryPersonId` AS `primaryPersonId`,`m`.`secondaryType` AS `secondaryType`,`m`.`serviceNotes` AS `serviceNotes`,`m`.`joinDate` AS `joinDate`,`m`.`createdDate` AS `createdDate`,`m`.`status` AS `status`,`m`.`dropReason` AS `dropReason`,`m`.`dropReasonId` AS `dropReasonId`,`m`.`householdSize` AS `householdSize`,`m`.`householdDues` AS `householdDues`,`m`.`quickbooksKey` AS `quickbooksKey`,`m`.`printedNewsletter` AS `printedNewsletter`,`m`.`scNotes` AS `scNotes`,`m`.`statusChangeNotes` AS `statusChangeNotes`,`m`.`miscNotes` AS `miscNotes`,`m`.`application` AS `application` from (`member` `m` join `person` `p` on((`p`.`id` = `m`.`personId`))) where ((`m`.`status` = 'Active') and (`p`.`deceased` = 0)) */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 
 --
@@ -972,7 +994,7 @@ DELIMITER ;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50001 VIEW `active_volunteer` AS select `volunteer`.`id` AS `id`,`volunteer`.`personId` AS `personId`,`volunteer`.`providerType` AS `providerType`,`volunteer`.`notes` AS `notes`,`volunteer`.`active` AS `active` from `volunteer` where (`volunteer`.`active` = 1) */;
+/*!50001 VIEW `active_volunteer` AS select `v`.`id` AS `id`,`v`.`personId` AS `personId`,`v`.`providerType` AS `providerType`,`v`.`active` AS `active`,`v`.`notes` AS `notes`,`v`.`application` AS `application` from (`volunteer` `v` join `person` `p` on((`p`.`id` = `v`.`personId`))) where ((`v`.`active` = 1) and (`p`.`deceased` = 0)) */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -982,4 +1004,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-06 19:28:11
+-- Dump completed on 2026-10-27 17:43:02

@@ -108,4 +108,26 @@ describe('VolunteerStep', () => {
     const body = createPerson.mock.calls[0][0]
     for (const k of ['genderId', 'ethnicityId', 'isVeteran', 'races']) expect(k in body).toBe(false)
   })
+
+  it('a deceased match is listed without a way to use it', async () => {
+    getPersons.mockResolvedValue([{ personId: '9', fullName: 'Brown, Nicole K.', deceased: true, village: { name: 'Barrington' } }])
+    mount()
+    await screen.findByText(/Brown, Nicole K\./)
+    expect(screen.queryByText('Use This Person')).toBeNull()
+    expect(screen.getByText(/This person is marked deceased/)).toBeInTheDocument()
+    expect(patchVolunteer).not.toHaveBeenCalled()
+  })
+
+  it('a new person ticked Deceased is created without a volunteer role', async () => {
+    getPersons.mockResolvedValue([])
+    const { emitted } = mount()
+    await screen.findByDisplayValue('Brown')
+    await fireEvent.click(screen.getByLabelText('Deceased'))
+    await fireEvent.click(screen.getByLabelText('Date unknown'))
+    await fireEvent.click(screen.getByText('Create Person'))
+    await waitFor(() => expect(createPerson).toHaveBeenCalled())
+    await waitFor(() => expect(emitted()['volunteer-skipped']).toBeTruthy())
+    expect(putVolunteer).not.toHaveBeenCalled()
+    expect(emitted()['volunteer-skipped'][0][0]).toEqual({ personId: '42', fullName: 'Brown, Nicole' })
+  })
 })

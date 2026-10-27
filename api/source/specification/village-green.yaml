@@ -1909,6 +1909,53 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
 
+  /member-drop-reasons:
+    get:
+      summary: List member drop reasons
+      tags: [MemberDropReason]
+      operationId: getMemberDropReasons
+      responses:
+        '200':
+          description: The drop-reason catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MemberDropReason' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a drop reason to the catalog (drop_reason:admin)
+      tags: [MemberDropReason]
+      operationId: createMemberDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReasonCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+
+  /member-drop-reasons/{memberDropReasonId}:
+    parameters: [ { $ref: '#/components/parameters/MemberDropReasonIdPath' } ]
+    patch:
+      summary: Rename, redescribe or retire a drop reason (drop_reason:admin)
+      tags: [MemberDropReason]
+      operationId: patchMemberDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReasonPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+    delete:
+      summary: Remove a drop reason no member uses (drop_reason:admin); 409 when in use
+      tags: [MemberDropReason]
+      operationId: deleteMemberDropReason
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+
   /trainings:
     get:
       summary: List volunteer trainings
@@ -3891,12 +3938,9 @@ components:
           format: date
         status:
           type: string
-          maxLength: 50
-          nullable: true
-        dropReason:
-          type: string
-          maxLength: 100
-          nullable: true
+          enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
         householdSize:
           type: integer
           nullable: true
@@ -3940,8 +3984,9 @@ components:
         secondaryType:   { type: string, maxLength: 50 }
         serviceNotes:    { type: string }
         joinDate:        { type: string, format: date }
-        status:          { type: string, maxLength: 50 }
-        dropReason:      { type: string, maxLength: 100 }
+        status:          { type: string, enum: [Active, Pending, Dropped] }
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
         householdSize:   { type: integer }
         circlePreferences:
           type: array
@@ -4027,12 +4072,13 @@ components:
           nullable: true
         status:
           type: string
-          maxLength: 50
-          nullable: true
-        dropReason:
+          enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
+        dropReasonName:
           type: string
-          maxLength: 100
           nullable: true
+          readOnly: true
         householdSize:
           type: integer
           nullable: true
@@ -4063,6 +4109,7 @@ components:
       type: object
       required:
       - personId
+      - deceased
       - fullName
       - circles
       - disabilities
@@ -4145,6 +4192,11 @@ components:
           type: string
           format: date
           nullable: true
+        deceased:
+          type: boolean
+        openServiceRequestCount:
+          type: integer
+          minimum: 0
         deceasedDate:
           type: string
           format: date
@@ -4224,12 +4276,15 @@ components:
       required:
         - personId
         - fullName
+        - deceased
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
         fullName:
           type: string
           maxLength: 200
+        deceased:
+          type: boolean
         village:
           # Always an object (built inline via JSON_OBJECT), but a villageless
           # (global) person yields null members — a LEFT JOIN with no village.
@@ -4266,6 +4321,7 @@ components:
       additionalProperties: false
       type: object
       required:
+      - deceased
       - circles
       - disabilities
       - languages
@@ -4330,6 +4386,8 @@ components:
           type: string
           format: date
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
@@ -4449,6 +4507,8 @@ components:
           type: string
           maxLength: 30
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
@@ -4559,6 +4619,8 @@ components:
           type: string
           maxLength: 30
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
@@ -5787,6 +5849,7 @@ components:
       - fullName
       - villageId
       - status
+      - deceased
       - count
       - completedRoundTrips
       properties:
@@ -5799,8 +5862,9 @@ components:
           $ref: '#/components/schemas/VillageId'
         status:
           type: string
-          maxLength: 50
-          nullable: true
+          enum: [Active, Pending, Dropped]
+        deceased:
+          type: boolean
         count:
           type: integer
         completedRoundTrips:
@@ -5813,6 +5877,7 @@ components:
       - fullName
       - villageId
       - active
+      - deceased
       - count
       - completedRoundTrips
       properties:
@@ -5824,6 +5889,8 @@ components:
         villageId:
           $ref: '#/components/schemas/VillageIdNullable'
         active:
+          type: boolean
+        deceased:
           type: boolean
         count:
           type: integer
@@ -6029,6 +6096,9 @@ components:
         active:
           type: boolean
           nullable: true
+        deceased:
+          description: Returned by the all-volunteers list only.
+          type: boolean
         village:
           type: object
           nullable: true
@@ -6095,6 +6165,34 @@ components:
       properties:
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
+    MemberDropReasonId:
+      $ref: '#/components/schemas/StringIntId'
+    MemberDropReason:
+      additionalProperties: false
+      type: object
+      required: [ memberDropReasonId, name, description, retired, holderCount ]
+      properties:
+        memberDropReasonId: { $ref: '#/components/schemas/MemberDropReasonId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean, description: Retired reasons stay on existing members but can't be newly chosen }
+        holderCount: { type: integer, minimum: 0, description: Members dropped with this reason }
+    MemberDropReasonCreate:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
+    MemberDropReasonPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
     PositionId:
       $ref: '#/components/schemas/StringIntId'
     PositionScope:
@@ -6143,7 +6241,7 @@ components:
     VolunteerPersonRef:
       additionalProperties: false
       type: object
-      required: [ personId, fullName, displayName, village, active ]
+      required: [ personId, fullName, displayName, village, active, deceased ]
       properties:
         personId: { $ref: '#/components/schemas/PersonId' }
         fullName: { type: string }
@@ -6155,6 +6253,7 @@ components:
             villageId: { $ref: '#/components/schemas/VillageId' }
             name: { type: string }
         active: { type: boolean, nullable: true }
+        deceased: { type: boolean }
     TrainingCompletion:
       additionalProperties: false
       type: object
@@ -6838,6 +6937,12 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/PersonId'
+    MemberDropReasonIdPath:
+      name: memberDropReasonId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/MemberDropReasonId'
     TrainingIdPath:
       name: trainingId
       in: path

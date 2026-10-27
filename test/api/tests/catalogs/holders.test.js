@@ -128,7 +128,7 @@ test('an inactive holder is hidden from holders and holderCount, kept, and back 
 
   const del = await vgCall('deletePosition', { positionId }, { token: admin })
   assert.equal(del.status, 409, 'a hidden holder still blocks delete')
-  assert.match(del.json.detail, /1 of them inactive/)
+  assert.match(del.json.detail, /1 of them inactive or deceased/)
 
   await vgCall('patchPersonVolunteer', { personId: b }, { token: staff, body: { active: true } })
   assert.deepEqual((await holderIds()).sort(), [a, b].sort())

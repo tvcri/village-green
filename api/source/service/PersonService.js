@@ -141,11 +141,19 @@ const RECORD_COLUMNS = [
   'p.suffix',
   'p.displayName',
   'p.pronouns',
+  'p.deceased',
   "DATE_FORMAT(p.deceasedDate, '%Y-%m-%d') AS deceasedDate",
   `${CONTACT_METHOD_OBJECT} AS preferredContactMethod`,
   `${LANGUAGES_SUBQUERY} AS languages`,
   `${CONTACTS_SUBQUERY} AS contacts`,
 ]
+// Open service requests the person is on, as member or as volunteer. Used by
+// getPerson only (the single-person GET), never the list endpoints.
+const OPEN_REQUEST_COUNT_COLUMN = `(
+      SELECT COUNT(*) FROM service_request sr
+      WHERE sr.status IN ('Open', 'Confirmed')
+        AND (sr.memberPersonId = p.id OR sr.volunteerPersonId = p.id)
+    ) AS openServiceRequestCount`
 const RECORD_JOINS = ['LEFT JOIN contact_method cm ON cm.id = p.preferredContactMethodId']
 
 // Gated by person:read_demographics (T3) — omitted, never nulled, like birthDate.
@@ -200,6 +208,7 @@ function detailColumn ({ birthDate, demographics }) {
       'zip', LPAD(p.zip, 5, '0'),
       'town', p.town,
       ${birthDate ? `'birthDate', DATE_FORMAT(p.birthDate, '%Y-%m-%d'),` : ''}
+      'deceased', IF(p.deceased, CAST('true' AS JSON), CAST('false' AS JSON)),
       'deceasedDate', DATE_FORMAT(p.deceasedDate, '%Y-%m-%d'),
       'preferredContactMethod', ${CONTACT_METHOD_OBJECT},
       'languages', ${LANGUAGES_SUBQUERY},
@@ -249,7 +258,8 @@ function memberColumn ({ financial, scNote, inactive }) {
       'joinDate', DATE_FORMAT(m2.joinDate, '%Y-%m-%d'),
       'createdDate', DATE_FORMAT(m2.createdDate, '%Y-%m-%d'),
       'status', m2.status,
-      'dropReason', m2.dropReason,
+      'dropReasonId', CAST(m2.dropReasonId AS CHAR),
+      'dropReasonName', (SELECT mdr.name FROM member_drop_reason mdr WHERE mdr.id = m2.dropReasonId),
       'householdSize', m2.householdSize,
       ${financial ? `'quickbooksKey', m2.quickbooksKey,` : ''}
       'printedNewsletter', m2.printedNewsletter != 0,
@@ -389,16 +399,18 @@ function applicationColumn ({ member, volunteer }) {
 //   application       - { member, volunteer } read_application gates (root object; base tables, never active_* views)
 //   birthDate         - include p.birthDate (person:read_birth_date)
 //   demographics      - include gender/ethnicity/races/isVeteran (person:read_demographics)
+//   openRequestCount  - include openServiceRequestCount (full rows only; getPerson)
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const {
     summary = false, detail = false, member = null, volunteer = null, application = null,
-    birthDate = false, demographics = false
+    birthDate = false, demographics = false, openRequestCount = false
   } = inOptions
 
   const columns = summary
     ? [
       'CAST(p.id AS CHAR) AS personId',
       'p.fullName',
+      'p.deceased',
       VILLAGE_COLUMN,
       ACTIVE_AS_COLUMN,
       `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,
@@ -428,6 +440,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       ...(birthDate ? ["DATE_FORMAT(p.birthDate, '%Y-%m-%d') AS birthDate"] : []),
       ...RECORD_COLUMNS,
       ...(demographics ? DEMOGRAPHICS_COLUMNS : []),
+      ...(openRequestCount ? [OPEN_REQUEST_COUNT_COLUMN] : []),
       VILLAGE_COLUMN,
       ACTIVE_AS_COLUMN,
       CIRCLES_COLUMN,
@@ -556,6 +569,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     {
       birthDate,
       demographics,
+      openRequestCount: true,
       member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
       volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null,
       application: wantsApplication ? { member: memberApplication, volunteer: volunteerApplication } : null
@@ -597,9 +611,22 @@ module.exports.getPersonsByVillage = async function (villageId, userObject) {
   })
 }
 
+// A deceased date is only meaningful while deceased is set (DB CHECK
+// chk_person_deceased_date). Answer 422 here so the CHECK never surfaces as a
+// 500. `stored` is the row as it stands (null on create); `patch` is the
+// incoming person fields.
+function assertDeceasedConsistent (stored, patch) {
+  const deceased = 'deceased' in patch ? patch.deceased : !!stored?.deceased
+  const deceasedDate = 'deceasedDate' in patch ? patch.deceasedDate : stored?.deceasedDate
+  if (deceasedDate != null && !deceased) {
+    throw new SmError.UnprocessableError('A deceased date requires deceased to be true.')
+  }
+}
+
 module.exports.createPerson = async function (body, userId) {
   const { circles, disabilities, races, languages, contacts, ...personFields } = body
   validateSets({ races, languages, contacts })
+  assertDeceasedConsistent(null, personFields)
   const insertId = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       return AuditService.auditUpdate(connection, { entityType: 'person', userId }, async () => {
@@ -634,6 +661,11 @@ module.exports.patchPerson = async function (personId, body, userId) {
   }
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
+      if ('deceased' in personFields || 'deceasedDate' in personFields) {
+        const [[stored]] = await connection.query(
+          'SELECT deceased, deceasedDate FROM person WHERE id = ? FOR UPDATE', [personId])
+        assertDeceasedConsistent(stored, personFields)
+      }
       await AuditService.auditUpdate(connection,
         { entityType: 'person', entityId: personId, userId, action: 'update' }, async () => {
           if (Object.keys(personFields).length > 0) {

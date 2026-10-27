@@ -188,7 +188,7 @@ async function save () {
         <Tag :value="scopeLabel(position.scope)" severity="secondary" />
         <span><b>{{ holders.length }}</b> {{ holders.length === 1 ? 'holder' : 'holders' }}</span>
         <span v-if="position.inactiveHolderCount">
-          {{ position.inactiveHolderCount }} inactive {{ position.inactiveHolderCount === 1 ? 'volunteer keeps' : 'volunteers keep' }} this position, hidden until active again
+          {{ position.inactiveHolderCount }} inactive or deceased {{ position.inactiveHolderCount === 1 ? 'volunteer keeps' : 'volunteers keep' }} this position, hidden
         </span>
         <span v-if="position.trainingIds.length">
           Expects <b>{{ position.trainingIds.map(id => trainingNames.get(id)).join(', ') }}</b>. VG reminds, never blocks.

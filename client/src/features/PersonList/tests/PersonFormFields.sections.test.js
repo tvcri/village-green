@@ -31,7 +31,7 @@ function mount (props = {}) {
 describe('PersonFormFields — 0027 fields', () => {
   it('renders the new Personal Information inputs', () => {
     mount()
-    for (const id of ['suffix', 'pronouns', 'deceasedDate', 'preferredContactMethodId']) {
+    for (const id of ['suffix', 'pronouns', 'preferredContactMethodId']) {
       expect(document.getElementById(id)).not.toBeNull()
     }
   })

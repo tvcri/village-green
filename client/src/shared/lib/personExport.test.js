@@ -63,3 +63,13 @@ describe('personExportValues', () => {
     expect(formatLanguages(undefined)).toBe('')
   })
 })
+
+describe('Deceased column', () => {
+  it('sits immediately before Deceased Date and reads Yes/No', () => {
+    const k = keys(PERSON_EXPORT_COLUMNS)
+    expect(k.indexOf('deceased')).toBe(k.indexOf('deceasedDate') - 1)
+    expect(PERSON_EXPORT_COLUMNS.find(c => c.key === 'deceased').header).toBe('Deceased')
+    expect(personExportValues({ deceased: true }).deceased).toBe('Yes')
+    expect(personExportValues({ deceased: false }).deceased).toBe('No')
+  })
+})

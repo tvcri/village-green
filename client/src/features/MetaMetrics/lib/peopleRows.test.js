@@ -101,3 +101,13 @@ describe('people CSV', () => {
       .toBe('tvcri-people-all-villages-volunteers-2026-01-01-2026-10-21.csv')
   })
 })
+
+describe('deceased rows', () => {
+  it('are labelled Deceased and counted as not active', () => {
+    const m = row({ status: 'Active', deceased: true })
+    const v = row({ active: true, deceased: true })
+    expect(isInactive(m)).toBe(true)
+    expect(isInactive(v)).toBe(true)
+    expect(peopleCsvRows([m, v], new Map()).map(r => r.status)).toEqual(['Deceased', 'Deceased'])
+  })
+})

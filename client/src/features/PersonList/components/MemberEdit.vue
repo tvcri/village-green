@@ -4,11 +4,14 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
+import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import MemberFormFields from './MemberFormFields.vue'
 import { getPerson, getCircles } from '../api/personApi.js'
+import { getMemberDropReasons } from '../../Admin/api/dropReasonApi.js'
 import { putMember, patchMember, deleteMember } from '../api/roleApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
-import { validateMemberForm } from '../lib/memberFormValidation.js'
+import { validateMemberForm, dropReasonSent } from '../lib/memberFormValidation.js'
 import { todayCivilDate } from '../../../shared/lib/civilDate.js'
 
 const router = useRouter()
@@ -28,7 +31,7 @@ const form = reactive({
   // A new grant starts Pending, matching the application import: the welcome
   // email (sent on activation) waits until the status is set Active. An
   // existing member's stored status overwrites this in onMounted.
-  status: 'Pending', dropReason: '', householdSize: null, householdDues: null,
+  status: 'Pending', dropReasonId: null, householdSize: null, householdDues: null,
   quickbooksKey: '', printedNewsletter: false,
   scNotes: '', statusChangeNotes: '', miscNotes: '',
 })
@@ -37,6 +40,12 @@ const primaryPersonName = ref('')
 const original = ref({ ...form })
 const errors = reactive({})
 const allCircles = ref([])
+const dropReasons = ref([])
+// The stored status and reason: validation and the PATCH body compare against
+// them. Empty for a new grant, where Dropped always needs a reason.
+const loaded = computed(() => hasMember.value
+  ? { status: original.value.status, dropReasonId: original.value.dropReasonId }
+  : {})
 const circlePreferences = ref([])
 let originalPreferences = []
 const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x))
@@ -77,6 +86,13 @@ onMounted(async () => {
   catch {
     toast.add({ severity: 'warn', summary: 'Circles unavailable', detail: 'Service preferences cannot be edited right now', life: 3000 })
   }
+  // Like circles, on its own: a failure only blocks choosing a reason.
+  try {
+    dropReasons.value = await getMemberDropReasons()
+  }
+  catch {
+    toast.add({ severity: 'warn', summary: 'Drop reasons unavailable', detail: 'A drop reason cannot be chosen right now', life: 3000 })
+  }
 })
 
 function putPayload () {
@@ -85,6 +101,7 @@ function putPayload () {
     if (v === '' || v === null) return
     out[k] = v
   })
+  if (!dropReasonSent(form, {})) delete out.dropReasonId
   return out
 }
 
@@ -100,11 +117,14 @@ function patchPayload () {
     }
     else out[k] = v
   })
+  // A reason key triggers the API's reason rules: send it only when Dropped
+  // and the reason or status actually changed.
+  if (!dropReasonSent(form, loaded.value)) delete out.dropReasonId
   return out
 }
 
 async function save () {
-  if (!validateMemberForm(form, errors)) {
+  if (!validateMemberForm(form, errors, loaded.value)) {
     toast.add({ severity: 'warn', summary: 'Check the form', detail: 'Fix the highlighted fields', life: 3000 })
     return
   }
@@ -141,7 +161,12 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
   <Card class="detail-card">
     <template #title>Member Role — {{ person?.fullName }}</template>
     <template #content>
-      <div v-if="!hasHomeVillage" class="notice">
+      <Message v-if="person?.deceased" severity="info" :closable="false">
+        {{ DECEASED_ROLE_NOTE }}
+        <Button label="Back" severity="secondary" @click="back" />
+      </Message>
+
+      <div v-else-if="!hasHomeVillage" class="notice">
         Set a home village on the person before granting a member role.
         <Button label="Back" severity="secondary" @click="back" />
       </div>
@@ -156,7 +181,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           v-model:member-level="form.memberLevel"
           v-model:primary-person-id="form.primaryPersonId"
           v-model:join-date="form.joinDate"
-          v-model:drop-reason="form.dropReason"
+          v-model:drop-reason-id="form.dropReasonId"
           v-model:household-size="form.householdSize"
           v-model:household-dues="form.householdDues"
           v-model:quickbooks-key="form.quickbooksKey"
@@ -166,6 +191,8 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
           v-model:status-change-notes="form.statusChangeNotes"
           v-model:misc-notes="form.miscNotes"
           :errors="errors"
+          :drop-reasons="dropReasons"
+          :loaded-drop-reason-id="loaded.dropReasonId"
           :primary-person-name="primaryPersonName"
           primary-person-editable
           :village-id="person?.village?.villageId"

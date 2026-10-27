@@ -174,6 +174,7 @@ const shapes = {
     relatedTables: ['volunteer_training', 'position_training'],
     sets: {},
   },
+  member_drop_reason: { table: 'member_drop_reason', relatedTables: [], sets: {} },
   position: {
     table: 'position',
     relatedTables: ['volunteer_position'],
