@@ -834,6 +834,7 @@ function serverErrorDetail (err) {
 
 const handleSubmit = async (notify = false) => {
   try {
+    if (pauseConflict.value) return
     if (!form.value.villageId) {
       toast.add({ severity: 'error', summary: 'Error', detail: 'Village is required', life: 3000 })
       return

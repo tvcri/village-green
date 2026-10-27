@@ -29,9 +29,15 @@ async function mount (pause = null) {
   await screen.findByText('Pause Volunteer')
   return r
 }
-const windowRadio = () => screen.getByLabelText(/Requests dated in the window only/)
+const windowRadio = () => screen.getByLabelText(/Only requests with a service date in these dates/)
 
 describe('VolunteerPauseDialog', () => {
+  it('renders both scope labels', async () => {
+    await mount(null)
+    expect(screen.getByLabelText('All new-request emails')).toBeInTheDocument()
+    expect(windowRadio()).toBeInTheDocument()
+  })
+
   it('window scope is disabled until both dates are set', async () => {
     await mount({ startDate: '2026-12-01', endDate: null, scope: 'all' })
     expect(windowRadio()).toBeDisabled()

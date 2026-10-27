@@ -1239,6 +1239,25 @@ describe('volunteer pause on the request form', () => {
     expect(saveButton().disabled).toBe(true)
   })
 
+  it('submitting while a pause conflict is set makes no API call', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountCreateWithVolunteers()
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Errand: Shopping'
+    vm.selectedVolunteer = option(vm, '9')
+    vm.form.serviceDate = new Date(2030, 2, 10)
+    await waitFor(() => expect(vm.pauseConflict).toBeTruthy())
+    apiCall.mockClear()
+    await vm.handleSubmit(false)
+    expect(apiCall).not.toHaveBeenCalled()
+
+    // Positive control: the same form submits once the conflict is gone.
+    vm.form.serviceDate = new Date(2030, 3, 2)
+    await waitFor(() => expect(vm.pauseConflict).toBeNull())
+    await vm.handleSubmit(false)
+    await waitFor(() => expect(apiCall).toHaveBeenCalledTimes(1))
+  })
+
   it('error copy is the pause sentence', async () => {
     const vm = await mountCreateWithVolunteers()
     vm.selectedVolunteer = option(vm, '9')

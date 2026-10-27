@@ -66,7 +66,6 @@ const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Volunteer
 <template>
   <Dialog v-model:visible="visible" modal header="Pause Volunteer" :style="{ width: '28rem' }">
     <div class="pause-form">
-      <p class="intro">A paused volunteer is not emailed about new requests and cannot be assigned to a request dated inside the pause.</p>
       <div class="field">
         <label for="pause-start">Start date</label>
         <DatePicker inputId="pause-start" :modelValue="serviceDateToDate(startDate)" dateFormat="mm/dd/yy" showIcon showButtonBar fluid
@@ -82,12 +81,12 @@ const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Volunteer
       <Message v-if="endPassed" severity="warn" :closable="false">The end date has passed, so this pause would have no effect.</Message>
       <fieldset class="scope">
         <legend>Applies to</legend>
-        <label class="radio"><RadioButton v-model="scope" value="all" inputId="pause-scope-all" /> Emails and assignment</label>
-        <small class="help">Stops new-request emails and blocks assignment for requests dated inside the pause.</small>
+        <label class="radio"><RadioButton v-model="scope" value="all" inputId="pause-scope-all" /> All new-request emails</label>
+        <small class="help">No new-request emails while paused. Can't be assigned to requests dated in the pause.</small>
         <label class="radio" :class="{ disabled: !windowAllowed }">
-          <RadioButton v-model="scope" value="window" inputId="pause-scope-window" :disabled="!windowAllowed" /> Requests dated in the window only
+          <RadioButton v-model="scope" value="window" inputId="pause-scope-window" :disabled="!windowAllowed" /> Only requests with a service date in these dates
         </label>
-        <small class="help">Emails keep going; only requests dated between the start and end dates are blocked. Needs both dates.</small>
+        <small class="help">Needs both dates. No emails about requests dated in these dates, and can't be assigned to them.</small>
       </fieldset>
       <Message v-if="errorText" severity="error" :closable="false">{{ errorText }}</Message>
     </div>
@@ -101,7 +100,6 @@ const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Volunteer
 
 <style scoped>
 .pause-form { display: flex; flex-direction: column; gap: 1rem; }
-.intro { margin: 0; color: var(--color-text-dim); }
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
 .help { color: var(--color-text-dim); }
 .scope { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }

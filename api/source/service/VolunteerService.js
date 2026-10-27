@@ -216,7 +216,7 @@ async function readPause (personId) {
 module.exports.putVolunteerPause = async function (personId, { startDate = null, endDate = null, scope }, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const [[vol]] = await connection.query('SELECT id, status FROM volunteer WHERE personId = ?', [personId])
+      const [[vol]] = await connection.query('SELECT id, status FROM volunteer WHERE personId = ? FOR UPDATE', [personId])
       if (!vol) throw new SmError.NotFoundError()
       if (vol.status !== 'Active') throw new SmError.UnprocessableError('Only an Active volunteer can be paused.')
       if (scope === 'window' && (!startDate || !endDate)) {

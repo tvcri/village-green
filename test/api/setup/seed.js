@@ -11,7 +11,7 @@ const TABLES = [
   'enrollment_request',
   'notification_event', 'service_request', 'fcv_submission', 'volunteer_vetting',
   'volunteer_training', 'volunteer_position', 'training', 'position',
-  'volunteer_capability', 'volunteer_village_associate', 'volunteer', 'member_circle_preference', 'member',
+  'volunteer_capability', 'volunteer_village_associate', 'volunteer_pause', 'volunteer', 'member_circle_preference', 'member',
   'person_image', 'person_contact', 'person_language', 'person_race', 'person_circle',
   'person_disability', 'person', 'role_grant', 'user_group_user_map',
   'user_group', 'privacy_acknowledgement', 'privacy_rules', 'user_data', 'village',
