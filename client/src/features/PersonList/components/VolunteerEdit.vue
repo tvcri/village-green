@@ -234,7 +234,7 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
         <VolunteerTrainingsFields v-model:trainings="trainings" v-model:adding="addingTraining" :training-options="trainingOptions" />
         <VolunteerPositionsFields v-model:positions="positions" v-model:adding="addingPosition" :position-options="positionOptions" :home-village="homeVillage"
                                   :associate-village-ids="selectedAssociateVillageIds" :village-options="villageOptions"
-                                  :circle-options="circleOptions" :trainings="trainings" :training-options="trainingOptions" :active="status === 'Active'" />
+                                  :circle-options="circleOptions" :trainings="trainings" :training-options="trainingOptions" :volunteer-active="status === 'Active'" />
 
         <div class="form-footer">
           <span class="footer-note" data-testid="footer-note">{{ footerNote }}</span>

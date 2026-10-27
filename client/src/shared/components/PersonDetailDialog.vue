@@ -5,6 +5,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useAsyncState } from '../composables/useAsyncState.js'
 import { apiCall } from '../api/apiClient.js'
 import PersonDetailCard from './PersonDetailCard.vue'
+import { flattenRoles } from '../lib/roleStatus.js'
 
 defineOptions({ name: 'PersonDetailDialog' })
 
@@ -53,11 +54,7 @@ const flatPerson = computed(() => {
   // roles only. The admin PersonDetail page is where inactive roles appear.
   const { member, volunteer, ...rest } = person.value
   const active = person.value.activeAs ?? []
-  return {
-    ...rest,
-    ...(active.includes('member') ? member : null),
-    ...(active.includes('volunteer') ? volunteer : null),
-  }
+  return flattenRoles(rest, active.includes('member') ? member : null, active.includes('volunteer') ? volunteer : null)
 })
 </script>
 

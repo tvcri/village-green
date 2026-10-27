@@ -24,13 +24,17 @@ describe('holderGroups', () => {
 
 describe('isPositionCandidate', () => {
   const group = { key: '1', label: 'Barrington', villageId: '1', circleId: null }
-  const vol = (over) => ({ personId: '2', village: villages[0], associateVillages: [], active: true, ...over })
+  const vol = (over) => ({ personId: '2', village: villages[0], associateVillages: [], status: 'Active', ...over })
   it('an active volunteer of the village qualifies', () => {
     expect(isPositionCandidate(vol(), group, vPos)).toBe(true)
   })
-  it('an inactive volunteer never does', () => {
-    expect(isPositionCandidate(vol({ active: false }), group, vPos)).toBe(false)
-    expect(isPositionCandidate(vol({ active: false }), { key: 'hub', villageId: null, circleId: null }, { scope: 'federation' })).toBe(false)
+  it('Pending volunteer is not a position candidate', () => {
+    expect(isPositionCandidate(vol({ status: 'Pending' }), group, vPos)).toBe(false)
+    expect(isPositionCandidate(vol({ status: 'Pending' }), { key: 'hub', villageId: null, circleId: null }, { scope: 'federation' })).toBe(false)
+  })
+  it('a Dropped volunteer never is either', () => {
+    expect(isPositionCandidate(vol({ status: 'Dropped' }), group, vPos)).toBe(false)
+    expect(isPositionCandidate(vol({ status: 'Dropped' }), { key: 'hub', villageId: null, circleId: null }, { scope: 'federation' })).toBe(false)
   })
   it('another village does not; an associate village does', () => {
     expect(isPositionCandidate(vol({ village: villages[2] }), group, vPos)).toBe(false)
@@ -72,7 +76,7 @@ describe('buildHoldersPatch', () => {
 describe('candidateStatus — deceased', () => {
   it('a deceased candidate is disabled with Deceased, ahead of any other reason', () => {
     const grp = { villageId: '1', circleId: null }
-    expect(candidateStatus({ personId: '9', deceased: true, active: true }, grp, [], [])).toEqual({ disabled: true, reason: 'Deceased' })
+    expect(candidateStatus({ personId: '9', deceased: true, status: 'Active' }, grp, [], [])).toEqual({ disabled: true, reason: 'Deceased' })
     expect(candidateStatus({ personId: '1', deceased: true }, grp, holders, [])).toEqual({ disabled: true, reason: 'Deceased' })
   })
 })

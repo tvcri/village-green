@@ -34,9 +34,9 @@ import { createSheet } from '../../../shared/services/googleSheetsService.js'
 const barrington = { villageId: '1', name: 'Barrington' }
 const bristol = { villageId: '3', name: 'Bristol-Warren' }
 const warwick = { villageId: '7', name: 'Warwick' }
-const abbott = { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, active: true }
-const silva = { personId: '2', fullName: 'Silva, Maria', displayName: 'Maria Silva', village: warwick, active: true }
-const medeiros = { personId: '8', fullName: 'Medeiros, Anthony', displayName: 'Anthony Medeiros', village: bristol, active: true }
+const abbott = { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, status: 'Active' }
+const silva = { personId: '2', fullName: 'Silva, Maria', displayName: 'Maria Silva', village: warwick, status: 'Active' }
+const medeiros = { personId: '8', fullName: 'Medeiros, Anthony', displayName: 'Anthony Medeiros', village: bristol, status: 'Active' }
 
 const personRow = (p, first, last) => ({
   personId: p.personId,
@@ -70,7 +70,7 @@ beforeEach(() => {
     { volunteerPositionId: '21', village: bristol, circle: null, person: medeiros },
   ])
   getVolunteerRoster.mockResolvedValue([
-    { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, active: true, associateVillages: [] },
+    { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, status: 'Active', associateVillages: [] },
   ])
   getPersons.mockResolvedValue([personRow(abbott, 'Lorraine', 'Abbott'), personRow(silva, 'Maria', 'Silva'), personRow(medeiros, 'Anthony', 'Medeiros')])
   createSheet.mockResolvedValue({ url: 'https://sheet' })

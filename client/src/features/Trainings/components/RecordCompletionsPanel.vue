@@ -61,7 +61,7 @@ function status (p) {
   return attendeeIds.value.includes(p.personId) ? { disabled: true, reason: 'Already in this batch' } : { disabled: false, reason: null }
 }
 function meta (p) {
-  return `${p.village?.name ?? 'Hub volunteer'} · ${p.deceased ? 'Deceased' : (p.active ? 'Active' : 'Inactive')} · ${trainingFlag(p.personId, props.completions, null).text}`
+  return `${p.village?.name ?? 'Hub volunteer'} · ${p.deceased ? 'Deceased' : p.status} · ${trainingFlag(p.personId, props.completions, null).text}`
 }
 function add (p) { attendeeIds.value = [...attendeeIds.value, p.personId] }
 function drop (personId) { attendeeIds.value = attendeeIds.value.filter(id => id !== personId) }
@@ -139,7 +139,7 @@ async function save () {
         <tr v-for="f in flags" :key="f.person.personId" class="adding">
           <td>{{ f.person.fullName }} <Tag value="New" severity="info" /></td>
           <td>{{ f.person.village?.name ?? 'Hub volunteer' }}</td>
-          <td>{{ f.person.deceased ? 'Deceased' : (f.person.active ? 'Active' : 'Inactive') }}</td>
+          <td>{{ f.person.deceased ? 'Deceased' : f.person.status }}</td>
           <td><span :class="['flag', f.training.kind]">{{ f.training.text }}</span></td>
           <td v-if="position"><span :class="['flag', f.position.kind]">{{ f.position.text }}</span></td>
           <td><Button icon="pi pi-times" text rounded :aria-label="`Don’t add ${f.person.displayName}`" @click="drop(f.person.personId)" /></td>

@@ -6,9 +6,9 @@ import PrimeVue from 'primevue/config'
 import VolunteerSearch from './VolunteerSearch.vue'
 
 const candidates = [
-  { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: { villageId: '1', name: 'Barrington' }, active: true },
-  { personId: '2', fullName: 'Delgado, Marcus', displayName: 'Marcus Delgado', village: { villageId: '7', name: 'Warwick' }, active: true },
-  { personId: '3', fullName: 'Quinn, Robert', displayName: 'Robert Quinn', village: null, active: false },
+  { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: { villageId: '1', name: 'Barrington' }, status: 'Active' },
+  { personId: '2', fullName: 'Delgado, Marcus', displayName: 'Marcus Delgado', village: { villageId: '7', name: 'Warwick' }, status: 'Active' },
+  { personId: '3', fullName: 'Quinn, Robert', displayName: 'Robert Quinn', village: null, status: 'Pending' },
 ]
 const opts = (props = {}) => ({ props: { candidates, ...props }, global: { plugins: [PrimeVue] } })
 
@@ -23,7 +23,7 @@ describe('VolunteerSearch', () => {
     expect(screen.queryByRole('option')).toBeNull()
     await fireEvent.update(input, 'qu')
     expect(screen.getByText('Quinn, Robert')).toBeInTheDocument()
-    expect(screen.getByText('Hub volunteer · Inactive')).toBeInTheDocument()
+    expect(screen.getByText('Hub volunteer · Pending')).toBeInTheDocument()
   })
 
   it('emits select on a click and clears the box', async () => {
@@ -52,7 +52,7 @@ describe('VolunteerSearch', () => {
   })
 
   it('deceased candidate is disabled', async () => {
-    const dead = [{ personId: '9', fullName: 'Ghost, Gail', displayName: 'Gail Ghost', village: null, active: true, deceased: true }]
+    const dead = [{ personId: '9', fullName: 'Ghost, Gail', displayName: 'Gail Ghost', village: null, status: 'Active', deceased: true }]
     const status = (p) => p.deceased ? { disabled: true, reason: 'Deceased' } : { disabled: false, reason: null }
     const { emitted } = render(VolunteerSearch, { props: { candidates: dead, status }, global: { plugins: [PrimeVue] } })
     const input = screen.getByRole('combobox')
@@ -64,7 +64,7 @@ describe('VolunteerSearch', () => {
   })
 
   it('default meta says Deceased, not Active, for a deceased candidate', async () => {
-    const dead = [{ personId: '9', fullName: 'Ghost, Gail', displayName: 'Gail Ghost', village: null, active: true, deceased: true }]
+    const dead = [{ personId: '9', fullName: 'Ghost, Gail', displayName: 'Gail Ghost', village: null, status: 'Active', deceased: true }]
     render(VolunteerSearch, { props: { candidates: dead }, global: { plugins: [PrimeVue] } })
     const input = screen.getByRole('combobox')
     await fireEvent.focus(input)

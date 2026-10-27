@@ -9,6 +9,7 @@ import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
+import { flattenRoles } from '../../../shared/lib/roleStatus.js'
 import { deletePerson } from '../api/personApi.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
@@ -50,7 +51,7 @@ const deleteBlockedTip = computed(() => person.value?.deceased
 const flatPerson = computed(() => {
   if (!person.value) return null
   const { member, volunteer, ...rest } = person.value
-  return { ...rest, ...member, ...volunteer }
+  return flattenRoles(rest, member, volunteer)
 })
 
 function goEdit () { router.push({ name: 'meta-person-edit', params: { personId: personId.value } }) }

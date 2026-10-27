@@ -100,8 +100,8 @@ const PERSONS = {
     { personId: '13', fullName: 'Gone, Gus', villageId: '1', status: 'Dropped', count: 2, completedRoundTrips: 0 },
   ],
   volunteers: [
-    { personId: '21', fullName: 'Driver, Dee', villageId: '2', active: true, count: 40, completedRoundTrips: 20 },
-    { personId: '22', fullName: 'Former, Fay', villageId: '1', active: false, count: 1, completedRoundTrips: 0 },
+    { personId: '21', fullName: 'Driver, Dee', villageId: '2', status: 'Active', count: 40, completedRoundTrips: 20 },
+    { personId: '22', fullName: 'Former, Fay', villageId: '1', status: 'Dropped', count: 1, completedRoundTrips: 0 },
   ],
 }
 
@@ -579,7 +579,7 @@ describe('People tab', () => {
     const { container } = await mountLoaded()
     await waitFor(() => expect(memberNames(container).length).toBe(3))
     expect(container.querySelector('.people-members').textContent).toContain('Dropped')
-    expect(container.querySelector('.people-volunteers').textContent).toContain('Inactive')
+    expect(container.querySelector('.people-volunteers').textContent).toContain('Dropped')
   })
 
   it('refetches when the range changes', async () => {

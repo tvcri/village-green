@@ -91,6 +91,9 @@ const titleAside = computed(() => [
 ].filter(Boolean).join(' · '))
 // The member status tag in the Member Information header.
 const memberStatusTag = computed(() => roleStatusTag(props.person.status, props.person.deceased))
+// The volunteer's own (see flattenRoles: a person can be both, so the
+// volunteer's status fields arrive prefixed).
+const volunteerStatusTag = computed(() => roleStatusTag(props.person.volunteerStatus, props.person.deceased))
 
 const hasContact = computed(() => !!(props.person.email || props.person.phone || props.person.cell
   || props.person.preferredContactMethod))
@@ -339,8 +342,19 @@ const copyEmail = async (email) => {
       </div>
 
       <!-- Volunteer-specific Section -->
-      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.positions?.length || person.trainings?.length || person.active != null)" class="section">
-        <h3 class="section-header">Volunteer Information</h3>
+      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.positions?.length || person.trainings?.length || person.volunteerStatus != null)" class="section">
+        <div class="section-header-row">
+          <h3 class="section-header">Volunteer Information</h3>
+          <Tag v-if="volunteerStatusTag" :value="volunteerStatusTag.value" :severity="volunteerStatusTag.severity" class="member-status-tag" />
+        </div>
+        <div v-if="person.volunteerStatus === 'Dropped' && person.volunteerDropReasonName" class="detail-field">
+          <span class="label">Drop Reason</span>
+          <span class="value">{{ person.volunteerDropReasonName }}</span>
+        </div>
+        <div v-if="person.volunteerStatusChangeNotes" class="detail-field notes-field">
+          <span class="label">Status Change Notes</span>
+          <span class="value">{{ person.volunteerStatusChangeNotes }}</span>
+        </div>
         <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities</span>
           <div class="capabilities-list">
@@ -377,10 +391,6 @@ const copyEmail = async (email) => {
           <span class="value">{{ line.text }}</span>
         </div>
 
-        <div v-if="person.active != null" class="detail-field">
-          <span class="label">Active</span>
-          <span class="value">{{ person.deceased ? 'Deceased' : (person.active ? 'Yes' : 'No') }}</span>
-        </div>
         <template v-if="person.vettings?.length">
           <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
             <span class="label">{{ vetting.name }}</span>

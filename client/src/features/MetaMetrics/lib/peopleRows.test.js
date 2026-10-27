@@ -37,9 +37,10 @@ describe('isInactive', () => {
     expect(isInactive(row({ status: 'Dropped' }))).toBe(true)
   })
 
-  it('reads a volunteer from active', () => {
-    expect(isInactive(row({ active: true }))).toBe(false)
-    expect(isInactive(row({ active: false }))).toBe(true)
+  it('reads a volunteer from status too: only Active is active', () => {
+    expect(isInactive(row({ status: 'Active' }))).toBe(false)
+    expect(isInactive(row({ status: 'Pending' }))).toBe(true)
+    expect(isInactive(row({ status: 'Dropped' }))).toBe(true)
   })
 })
 
@@ -78,7 +79,7 @@ describe('people CSV', () => {
   it('carries name, village, status and the doubled completed count', () => {
     const rows = peopleCsvRows([
       row({ fullName: 'Brown, Ann', villageId: '1', status: 'Dropped', count: 3, completedRoundTrips: 1 }),
-      row({ fullName: 'Cole, Cy', villageId: '1', active: true, count: 0 }),
+      row({ fullName: 'Cole, Cy', villageId: '1', status: 'Active', count: 0 }),
     ], names)
     expect(peopleCsvColumns('Member').map(c => c.header)).toEqual(['Member', 'Village', 'Status', 'Completed'])
     expect(rows).toEqual([
@@ -87,8 +88,9 @@ describe('people CSV', () => {
     ])
   })
 
-  it('names an inactive volunteer Inactive', () => {
-    expect(peopleCsvRows([row({ active: false })], names)[0].status).toBe('Inactive')
+  it('volunteer rows carry the status word', () => {
+    expect(peopleCsvRows([row({ status: 'Pending' }), row({ status: 'Dropped' })], names).map(r => r.status))
+      .toEqual(['Pending', 'Dropped'])
   })
 
   it('puts the village, list, bucket and range in the filename', () => {
@@ -105,7 +107,7 @@ describe('people CSV', () => {
 describe('deceased rows', () => {
   it('are labelled Deceased and counted as not active', () => {
     const m = row({ status: 'Active', deceased: true })
-    const v = row({ active: true, deceased: true })
+    const v = row({ status: 'Active', deceased: true })
     expect(isInactive(m)).toBe(true)
     expect(isInactive(v)).toBe(true)
     expect(peopleCsvRows([m, v], new Map()).map(r => r.status)).toEqual(['Deceased', 'Deceased'])

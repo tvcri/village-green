@@ -36,14 +36,24 @@ describe('PersonDetailCard — 0027 fields', () => {
     expect(screen.queryByText('Date unknown')).toBeNull()
   })
 
-  it('a deceased person shows Deceased in place of the member status and volunteer active line', () => {
+  it('a deceased person shows Deceased in place of the member and volunteer status tags', () => {
     mount({ ...base, deceased: true, deceasedDate: null, status: 'Active' }, 'member')
     const header = screen.getByText('Member Information').parentElement
     expect(header.querySelector('.p-tag-label').textContent).toBe('Deceased')
     expect(screen.queryByText('Active')).toBeNull()
     cleanup()
-    mount({ ...base, deceased: true, deceasedDate: null, active: true, capabilities: ['Driving'] }, 'volunteer')
-    expect(screen.getByText('Active').nextElementSibling.textContent).toBe('Deceased')
+    mount({ ...base, deceased: true, deceasedDate: null, volunteerStatus: 'Active', capabilities: ['Driving'] }, 'volunteer')
+    expect(screen.getByText('Volunteer Information').parentElement.querySelector('.p-tag-label').textContent).toBe('Deceased')
+    expect(screen.queryByText('Active')).toBeNull()
+  })
+
+  it('shows the volunteer status as a tag in the Volunteer Information header', () => {
+    mount({ ...base, volunteerStatus: 'Dropped', volunteerDropReasonName: 'Moved', volunteerStatusChangeNotes: 'Called to say so', capabilities: ['Driving'] }, 'volunteer')
+    const header = screen.getByText('Volunteer Information').parentElement
+    expect(header.querySelector('.p-tag-label').textContent).toBe('Dropped')
+    expect(screen.queryByText('Active')).toBeNull()
+    expect(screen.getByText('Drop Reason').nextElementSibling.textContent).toBe('Moved')
+    expect(screen.getByText('Status Change Notes').nextElementSibling.textContent).toBe('Called to say so')
   })
 
   it('shows the member status as a tag in the Member Information header', () => {
@@ -52,6 +62,12 @@ describe('PersonDetailCard — 0027 fields', () => {
     expect(header.querySelector('.p-tag-label').textContent).toBe('Dropped')
     expect(screen.queryByText('Status')).toBeNull()
     expect(screen.getByText('Drop Reason').nextElementSibling.textContent).toBe('Moved')
+  })
+
+  it('a member who is also a volunteer shows each role its own status', () => {
+    mount({ ...base, status: 'Active', volunteerStatus: 'Pending', capabilities: ['Driving'] }, 'member, volunteer')
+    expect(screen.getByText('Member Information').parentElement.querySelector('.p-tag-label').textContent).toBe('Active')
+    expect(screen.getByText('Volunteer Information').parentElement.querySelector('.p-tag-label').textContent).toBe('Pending')
   })
 
   it('lists languages with the preferred one marked', () => {
@@ -148,7 +164,7 @@ describe('PersonDetailCard — household links', () => {
 
 describe('PersonDetailCard — volunteer trainings and positions', () => {
   const volunteerPerson = (extra) => ({
-    personId: '1', firstName: 'Lorraine', lastName: 'Abbott', fullName: 'Abbott, Lorraine', active: true,
+    personId: '1', firstName: 'Lorraine', lastName: 'Abbott', fullName: 'Abbott, Lorraine', volunteerStatus: 'Active',
     capabilities: [], associateVillages: [], vettings: [], ...extra,
   })
 
@@ -172,7 +188,7 @@ describe('PersonDetailCard — volunteer trainings and positions', () => {
   })
 
   it('shows Volunteer Information when positions are the only volunteer data', () => {
-    mount(volunteerPerson({ active: null,
+    mount(volunteerPerson({ volunteerStatus: null,
       positions: [{ volunteerPositionId: '2', positionId: '2', name: 'Board of Directors', scope: 'federation', village: null, circle: null }],
     }), 'volunteer')
     expect(screen.getByText('Volunteer Information')).toBeInTheDocument()
