@@ -28,7 +28,7 @@ const EXPECTED_COLUMNS = {
   role_permission: ['roleId', 'permission'],
   person: ['id', 'villageId', 'firstName', 'lastName', 'street', 'city', 'state', 'zip', 'email', 'phone', 'cell', 'birthDate'],
   member: ['id', 'personId', 'memberNumber', 'status'],
-  volunteer: ['id', 'personId', 'active'],
+  volunteer: ['id', 'personId', 'status'],
   volunteer_capability: ['volunteerId', 'capabilityId'],
   service_request: ['id', 'requestNumber', 'villageId', 'memberPersonId', 'volunteerPersonId',
     'status', 'serviceName', 'destination', 'transportationType', 'createdAt', 'serviceDate', 'finishTime'],
@@ -184,7 +184,7 @@ export async function seed () {
     }
 
     for (const vol of Object.values(volunteers)) {
-      await conn.query('INSERT INTO volunteer (id, personId, active) VALUES (?, ?, ?)', [vol.id, vol.personId, vol.active])
+      await conn.query('INSERT INTO volunteer (id, personId, status) VALUES (?, ?, ?)', [vol.id, vol.personId, vol.status])
     }
 
     for (const vc of volunteerCapabilities) {

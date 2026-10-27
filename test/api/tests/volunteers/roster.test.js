@@ -6,22 +6,22 @@ import { villages } from '../../setup/fixtures.js'
 
 // GET /volunteers feeds the Hub name searches (UI spec §2.4): inactive rows
 // on request (federation read_inactive only), plus village, displayName,
-// active and associateVillages.
+// status and associateVillages.
 const staff = tokens.users.staff
 const scratch = String(villages.scratch.id)
 const quahog = String(villages.quahog.id)
 const uniq = (s) => `${s}${Date.now()}${Math.round(Math.random() * 1e6)}`
 
-async function makeVolunteer (lastName, { villageId = scratch, active = true, associateVillageIds = [] } = {}) {
+async function makeVolunteer (lastName, { villageId = scratch, status = 'Active', associateVillageIds = [] } = {}) {
   const p = await vgCall('createPerson', {}, { token: staff, body: { firstName: 'Roster', lastName, ...(villageId && { villageId }) } })
   assert.equal(p.status, 201)
-  assert.equal((await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { active, associateVillageIds } })).status, 200)
+  assert.equal((await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { status, associateVillageIds } })).status, 200)
   return p.json.personId
 }
 
 test('default roster is active-only; includeInactive adds inactive rows with the new fields', async () => {
   const activeId = await makeVolunteer(uniq('RosterActive'), { associateVillageIds: [quahog] })
-  const inactiveId = await makeVolunteer(uniq('RosterInactive'), { active: false })
+  const inactiveId = await makeVolunteer(uniq('RosterInactive'), { status: 'Dropped' })
 
   const def = await vgCall('getVolunteers', {}, { token: staff })
   assert.equal(def.status, 200)
@@ -32,8 +32,8 @@ test('default roster is active-only; includeInactive adds inactive rows with the
   const a = all.json.find(v => v.personId === activeId)
   const i = all.json.find(v => v.personId === inactiveId)
   assert.ok(i, 'inactive included on request')
-  assert.equal(i.active, false)
-  assert.equal(a.active, true)
+  assert.equal(i.status, 'Dropped')
+  assert.equal(a.status, 'Active')
   assert.equal(a.village.villageId, scratch)
   assert.match(a.displayName, /^Roster /)
   assert.deepEqual(a.associateVillages.map(v => v.villageId), [quahog])
@@ -46,11 +46,11 @@ test('a Hub volunteer has village null', async () => {
 })
 
 test('includeInactive is ignored without volunteer:read_inactive (board)', async () => {
-  const inactiveId = await makeVolunteer(uniq('RosterBoardInactive'), { active: false })
+  const inactiveId = await makeVolunteer(uniq('RosterBoardInactive'), { status: 'Dropped' })
   const res = await vgCall('getVolunteers', { includeInactive: true }, { token: tokens.users.board })
   assert.equal(res.status, 200)
   assert.ok(res.json.length > 0)
-  assert.ok(res.json.every(v => v.active === true), 'only active rows')
+  assert.ok(res.json.every(v => v.status === 'Active'), 'only active rows')
   assert.ok(!res.json.some(v => v.personId === inactiveId), 'inactive volunteer not returned')
 })
 

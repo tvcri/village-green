@@ -5876,7 +5876,7 @@ components:
       - personId
       - fullName
       - villageId
-      - active
+      - status
       - deceased
       - count
       - completedRoundTrips
@@ -5888,8 +5888,9 @@ components:
           maxLength: 200
         villageId:
           $ref: '#/components/schemas/VillageIdNullable'
-        active:
-          type: boolean
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
         deceased:
           type: boolean
         count:
@@ -6093,9 +6094,9 @@ components:
         displayName:
           type: string
           maxLength: 300
-        active:
-          type: boolean
-          nullable: true
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
         deceased:
           description: Returned by the all-volunteers list only.
           type: boolean
@@ -6241,7 +6242,7 @@ components:
     VolunteerPersonRef:
       additionalProperties: false
       type: object
-      required: [ personId, fullName, displayName, village, active, deceased ]
+      required: [ personId, fullName, displayName, village, status, deceased ]
       properties:
         personId: { $ref: '#/components/schemas/PersonId' }
         fullName: { type: string }
@@ -6252,7 +6253,7 @@ components:
           properties:
             villageId: { $ref: '#/components/schemas/VillageId' }
             name: { type: string }
-        active: { type: boolean, nullable: true }
+        status: { type: string, enum: [Active, Pending, Dropped] }
         deceased: { type: boolean }
     TrainingCompletion:
       additionalProperties: false
@@ -6392,9 +6393,9 @@ components:
         notes:
           type: string
           nullable: true
-        active:
-          type: boolean
-          nullable: true
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
         capabilities:
           type: array
           items:
@@ -6479,9 +6480,9 @@ components:
         notes:
           type: string
           nullable: true
-        active:
-          type: boolean
-          nullable: true
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
         capabilityIds:
           type: array
           items: { $ref: '#/components/schemas/CapabilityId' }
@@ -6512,9 +6513,9 @@ components:
         notes:
           type: string
           nullable: true
-        active:
-          type: boolean
-          nullable: true
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
         capabilityIds:
           type: array
           items: { $ref: '#/components/schemas/CapabilityId' }

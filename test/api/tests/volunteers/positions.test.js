@@ -19,7 +19,7 @@ async function makeVolunteer (lastName, { villageId = scratch, associateVillageI
   const body = { firstName: 'Throwaway', lastName, ...(villageId && { villageId }) }
   const p = await vgCall('createPerson', {}, { token: staff, body })
   assert.equal(p.status, 201)
-  const put = await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { active: true, associateVillageIds } })
+  const put = await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { status: 'Active', associateVillageIds } })
   assert.equal(put.status, 200)
   return p.json.personId
 }
@@ -88,7 +88,7 @@ test('unchanged rows keep their id across a PUT that re-sends them', async () =>
   const h = await makePosition('federation')
   const first = await patch(personId, { positions: [{ positionId: h }] })
   const id1 = first.json.volunteer.positions[0].volunteerPositionId
-  const put = await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { active: true, positions: [{ positionId: h }] } })
+  const put = await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { status: 'Active', positions: [{ positionId: h }] } })
   assert.equal(put.json.volunteer.positions[0].volunteerPositionId, id1)
 })
 

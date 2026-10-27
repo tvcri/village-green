@@ -37,7 +37,7 @@ before(() => withDb(async conn => {
   await person(INACTIVE_IDLE, quahog, 'Cleveland', 'Brown')
   await conn.query(`INSERT INTO member (id, personId, memberNumber, status) VALUES
     (80, ?, 'Q-8080', 'Dropped'), (81, ?, 'Q-8081', 'Dropped')`, [DROPPED_ACTIVE, DROPPED_IDLE])
-  await conn.query('INSERT INTO volunteer (id, personId, active) VALUES (82, ?, 0), (83, ?, 0)',
+  await conn.query("INSERT INTO volunteer (id, personId, status) VALUES (82, ?, 'Dropped'), (83, ?, 'Dropped')",
     [INACTIVE_DRIVER, INACTIVE_IDLE])
   const sr = (id, memberPersonId, volunteerPersonId, status, serviceName, transportationType, serviceDate, villageId = quahog) =>
     conn.query(`INSERT INTO service_request
@@ -87,7 +87,7 @@ test('metrics persons: an active volunteer with no activity is listed with count
   const v = byId((await board()).volunteers).get(String(persons.miskatonicVolunteer.id))
   assert.ok(v, 'active idle volunteer missing')
   assert.equal(v.count, 0)
-  assert.equal(v.active, true)
+  assert.equal(v.status, 'Active')
 })
 
 test('metrics persons: a dropped member with activity in range is listed', async () => {
@@ -105,7 +105,7 @@ test('metrics persons: a dropped member with no activity in range is not listed'
 test('metrics persons: an inactive volunteer with activity in range is listed', async () => {
   const v = byId((await board()).volunteers).get(String(INACTIVE_DRIVER))
   assert.ok(v, 'inactive volunteer with activity missing')
-  assert.equal(v.active, false)
+  assert.equal(v.status, 'Dropped')
   assert.equal(v.count, 1)
   assert.equal(v.completedRoundTrips, 1)
 })

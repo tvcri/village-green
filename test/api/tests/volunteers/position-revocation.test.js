@@ -22,7 +22,7 @@ async function setup (lastName) {
   const mk = async (scope) => (await vgCall('createPosition', {}, { token: admin, body: { name: uniq(scope), scope } })).json.positionId
   const atHome = await mk('village'); const atAssoc = await mk('village'); const hub = await mk('federation')
   const put = await vgCall('putPersonVolunteer', { personId }, { token: staff, body: {
-    active: true, associateVillageIds: [quahog],
+    status: 'Active', associateVillageIds: [quahog],
     positions: [{ positionId: atHome, villageId: scratch }, { positionId: atAssoc, villageId: quahog }, { positionId: hub }],
   } })
   assert.equal(put.status, 200)

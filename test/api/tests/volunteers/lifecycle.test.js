@@ -9,7 +9,7 @@ import { villages, persons } from '../../setup/fixtures.js'
 // /persons/{personId}/volunteer. The write endpoints respond with the full
 // Person expanded with the `volunteer` projection (post-#56 property name;
 // volunteerDetail is gone). The list always reads the active_volunteer view
-// (active=1), scoped to the caller's volunteer:read grants — federation
+// (status = 'Active'), scoped to the caller's volunteer:read grants — federation
 // readers see every village; there is no villageId (or elevate) param.
 //
 // Post-#56, volunteer:write lives only at federation scope, so the lifecycle
@@ -86,7 +86,7 @@ test('PUT grants the volunteer role with capabilities', async () => {
   const personId = await makePerson('VPut')
   const { status, json } = await vgCall('putPersonVolunteer', { personId }, {
     token: staff,
-    body: { active: true, capabilityIds: ['1', '5'] }, // Errands, Rides
+    body: { status: 'Active', capabilityIds: ['1', '5'] }, // Errands, Rides
   })
   assert.equal(status, 200)
   assert.equal(json.personId, personId, 'responds with the person')
@@ -98,23 +98,10 @@ test('PUT grants the volunteer role with capabilities', async () => {
   assert.ok(names.includes('VPut, Throwaway'), 'active volunteer appears in GET /volunteers')
 })
 
-test('PUT without `active` leaves the volunteer out of the active list', async () => {
-  // putVolunteer defaults every omitted scalar to null — including active — so
-  // a PUT that only sets capabilities creates a volunteer the active_volunteer
-  // view (active=1) filters out. Surprising but current behavior; pinned here.
-  const personId = await makePerson('VInactive')
-  const { status } = await vgCall('putPersonVolunteer', { personId }, {
-    token: staff, body: { capabilityIds: ['2'] },
-  })
-  assert.equal(status, 200)
-  const names = await listedNames(staff)
-  assert.ok(!names.includes('VInactive, Throwaway'), 'volunteer with active=null is hidden from the list')
-})
-
 test('PATCH replaces the capability set and toggles active-list membership', async () => {
   const personId = await makePerson('VPatch')
   await vgCall('putPersonVolunteer', { personId }, {
-    token: staff, body: { active: true, capabilityIds: ['1'] },
+    token: staff, body: { status: 'Active', capabilityIds: ['1'] },
   })
 
   const patched = await vgCall('patchPersonVolunteer', { personId }, {
@@ -125,7 +112,7 @@ test('PATCH replaces the capability set and toggles active-list membership', asy
   assert.ok((await listedNames(staff)).includes('VPatch, Throwaway'), 'still active')
 
   const deactivated = await vgCall('patchPersonVolunteer', { personId }, {
-    token: staff, body: { active: false },
+    token: staff, body: { status: 'Dropped' },
   })
   assert.equal(deactivated.status, 200)
   assert.ok(!(await listedNames(staff)).includes('VPatch, Throwaway'),
@@ -134,7 +121,7 @@ test('PATCH replaces the capability set and toggles active-list membership', asy
 
 test('PATCH associates villages (echoed in the volunteer projection)', async () => {
   const personId = await makePerson('VAssoc')
-  await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { active: true } })
+  await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { status: 'Active' } })
   const { status, json } = await vgCall('patchPersonVolunteer', { personId }, {
     token: staff,
     body: { associateVillageIds: [String(villages.innsmouth.id)] },
@@ -147,7 +134,7 @@ test('PATCH associates villages (echoed in the volunteer projection)', async () 
 
 test('DELETE revokes the volunteer role; a second DELETE 404s', async () => {
   const personId = await makePerson('VDel')
-  await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { active: true } })
+  await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { status: 'Active' } })
   const del = await vgCall('deletePersonVolunteer', { personId }, { token: staff })
   assert.equal(del.status, 204)
   const again = await vgCall('deletePersonVolunteer', { personId }, { token: staff })
@@ -175,11 +162,11 @@ test('PUT for a person with no home village -> 200 (a Hub volunteer)', async () 
   assert.equal(res.status, 201, 'precondition: villageless person created')
   const personId = res.json.personId
   const put = await vgCall('putPersonVolunteer', { personId }, {
-    token: staff, body: { active: true },
+    token: staff, body: { status: 'Active' },
   })
   assert.equal(put.status, 200)
   assert.equal(put.json.village?.villageId ?? null, null, 'still villageless')
-  assert.equal(put.json.volunteer?.active, true)
+  assert.equal(put.json.volunteer?.status, 'Active')
   const names = await listedNames(staff)
   assert.ok(names.includes('VNoVillage, Throwaway'), 'federation readers list the Hub volunteer')
   await vgCall('deletePersonVolunteer', { personId }, { token: staff })
@@ -192,7 +179,7 @@ test('PUT volunteer by a village user -> 403 (volunteer:write is federation-only
   const id = await makePerson('VCross')
   for (const token of [tokens.users.full_v1, tokens.users.full_v2]) {
     const res = await vgCall('putPersonVolunteer', { personId: id }, {
-      token, body: { active: true },
+      token, body: { status: 'Active' },
     })
     if (res.status === 200) { // regression guard: undo
       await vgCall('deletePersonVolunteer', { personId: id }, { token: staff })

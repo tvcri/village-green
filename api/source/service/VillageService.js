@@ -253,7 +253,7 @@ module.exports.getVolunteers = async function ({ villageIdsGranted, includeInact
     'p.displayName',
     'CAST(vol.id AS CHAR) AS volunteerId',
     'CAST(vol.personId AS CHAR) AS personId',
-    'vol.active',
+    'vol.status',
     'p.deceased AS deceased',
     `(SELECT JSON_OBJECT('villageId', CAST(hv.id AS CHAR), 'name', hv.name) FROM village hv WHERE hv.id = p.villageId) AS village`,
     `COALESCE(CAST(

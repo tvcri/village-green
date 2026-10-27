@@ -298,3 +298,19 @@ test('member contact and GET /user volunteers carry displayName, suffix included
     await withDb(conn => conn.query('UPDATE person SET suffix = NULL WHERE id IN (?)', [ids]))
   }
 })
+
+// ---- a Pending volunteer row carries no VSS identity ----
+
+test('a Pending vssJoe volunteer row loses VSS access', async () => {
+  // Fixtures are shared and order-dependent: set both matching rows Pending,
+  // then restore Active in finally.
+  const personIds = [persons.quahogVolunteer.id, persons.vssHouseholdSibling.id]
+  await withDb(c => c.query("UPDATE volunteer SET status = 'Pending' WHERE personId IN (?)", [personIds]))
+  try {
+    const { status } = await vgCall('getVolunteerRequests', { scope: 'open' }, { token: vssJoe })
+    assert.equal(status, 403)
+  }
+  finally {
+    await withDb(c => c.query("UPDATE volunteer SET status = 'Active' WHERE personId IN (?)", [personIds]))
+  }
+})

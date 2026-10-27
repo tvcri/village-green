@@ -5,13 +5,13 @@ const AuditService = require('./audit/AuditService')
 const volunteerAssignments = require('./volunteerAssignments')
 
 // Ensure a volunteer row exists for the person; return its id.
-async function ensureVolunteer (connection, personId) {
+async function ensureVolunteer (connection, personId, status) {
   const [existing] = await connection.query(
     'SELECT id FROM volunteer WHERE personId = ?', [personId]
   )
   if (existing.length) return existing[0].id
   const [res] = await connection.query(
-    'INSERT INTO volunteer SET ?', { personId }
+    'INSERT INTO volunteer SET ?', status === undefined ? { personId } : { personId, status }
   )
   return res.insertId
 }
@@ -73,7 +73,7 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, active = null, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], trainings = [], positions = [], application } = {}, userObject) {
+module.exports.putVolunteer = async function (personId, { providerType = null, status, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], trainings = [], positions = [], application } = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
@@ -81,10 +81,13 @@ module.exports.putVolunteer = async function (personId, { providerType = null, a
       await AuditService.auditUpdate(connection,
         { entityType: 'volunteer', entityId: preexisting ?? null, userId: userObject.userId },
         async () => {
-          const volunteerId = await ensureVolunteer(connection, personId)
-          await connection.query(
-            'UPDATE volunteer SET providerType = ?, active = ?, notes = ? WHERE id = ?', [providerType, active, notes, volunteerId]
-          )
+          // Insert lets the column default (Pending) apply when status is absent;
+          // an update writes status only when sent, so a PUT without it never
+          // demotes an existing volunteer.
+          const volunteerId = await ensureVolunteer(connection, personId, status)
+          const putFields = { providerType, notes }
+          if (status !== undefined) putFields.status = status
+          await connection.query('UPDATE volunteer SET ? WHERE id = ?', [putFields, volunteerId])
           // Written only when sent: a PUT from the volunteer form (which never
           // carries it) must not null the stored application.
           if (application !== undefined) {
@@ -117,7 +120,7 @@ module.exports.patchVolunteer = async function (personId, body = {}, userObject)
           const volunteerId = await ensureVolunteer(connection, personId)
           const fields = {}
           if (body.providerType !== undefined) fields.providerType = body.providerType
-          if (body.active !== undefined) fields.active = body.active
+          if (body.status !== undefined) fields.status = body.status
           if (body.notes !== undefined) fields.notes = body.notes
           if (body.application !== undefined) fields.application = body.application === null ? null : JSON.stringify(body.application)
           if (Object.keys(fields).length) {

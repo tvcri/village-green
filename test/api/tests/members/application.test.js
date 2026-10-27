@@ -25,7 +25,7 @@ before(async () => {
   await vgCall('putPersonMember', { personId: mid }, { ...staff, body: { memberLevel: 'Household', joinDate: '2026-01-15' } })
   const v = await vgCall('createPerson', {}, { ...staff, body: { villageId: scratch, firstName: 'App', lastName: 'Volunteer' } })
   vid = v.json.personId
-  await vgCall('putPersonVolunteer', { personId: vid }, { ...staff, body: { active: true } })
+  await vgCall('putPersonVolunteer', { personId: vid }, { ...staff, body: { status: 'Active' } })
 })
 
 after(async () => {
@@ -53,7 +53,7 @@ test('a member PUT without application leaves the stored envelope alone', async 
 test('volunteer envelope: PUT without the key keeps it, explicit null clears it', async () => {
   const w = await vgCall('patchPersonVolunteer', { personId: vid }, { ...staff, body: { application: envelope('volunteer', null) } })
   assert.equal(w.status, 200)
-  await vgCall('putPersonVolunteer', { personId: vid }, { ...staff, body: { active: true } })
+  await vgCall('putPersonVolunteer', { personId: vid }, { ...staff, body: { status: 'Active' } })
   assert.deepEqual((await readApp(vid)).json.application.volunteer, envelope('volunteer', null))
   await vgCall('patchPersonVolunteer', { personId: vid }, { ...staff, body: { application: null } })
   assert.equal((await readApp(vid)).json.application.volunteer, null)

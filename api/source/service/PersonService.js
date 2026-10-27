@@ -288,7 +288,7 @@ function volunteerColumn ({ inactive }) {
       'personId', CAST(vol3.personId AS CHAR),
       'providerType', vol3.providerType,
       'notes', vol3.notes,
-      'active', vol3.active != 0,
+      'status', vol3.status,
       'capabilities', (
         SELECT COALESCE(
           CAST(CONCAT('[', GROUP_CONCAT(CONCAT('"', c.name, '"') ORDER BY c.name), ']') AS JSON),

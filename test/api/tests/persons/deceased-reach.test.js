@@ -22,7 +22,7 @@ before(async () => {
   assert.equal(p.status, 201)
   personId = p.json.personId
   assert.equal((await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })).status, 200)
-  assert.equal((await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { active: true } })).status, 200)
+  assert.equal((await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { status: 'Active' } })).status, 200)
   positionId = (await vgCall('createPosition', {}, { token: admin, body: { name: uniq('Reach pos'), scope: 'village' } })).json.positionId
   const add = await vgCall('patchPositionHolders', { positionId }, { token: staff, body: { add: [{ personId, villageId: scratch }] } })
   assert.equal(add.status, 200)

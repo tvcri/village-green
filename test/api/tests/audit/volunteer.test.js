@@ -27,7 +27,7 @@ test('volunteer put(create)/patch/delete audit lifecycle incl. capability set di
   // PUT with no existing row -> action 'create'
   const put = await vgCall('putPersonVolunteer', { personId }, {
     token: tokens.users.staff,
-    body: { providerType: 'Volunteer', active: true, capabilityIds: ['1'] },
+    body: { providerType: 'Volunteer', status: 'Active', capabilityIds: ['1'] },
   })
   assert.equal(put.status, 200)
   const volunteerId = await volunteerIdFor(personId)
@@ -37,13 +37,13 @@ test('volunteer put(create)/patch/delete audit lifecycle incl. capability set di
   assert.equal(rows.length, 1)
   assert.equal(rows[0].action, 'create')
   assert.equal(rows[0].userId, STAFF_ID)
-  assert.equal(rows[0].changes.snapshot.active, true)
+  assert.equal(rows[0].changes.snapshot.status, 'Active')
   assert.ok(Array.isArray(rows[0].changes.snapshot.capabilities), 'capabilities snapshot is an array')
   assert.ok(rows[0].changes.snapshot.capabilities.length > 0, 'capabilities snapshot is non-empty')
   assert.ok(rows[0].changes.snapshot.capabilities.every(c => typeof c === 'string'), 'capabilities are names')
 
   // PATCH clearing capabilities -> set diff has 'removed', no 'added';
-  // unchanged scalar (active) absent from diff
+  // unchanged scalar (status) absent from diff
   const patch = await vgCall('patchPersonVolunteer', { personId }, {
     token: tokens.users.staff, body: { capabilityIds: [] },
   })
@@ -53,7 +53,7 @@ test('volunteer put(create)/patch/delete audit lifecycle incl. capability set di
   assert.equal(rows[1].action, 'update')
   assert.ok(rows[1].changes.diff.capabilities.removed.length >= 1, 'capabilities removed from diff')
   assert.ok(!('added' in rows[1].changes.diff.capabilities), 'no added key when nothing was added')
-  assert.ok(!('active' in rows[1].changes.diff), 'unchanged scalar not in diff')
+  assert.ok(!('status' in rows[1].changes.diff), 'unchanged scalar not in diff')
 
   // no-op: repeat the same patch -> no new row
   const noop = await vgCall('patchPersonVolunteer', { personId }, {
@@ -87,7 +87,7 @@ test('volunteer delete snapshot preserves a non-empty capability set when delete
 
   const put = await vgCall('putPersonVolunteer', { personId }, {
     token: tokens.users.staff,
-    body: { providerType: 'Volunteer', active: true, capabilityIds: ['1'] },
+    body: { providerType: 'Volunteer', status: 'Active', capabilityIds: ['1'] },
   })
   assert.equal(put.status, 200)
   const volunteerId = await volunteerIdFor(personId)
