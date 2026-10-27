@@ -169,4 +169,18 @@ describe('CatalogAdmin — member drop reasons', () => {
     expect(btn).toBeDisabled()
     expect(btn.closest('span').dataset.tip).toBe('Held by 3 members. Remove it from their records first.')
   })
+
+  it('delete confirm for an unheld reason says no member has it', async () => {
+    render(CatalogAdmin, opts('memberDropReason'))
+    await screen.findByText('Health')
+    await fireEvent.click(screen.getByLabelText('Delete Health'))
+    expect(confirmRequire.mock.calls[0][0].message).toBe('Delete Health? No member has it, so nothing else changes.')
+  })
+
+  it('held edit note names members', async () => {
+    render(CatalogAdmin, opts('memberDropReason'))
+    await screen.findByText('Moved away')
+    await fireEvent.click(screen.getByLabelText('Edit Moved away'))
+    expect(await screen.findByText(/3 members have this drop reason\./)).toBeInTheDocument()
+  })
 })

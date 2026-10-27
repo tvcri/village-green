@@ -139,7 +139,7 @@ function askDelete (row) {
   const linked = props.kind === 'training' ? positionsExpecting(row.trainingId).map(p => p.name) : []
   const tail = linked.length
     ? ` It will also be removed from the expected trainings of ${linked.join(' and ')}.`
-    : ' No volunteer has it, so nothing else changes.'
+    : ` No ${cfg.value.holderNoun ?? 'volunteer'} has it, so nothing else changes.`
   confirm.require({
     header: `Delete ${cfg.value.singular}?`,
     message: `Delete ${row.name}?${tail}`,
@@ -222,7 +222,7 @@ function askDelete (row) {
           <small v-if="nameError" class="error">{{ nameError }}</small>
         </div>
         <p v-if="held" class="note">
-          {{ plural(allHolders(editing), 'volunteer') }}{{ inactiveNote(editing) }} {{ allHolders(editing) === 1 ? 'has' : 'have' }} this {{ cfg.singular }}.
+          {{ plural(allHolders(editing), cfg.holderNoun ?? 'volunteer') }}{{ inactiveNote(editing) }} {{ allHolders(editing) === 1 ? 'has' : 'have' }} this {{ cfg.singular }}.
           Updating the name will update every one of their records.
         </p>
         <div v-if="cfg.hasScope" class="field">
