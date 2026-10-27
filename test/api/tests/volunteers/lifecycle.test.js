@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
+import { makeVolunteerDropReason } from '../../lib/dropReason.js'
 import { villages, persons } from '../../setup/fixtures.js'
 
 // GET /volunteers (the only flat volunteer endpoint) plus the volunteer-role
@@ -112,7 +113,7 @@ test('PATCH replaces the capability set and toggles active-list membership', asy
   assert.ok((await listedNames(staff)).includes('VPatch, Throwaway'), 'still active')
 
   const deactivated = await vgCall('patchPersonVolunteer', { personId }, {
-    token: staff, body: { status: 'Dropped' },
+    token: staff, body: { status: 'Dropped', dropReasonId: await makeVolunteerDropReason() },
   })
   assert.equal(deactivated.status, 200)
   assert.ok(!(await listedNames(staff)).includes('VPatch, Throwaway'),

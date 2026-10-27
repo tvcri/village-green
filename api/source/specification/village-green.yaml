@@ -1956,6 +1956,53 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:member ] } ]
 
+  /volunteer-drop-reasons:
+    get:
+      summary: List volunteer drop reasons
+      tags: [VolunteerDropReason]
+      operationId: getVolunteerDropReasons
+      responses:
+        '200':
+          description: The drop-reason catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/VolunteerDropReason' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a drop reason to the catalog (drop_reason:admin)
+      tags: [VolunteerDropReason]
+      operationId: createVolunteerDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerDropReasonCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /volunteer-drop-reasons/{volunteerDropReasonId}:
+    parameters: [ { $ref: '#/components/parameters/VolunteerDropReasonIdPath' } ]
+    patch:
+      summary: Rename, redescribe or retire a drop reason (drop_reason:admin)
+      tags: [VolunteerDropReason]
+      operationId: patchVolunteerDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerDropReasonPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a drop reason no volunteer uses (drop_reason:admin); 409 when in use
+      tags: [VolunteerDropReason]
+      operationId: deleteVolunteerDropReason
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
   /trainings:
     get:
       summary: List volunteer trainings
@@ -6194,6 +6241,34 @@ components:
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
         retired: { type: boolean }
+    VolunteerDropReasonId:
+      $ref: '#/components/schemas/StringIntId'
+    VolunteerDropReason:
+      additionalProperties: false
+      type: object
+      required: [ volunteerDropReasonId, name, description, retired, holderCount ]
+      properties:
+        volunteerDropReasonId: { $ref: '#/components/schemas/VolunteerDropReasonId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean, description: Retired reasons stay on existing volunteers but can't be newly chosen }
+        holderCount: { type: integer, minimum: 0, description: Volunteers dropped with this reason }
+    VolunteerDropReasonCreate:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
+    VolunteerDropReasonPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
     PositionId:
       $ref: '#/components/schemas/StringIntId'
     PositionScope:
@@ -6396,6 +6471,15 @@ components:
         status:
           type: string
           enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
+        dropReasonName:
+          type: string
+          nullable: true
+          readOnly: true
+        statusChangeNotes:
+          type: string
+          nullable: true
         capabilities:
           type: array
           items:
@@ -6483,6 +6567,11 @@ components:
         status:
           type: string
           enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
+        statusChangeNotes:
+          type: string
+          nullable: true
         capabilityIds:
           type: array
           items: { $ref: '#/components/schemas/CapabilityId' }
@@ -6516,6 +6605,11 @@ components:
         status:
           type: string
           enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
+        statusChangeNotes:
+          type: string
+          nullable: true
         capabilityIds:
           type: array
           items: { $ref: '#/components/schemas/CapabilityId' }
@@ -6944,6 +7038,12 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/MemberDropReasonId'
+    VolunteerDropReasonIdPath:
+      name: volunteerDropReasonId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/VolunteerDropReasonId'
     TrainingIdPath:
       name: trainingId
       in: path

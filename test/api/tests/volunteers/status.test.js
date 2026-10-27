@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
+import { makeVolunteerDropReason } from '../../lib/dropReason.js'
 import { villages } from '../../setup/fixtures.js'
 
 // volunteer.status (Active | Pending | Dropped) replaces the old `active` bit.
@@ -45,7 +46,8 @@ test('PATCH moves between all three statuses', async () => {
   const personId = await makePerson('SMove')
   await vgCall('putPersonVolunteer', { personId }, { token: staff, body: {} })
   const set = async (status) => {
-    const res = await vgCall('patchPersonVolunteer', { personId }, { token: staff, body: { status } })
+    const body = status === 'Dropped' ? { status, dropReasonId: await makeVolunteerDropReason() } : { status }
+    const res = await vgCall('patchPersonVolunteer', { personId }, { token: staff, body })
     assert.equal(res.status, 200)
     assert.equal(res.json.volunteer.status, status)
     return (await listedNames()).includes('SMove, Throwaway')

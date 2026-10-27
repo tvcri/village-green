@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
+import { makeVolunteerDropReason } from '../../lib/dropReason.js'
 import { villages, users } from '../../setup/fixtures.js'
 import { withDb } from '../../lib/db.js'
 import { auditRows } from '../audit/lib.js'
@@ -115,7 +116,7 @@ test('an inactive holder is hidden from holders and holderCount, kept, and back 
   const counts = async () => (await vgCall('getPositions', {}, { token: staff })).json.find(p => p.positionId === positionId)
   const holderIds = async () => (await vgCall('getPositionHolders', { positionId }, { token: staff })).json.map(h => h.person.personId)
 
-  assert.equal((await vgCall('patchPersonVolunteer', { personId: b }, { token: staff, body: { status: 'Dropped' } })).status, 200)
+  assert.equal((await vgCall('patchPersonVolunteer', { personId: b }, { token: staff, body: { status: 'Dropped', dropReasonId: await makeVolunteerDropReason() } })).status, 200)
   assert.deepEqual(await holderIds(), [a])
   // ...unless asked for: the record-completions panel must know who holds it.
   const all = (await vgCall('getPositionHolders', { positionId, includeInactive: true }, { token: staff })).json

@@ -289,6 +289,9 @@ function volunteerColumn ({ inactive }) {
       'providerType', vol3.providerType,
       'notes', vol3.notes,
       'status', vol3.status,
+      'dropReasonId', CAST(vol3.dropReasonId AS CHAR),
+      'dropReasonName', (SELECT vdr.name FROM volunteer_drop_reason vdr WHERE vdr.id = vol3.dropReasonId),
+      'statusChangeNotes', vol3.statusChangeNotes,
       'capabilities', (
         SELECT COALESCE(
           CAST(CONCAT('[', GROUP_CONCAT(CONCAT('"', c.name, '"') ORDER BY c.name), ']') AS JSON),

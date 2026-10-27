@@ -3,6 +3,7 @@ const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
 const AuditService = require('./audit/AuditService')
 const volunteerAssignments = require('./volunteerAssignments')
+const { applyDropReasonRules } = require('./dropReasonRules')
 
 // Ensure a volunteer row exists for the person; return its id.
 async function ensureVolunteer (connection, personId, status) {
@@ -73,11 +74,17 @@ module.exports.volunteerExists = async function (personId) {
 }
 
 // Grant or fully replace the volunteer role (capabilities + associates wholesale).
-module.exports.putVolunteer = async function (personId, { providerType = null, status, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], trainings = [], positions = [], application } = {}, userObject) {
+module.exports.putVolunteer = async function (personId, { providerType = null, status, dropReasonId, statusChangeNotes, notes = null, capabilityIds = [], associateVillageIds = [], vettings = [], trainings = [], positions = [], application } = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
+      const [pre] = await connection.query(
+        'SELECT id, status, CAST(dropReasonId AS CHAR) AS dropReasonId FROM volunteer WHERE personId = ?', [personId])
       const preexisting = pre[0]?.id
+      // Drop-reason fields follow the same rule as status: written only when sent.
+      const dropFields = {}
+      if (status !== undefined) dropFields.status = status
+      if (dropReasonId !== undefined) dropFields.dropReasonId = dropReasonId
+      await applyDropReasonRules(pre[0], dropFields, connection, 'volunteer_drop_reason')
       await AuditService.auditUpdate(connection,
         { entityType: 'volunteer', entityId: preexisting ?? null, userId: userObject.userId },
         async () => {
@@ -87,6 +94,8 @@ module.exports.putVolunteer = async function (personId, { providerType = null, s
           const volunteerId = await ensureVolunteer(connection, personId, status)
           const putFields = { providerType, notes }
           if (status !== undefined) putFields.status = status
+          if ('dropReasonId' in dropFields) putFields.dropReasonId = dropFields.dropReasonId
+          if (statusChangeNotes !== undefined) putFields.statusChangeNotes = statusChangeNotes
           await connection.query('UPDATE volunteer SET ? WHERE id = ?', [putFields, volunteerId])
           // Written only when sent: a PUT from the volunteer form (which never
           // carries it) must not null the stored application.
@@ -112,15 +121,19 @@ module.exports.putVolunteer = async function (personId, { providerType = null, s
 module.exports.patchVolunteer = async function (personId, body = {}, userObject) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const [pre] = await connection.query('SELECT id FROM volunteer WHERE personId = ?', [personId])
+      const [pre] = await connection.query(
+        'SELECT id, status, CAST(dropReasonId AS CHAR) AS dropReasonId FROM volunteer WHERE personId = ?', [personId])
       const preexisting = pre[0]?.id
+      const fields = {}
+      if (body.providerType !== undefined) fields.providerType = body.providerType
+      if (body.status !== undefined) fields.status = body.status
+      if (body.dropReasonId !== undefined) fields.dropReasonId = body.dropReasonId
+      if (body.statusChangeNotes !== undefined) fields.statusChangeNotes = body.statusChangeNotes
+      await applyDropReasonRules(pre[0], fields, connection, 'volunteer_drop_reason')
       await AuditService.auditUpdate(connection,
         { entityType: 'volunteer', entityId: preexisting ?? null, userId: userObject.userId },
         async () => {
           const volunteerId = await ensureVolunteer(connection, personId)
-          const fields = {}
-          if (body.providerType !== undefined) fields.providerType = body.providerType
-          if (body.status !== undefined) fields.status = body.status
           if (body.notes !== undefined) fields.notes = body.notes
           if (body.application !== undefined) fields.application = body.application === null ? null : JSON.stringify(body.application)
           if (Object.keys(fields).length) {

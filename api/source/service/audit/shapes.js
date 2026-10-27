@@ -175,6 +175,7 @@ const shapes = {
     sets: {},
   },
   member_drop_reason: { table: 'member_drop_reason', relatedTables: [], sets: {} },
+  volunteer_drop_reason: { table: 'volunteer_drop_reason', relatedTables: [], sets: {} },
   position: {
     table: 'position',
     relatedTables: ['volunteer_position'],

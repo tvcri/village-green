@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
+import { makeVolunteerDropReason } from '../../lib/dropReason.js'
 import { villages } from '../../setup/fixtures.js'
 
 // GET /volunteers feeds the Hub name searches (UI spec §2.4): inactive rows
@@ -15,7 +16,8 @@ const uniq = (s) => `${s}${Date.now()}${Math.round(Math.random() * 1e6)}`
 async function makeVolunteer (lastName, { villageId = scratch, status = 'Active', associateVillageIds = [] } = {}) {
   const p = await vgCall('createPerson', {}, { token: staff, body: { firstName: 'Roster', lastName, ...(villageId && { villageId }) } })
   assert.equal(p.status, 201)
-  assert.equal((await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { status, associateVillageIds } })).status, 200)
+  const dropReasonId = status === 'Dropped' ? await makeVolunteerDropReason() : undefined
+  assert.equal((await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { status, dropReasonId, associateVillageIds } })).status, 200)
   return p.json.personId
 }
 
