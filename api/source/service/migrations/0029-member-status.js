@@ -13,6 +13,10 @@ const MigrationHandler = require('./lib/MigrationHandler')
 // a Dropped row). "Dropped implies a reason" cannot be a CHECK because legacy
 // dropped members have none; the service enforces it on write.
 //
+// member.status is never NULL: Pending is the default for a member created
+// without one. Prod has no NULL statuses; if one existed, the MODIFY fails in
+// strict mode rather than inventing a status.
+//
 // member.dropReason (legacy text) stays in the table, untouched by the API.
 // The views keep the column list the previous SELECT * views exposed; MySQL
 // expands m.* / v.* at creation time.
@@ -35,6 +39,7 @@ const upMigration = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
 
   `ALTER TABLE member
+     MODIFY status varchar(50) NOT NULL DEFAULT 'Pending',
      ADD COLUMN dropReasonId int NULL AFTER dropReason,
      ADD CONSTRAINT member_drop_reason_fk FOREIGN KEY (dropReasonId) REFERENCES member_drop_reason (id),
      ADD CONSTRAINT chk_member_drop_reason_status CHECK (dropReasonId IS NULL OR status = 'Dropped')`,
@@ -48,17 +53,21 @@ const upMigration = [
      WHERE v.active = 1 AND p.deceased = 0`,
 ]
 
+// The views are recreated LAST: SELECT * is expanded at creation, so a view
+// rebuilt while member.dropReasonId still exists keeps that column and breaks
+// when it is dropped.
 const downMigration = [
-  `CREATE OR REPLACE VIEW active_member AS SELECT * FROM member WHERE status = 'Active'`,
-  `CREATE OR REPLACE VIEW active_volunteer AS SELECT * FROM volunteer WHERE active = 1`,
-
   `ALTER TABLE member DROP CHECK chk_member_drop_reason_status`,
   `ALTER TABLE member DROP FOREIGN KEY member_drop_reason_fk`,
   `ALTER TABLE member DROP COLUMN dropReasonId`,
+  `ALTER TABLE member MODIFY status varchar(50) DEFAULT NULL`,
   `DROP TABLE member_drop_reason`,
 
   `ALTER TABLE person DROP CHECK chk_person_deceased_date`,
   `ALTER TABLE person DROP COLUMN deceased`,
+
+  `CREATE OR REPLACE VIEW active_member AS SELECT * FROM member WHERE status = 'Active'`,
+  `CREATE OR REPLACE VIEW active_volunteer AS SELECT * FROM volunteer WHERE active = 1`,
 ]
 
 const migrationHandler = new MigrationHandler(upMigration, downMigration)

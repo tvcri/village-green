@@ -271,7 +271,7 @@ CREATE TABLE `member` (
   `serviceNotes` text,
   `joinDate` date DEFAULT NULL,
   `createdDate` date DEFAULT NULL,
-  `status` varchar(50) DEFAULT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'Pending',
   `dropReason` varchar(100) DEFAULT NULL,
   `dropReasonId` int DEFAULT NULL,
   `householdSize` tinyint DEFAULT NULL,
@@ -1004,4 +1004,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-26 23:24:19
+-- Dump completed on 2026-10-27 17:43:02

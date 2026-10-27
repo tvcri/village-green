@@ -4072,8 +4072,7 @@ components:
           nullable: true
         status:
           type: string
-          maxLength: 50
-          nullable: true
+          enum: [Active, Pending, Dropped]
         dropReasonId:
           $ref: '#/components/schemas/StringIntIdNullable'
         dropReasonName:
@@ -5863,8 +5862,7 @@ components:
           $ref: '#/components/schemas/VillageId'
         status:
           type: string
-          maxLength: 50
-          nullable: true
+          enum: [Active, Pending, Dropped]
         deceased:
           type: boolean
         count:
