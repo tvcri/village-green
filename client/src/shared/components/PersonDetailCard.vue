@@ -4,7 +4,8 @@ import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import { roleStatusTag } from '../lib/roleStatus.js'
 import PersonMap from '../../components/PersonMap.vue'
-import { formatCivilDate } from '../lib/civilDate.js'
+import { formatCivilDate, todayCivilDateIn } from '../lib/civilDate.js'
+import { PAUSE_TIME_ZONE, pauseTag } from '../lib/volunteerPause.js'
 import { positionPlace } from '../lib/positionRules.js'
 
 const props = defineProps({
@@ -94,6 +95,11 @@ const memberStatusTag = computed(() => roleStatusTag(props.person.status, props.
 // The volunteer's own (see flattenRoles: a person can be both, so the
 // volunteer's status fields arrive prefixed).
 const volunteerStatusTag = computed(() => roleStatusTag(props.person.volunteerStatus, props.person.deceased))
+
+// New-request emails: only an Active volunteer can be paused. The wording is
+// computed against the Eastern civil date the server uses for pause rules.
+const showPauseRow = computed(() => props.person.volunteerStatus === 'Active' && !props.person.deceased)
+const pauseText = computed(() => pauseTag(props.person.pause, todayCivilDateIn(PAUSE_TIME_ZONE)) ?? 'Sending')
 
 const hasContact = computed(() => !!(props.person.email || props.person.phone || props.person.cell
   || props.person.preferredContactMethod))
@@ -355,6 +361,13 @@ const copyEmail = async (email) => {
           <span class="label">Status Change Notes</span>
           <span class="value">{{ person.volunteerStatusChangeNotes }}</span>
         </div>
+        <div v-if="showPauseRow" class="detail-field">
+          <span class="label">New-request emails</span>
+          <span class="value pause-row">
+            {{ pauseText }}
+            <slot name="volunteer-pause-actions" />
+          </span>
+        </div>
         <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities</span>
           <div class="capabilities-list">
@@ -509,6 +522,13 @@ const copyEmail = async (email) => {
 .detail-field .label {
   font-size: 0.75rem;
   color: var(--color-text-dim);
+}
+
+.pause-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
 }
 
 .value {

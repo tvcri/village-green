@@ -39,3 +39,12 @@ describe('flattenRoles', () => {
     expect(flat.volunteerStatus).toBe('Dropped')
   })
 })
+
+describe('flattenRoles — pause', () => {
+  it('passes the volunteer pause through under its own name', () => {
+    const pause = { startDate: null, endDate: null, scope: 'all' }
+    const out = flattenRoles({ personId: '5' }, { status: 'Active' }, { status: 'Active', pause })
+    expect(out.pause).toEqual(pause)
+    expect(out.status).toBe('Active')
+  })
+})

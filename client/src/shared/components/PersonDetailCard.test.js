@@ -194,3 +194,41 @@ describe('PersonDetailCard — volunteer trainings and positions', () => {
     expect(screen.getByText('Volunteer Information')).toBeInTheDocument()
   })
 })
+
+describe('PersonDetailCard — New-request emails row', () => {
+  const vol = { ...base, volunteerStatus: 'Active', capabilities: ['Driving'] }
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-20T15:00:00Z')) })
+  afterEach(() => vi.useRealTimers())
+
+  it('shows Sending for an unpaused Active volunteer', () => {
+    mount({ ...vol, pause: null }, 'volunteer')
+    expect(screen.getByText('New-request emails').nextElementSibling.textContent.trim()).toBe('Sending')
+  })
+
+  it('shows the pause wording', () => {
+    mount({ ...vol, pause: { startDate: '2026-12-01', endDate: '2026-12-15', scope: 'window' } }, 'volunteer')
+    expect(screen.getByText('New-request emails').nextElementSibling.textContent.trim()).toBe('Paused Dec 1–15')
+  })
+
+  it('reads Sending once the pause has expired', () => {
+    mount({ ...vol, pause: { startDate: null, endDate: '2026-11-19', scope: 'all' } }, 'volunteer')
+    expect(screen.getByText('New-request emails').nextElementSibling.textContent.trim()).toBe('Sending')
+  })
+
+  it('hides the row for a Dropped volunteer and a deceased person', () => {
+    mount({ ...vol, volunteerStatus: 'Dropped' }, 'volunteer')
+    expect(screen.queryByText('New-request emails')).toBeNull()
+    cleanup()
+    mount({ ...vol, deceased: true }, 'volunteer')
+    expect(screen.queryByText('New-request emails')).toBeNull()
+  })
+
+  it('renders the volunteer-pause-actions slot', () => {
+    render(PersonDetailCard, {
+      props: { person: vol, personType: 'volunteer' },
+      slots: { 'volunteer-pause-actions': '<button>Pause…</button>' },
+      global: { plugins: [PrimeVue] }
+    })
+    expect(screen.getByRole('button', { name: 'Pause…' })).toBeInTheDocument()
+  })
+})

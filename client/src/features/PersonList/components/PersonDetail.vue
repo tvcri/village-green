@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
@@ -11,6 +11,10 @@ import { apiCall } from '../../../shared/api/apiClient.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
 import { flattenRoles } from '../../../shared/lib/roleStatus.js'
 import { deletePerson } from '../api/personApi.js'
+import { deleteVolunteerPause } from '../api/roleApi.js'
+import VolunteerPauseDialog from './VolunteerPauseDialog.vue'
+import { PAUSE_TIME_ZONE, pauseState } from '../../../shared/lib/volunteerPause.js'
+import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const route = useRoute()
@@ -23,7 +27,7 @@ const canWriteMember = computed(() => hasPermission('member:write'))
 const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const personId = computed(() => route.params.personId)
 
-const { state: person } = useAsyncState(
+const { state: person, execute: refresh } = useAsyncState(
   () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] }),
   { immediate: true }
 )
@@ -53,6 +57,34 @@ const flatPerson = computed(() => {
   const { member, volunteer, ...rest } = person.value
   return flattenRoles(rest, member, volunteer)
 })
+
+// New-request emails row (Volunteer Information panel). A scheduled or active
+// pause offers Change + Unpause; none or expired offers Pause….
+const pauseDialogOpen = ref(false)
+const hasLivePause = computed(() => {
+  const s = pauseState(person.value?.volunteer?.pause ?? null, todayCivilDateIn(PAUSE_TIME_ZONE))
+  return s === 'scheduled' || s === 'active'
+})
+
+function unpauseVolunteer () {
+  confirm.require({
+    header: 'Unpause Volunteer',
+    message: 'Unpause this volunteer? They will be emailed about new requests and can be assigned again.',
+    acceptLabel: 'Unpause',
+    rejectLabel: 'Cancel',
+    rejectProps: { severity: 'secondary' },
+    accept: async () => {
+      try {
+        await deleteVolunteerPause(personId.value)
+        toast.add({ severity: 'success', summary: 'Volunteer unpaused', life: 2000 })
+        await refresh()
+      }
+      catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to unpause', life: 3000 })
+      }
+    }
+  })
+}
 
 function goEdit () { router.push({ name: 'meta-person-edit', params: { personId: personId.value } }) }
 function goMember () { router.push({ name: 'meta-person-member', params: { personId: personId.value } }) }
@@ -105,6 +137,21 @@ function removePerson () {
       :person-type="personType"
       :has-member-detail="hasMemberDetail"
       :has-volunteer-detail="hasVolunteerDetail"
+    >
+      <template v-if="canWriteVolunteer" #volunteer-pause-actions>
+        <Button v-if="!hasLivePause" label="Pause…" link size="small" @click="pauseDialogOpen = true" />
+        <template v-else>
+          <Button label="Change" link size="small" @click="pauseDialogOpen = true" />
+          <Button label="Unpause" link size="small" @click="unpauseVolunteer" />
+        </template>
+      </template>
+    </PersonDetailCard>
+    <VolunteerPauseDialog
+      v-if="canWriteVolunteer && person"
+      v-model:visible="pauseDialogOpen"
+      :person-id="String(personId)"
+      :pause="hasLivePause ? person.volunteer.pause : null"
+      @saved="refresh"
     />
   </div>
 </template>
