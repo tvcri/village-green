@@ -90,3 +90,14 @@ test('open request count', async () => {
   const after = await vgCall('getPerson', { personId: p.personId }, { token: staff })
   assert.equal(after.json.openServiceRequestCount, 1)
 })
+
+test('getPersons summary rows carry deceased', async () => {
+  const { json: p } = await makePerson('DecSummary')
+  assert.equal((await patch(p.personId, { deceased: true })).status, 200)
+  const { status, json } = await vgCall('getPersons', { lastName: 'DecSummary' }, { token: staff })
+  assert.equal(status, 200)
+  const row = json.find(r => r.personId === p.personId)
+  assert.ok(row, 'summary row found')
+  assert.strictEqual(row.deceased, true)
+  assert.ok(json.every(r => typeof r.deceased === 'boolean'), 'every summary row has a boolean deceased')
+})

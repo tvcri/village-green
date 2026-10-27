@@ -4277,12 +4277,15 @@ components:
       required:
         - personId
         - fullName
+        - deceased
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
         fullName:
           type: string
           maxLength: 200
+        deceased:
+          type: boolean
         village:
           # Always an object (built inline via JSON_OBJECT), but a villageless
           # (global) person yields null members — a LEFT JOIN with no village.

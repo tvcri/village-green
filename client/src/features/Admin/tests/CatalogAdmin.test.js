@@ -167,7 +167,7 @@ describe('CatalogAdmin — member drop reasons', () => {
     await screen.findByText('Moved away')
     const btn = screen.getByLabelText('Delete Moved away')
     expect(btn).toBeDisabled()
-    expect(btn.closest('span').dataset.tip).toBe('Held by 3 members. Remove it from their records first.')
+    expect(btn.closest('span').dataset.tip).toBe('Held by 3 members. Retire it instead.')
   })
 
   it('delete confirm for an unheld reason says no member has it', async () => {

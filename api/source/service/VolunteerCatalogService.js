@@ -42,7 +42,7 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label, me
     const [[row]] = await connection.query(
       `SELECT COUNT(DISTINCT j.volunteerId) AS n${hasScope ? `, COUNT(DISTINCT IF(${positionShownSql('v')}, NULL, j.volunteerId)) AS hidden` : ''}
        FROM \`${junction}\` j JOIN volunteer v ON v.id = j.volunteerId WHERE j.${entityType}Id = ?`, [id])
-    return { n: row.n, phrase: `${row.n} volunteer(s)${row.hidden ? `, ${row.hidden} of them inactive` : ''}` }
+    return { n: row.n, phrase: `${row.n} volunteer(s)${row.hidden ? `, ${row.hidden} of them inactive or deceased` : ''}` }
   }
 
   // Full replace of a position's expected trainings. Runs inside the
@@ -123,7 +123,7 @@ function makeCatalog ({ table, idName, junction, entityType, hasScope, label, me
           const h = await holders(connection, id)
           if (h.n > 0) {
             throw new SmError.ConflictError(
-              `This ${label} is held by ${h.phrase}. Remove it from them first, or rename it instead.`)
+              `This ${label} is held by ${h.phrase}. ${memberHolders ? 'Retire it instead.' : 'Remove it from them first, or rename it instead.'}`)
           }
           // Deleting a training cascades its position_training links, which
           // changes each linked position's audited trainings set: record it

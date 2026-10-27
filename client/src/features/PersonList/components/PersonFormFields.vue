@@ -489,7 +489,7 @@ onMounted(() => {
           <Checkbox :modelValue="deceased" binary @update:modelValue="setDeceased" />
           <span class="checkbox-label">Deceased</span>
         </label>
-        <small class="field-error" v-if="showOpenRequestWarning">{{ openRequestWarning }}</small>
+        <small class="field-hint" v-if="showOpenRequestWarning">{{ openRequestWarning }}</small>
       </div>
 
       <div class="form-field" v-if="deceased">

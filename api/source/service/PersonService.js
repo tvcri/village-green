@@ -410,6 +410,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
     ? [
       'CAST(p.id AS CHAR) AS personId',
       'p.fullName',
+      'p.deceased',
       VILLAGE_COLUMN,
       ACTIVE_AS_COLUMN,
       `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,

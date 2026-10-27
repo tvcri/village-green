@@ -131,7 +131,7 @@ async function setRetired (row, retired) {
 // ---- delete ----
 function deleteReason (row) {
   return allHolders(row) > 0
-    ? `Held by ${plural(allHolders(row), cfg.value.holderNoun ?? 'volunteer')}${inactiveNote(row)}. Remove it from their records first.`
+    ? `Held by ${plural(allHolders(row), cfg.value.holderNoun ?? 'volunteer')}${inactiveNote(row)}. ${cfg.value.hasRetired ? 'Retire it instead.' : 'Remove it from their records first.'}`
     : `Delete ${row.name}`
 }
 

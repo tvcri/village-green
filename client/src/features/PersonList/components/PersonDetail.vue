@@ -43,6 +43,9 @@ const hasMemberDetail = computed(() => !!person.value?.member)
 const hasVolunteerDetail = computed(() => !!person.value?.volunteer)
 
 const canDelete = computed(() => !(person.value?.activeAs ?? []).length)
+const deleteBlockedTip = computed(() => person.value?.deceased
+  ? 'Untick Deceased on the person form to change their roles, then remove them before deleting.'
+  : 'Remove member and volunteer roles before deleting this person')
 
 const flatPerson = computed(() => {
   if (!person.value) return null
@@ -90,7 +93,7 @@ function removePerson () {
       <Button v-if="canWriteVolunteer && !person?.deceased" :label="hasVolunteerDetail ? 'Edit Volunteer' : 'Add Volunteer Role'"
               :icon="hasVolunteerDetail ? 'pi pi-pencil' : 'pi pi-plus'"
               :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
-      <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
+      <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : deleteBlockedTip">
         <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="!canDelete" @click="removePerson" />
       </span>
     </div>
