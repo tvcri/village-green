@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { volunteerSnapshot, summarizeVolunteerChanges } from './volunteerChanges.js'
 
 const base = () => ({
-  active: true,
+  status: 'Active',
+  dropReasonId: null,
+  statusChangeNotes: '',
   notes: 'Existing notes',
   capabilityIds: [1, 2],
   associateVillageIds: ['7'],
@@ -50,10 +52,23 @@ describe('summarizeVolunteerChanges', () => {
 
   it('names edited provider fields in one entry', () => {
     const after = base()
-    after.active = false
     after.capabilityIds = [1]
     after.associateVillageIds = ['7', '9']
     after.notes = 'New'
-    expect(summarize(after)).toEqual(['active, capabilities, associate villages, notes edited'])
+    expect(summarize(after)).toEqual(['capabilities, associate villages, notes edited'])
+  })
+
+  it('confirm summary lists status and drop reason changes', () => {
+    const after = base()
+    after.status = 'Dropped'
+    after.dropReasonId = '2'
+    after.statusChangeNotes = 'Moved away'
+    expect(summarize(after)).toEqual(['status, drop reason, status change notes edited'])
+  })
+
+  it('treats a null and an unset drop reason as the same', () => {
+    const after = base()
+    after.dropReasonId = undefined
+    expect(summarize(after)).toEqual([])
   })
 })

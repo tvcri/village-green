@@ -13,6 +13,7 @@ vi.mock('../../../shared/composables/useCurrentUser.js', () => ({
 }))
 vi.mock('../../PersonList/api/personApi.js', () => ({
   getPersons: vi.fn().mockResolvedValue([]),
+  getPerson: vi.fn().mockResolvedValue({ personId: '9', volunteer: null }),
   createPerson: vi.fn(),
   patchPerson: vi.fn().mockResolvedValue({}),
   getDisabilities: vi.fn().mockResolvedValue([]),
@@ -28,11 +29,14 @@ vi.mock('../../PersonList/api/roleApi.js', () => ({
   putVolunteer: vi.fn().mockResolvedValue({}),
   patchVolunteer: vi.fn().mockResolvedValue({}),
 }))
+vi.mock('../../Admin/api/dropReasonApi.js', () => ({
+  getVolunteerDropReasons: vi.fn().mockResolvedValue([{ volunteerDropReasonId: '1', name: 'Moved', retired: false }]),
+}))
 vi.mock('../../VillageList/api/villageApi.js', () => ({
   getVillages: vi.fn().mockResolvedValue([{ villageId: '7', name: 'Barrington' }]),
 }))
 
-import { getPersons, createPerson } from '../../PersonList/api/personApi.js'
+import { getPersons, createPerson, getPerson } from '../../PersonList/api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../../PersonList/api/roleApi.js'
 
 const extraction = () => ({
@@ -97,6 +101,29 @@ describe('VolunteerStep', () => {
     expect(patchVolunteer.mock.calls[0][0]).toBe('9')
     expect('associateVillageIds' in patchVolunteer.mock.calls[0][1]).toBe(false)
     expect(emitted()['volunteer-done'][0][0]).toEqual({ personId: '9', fullName: 'Brown, Nicole K.' })
+  })
+
+  it('new volunteer is imported Pending', async () => {
+    mount()
+    await screen.findByDisplayValue('Brown')
+    await fireEvent.click(screen.getByText('Create Person & Grant Volunteer Role'))
+    await waitFor(() => expect(putVolunteer).toHaveBeenCalled())
+    const body = putVolunteer.mock.calls[0][1]
+    expect(body.status).toBe('Pending')
+    expect('active' in body).toBe(false)
+  })
+
+  it('existing volunteer keeps its status on import', async () => {
+    getPersons.mockResolvedValue([{ personId: '9', fullName: 'Brown, Nicole K.', village: { name: 'Barrington' } }])
+    getPerson.mockResolvedValue({ personId: '9', volunteer: { status: 'Active', dropReasonId: null } })
+    mount()
+    await fireEvent.click(await screen.findByText('Use This Person'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    expect(getPerson).toHaveBeenCalledWith('9', ['volunteer'])
+    const body = patchVolunteer.mock.calls[0][1]
+    expect(body.status).toBe('Active')
+    expect('dropReasonId' in body).toBe(false)
+    expect('active' in body).toBe(false)
   })
 
   it('omits demographics from the create without person:read_demographics', async () => {

@@ -14,11 +14,14 @@ import {
 import { usePersonLookups } from '../../PersonList/composables/usePersonLookups.js'
 import { emptyPersonFields, addPersonFields } from '../../PersonList/lib/personPayload.js'
 import {
-  getPersons, createPerson, getDisabilities, getCapabilities,
+  getPersons, getPerson, createPerson, getDisabilities, getCapabilities,
 } from '../../PersonList/api/personApi.js'
 import { putVolunteer, patchVolunteer } from '../../PersonList/api/roleApi.js'
 import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
+import { getVolunteerDropReasons } from '../../Admin/api/dropReasonApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
+import { validateVolunteerForm } from '../../PersonList/lib/volunteerFormValidation.js'
+import { dropReasonSent } from '../../PersonList/lib/memberFormValidation.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const props = defineProps({
@@ -50,7 +53,16 @@ const { lookups, ready: lookupsReady } = usePersonLookups()
 
 const selectedCapabilityIds = ref([])
 const providerType = ref('Non-member Volunteer')
-const active = ref(true)
+// A new volunteer starts Pending: recorded from receipt of the application.
+// An existing volunteer's stored status replaces this in useExisting.
+const status = ref('Pending')
+const dropReasonId = ref(null)
+const statusChangeNotes = ref('')
+const volunteerErrors = reactive({})
+const dropReasons = ref([])
+// Stored status and reason of an existing volunteer ({} for a new one, where
+// Dropped always needs a reason).
+const loaded = ref({})
 const notes = ref(props.extraction.notes ?? '')
 
 const capabilityNameToId = computed(() =>
@@ -68,6 +80,8 @@ onMounted(async () => {
     selectedCapabilityIds.value = [...volunteerCapabilityNames(props.extraction)]
       .map(n => capabilityNameToId.value.get(n))
       .filter(Boolean)
+    try { dropReasons.value = await getVolunteerDropReasons() }
+    catch { toast.add({ severity: 'warn', summary: 'Drop reasons unavailable', detail: 'A drop reason cannot be chosen right now', life: 3000 }) }
     await findDuplicates()
   }
   catch {
@@ -92,11 +106,13 @@ function onEdited (field) {
 async function grantVolunteerRole (personId, { isExisting = false } = {}) {
   const body = {
     providerType: providerType.value || null,
-    active: active.value,
+    status: status.value,
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
     application: buildApplicationEnvelope(props.extraction, null),
   }
+  if (statusChangeNotes.value) body.statusChangeNotes = statusChangeNotes.value
+  if (dropReasonSent({ status: status.value, dropReasonId: dropReasonId.value }, loaded.value)) body.dropReasonId = dropReasonId.value
   // A PATCH that carries associateVillageIds prunes village positions held at
   // associate villages, so an existing person's PATCH must omit it entirely.
   if (!isExisting) body.associateVillageIds = []
@@ -122,12 +138,36 @@ async function useExisting (person) {
   createdPersonId = person.personId
   createdPersonName = person.fullName
   saving.value = true
-  await grantVolunteerRole(person.personId, { isExisting: true })
-  saving.value = false
+  try {
+    // An existing volunteer keeps its stored status and reason: they replace
+    // the form's before the PATCH, so an Active volunteer stays Active.
+    const p = await getPerson(person.personId, ['volunteer'])
+    if (p.volunteer) {
+      status.value = p.volunteer.status
+      dropReasonId.value = p.volunteer.dropReasonId ?? null
+      statusChangeNotes.value = p.volunteer.statusChangeNotes ?? ''
+      loaded.value = { status: status.value, dropReasonId: dropReasonId.value }
+    }
+    else loaded.value = {}
+    if (!validateVolunteerForm({ status: status.value, dropReasonId: dropReasonId.value }, volunteerErrors, loaded.value)) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
+      return
+    }
+    await grantVolunteerRole(person.personId, { isExisting: true })
+  }
+  catch {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load the existing volunteer role', life: 3000 })
+  }
+  finally {
+    saving.value = false
+  }
 }
 
 async function submit () {
-  if (!validatePersonForm(form, errors, { deceased: personFields.deceased, deceasedDate: personFields.deceasedDate, dateUnknown: personFields.dateUnknown })) {
+  // A new person has no stored volunteer row, so Dropped always needs a reason.
+  loaded.value = {}
+  const volunteerOk = validateVolunteerForm({ status: status.value, dropReasonId: dropReasonId.value }, volunteerErrors, loaded.value)
+  if (!validatePersonForm(form, errors, { deceased: personFields.deceased, deceasedDate: personFields.deceasedDate, dateUnknown: personFields.dateUnknown }) || !volunteerOk) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
@@ -215,12 +255,17 @@ async function submit () {
       />
       <VolunteerFormFields
         v-model:provider-type="providerType"
-        v-model:active="active"
+        v-model:status="status"
+        v-model:drop-reason-id="dropReasonId"
+        v-model:status-change-notes="statusChangeNotes"
         v-model:notes="notes"
         v-model:selected-capability-ids="selectedCapabilityIds"
         :selected-associate-village-ids="[]"
         :capability-options="allCapabilities"
         :village-options="villages"
+        :drop-reasons="dropReasons"
+        :loaded-drop-reason-id="loaded.dropReasonId"
+        :errors="volunteerErrors"
       />
       <div class="step-footer">
         <Button type="submit" :label="personFields.deceased ? 'Create Person' : 'Create Person & Grant Volunteer Role'" :loading="saving" />
