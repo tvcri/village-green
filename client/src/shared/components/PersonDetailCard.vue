@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
+import { roleStatusTag } from '../lib/roleStatus.js'
 import PersonMap from '../../components/PersonMap.vue'
 import { formatCivilDate } from '../lib/civilDate.js'
 import { positionPlace } from '../lib/positionRules.js'
@@ -88,14 +89,8 @@ const titleAside = computed(() => [
   props.person.nickname ? `“${props.person.nickname}”` : null,
   props.person.pronouns,
 ].filter(Boolean).join(' · '))
-// The member status tag in the Member Information header. A deceased
-// person's tag says Deceased, whatever the stored status.
-const MEMBER_STATUS_SEVERITY = { Active: 'success', Pending: 'secondary', Dropped: 'warn' }
-const memberStatusTag = computed(() => {
-  if (props.person.deceased) return { value: 'Deceased', severity: 'contrast' }
-  const status = props.person.status
-  return status ? { value: status, severity: MEMBER_STATUS_SEVERITY[status] ?? 'secondary' } : null
-})
+// The member status tag in the Member Information header.
+const memberStatusTag = computed(() => roleStatusTag(props.person.status, props.person.deceased))
 
 const hasContact = computed(() => !!(props.person.email || props.person.phone || props.person.cell
   || props.person.preferredContactMethod))

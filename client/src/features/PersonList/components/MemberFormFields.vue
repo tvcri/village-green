@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Checkbox from 'primevue/checkbox'
@@ -9,7 +9,7 @@ import IftaLabel from 'primevue/iftalabel'
 import AutoComplete from 'primevue/autocomplete'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
-import { dropReasonOptions } from '../lib/memberFormValidation.js'
+import RoleStatusRow from './RoleStatusRow.vue'
 
 const props = defineProps({
   errors: { type: Object, default: () => ({}) },
@@ -50,8 +50,6 @@ function togglePreference (id, checked) {
   emit('edited', 'circlePreferences')
 }
 
-const dropReasonSelectOptions = computed(() => dropReasonOptions(props.dropReasons, props.loadedDropReasonId))
-const statusOptions = ['Pending', 'Active', 'Dropped'].map(s => ({ label: s, value: s }))
 const memberLevelOptions = ['Primary', 'Secondary'].map(s => ({ label: s, value: s }))
 
 // Clear a field's validation error as soon as the user changes it, so the
@@ -97,29 +95,9 @@ watch(memberLevel, (level) => {
   <div class="section">
     <h3 class="section-header">Membership</h3>
 
-    <!-- Status gets a row of its own; Drop Reason and its hint join it. -->
-    <div class="status-row">
-      <div class="form-field">
-        <IftaLabel>
-          <Select id="status" v-model="status" :options="statusOptions"
-                  optionLabel="label" optionValue="value" placeholder="Select status" class="w-full" @update:modelValue="edited('status')" />
-          <label for="status">Status
-            <i v-if="uncertain.status" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('status')" />
-          </label>
-        </IftaLabel>
-      </div>
-
-      <div v-if="status === 'Dropped'" class="form-field">
-        <IftaLabel>
-          <Select id="dropReasonId" v-model="dropReasonId" :options="dropReasonSelectOptions"
-                  optionLabel="label" optionValue="value" placeholder="Select drop reason" class="w-full"
-                  :class="{ 'p-invalid': errors.dropReasonId }" @update:modelValue="edited('dropReasonId')" />
-          <label for="dropReasonId">Drop Reason</label>
-        </IftaLabel>
-        <small class="field-error" v-if="errors.dropReasonId">{{ errors.dropReasonId }}</small>
-      </div>
-      <small v-if="status === 'Dropped' && !dropReasons.length" class="field-hint drop-reason-hint">No drop reasons yet. An administrator adds them under Admin › Drop Reasons.</small>
-    </div>
+    <RoleStatusRow v-model:status="status" v-model:dropReasonId="dropReasonId"
+                   :reasons="dropReasons" :loadedDropReasonId="loadedDropReasonId"
+                   :errors="errors" :uncertain="uncertain" @edited="edited" />
 
     <div v-if="showCreatedDate" class="form-field">
       <IftaLabel>
@@ -300,21 +278,6 @@ watch(memberLevel, (level) => {
   grid-column: span 2;
 }
 
-/* subgrid keeps Status and Drop Reason on the section's columns. */
-.status-row {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: subgrid;
-  row-gap: 1rem;
-  align-items: start;
-}
-
-.drop-reason-hint {
-  grid-column: span 2;
-  align-self: center;
-  margin-top: 0;
-}
-
 .checkbox-field {
   justify-content: flex-end;
 }
@@ -336,9 +299,6 @@ watch(memberLevel, (level) => {
   }
   .notes-section .form-field {
     grid-column: span 1;
-  }
-  .drop-reason-hint {
-    grid-column: auto;
   }
 }
 </style>
