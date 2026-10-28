@@ -9,9 +9,12 @@ import { str } from '../../../shared/lib/positionRules.js'
 
 const idSet = (ids = []) => ids.map(str).sort().join(',')
 
-export function volunteerSnapshot ({ active, notes, capabilityIds, associateVillageIds, vettings, trainings, positions }) {
+export function volunteerSnapshot ({ status, dropReasonId, statusChangeNotes, notes, capabilityIds, associateVillageIds, vettings, trainings, positions }) {
   return {
-    active: !!active,
+    status: str(status),
+    // the API clears a reason once the volunteer is no longer Dropped
+    dropReason: status === 'Dropped' ? str(dropReasonId) : '',
+    statusChangeNotes: str(statusChangeNotes),
     notes: str(notes),
     capabilities: idSet(capabilityIds),
     associateVillages: idSet(associateVillageIds),
@@ -38,7 +41,10 @@ function phrases (noun, { added = 0, removed = 0, changed = 0 }) {
   return [added && `${n(added)} added`, removed && `${n(removed)} removed`, changed && `${n(changed)} changed`].filter(Boolean)
 }
 
-const FIELDS = [['active', 'active'], ['capabilities', 'capabilities'], ['associateVillages', 'associate villages'], ['notes', 'notes']]
+const FIELDS = [
+  ['status', 'status'], ['dropReason', 'drop reason'], ['capabilities', 'capabilities'],
+  ['associateVillages', 'associate villages'], ['notes', 'notes'], ['statusChangeNotes', 'status change notes'],
+]
 
 // Returns the summary parts in form order; empty when nothing changed.
 export function summarizeVolunteerChanges (before, after) {

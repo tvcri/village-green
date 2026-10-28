@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Card from 'primevue/card'
@@ -8,6 +8,7 @@ import Message from 'primevue/message'
 import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import { getPerson, getCapabilities, getVettingTypes, getCircles } from '../api/personApi.js'
 import { putVolunteer, patchVolunteer, deleteVolunteer } from '../api/roleApi.js'
+import { getVolunteerDropReasons } from '../../Admin/api/dropReasonApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { getTrainings } from '../../Trainings/api/trainingApi.js'
 import { getPositions } from '../../Positions/api/positionApi.js'
@@ -17,6 +18,8 @@ import VolunteerTrainingsFields from './VolunteerTrainingsFields.vue'
 import VolunteerPositionsFields from './VolunteerPositionsFields.vue'
 import { isPositionEligible } from '../../../shared/lib/positionRules.js'
 import { volunteerSnapshot, summarizeVolunteerChanges } from '../lib/volunteerChanges.js'
+import { validateVolunteerForm } from '../lib/volunteerFormValidation.js'
+import { dropReasonSent } from '../lib/memberFormValidation.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 const router = useRouter()
@@ -43,7 +46,16 @@ const vettingTypeOptions = ref([])  // [{ vettingTypeId, name }] from getVetting
 const selectedCapabilityIds = ref([])
 const selectedAssociateVillageIds = ref([])
 const providerType = ref('')
-const active = ref(true)
+// A role granted here starts Pending, like the application import; an existing
+// volunteer's stored status replaces it in onMounted.
+const status = ref('Pending')
+const dropReasonId = ref(null)
+const statusChangeNotes = ref('')
+const dropReasons = ref([])
+const errors = reactive({})
+// The stored status and reason: validation and the body compare against them.
+// Empty for a new grant, where Dropped always needs a reason.
+const loaded = ref({})
 const notes = ref('')
 const vettings = ref([])            // [{ key, vettingTypeId, name, dateEntered, dateExpired, additionalData, notes }]
 const trainingOptions = ref([])     // [{ trainingId, name }]
@@ -75,7 +87,8 @@ const keptPositions = computed(() => {
 // form as loaded, with every position it loaded. The current side counts only
 // the positions Save will send, so an uncovered one reads as removed.
 const formState = (positionRows) => volunteerSnapshot({
-  active: active.value, notes: notes.value, capabilityIds: selectedCapabilityIds.value,
+  status: status.value, dropReasonId: dropReasonId.value, statusChangeNotes: statusChangeNotes.value,
+  notes: notes.value, capabilityIds: selectedCapabilityIds.value,
   associateVillageIds: selectedAssociateVillageIds.value, vettings: vettings.value, trainings: trainings.value, positions: positionRows,
 })
 const loadedState = ref(null)
@@ -105,7 +118,10 @@ onMounted(async () => {
       selectedCapabilityIds.value = (d.capabilities ?? []).map(n => nameToId.get(n)).filter(Boolean)
       selectedAssociateVillageIds.value = (d.associateVillages ?? []).map(v => v.villageId)
       providerType.value = d.providerType ?? ''
-      active.value = d.active ?? true
+      status.value = d.status
+      dropReasonId.value = d.dropReasonId ?? null
+      statusChangeNotes.value = d.statusChangeNotes ?? ''
+      loaded.value = { status: d.status, dropReasonId: d.dropReasonId ?? null }
       notes.value = d.notes ?? ''
       // key: stable row identity for the change summary (vettings carry no id); never sent.
       vettings.value = (d.vettings ?? []).map((v, i) => ({ ...v, key: `vv${i}` }))
@@ -125,14 +141,26 @@ onMounted(async () => {
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load person', life: 3000 })
   }
+  // On its own: a failure only blocks choosing a reason.
+  try {
+    dropReasons.value = await getVolunteerDropReasons()
+  }
+  catch {
+    toast.add({ severity: 'warn', summary: 'Drop reasons unavailable', detail: 'A drop reason cannot be chosen right now', life: 3000 })
+  }
 })
 
 async function save () {
+  if (!validateVolunteerForm({ status: status.value, dropReasonId: dropReasonId.value }, errors, loaded.value)) {
+    toast.add({ severity: 'warn', summary: 'Check the form', detail: 'Fix the highlighted fields', life: 3000 })
+    return
+  }
   const kept = keptPositions.value
   const dropped = positions.value.filter(r => !kept.includes(r))
   const body = {
     providerType: providerType.value || null,
-    active: active.value,
+    status: status.value,
+    statusChangeNotes: statusChangeNotes.value || null,
     notes: notes.value || null,
     capabilityIds: selectedCapabilityIds.value,
     associateVillageIds: selectedAssociateVillageIds.value,
@@ -140,6 +168,9 @@ async function save () {
     trainings: trainings.value.map(({ trainingId, completedDate, notes }) => ({ trainingId, completedDate: completedDate ?? null, notes: notes ?? null })),
     positions: kept.map(({ positionId, villageId, circleId }) => ({ positionId, villageId: villageId ?? null, circleId: circleId ?? null })),
   }
+  // A reason key triggers the API's reason rules: send it only when Dropped
+  // and the reason or status actually changed.
+  if (dropReasonSent({ status: status.value, dropReasonId: dropReasonId.value }, loaded.value)) body.dropReasonId = dropReasonId.value
   try {
     if (hasVolunteer.value) await patchVolunteer(personId.value, body)
     else await putVolunteer(personId.value, body)
@@ -187,18 +218,23 @@ function back () { router.push({ name: 'meta-person-detail', params: { personId:
       <form v-else @submit.prevent>
         <VolunteerFormFields
           v-model:provider-type="providerType"
-          v-model:active="active"
+          v-model:status="status"
+          v-model:drop-reason-id="dropReasonId"
+          v-model:status-change-notes="statusChangeNotes"
           v-model:notes="notes"
           v-model:selected-capability-ids="selectedCapabilityIds"
           v-model:selected-associate-village-ids="selectedAssociateVillageIds"
           :capability-options="capabilityOptions"
           :village-options="villageOptions"
+          :drop-reasons="dropReasons"
+          :loaded-drop-reason-id="loaded.dropReasonId"
+          :errors="errors"
         />
         <VolunteerVettingsFields v-model:vettings="vettings" v-model:adding="addingVetting" :vetting-type-options="vettingTypeOptions" />
         <VolunteerTrainingsFields v-model:trainings="trainings" v-model:adding="addingTraining" :training-options="trainingOptions" />
         <VolunteerPositionsFields v-model:positions="positions" v-model:adding="addingPosition" :position-options="positionOptions" :home-village="homeVillage"
                                   :associate-village-ids="selectedAssociateVillageIds" :village-options="villageOptions"
-                                  :circle-options="circleOptions" :trainings="trainings" :training-options="trainingOptions" :active="active" />
+                                  :circle-options="circleOptions" :trainings="trainings" :training-options="trainingOptions" :volunteer-active="status === 'Active'" />
 
         <div class="form-footer">
           <span class="footer-note" data-testid="footer-note">{{ footerNote }}</span>

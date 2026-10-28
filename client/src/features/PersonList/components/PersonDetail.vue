@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
@@ -9,7 +9,12 @@ import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
+import { flattenRoles } from '../../../shared/lib/roleStatus.js'
 import { deletePerson } from '../api/personApi.js'
+import { deleteVolunteerPause } from '../api/roleApi.js'
+import VolunteerPauseDialog from './VolunteerPauseDialog.vue'
+import { PAUSE_TIME_ZONE, pauseState } from '../../../shared/lib/volunteerPause.js'
+import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 
 const route = useRoute()
@@ -22,7 +27,7 @@ const canWriteMember = computed(() => hasPermission('member:write'))
 const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const personId = computed(() => route.params.personId)
 
-const { state: person } = useAsyncState(
+const { state: person, execute: refresh } = useAsyncState(
   () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] }),
   { immediate: true }
 )
@@ -50,8 +55,36 @@ const deleteBlockedTip = computed(() => person.value?.deceased
 const flatPerson = computed(() => {
   if (!person.value) return null
   const { member, volunteer, ...rest } = person.value
-  return { ...rest, ...member, ...volunteer }
+  return flattenRoles(rest, member, volunteer)
 })
+
+// Pause actions beside the volunteer status tag. A scheduled or active
+// pause offers Change + Unpause; none or expired offers Pause….
+const pauseDialogOpen = ref(false)
+const hasLivePause = computed(() => {
+  const s = pauseState(person.value?.volunteer?.pause ?? null, todayCivilDateIn(PAUSE_TIME_ZONE))
+  return s === 'scheduled' || s === 'active'
+})
+
+function unpauseVolunteer () {
+  confirm.require({
+    header: 'Unpause Service Email',
+    message: 'Unpause service email? This volunteer will be emailed about new requests again and can be assigned to requests in the paused dates.',
+    acceptLabel: 'Unpause',
+    rejectLabel: 'Cancel',
+    rejectProps: { severity: 'secondary' },
+    accept: async () => {
+      try {
+        await deleteVolunteerPause(personId.value)
+        toast.add({ severity: 'success', summary: 'Service email unpaused', life: 2000 })
+        await refresh()
+      }
+      catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to unpause service email', life: 3000 })
+      }
+    }
+  })
+}
 
 function goEdit () { router.push({ name: 'meta-person-edit', params: { personId: personId.value } }) }
 function goMember () { router.push({ name: 'meta-person-member', params: { personId: personId.value } }) }
@@ -104,6 +137,21 @@ function removePerson () {
       :person-type="personType"
       :has-member-detail="hasMemberDetail"
       :has-volunteer-detail="hasVolunteerDetail"
+    >
+      <template v-if="canWriteVolunteer" #volunteer-pause-actions>
+        <Button v-if="!hasLivePause" label="Pause service email…" icon="pi pi-pause" outlined size="small" data-testid="pause-open" @click="pauseDialogOpen = true" />
+        <template v-else>
+          <Button label="Change" icon="pi pi-pencil" outlined size="small" data-testid="pause-change" @click="pauseDialogOpen = true" />
+          <Button label="Unpause" icon="pi pi-play" outlined size="small" data-testid="pause-unpause" @click="unpauseVolunteer" />
+        </template>
+      </template>
+    </PersonDetailCard>
+    <VolunteerPauseDialog
+      v-if="canWriteVolunteer && person"
+      v-model:visible="pauseDialogOpen"
+      :person-id="String(personId)"
+      :pause="hasLivePause ? person.volunteer.pause : null"
+      @saved="refresh"
     />
   </div>
 </template>

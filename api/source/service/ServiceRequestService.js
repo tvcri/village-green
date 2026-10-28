@@ -5,6 +5,8 @@ const dbUtils = require('./utils')
 const config = require('../utils/config')
 const SmError = require('../utils/error')
 const AuditService = require('./audit/AuditService')
+const { findCoveringPause, pauseSentence } = require('./volunteerPause')
+const { todayCivil } = require('../utils/metricsRange')
 
 const CANCELLED_STATUSES = ['Member cancelled', 'Volunteer cancelled', 'Hub cancelled']
 
@@ -293,6 +295,17 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
   return rows
 }
 
+// A coordinator cannot assign a volunteer to a request dated inside that
+// volunteer's pause (spec 4.2). Self sign-up does not come through here.
+async function assertNotPaused (connection, volunteerPersonId, serviceDate) {
+  if (!volunteerPersonId || !serviceDate) return
+  const pause = await findCoveringPause(connection, volunteerPersonId, serviceDate)
+  if (pause) {
+    throw new SmError.UnprocessableError(
+      pauseSentence(pause.displayName, pause, todayCivil(config.settings.civilTimeZone)))
+  }
+}
+
 module.exports.createServiceRequest = async function (payload, userId) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
@@ -329,6 +342,11 @@ module.exports.createServiceRequest = async function (payload, userId) {
         createdUserId: userId
       }
 
+      // A terminal write records the past; only in-flight rows are lined up.
+      if (!isEndState(resolvedStatus)) {
+        await assertNotPaused(connection, insertFields.volunteerPersonId, insertFields.serviceDate)
+      }
+
       const [result] = await connection.query(
         'INSERT INTO service_request SET ?, createdAt = NOW()',
         insertFields
@@ -359,7 +377,7 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
       const { row: before } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
 
       const [currentRows] = await connection.query(
-        'SELECT volunteerPersonId, status FROM service_request WHERE id = ?',
+        "SELECT volunteerPersonId, status, DATE_FORMAT(serviceDate, '%Y-%m-%d') AS serviceDate FROM service_request WHERE id = ?",
         [serviceRequestId]
       )
       const current = currentRows[0]
@@ -438,6 +456,14 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
         ? current.status
         : deriveStatus(payload.status, newVolunteerPersonId)
       updateFields.status = resolvedStatus
+
+      // Pause rule: checked only when the volunteer or the date changes, so
+      // an ordinary edit of a request whose volunteer paused later still saves. A terminal write records the past and is never blocked.
+      const dateChanged = payload.serviceDate !== undefined && payload.serviceDate !== current.serviceDate
+      if ((volunteerChanged || dateChanged) && !isEndState(resolvedStatus)) {
+        await assertNotPaused(connection, newVolunteerPersonId,
+          payload.serviceDate !== undefined ? payload.serviceDate : current.serviceDate)
+      }
 
       // Rule 3: a Completed request must credit a volunteer. deriveStatus
       // passes an explicit Completed through untouched, so without this a

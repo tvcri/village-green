@@ -41,3 +41,9 @@ export function formatCivilDate (s) {
   const [y, m, d] = s.split('-').map(Number)
   return `${MONTHS[m - 1]} ${d}, ${y}`
 }
+
+// Today's civil 'YYYY-MM-DD' in a named zone (en-CA formats as ISO). For rules
+// the server evaluates in a fixed zone, regardless of the viewer's clock zone.
+export function todayCivilDateIn (timeZone) {
+  return new Date().toLocaleDateString('en-CA', { timeZone })
+}

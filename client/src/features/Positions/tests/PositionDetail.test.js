@@ -36,11 +36,11 @@ beforeEach(() => {
   getVillages.mockResolvedValue([barrington, bristol, { villageId: '7', name: 'Warwick' }])
   getCircles.mockResolvedValue([])
   getPositionHolders.mockResolvedValue([
-    { volunteerPositionId: '20', village: barrington, circle: null, person: { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, active: true } },
-    { volunteerPositionId: '21', village: bristol, circle: null, person: { personId: '8', fullName: 'Medeiros, Anthony', displayName: 'Anthony Medeiros', village: bristol, active: true } },
+    { volunteerPositionId: '20', village: barrington, circle: null, person: { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, status: 'Active' } },
+    { volunteerPositionId: '21', village: bristol, circle: null, person: { personId: '8', fullName: 'Medeiros, Anthony', displayName: 'Anthony Medeiros', village: bristol, status: 'Active' } },
   ])
   getVolunteerRoster.mockResolvedValue([
-    { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, active: true, associateVillages: [] },
+    { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, status: 'Active', associateVillages: [] },
   ])
   patchPositionHolders.mockResolvedValue([])
 })
@@ -61,7 +61,7 @@ describe('PositionDetail', () => {
   it('says how many inactive or deceased volunteers keep the position, hidden', async () => {
     getPositions.mockResolvedValue([{ positionId: '5', name: 'Local Service Coordinator', scope: 'village', trainingIds: ['4'], holderCount: 2, inactiveHolderCount: 1 }])
     render(PositionDetail, opts)
-    expect(await screen.findByText('1 inactive or deceased volunteer keeps this position, hidden')).toBeInTheDocument()
+    expect(await screen.findByText('1 Pending, Dropped or deceased volunteer keeps this position, hidden')).toBeInTheDocument()
     expect(screen.queryByText('Active')).toBeNull()
   })
 
@@ -75,17 +75,17 @@ describe('PositionDetail', () => {
   it('no hidden-holder line when none are inactive', async () => {
     render(PositionDetail, opts)
     await screen.findByText('Abbott, Lorraine')
-    expect(screen.queryByText(/hidden until active again/)).toBeNull()
+    expect(screen.queryByText(/keeps? this position, hidden/)).toBeNull()
   })
 
   // Agreed with staff 2026-10-08: the add search lists only who can hold it
   // here, active volunteers of the village (own or associate), not greyed rows.
   it('the add search lists only active volunteers eligible for the village', async () => {
     getVolunteerRoster.mockResolvedValueOnce([
-      { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, active: true, associateVillages: [] },
-      { personId: '6', fullName: 'Walsh, Ines', displayName: 'Ines Walsh', village: barrington, active: false, associateVillages: [] },
-      { personId: '7', fullName: 'Walsh, Peter', displayName: 'Peter Walsh', village: bristol, active: true, associateVillages: [] },
-      { personId: '9', fullName: 'Walsh, Ruth', displayName: 'Ruth Walsh', village: bristol, active: true, associateVillages: [barrington] },
+      { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, status: 'Active', associateVillages: [] },
+      { personId: '6', fullName: 'Walsh, Ines', displayName: 'Ines Walsh', village: barrington, status: 'Dropped', associateVillages: [] },
+      { personId: '7', fullName: 'Walsh, Peter', displayName: 'Peter Walsh', village: bristol, status: 'Active', associateVillages: [] },
+      { personId: '9', fullName: 'Walsh, Ruth', displayName: 'Ruth Walsh', village: bristol, status: 'Active', associateVillages: [barrington] },
     ])
     render(PositionDetail, opts)
     await screen.findByText('Abbott, Lorraine')
@@ -111,8 +111,8 @@ describe('PositionDetail', () => {
     expect(screen.getByText('Will be removed')).toBeInTheDocument()
     expect(screen.getByText('1 to add, 1 to remove')).toBeInTheDocument()
     patchPositionHolders.mockResolvedValueOnce([
-      { volunteerPositionId: '20', village: barrington, circle: null, person: { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, active: true } },
-      { volunteerPositionId: '30', village: barrington, circle: null, person: { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, active: true } },
+      { volunteerPositionId: '20', village: barrington, circle: null, person: { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, status: 'Active' } },
+      { volunteerPositionId: '30', village: barrington, circle: null, person: { personId: '5', fullName: 'Walsh, Bridget', displayName: 'Bridget Walsh', village: barrington, status: 'Active' } },
     ])
     await fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(patchPositionHolders).toHaveBeenCalled())

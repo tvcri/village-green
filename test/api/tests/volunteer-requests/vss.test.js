@@ -298,3 +298,39 @@ test('member contact and GET /user volunteers carry displayName, suffix included
     await withDb(conn => conn.query('UPDATE person SET suffix = NULL WHERE id IN (?)', [ids]))
   }
 })
+
+// ---- a Pending volunteer row carries no VSS identity ----
+
+test('a Pending vssJoe volunteer row loses VSS access', async () => {
+  // Fixtures are shared and order-dependent: set both matching rows Pending,
+  // then restore Active in finally.
+  const personIds = [persons.quahogVolunteer.id, persons.vssHouseholdSibling.id]
+  await withDb(c => c.query("UPDATE volunteer SET status = 'Pending' WHERE personId IN (?)", [personIds]))
+  try {
+    const { status } = await vgCall('getVolunteerRequests', { scope: 'open' }, { token: vssJoe })
+    assert.equal(status, 403)
+  }
+  finally {
+    await withDb(c => c.query("UPDATE volunteer SET status = 'Active' WHERE personId IN (?)", [personIds]))
+  }
+})
+
+// ---- a pause blocks coordinator assignment, never self sign-up (spec 4.2) ----
+
+test('a paused volunteer can still sign themselves up', async () => {
+  const id = await openRequest()
+  await withDb(c => c.query(
+    `INSERT INTO volunteer_pause (volunteerId, startDate, endDate, scope)
+     SELECT id, '2026-07-01', '2026-09-01', 'window' FROM volunteer WHERE personId = ?`, [quahogPerson]))
+  try {
+    const { status } = await vgCall('signUpVolunteerRequest', { serviceRequestId: id }, {
+      token: vssJoe, body: { personId: quahogPerson },
+    })
+    assert.equal(status, 200)
+    assert.equal((await statusOf(id)).status, 'Confirmed')
+  }
+  finally {
+    await withDb(c => c.query(
+      'DELETE FROM volunteer_pause WHERE volunteerId IN (SELECT id FROM volunteer WHERE personId = ?)', [quahogPerson]))
+  }
+})

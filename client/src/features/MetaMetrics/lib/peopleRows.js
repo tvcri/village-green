@@ -1,5 +1,5 @@
-// Rows from GET /metrics/persons. Members carry `status`, volunteers carry
-// `active`; both carry count + completedRoundTrips.
+// Rows from GET /metrics/persons. Members and volunteers both carry `status`
+// (Active, Pending, Dropped); both carry count + completedRoundTrips.
 
 // legs is pinned on this page (see MetaMetrics.vue): a completed round-trip
 // ride counts as two.
@@ -24,7 +24,7 @@ export function inActivity (n, bucket) {
 
 export function isInactive (row) {
   if (row.deceased) return true
-  return 'status' in row ? row.status !== 'Active' : row.active !== true
+  return row.status !== 'Active'
 }
 
 // villageNames: Map of villageId -> name, from the /metrics payload.
@@ -52,10 +52,8 @@ export function peopleCsvColumns (nameHeader) {
   ]
 }
 
-// Members carry their status word (Dropped, ...); volunteers only a flag.
-export const statusOf = (row) => row.deceased ? 'Deceased' : ('status' in row
-  ? (row.status ?? 'Inactive')
-  : (row.active === true ? 'Active' : 'Inactive'))
+// Members and volunteers both carry their status word.
+export const statusOf = (row) => row.deceased ? 'Deceased' : row.status
 
 export function peopleCsvRows (rows, villageNames) {
   return rows.map(r => ({

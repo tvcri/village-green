@@ -34,11 +34,11 @@ export function dropReasonSent (form, loaded = {}) {
 // Select options for the drop-reason catalog: active reasons, plus the
 // member's current reason even when retired (suffixed), so an unchanged save
 // stays possible. Order is the API's (by name).
-export function dropReasonOptions (reasons, currentId) {
+export function dropReasonOptions (reasons, currentId, idKey = 'memberDropReasonId') {
   return (reasons ?? [])
-    .filter(r => !r.retired || r.memberDropReasonId === currentId)
+    .filter(r => !r.retired || r[idKey] === currentId)
     .map(r => ({
       label: r.retired ? `${r.name} (retired)` : r.name,
-      value: r.memberDropReasonId,
+      value: r[idKey],
     }))
 }

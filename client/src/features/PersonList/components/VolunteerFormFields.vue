@@ -1,38 +1,48 @@
 <script setup>
 import MultiSelect from 'primevue/multiselect'
 import IftaLabel from 'primevue/iftalabel'
-import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
+import RoleStatusRow from './RoleStatusRow.vue'
 
 const props = defineProps({
   capabilityOptions: { type: Array, required: true },
   villageOptions: { type: Array, required: true },
   uncertain: { type: Object, default: () => ({}) },
+  errors: { type: Object, default: () => ({}) },
+  dropReasons: { type: Array, default: () => [] },       // volunteer drop-reason catalog rows
+  loadedDropReasonId: { type: String, default: null },   // stored reason, offered even when retired
 })
+const emit = defineEmits(['edited'])
 
 // providerType has no control in this panel (set/edited by the parent) but is
 // still declared as a model so the panel's v-model:provider-type contract
 // stays symmetric with its sibling fields.
 // eslint-disable-next-line no-unused-vars
 const providerType = defineModel('providerType', { type: String, default: '' })
-const active = defineModel('active', { type: Boolean, default: true })
+const status = defineModel('status', { type: String, default: 'Pending' })
+const dropReasonId = defineModel('dropReasonId', { type: String, default: null })
+const statusChangeNotes = defineModel('statusChangeNotes', { type: String, default: '' })
 const notes = defineModel('notes', { type: String, default: '' })
 const selectedCapabilityIds = defineModel('selectedCapabilityIds', { type: Array, required: true })
 const selectedAssociateVillageIds = defineModel('selectedAssociateVillageIds', { type: Array, required: true })
+
+// Clear a field's validation error as soon as the user changes it.
+function edited (field) {
+  delete props.errors[field]
+  emit('edited', field)
+}
 
 function uncertainText (field) { return sharedUncertainText(props.uncertain, field) }
 </script>
 
 <template>
   <div class="section">
-    <div class="section-header-row">
-      <h3 class="section-header">Provider</h3>
-      <label class="checkbox-item">
-        <Checkbox v-model="active" binary />
-        <span class="checkbox-label">Active</span>
-      </label>
-    </div>
+    <h3 class="section-header">Provider</h3>
+
+    <RoleStatusRow v-model:status="status" v-model:dropReasonId="dropReasonId" idKey="volunteerDropReasonId"
+                   :reasons="dropReasons" :loadedDropReasonId="loadedDropReasonId"
+                   :errors="errors" :uncertain="uncertain" @edited="edited" />
 
     <div class="form-field span-4">
       <IftaLabel>
@@ -52,6 +62,13 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
         <Textarea id="volunteerNotes" v-model="notes"
                   rows="4" class="w-full" />
         <label for="volunteerNotes">Notes</label>
+      </IftaLabel>
+    </div>
+
+    <div class="form-field span-4">
+      <IftaLabel>
+        <Textarea id="statusChangeNotes" v-model="statusChangeNotes" rows="3" class="w-full" />
+        <label for="statusChangeNotes">Status Change Notes</label>
       </IftaLabel>
     </div>
 
@@ -76,16 +93,6 @@ function uncertainText (field) { return sharedUncertainText(props.uncertain, fie
 <style scoped>
 .section {
   grid-template-columns: repeat(4, 1fr);
-}
-.section-header-row {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.section-header-row .section-header {
-  margin: 0;
 }
 .form-field.span-4 { grid-column: 1 / -1; }
 

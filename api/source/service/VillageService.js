@@ -4,6 +4,7 @@ const PersonService = require('./PersonService')
 const config = require('../utils/config')
 const SmError = require('../utils/error')
 const AuditService = require('./audit/AuditService')
+const { pauseJsonSql } = require('./volunteerPause')
 
 const _this = this
 
@@ -224,8 +225,10 @@ module.exports.getVillageMembers = async function (villageId) {
 module.exports.getVillageVolunteers = async function (villageId) {
   const columns = [
     'p.fullName',
+    'p.displayName',
     'CAST(vol.id AS CHAR) AS volunteerId',
     'CAST(vol.personId AS CHAR) AS personId',
+    `${pauseJsonSql('vol')} AS pause`,
   `  COALESCE(CAST(
       CONCAT('[', GROUP_CONCAT(CONCAT('"',c.name,'"') ORDER BY c.name), ']')
       AS JSON), JSON_ARRAY()) AS capabilities`,
@@ -253,7 +256,8 @@ module.exports.getVolunteers = async function ({ villageIdsGranted, includeInact
     'p.displayName',
     'CAST(vol.id AS CHAR) AS volunteerId',
     'CAST(vol.personId AS CHAR) AS personId',
-    'vol.active',
+    'vol.status',
+    `${pauseJsonSql('vol')} AS pause`,
     'p.deceased AS deceased',
     `(SELECT JSON_OBJECT('villageId', CAST(hv.id AS CHAR), 'name', hv.name) FROM village hv WHERE hv.id = p.villageId) AS village`,
     `COALESCE(CAST(

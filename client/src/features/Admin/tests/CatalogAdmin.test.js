@@ -20,8 +20,9 @@ import { getTrainings, deleteTraining } from '../../Trainings/api/trainingApi.js
 import { getPositions, createPosition, patchPosition } from '../../Positions/api/positionApi.js'
 vi.mock('../api/dropReasonApi.js', () => ({
   getMemberDropReasons: vi.fn(), createMemberDropReason: vi.fn(), patchMemberDropReason: vi.fn(), deleteMemberDropReason: vi.fn(),
+  getVolunteerDropReasons: vi.fn(), createVolunteerDropReason: vi.fn(), patchVolunteerDropReason: vi.fn(), deleteVolunteerDropReason: vi.fn(),
 }))
-import { getMemberDropReasons, patchMemberDropReason } from '../api/dropReasonApi.js'
+import { getMemberDropReasons, patchMemberDropReason, getVolunteerDropReasons, patchVolunteerDropReason } from '../api/dropReasonApi.js'
 
 const TRAININGS = [
   { trainingId: '1', name: 'Volunteer Training', description: 'Required.', holderCount: 560 },
@@ -182,5 +183,45 @@ describe('CatalogAdmin — member drop reasons', () => {
     await screen.findByText('Moved away')
     await fireEvent.click(screen.getByLabelText('Edit Moved away'))
     expect(await screen.findByText(/3 members have this drop reason\./)).toBeInTheDocument()
+  })
+})
+
+describe('CatalogAdmin — volunteer drop reasons', () => {
+  const REASONS = [
+    { volunteerDropReasonId: '1', name: 'Moved away', description: null, retired: false, holderCount: 3 },
+    { volunteerDropReasonId: '2', name: 'Health', description: 'Illness.', retired: true, holderCount: 0 },
+  ]
+  const tipDirective = { tooltip: { mounted (el, b) { el.dataset.tip = b.value } } }
+  beforeEach(() => { getVolunteerDropReasons.mockResolvedValue(REASONS) })
+
+  it('volunteerDropReason kind lists its own reasons with a Volunteers count', async () => {
+    render(CatalogAdmin, opts('volunteerDropReason'))
+    expect(await screen.findByText('Moved away')).toBeInTheDocument()
+    expect(screen.getByText('Volunteers')).toBeInTheDocument()
+    expect(screen.getByLabelText('Retired: Health')).toBeChecked()
+    expect(getMemberDropReasons).not.toHaveBeenCalled()
+    expect(getTrainings).not.toHaveBeenCalled()
+  })
+
+  it('retired toggle patches the volunteer catalog', async () => {
+    patchVolunteerDropReason.mockResolvedValue({})
+    render(CatalogAdmin, opts('volunteerDropReason'))
+    await screen.findByText('Moved away')
+    await fireEvent.click(screen.getByLabelText('Retired: Moved away'))
+    await waitFor(() => expect(patchVolunteerDropReason).toHaveBeenCalledWith('1', { retired: true }))
+    expect(patchMemberDropReason).not.toHaveBeenCalled()
+  })
+
+  it('delete blocked message names the volunteer count', async () => {
+    render(CatalogAdmin, { props: { kind: 'volunteerDropReason' }, global: { plugins: [PrimeVue], directives: tipDirective } })
+    await screen.findByText('Moved away')
+    expect(screen.getByLabelText('Delete Moved away').closest('span').dataset.tip).toBe('Held by 3 volunteers. Retire it instead.')
+  })
+
+  it('held edit note names volunteers', async () => {
+    render(CatalogAdmin, opts('volunteerDropReason'))
+    await screen.findByText('Moved away')
+    await fireEvent.click(screen.getByLabelText('Edit Moved away'))
+    expect(await screen.findByText(/3 volunteers have this drop reason\./)).toBeInTheDocument()
   })
 })

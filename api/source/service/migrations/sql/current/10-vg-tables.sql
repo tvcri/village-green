@@ -62,7 +62,9 @@ DROP TABLE IF EXISTS `active_volunteer`;
  1 AS `id`,
  1 AS `personId`,
  1 AS `providerType`,
- 1 AS `active`,
+ 1 AS `status`,
+ 1 AS `dropReasonId`,
+ 1 AS `statusChangeNotes`,
  1 AS `notes`,
  1 AS `application`*/;
 
@@ -787,12 +789,17 @@ CREATE TABLE `volunteer` (
   `id` int NOT NULL AUTO_INCREMENT,
   `personId` int NOT NULL,
   `providerType` varchar(50) DEFAULT NULL,
-  `active` bit(1) DEFAULT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'Pending',
+  `dropReasonId` int DEFAULT NULL,
+  `statusChangeNotes` text,
   `notes` text,
   `application` json DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `person_id` (`personId`),
-  CONSTRAINT `volunteer_ibfk_1` FOREIGN KEY (`personId`) REFERENCES `person` (`id`)
+  KEY `volunteer_drop_reason_fk` (`dropReasonId`),
+  CONSTRAINT `volunteer_drop_reason_fk` FOREIGN KEY (`dropReasonId`) REFERENCES `volunteer_drop_reason` (`id`),
+  CONSTRAINT `volunteer_ibfk_1` FOREIGN KEY (`personId`) REFERENCES `person` (`id`),
+  CONSTRAINT `chk_volunteer_drop_reason_status` CHECK (((`dropReasonId` is null) or (`status` = _utf8mb4'Dropped')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -809,6 +816,37 @@ CREATE TABLE `volunteer_capability` (
   KEY `capability_id` (`capabilityId`),
   CONSTRAINT `volunteer_capability_ibfk_1` FOREIGN KEY (`volunteerId`) REFERENCES `volunteer` (`id`),
   CONSTRAINT `volunteer_capability_ibfk_2` FOREIGN KEY (`capabilityId`) REFERENCES `capability` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `volunteer_drop_reason`
+--
+
+DROP TABLE IF EXISTS `volunteer_drop_reason`;
+CREATE TABLE `volunteer_drop_reason` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `retired` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `volunteer_drop_reason_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `volunteer_pause`
+--
+
+DROP TABLE IF EXISTS `volunteer_pause`;
+CREATE TABLE `volunteer_pause` (
+  `volunteerId` int NOT NULL,
+  `startDate` date DEFAULT NULL,
+  `endDate` date DEFAULT NULL,
+  `scope` varchar(20) NOT NULL,
+  PRIMARY KEY (`volunteerId`),
+  CONSTRAINT `volunteer_pause_volunteer_fk` FOREIGN KEY (`volunteerId`) REFERENCES `volunteer` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_volunteer_pause_order` CHECK (((`startDate` is null) or (`endDate` is null) or (`startDate` <= `endDate`))),
+  CONSTRAINT `chk_volunteer_pause_scope` CHECK ((`scope` in (_utf8mb4'all',_utf8mb4'window'))),
+  CONSTRAINT `chk_volunteer_pause_window` CHECK (((`scope` <> _utf8mb4'window') or ((`startDate` is not null) and (`endDate` is not null))))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -994,7 +1032,7 @@ DELIMITER ;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50001 VIEW `active_volunteer` AS select `v`.`id` AS `id`,`v`.`personId` AS `personId`,`v`.`providerType` AS `providerType`,`v`.`active` AS `active`,`v`.`notes` AS `notes`,`v`.`application` AS `application` from (`volunteer` `v` join `person` `p` on((`p`.`id` = `v`.`personId`))) where ((`v`.`active` = 1) and (`p`.`deceased` = 0)) */;
+/*!50001 VIEW `active_volunteer` AS select `v`.`id` AS `id`,`v`.`personId` AS `personId`,`v`.`providerType` AS `providerType`,`v`.`status` AS `status`,`v`.`dropReasonId` AS `dropReasonId`,`v`.`statusChangeNotes` AS `statusChangeNotes`,`v`.`notes` AS `notes`,`v`.`application` AS `application` from (`volunteer` `v` join `person` `p` on((`p`.`id` = `v`.`personId`))) where ((`v`.`status` = 'Active') and (`p`.`deceased` = 0)) */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -1004,4 +1042,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-27 17:43:02
+-- Dump completed on 2026-10-27 22:25:02

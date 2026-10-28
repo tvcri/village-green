@@ -20,7 +20,7 @@ const props = defineProps({
   circleOptions: { type: Array, required: true },
   trainings: { type: Array, required: true },
   trainingOptions: { type: Array, required: true },
-  active: { type: Boolean, default: true }, // the volunteer's Active checkbox, as edited
+  volunteerActive: { type: Boolean, default: true }, // the volunteer's status is Active, as edited
 })
 const positions = defineModel('positions', { type: Array, required: true })
 const adding = defineModel('adding', { type: Boolean, default: false })
@@ -145,8 +145,8 @@ function remove (i) { const next = positions.value.slice(); next.splice(i, 1); p
         </tbody>
       </table>
     </div>
-    <small v-if="!active && positions.length" class="dim" data-testid="positions-hidden-note">
-      While this volunteer is inactive, these positions are kept but hidden from position pages. They show again when the volunteer is active.
+    <small v-if="!volunteerActive && positions.length" class="dim" data-testid="positions-hidden-note">
+      While this volunteer is Pending or Dropped, these positions are kept but hidden from position pages. They show again when the volunteer is Active.
     </small>
     <small v-if="chosen?.scope === 'village'" class="dim">
       Only {{ homeVillage?.name ? `${homeVillage.name} (home) and` : '' }} this volunteer’s associate villages are offered, less any where

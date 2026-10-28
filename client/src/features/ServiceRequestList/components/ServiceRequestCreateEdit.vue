@@ -12,6 +12,7 @@ import DatePicker from 'primevue/datepicker'
 import Select from 'primevue/select'
 import AutoComplete from 'primevue/autocomplete'
 import Tag from 'primevue/tag'
+import Message from 'primevue/message'
 import Checkbox from 'primevue/checkbox'
 import Popover from 'primevue/popover'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
@@ -28,6 +29,8 @@ import {
   minutesToTimeString, timeStringToMinutes,
   dateToServiceDate, serviceDateToDate
 } from '../lib/timeFields.js'
+import { dateToServiceDate as civilFromDate, todayCivilDateIn } from '../../../shared/lib/civilDate.js'
+import { pauseCovers, pauseState, pauseTag, pauseSentence, PAUSE_TIME_ZONE } from '../../../shared/lib/volunteerPause.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
 defineOptions({ name: 'ServiceRequestCreateEdit' })
@@ -166,12 +169,49 @@ const selectedMemberServiceNotes = computed(() => {
   return member?.serviceNotes || ''
 })
 
+// Pause rules bind only to a request that stays in flight (Open/Confirmed).
+// Recording a terminal status (e.g. who completed a past ride) is never
+// blocked, mirroring the API rule. Dates are civil strings: serviceDate is the
+// picker's Date turned back into 'YYYY-MM-DD', never the other way round.
+const chosenServiceDate = computed(() => form.value.serviceDate ? civilFromDate(form.value.serviceDate) : null)
+const pauseRuleApplies = computed(() => ['Open', 'Confirmed'].includes(computedStatus.value))
+
 const allVolunteerOptions = computed(() => {
   if (!Array.isArray(villageVolunteers.value)) return []
-  return villageVolunteers.value.map(v => ({
-    label: v.personFullName || v.fullName,
-    value: String(v.personId || v.id)
-  }))
+  const today = todayCivilDateIn(PAUSE_TIME_ZONE)
+  const date = chosenServiceDate.value
+  return villageVolunteers.value.map(v => {
+    const pause = v.pause || null
+    // With no date yet, only an open-ended pause can be known to apply.
+    const disabled = pauseRuleApplies.value && !!pause && (date
+      ? pauseCovers(pause, date)
+      : pause.endDate == null && pauseState(pause, today) !== 'expired')
+    return {
+      label: v.personFullName || v.fullName,
+      value: String(v.personId || v.id),
+      displayName: v.displayName,
+      pause,
+      disabled,
+      pauseLabel: pauseTag(pause, today)
+    }
+  })
+})
+
+// The sentence explaining why the chosen volunteer cannot take the chosen date,
+// or null. On edit it fires only when the volunteer or date was changed, so a
+// request whose volunteer paused later still saves.
+const pauseConflict = computed(() => {
+  const date = chosenServiceDate.value
+  const volunteerId = form.value.volunteerPersonId
+  if (!pauseRuleApplies.value || !date || !volunteerId) return null
+  const option = allVolunteerOptions.value.find(v => v.value === String(volunteerId))
+  if (!option || !pauseCovers(option.pause, date)) return null
+  if (isEdit.value && existingRequest.value) {
+    const unchanged = String(existingRequest.value.volunteerPersonId || '') === String(volunteerId) &&
+      existingRequest.value.serviceDate === date
+    if (unchanged) return null
+  }
+  return pauseSentence(option.displayName || option.label, option.pause, todayCivilDateIn(PAUSE_TIME_ZONE))
 })
 
 const memberFilteredOptions = ref([])
@@ -794,6 +834,7 @@ function serverErrorDetail (err) {
 
 const handleSubmit = async (notify = false) => {
   try {
+    if (pauseConflict.value) return
     if (!form.value.villageId) {
       toast.add({ severity: 'error', summary: 'Error', detail: 'Village is required', life: 3000 })
       return
@@ -1162,10 +1203,23 @@ const openPersonDialog = (personId) => {
                   :suggestions="volunteerFilteredOptions"
                   option-label="label"
                   placeholder="Search volunteer"
+                  option-disabled="disabled"
                   :force-selection="true"
                   showClear
                   @complete="filterVolunteers"
-                />
+                >
+                  <template #option="{ option }">
+                    <span class="volunteer-option">
+                      <span>{{ option.label }}</span>
+                      <Tag
+                        v-if="option.pauseLabel"
+                        class="volunteer-pause-badge"
+                        severity="warn"
+                        :value="`⏸ ${option.pauseLabel}`"
+                      />
+                    </span>
+                  </template>
+                </AutoComplete>
                 <Button
                   v-if="form.volunteerPersonId"
                   type="button"
@@ -1178,6 +1232,13 @@ const openPersonDialog = (personId) => {
                   @click="openPersonDialog(form.volunteerPersonId)"
                 />
               </div>
+              <Message
+                v-if="pauseConflict"
+                severity="error"
+                size="small"
+                variant="simple"
+                data-testid="pause-conflict"
+              >{{ pauseConflict }}</Message>
             </div>
           </div>
 
@@ -1573,7 +1634,7 @@ const openPersonDialog = (personId) => {
                 :label="primarySaveAction.label"
                 :icon="primarySaveAction.icon"
                 :loading="isSubmitting"
-                :disabled="!isFormValid || isSubmitting"
+                :disabled="!isFormValid || isSubmitting || !!pauseConflict"
                 :model="splitButtonModel"
                 @click="handleSubmit(notifyOnPrimarySave)"
               />
@@ -1585,7 +1646,7 @@ const openPersonDialog = (personId) => {
                 :label="primarySaveAction.label"
                 :icon="primarySaveAction.icon"
                 :loading="isSubmitting"
-                :disabled="!isFormValid || isSubmitting"
+                :disabled="!isFormValid || isSubmitting || !!pauseConflict"
                 @click="handleSubmit(notifyOnPrimarySave)"
               />
             </div>
@@ -1614,6 +1675,11 @@ const openPersonDialog = (personId) => {
 </template>
 
 <style scoped>
+.volunteer-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .service-request-create-edit {
   padding: 2rem;
   max-width: 1000px;

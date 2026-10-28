@@ -21,7 +21,9 @@ vi.mock('../api/personApi.js', () => ({
     village: { villageId: '1' },
     volunteer: {
       providerType: 'Member Volunteer',
-      active: true,
+      status: 'Active',
+      dropReasonId: null,
+      statusChangeNotes: null,
       notes: 'Existing notes',
       capabilities: ['Driving'],
       vettings: [],
@@ -36,6 +38,12 @@ vi.mock('../api/personApi.js', () => ({
   ]),
   getVettingTypes: vi.fn().mockResolvedValue([]),
   getCircles: vi.fn().mockResolvedValue([]),
+}))
+vi.mock('../../Admin/api/dropReasonApi.js', () => ({
+  getVolunteerDropReasons: vi.fn().mockResolvedValue([
+    { volunteerDropReasonId: '1', name: 'Moved', retired: false },
+    { volunteerDropReasonId: '2', name: 'Too busy', retired: false },
+  ]),
 }))
 vi.mock('../api/roleApi.js', () => ({
   putVolunteer: vi.fn().mockResolvedValue({}),
@@ -103,24 +111,71 @@ describe('VolunteerEdit', () => {
     expect(screen.getByText('Driving')).toBeInTheDocument()
   })
 
-  it('saves edited notes and toggled active checkbox', async () => {
-    const { patchVolunteer } = await import('../api/roleApi.js')
+  it('save sends status, dropReasonId and statusChangeNotes, never active', async () => {
     render(VolunteerEdit, { global: globalOpts })
-
-    const notesInput = await screen.findByDisplayValue('Existing notes')
-    await fireEvent.update(notesInput, 'Updated notes')
-
-    const activeLabel = screen.getByText('Active').closest('label')
-    const activeCheckbox = activeLabel.querySelector('input[type="checkbox"]')
-    await fireEvent.click(activeCheckbox)
-
+    await fireEvent.update(await screen.findByDisplayValue('Existing notes'), 'Updated notes')
+    await fireEvent.click(document.querySelector('#status'))
+    await fireEvent.mouseDown(await screen.findByRole('option', { name: 'Dropped' }))
+    await fireEvent.click(await screen.findByLabelText('Select drop reason'))
+    await fireEvent.mouseDown(await screen.findByRole('option', { name: 'Too busy' }))
+    await fireEvent.update(document.querySelector('#statusChangeNotes'), 'Moved out of state')
     await fireEvent.click(screen.getByText('Save'))
 
     await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
     const [personId, body] = patchVolunteer.mock.calls[0]
     expect(personId).toBe('5')
-    expect(body.notes).toBe('Updated notes')
-    expect(body.active).toBe(false)
+    expect(body).toMatchObject({ notes: 'Updated notes', status: 'Dropped', dropReasonId: '2', statusChangeNotes: 'Moved out of state' })
+    expect('active' in body).toBe(false)
+  })
+
+  it('new volunteer role defaults to Pending', async () => {
+    getPerson.mockResolvedValueOnce({ personId: '5', fullName: 'Quinn, Robert', village: null, volunteer: null })
+    render(VolunteerEdit, { global: globalOpts })
+    await screen.findByText('Grant Volunteer Role')
+    expect(document.querySelector('#status').textContent).toContain('Pending')
+    await fireEvent.click(screen.getByText('Grant Volunteer Role'))
+    await waitFor(() => expect(putVolunteer).toHaveBeenCalled())
+    expect(putVolunteer.mock.calls[0][1].status).toBe('Pending')
+    expect('active' in putVolunteer.mock.calls[0][1]).toBe(false)
+  })
+
+  it('dropping without a reason blocks save', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await screen.findByDisplayValue('Existing notes')
+    await fireEvent.click(document.querySelector('#status'))
+    await fireEvent.mouseDown(await screen.findByRole('option', { name: 'Dropped' }))
+    await fireEvent.click(screen.getByText('Save'))
+    expect(await screen.findByText('A drop reason is required')).toBeInTheDocument()
+    expect(patchVolunteer).not.toHaveBeenCalled()
+  })
+
+  it('picking a reason clears the drop-reason error', async () => {
+    render(VolunteerEdit, { global: globalOpts })
+    await screen.findByDisplayValue('Existing notes')
+    await fireEvent.click(document.querySelector('#status'))
+    await fireEvent.mouseDown(await screen.findByRole('option', { name: 'Dropped' }))
+    await fireEvent.click(screen.getByText('Save'))
+    expect(await screen.findByText('A drop reason is required')).toBeInTheDocument()
+    await fireEvent.click(await screen.findByLabelText('Select drop reason'))
+    await fireEvent.mouseDown(await screen.findByRole('option', { name: 'Too busy' }))
+    await waitFor(() => expect(screen.queryByText('A drop reason is required')).toBeNull())
+  })
+
+  it('legacy dropped volunteer saves without choosing a reason', async () => {
+    getPerson.mockResolvedValueOnce({
+      personId: '5', fullName: 'Smith, Alice', village: { villageId: '1' },
+      volunteer: {
+        providerType: null, status: 'Dropped', dropReasonId: null, notes: 'Existing notes', statusChangeNotes: null,
+        capabilities: [], vettings: [], trainings: [], associateVillages: [], positions: [],
+      },
+    })
+    render(VolunteerEdit, { global: globalOpts })
+    await fireEvent.update(await screen.findByDisplayValue('Existing notes'), 'Edited')
+    await fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(patchVolunteer).toHaveBeenCalled())
+    expect(screen.queryByText('A drop reason is required')).toBeNull()
+    expect(patchVolunteer.mock.calls[0][1]).toMatchObject({ status: 'Dropped' })
+    expect('dropReasonId' in patchVolunteer.mock.calls[0][1]).toBe(false)
   })
 
   it('renders the form for a person with no home village (Hub volunteer)', async () => {
@@ -185,7 +240,7 @@ describe('VolunteerEdit', () => {
     getPerson.mockResolvedValueOnce({
       personId: '5', fullName: 'Smith, Alice', village: { villageId: '1' },
       volunteer: {
-        providerType: null, active: true, notes: 'Existing notes', capabilities: [], vettings: [], trainings: [],
+        providerType: null, status: 'Active', notes: 'Existing notes', capabilities: [], vettings: [], trainings: [],
         associateVillages: [], // Warwick already removed in this form session
         positions: [{ volunteerPositionId: '3', positionId: '3', name: 'Member Ambassador', scope: 'village', village: { villageId: '7', name: 'Warwick' }, circle: null }],
       },

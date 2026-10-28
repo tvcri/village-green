@@ -146,7 +146,7 @@ export const persons = {
   vssHouseholdSibling: person(7, villages.innsmouth.id, 'Joe', 'Swanson', '5 Marsh St', 'Innsmouth', '02882', '1962-12-12'),
 }
 
-// status 'Active' / active 1 so the active_member / active_volunteer views
+// status 'Active' so the active_member / active_volunteer views
 // (which the services select from) include the canonical rows.
 export const members = {
   quahog: { id: 1, personId: persons.quahogMember.id, memberNumber: 'Q-1001', status: 'Active' },
@@ -155,10 +155,10 @@ export const members = {
 }
 
 export const volunteers = {
-  quahog: { id: 1, personId: persons.quahogVolunteer.id, active: 1 },
-  innsmouth: { id: 2, personId: persons.innsmouthVolunteer.id, active: 1 },
-  miskatonic: { id: 3, personId: persons.miskatonicVolunteer.id, active: 1 },
-  vssSibling: { id: 4, personId: persons.vssHouseholdSibling.id, active: 1 },
+  quahog: { id: 1, personId: persons.quahogVolunteer.id, status: 'Active' },
+  innsmouth: { id: 2, personId: persons.innsmouthVolunteer.id, status: 'Active' },
+  miskatonic: { id: 3, personId: persons.miskatonicVolunteer.id, status: 'Active' },
+  vssSibling: { id: 4, personId: persons.vssHouseholdSibling.id, status: 'Active' },
 }
 
 // capabilityId values come from the scaffold's static catalog

@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import PrimeVue from 'primevue/config'
 import PersonDetailCard from './PersonDetailCard.vue'
+import { PAUSE_WORDING } from '../lib/volunteerPause.js'
 
 vi.mock('../../components/PersonMap.vue', () => ({ default: { template: '<div />' } }))
 
@@ -36,14 +37,24 @@ describe('PersonDetailCard — 0027 fields', () => {
     expect(screen.queryByText('Date unknown')).toBeNull()
   })
 
-  it('a deceased person shows Deceased in place of the member status and volunteer active line', () => {
+  it('a deceased person shows Deceased in place of the member and volunteer status tags', () => {
     mount({ ...base, deceased: true, deceasedDate: null, status: 'Active' }, 'member')
     const header = screen.getByText('Member Information').parentElement
     expect(header.querySelector('.p-tag-label').textContent).toBe('Deceased')
     expect(screen.queryByText('Active')).toBeNull()
     cleanup()
-    mount({ ...base, deceased: true, deceasedDate: null, active: true, capabilities: ['Driving'] }, 'volunteer')
-    expect(screen.getByText('Active').nextElementSibling.textContent).toBe('Deceased')
+    mount({ ...base, deceased: true, deceasedDate: null, volunteerStatus: 'Active', capabilities: ['Driving'] }, 'volunteer')
+    expect(screen.getByText('Volunteer Information').parentElement.querySelector('.p-tag-label').textContent).toBe('Deceased')
+    expect(screen.queryByText('Active')).toBeNull()
+  })
+
+  it('shows the volunteer status as a tag in the Volunteer Information header', () => {
+    mount({ ...base, volunteerStatus: 'Dropped', volunteerDropReasonName: 'Moved', volunteerStatusChangeNotes: 'Called to say so', capabilities: ['Driving'] }, 'volunteer')
+    const header = screen.getByText('Volunteer Information').parentElement
+    expect(header.querySelector('.p-tag-label').textContent).toBe('Dropped')
+    expect(screen.queryByText('Active')).toBeNull()
+    expect(screen.getByText('Drop Reason').nextElementSibling.textContent).toBe('Moved')
+    expect(screen.getByText('Status Change Notes').nextElementSibling.textContent).toBe('Called to say so')
   })
 
   it('shows the member status as a tag in the Member Information header', () => {
@@ -52,6 +63,12 @@ describe('PersonDetailCard — 0027 fields', () => {
     expect(header.querySelector('.p-tag-label').textContent).toBe('Dropped')
     expect(screen.queryByText('Status')).toBeNull()
     expect(screen.getByText('Drop Reason').nextElementSibling.textContent).toBe('Moved')
+  })
+
+  it('a member who is also a volunteer shows each role its own status', () => {
+    mount({ ...base, status: 'Active', volunteerStatus: 'Pending', capabilities: ['Driving'] }, 'member, volunteer')
+    expect(screen.getByText('Member Information').parentElement.querySelector('.p-tag-label').textContent).toBe('Active')
+    expect(screen.getByText('Volunteer Information').parentElement.querySelector('.p-tag-label').textContent).toBe('Pending')
   })
 
   it('lists languages with the preferred one marked', () => {
@@ -148,7 +165,7 @@ describe('PersonDetailCard — household links', () => {
 
 describe('PersonDetailCard — volunteer trainings and positions', () => {
   const volunteerPerson = (extra) => ({
-    personId: '1', firstName: 'Lorraine', lastName: 'Abbott', fullName: 'Abbott, Lorraine', active: true,
+    personId: '1', firstName: 'Lorraine', lastName: 'Abbott', fullName: 'Abbott, Lorraine', volunteerStatus: 'Active',
     capabilities: [], associateVillages: [], vettings: [], ...extra,
   })
 
@@ -172,9 +189,59 @@ describe('PersonDetailCard — volunteer trainings and positions', () => {
   })
 
   it('shows Volunteer Information when positions are the only volunteer data', () => {
-    mount(volunteerPerson({ active: null,
+    mount(volunteerPerson({ volunteerStatus: null,
       positions: [{ volunteerPositionId: '2', positionId: '2', name: 'Board of Directors', scope: 'federation', village: null, circle: null }],
     }), 'volunteer')
     expect(screen.getByText('Volunteer Information')).toBeInTheDocument()
+  })
+})
+
+describe('PersonDetailCard — pause beside the volunteer status tag', () => {
+  const vol = { ...base, volunteerStatus: 'Active', capabilities: ['Driving'] }
+  const actions = { 'volunteer-pause-actions': '<button data-testid="pause-open">Pause</button>' }
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-20T15:00:00Z')) })
+  afterEach(() => vi.useRealTimers())
+
+  function mountWithActions (person) {
+    return render(PersonDetailCard, {
+      props: { person, personType: 'volunteer' },
+      slots: actions,
+      global: { plugins: [PrimeVue] }
+    })
+  }
+  const header = () => screen.getByText('Volunteer Information').parentElement
+
+  it('shows no pause tag for an unpaused Active volunteer', () => {
+    mountWithActions({ ...vol, pause: null })
+    expect(screen.queryByTestId('pause-tag')).toBeNull()
+  })
+
+  it('shows the pause wording in the header, beside the status tag', () => {
+    mountWithActions({ ...vol, pause: { startDate: '2026-12-01', endDate: '2026-12-15', scope: 'window' } })
+    const tag = screen.getByTestId('pause-tag')
+    expect(tag).toHaveTextContent(`${PAUSE_WORDING.tag} Dec 1–15`)
+    expect(header()).toContainElement(tag)
+    expect(header()).toHaveTextContent('Active')
+  })
+
+  it('shows no tag once the pause has expired', () => {
+    mountWithActions({ ...vol, pause: { startDate: null, endDate: '2026-11-19', scope: 'all' } })
+    expect(screen.queryByTestId('pause-tag')).toBeNull()
+  })
+
+  it('renders the pause actions in the header', () => {
+    mountWithActions({ ...vol, pause: null })
+    expect(header()).toContainElement(screen.getByTestId('pause-open'))
+  })
+
+  it('hides tag and actions for a Dropped volunteer and a deceased person', () => {
+    const paused = { startDate: null, endDate: null, scope: 'all' }
+    mountWithActions({ ...vol, volunteerStatus: 'Dropped', pause: paused })
+    expect(screen.queryByTestId('pause-tag')).toBeNull()
+    expect(screen.queryByTestId('pause-open')).toBeNull()
+    cleanup()
+    mountWithActions({ ...vol, deceased: true, pause: paused })
+    expect(screen.queryByTestId('pause-tag')).toBeNull()
+    expect(screen.queryByTestId('pause-open')).toBeNull()
   })
 })

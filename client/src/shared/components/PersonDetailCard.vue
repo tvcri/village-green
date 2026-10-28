@@ -2,8 +2,10 @@
 import { computed, ref } from 'vue'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
+import { roleStatusTag } from '../lib/roleStatus.js'
 import PersonMap from '../../components/PersonMap.vue'
-import { formatCivilDate } from '../lib/civilDate.js'
+import { formatCivilDate, todayCivilDateIn } from '../lib/civilDate.js'
+import { PAUSE_TIME_ZONE, pauseTag } from '../lib/volunteerPause.js'
 import { positionPlace } from '../lib/positionRules.js'
 
 const props = defineProps({
@@ -88,14 +90,17 @@ const titleAside = computed(() => [
   props.person.nickname ? `“${props.person.nickname}”` : null,
   props.person.pronouns,
 ].filter(Boolean).join(' · '))
-// The member status tag in the Member Information header. A deceased
-// person's tag says Deceased, whatever the stored status.
-const MEMBER_STATUS_SEVERITY = { Active: 'success', Pending: 'secondary', Dropped: 'warn' }
-const memberStatusTag = computed(() => {
-  if (props.person.deceased) return { value: 'Deceased', severity: 'contrast' }
-  const status = props.person.status
-  return status ? { value: status, severity: MEMBER_STATUS_SEVERITY[status] ?? 'secondary' } : null
-})
+// The member status tag in the Member Information header.
+const memberStatusTag = computed(() => roleStatusTag(props.person.status, props.person.deceased))
+// The volunteer's own (see flattenRoles: a person can be both, so the
+// volunteer's status fields arrive prefixed).
+const volunteerStatusTag = computed(() => roleStatusTag(props.person.volunteerStatus, props.person.deceased))
+
+// Pause tag and actions sit beside the volunteer status tag: only an Active
+// volunteer can be paused. The wording is computed against the Eastern civil
+// date the server uses for pause rules; null means unpaused (no tag).
+const showPause = computed(() => props.person.volunteerStatus === 'Active' && !props.person.deceased)
+const pauseText = computed(() => pauseTag(props.person.pause, todayCivilDateIn(PAUSE_TIME_ZONE)))
 
 const hasContact = computed(() => !!(props.person.email || props.person.phone || props.person.cell
   || props.person.preferredContactMethod))
@@ -344,8 +349,23 @@ const copyEmail = async (email) => {
       </div>
 
       <!-- Volunteer-specific Section -->
-      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.positions?.length || person.trainings?.length || person.active != null)" class="section">
-        <h3 class="section-header">Volunteer Information</h3>
+      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.positions?.length || person.trainings?.length || person.volunteerStatus != null)" class="section">
+        <div class="section-header-row">
+          <h3 class="section-header">Volunteer Information</h3>
+          <Tag v-if="volunteerStatusTag" :value="volunteerStatusTag.value" :severity="volunteerStatusTag.severity" class="member-status-tag" />
+          <template v-if="showPause">
+            <Tag v-if="pauseText" :value="pauseText" severity="info" icon="pi pi-pause" class="member-status-tag" data-testid="pause-tag" />
+            <slot name="volunteer-pause-actions" />
+          </template>
+        </div>
+        <div v-if="person.volunteerStatus === 'Dropped' && person.volunteerDropReasonName" class="detail-field">
+          <span class="label">Drop Reason</span>
+          <span class="value">{{ person.volunteerDropReasonName }}</span>
+        </div>
+        <div v-if="person.volunteerStatusChangeNotes" class="detail-field notes-field">
+          <span class="label">Status Change Notes</span>
+          <span class="value">{{ person.volunteerStatusChangeNotes }}</span>
+        </div>
         <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities</span>
           <div class="capabilities-list">
@@ -382,10 +402,6 @@ const copyEmail = async (email) => {
           <span class="value">{{ line.text }}</span>
         </div>
 
-        <div v-if="person.active != null" class="detail-field">
-          <span class="label">Active</span>
-          <span class="value">{{ person.deceased ? 'Deceased' : (person.active ? 'Yes' : 'No') }}</span>
-        </div>
         <template v-if="person.vettings?.length">
           <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
             <span class="label">{{ vetting.name }}</span>
@@ -540,7 +556,8 @@ const copyEmail = async (email) => {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
 }
 
 .subgroup {

@@ -37,7 +37,7 @@ async function sanity (dataset) {
       (SELECT COUNT(*) FROM member) m,
       (SELECT COUNT(*) FROM member WHERE status = 'Active') am,
       (SELECT COUNT(*) FROM volunteer) vol,
-      (SELECT COUNT(*) FROM volunteer WHERE active = 1) avol,
+      (SELECT COUNT(*) FROM volunteer WHERE status = 'Active') avol,
       (SELECT COUNT(*) FROM service_request) sr,
       (SELECT COUNT(*) FROM service_request WHERE status IN ('Confirmed','Completed') AND volunteerPersonId IS NULL) bad,
       (SELECT COUNT(*) FROM user_data) u,

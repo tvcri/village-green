@@ -81,3 +81,31 @@ module.exports.deletePersonVolunteer = async function deletePersonVolunteer (req
   }
   catch (err) { next(err) }
 }
+
+module.exports.putPersonVolunteerPause = async function putPersonVolunteerPause (req, res, next) {
+  try {
+    const personId = req.params.personId
+    const person = await PersonService.getPerson(personId)
+    if (!person || !(await VolunteerService.volunteerExists(personId))) throw new SmError.NotFoundError()
+    if (!hasPermission(req.userObject, 'volunteer:write', { villageId: person.village?.villageId })) {
+      throw new SmError.PrivilegeError()
+    }
+    const response = await VolunteerService.putVolunteerPause(personId, req.body, req.userObject)
+    res.json(response)
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.deletePersonVolunteerPause = async function deletePersonVolunteerPause (req, res, next) {
+  try {
+    const personId = req.params.personId
+    const person = await PersonService.getPerson(personId)
+    if (!person || !(await VolunteerService.volunteerExists(personId))) throw new SmError.NotFoundError()
+    if (!hasPermission(req.userObject, 'volunteer:write', { villageId: person.village?.villageId })) {
+      throw new SmError.PrivilegeError()
+    }
+    await VolunteerService.deleteVolunteerPause(personId, req.userObject.userId)
+    res.status(204).end()
+  }
+  catch (err) { next(err) }
+}

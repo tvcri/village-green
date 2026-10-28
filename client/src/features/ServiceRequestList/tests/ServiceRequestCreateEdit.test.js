@@ -3,6 +3,7 @@ import { render, screen, waitFor, cleanup } from '@testing-library/vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import ServiceRequestCreateEdit from '../components/ServiceRequestCreateEdit.vue'
+import { PAUSE_WORDING } from '../../../shared/lib/volunteerPause.js'
 
 const routeParams = { value: {} }
 // Shared spy (vi.hoisted, same reasoning as toastAdd below) so tests can
@@ -1134,6 +1135,149 @@ describe('#27233 — a cancelled request that already has a volunteer', () => {
     const [, , payload] = apiCall.mock.calls.at(-1)
     expect(payload.description).toBe('edited note')
     expect(payload.status).toBe('Member cancelled')
+  })
+})
+
+describe('volunteer pause on the request form', () => {
+  // Far-future dates with a fake clock in the same year, so the no-year copy
+  // is deterministic. Only Date is faked; waitFor still needs real timers.
+  const volunteers = [
+    { personId: '9', personFullName: 'Example, Pat', displayName: 'Pat Example', pause: { startDate: '2030-03-01', endDate: '2030-03-15', scope: 'window' } },
+    { personId: '10', personFullName: 'Sample, Sam', displayName: 'Sam Sample', pause: { startDate: null, endDate: null, scope: 'all' } },
+    { personId: '11', personFullName: 'Other, Olive', displayName: 'Olive Other', pause: null }
+  ]
+  const editRequest = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Errand: Shopping', serviceDate: '2030-03-10',
+    status: 'Confirmed', volunteerPersonId: '9'
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2030-01-15T12:00:00Z'))
+    const { getVillageVolunteers } = await import('../../VolunteerList/api/volunteerApi.js')
+    getVillageVolunteers.mockResolvedValue(volunteers)
+  })
+  afterEach(() => vi.useRealTimers())
+
+  async function mountCreateWithVolunteers () {
+    const vm = await mountAndExpose()
+    vm.form.villageId = '1'
+    await waitFor(() => expect(vm.allVolunteerOptions.length).toBe(3))
+    return vm
+  }
+  const option = (vm, id) => vm.allVolunteerOptions.find(o => o.value === id)
+  const saveButton = () => screen.getByText(/^Save/).closest('button')
+
+  it('a volunteer paused on the chosen date is listed but disabled', async () => {
+    const vm = await mountCreateWithVolunteers()
+    vm.form.serviceDate = new Date(2030, 2, 10)
+    await waitFor(() => expect(option(vm, '9').disabled).toBe(true))
+    expect(option(vm, '9').pauseLabel).toBe(`${PAUSE_WORDING.tag} Mar 1–15`)
+    expect(option(vm, '11').disabled).toBe(false)
+  })
+
+  it('a date outside the pause leaves the volunteer selectable', async () => {
+    const vm = await mountCreateWithVolunteers()
+    vm.form.serviceDate = new Date(2030, 2, 16)
+    await waitFor(() => expect(option(vm, '9').disabled).toBe(false))
+  })
+
+  it('a no-end pause is disabled before a date is chosen', async () => {
+    const vm = await mountCreateWithVolunteers()
+    expect(option(vm, '10').disabled).toBe(true)
+    expect(option(vm, '9').disabled).toBe(false)
+  })
+
+  it('choosing a covered date after the volunteer shows the error and disables Save', async () => {
+    const vm = await mountCreateWithVolunteers()
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Errand: Shopping'
+    vm.form.serviceDate = new Date(2030, 2, 20)
+    vm.selectedVolunteer = option(vm, '9')
+    await waitFor(() => expect(saveButton().disabled).toBe(false))
+    expect(vm.pauseConflict).toBeNull()
+
+    vm.form.serviceDate = new Date(2030, 2, 10)
+    await waitFor(() => expect(screen.getByTestId('pause-conflict')).toBeTruthy())
+    expect(saveButton().disabled).toBe(true)
+  })
+
+  it('choosing the volunteer after a covered date is impossible', async () => {
+    const vm = await mountCreateWithVolunteers()
+    vm.form.serviceDate = new Date(2030, 2, 10)
+    await waitFor(() => expect(option(vm, '9').disabled).toBe(true))
+    expect(vm.pauseConflict).toBeNull()
+  })
+
+  it('changing the date out of the pause clears the error', async () => {
+    const vm = await mountCreateWithVolunteers()
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Errand: Shopping'
+    vm.selectedVolunteer = option(vm, '9')
+    vm.form.serviceDate = new Date(2030, 2, 10)
+    await waitFor(() => expect(screen.getByTestId('pause-conflict')).toBeTruthy())
+
+    vm.form.serviceDate = new Date(2030, 3, 2)
+    await waitFor(() => expect(screen.queryByTestId('pause-conflict')).toBeNull())
+    expect(saveButton().disabled).toBe(false)
+  })
+
+  it('edit with unchanged volunteer and date keeps Save enabled', async () => {
+    const vm = await mountEditAndExpose(editRequest)
+    await waitFor(() => expect(vm.allVolunteerOptions.length).toBe(3))
+    expect(vm.pauseConflict).toBeNull()
+    expect(screen.queryByTestId('pause-conflict')).toBeNull()
+    await waitFor(() => expect(saveButton().disabled).toBe(false))
+  })
+
+  it('edit that moves the date into the pause shows the error', async () => {
+    const vm = await mountEditAndExpose({ ...editRequest, serviceDate: '2030-04-10' })
+    await waitFor(() => expect(vm.allVolunteerOptions.length).toBe(3))
+    expect(vm.pauseConflict).toBeNull()
+    vm.form.serviceDate = new Date(2030, 2, 5)
+    await waitFor(() => expect(vm.pauseConflict).toBeTruthy())
+    expect(saveButton().disabled).toBe(true)
+  })
+
+  it('submitting while a pause conflict is set makes no API call', async () => {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    const vm = await mountCreateWithVolunteers()
+    vm.form.memberPersonId = '7'
+    vm.form.serviceName = 'Errand: Shopping'
+    vm.selectedVolunteer = option(vm, '9')
+    vm.form.serviceDate = new Date(2030, 2, 10)
+    await waitFor(() => expect(vm.pauseConflict).toBeTruthy())
+    apiCall.mockClear()
+    await vm.handleSubmit(false)
+    expect(apiCall).not.toHaveBeenCalled()
+
+    // Positive control: the same form submits once the conflict is gone.
+    vm.form.serviceDate = new Date(2030, 3, 2)
+    await waitFor(() => expect(vm.pauseConflict).toBeNull())
+    await vm.handleSubmit(false)
+    await waitFor(() => expect(apiCall).toHaveBeenCalledTimes(1))
+  })
+
+  it('error copy is the pause sentence', async () => {
+    const vm = await mountCreateWithVolunteers()
+    vm.selectedVolunteer = option(vm, '9')
+    vm.form.serviceDate = new Date(2030, 2, 10)
+    await waitFor(() => expect(screen.getByTestId('pause-conflict').textContent).toBe(`${PAUSE_WORDING.sentence('Pat Example')} Mar 1 – Mar 15.`))
+  })
+
+  it('recording Completed with a paused volunteer is allowed', async () => {
+    const vm = await mountEditAndExpose({ ...editRequest, serviceDate: '2030-04-10', status: 'Member cancelled', volunteerPersonId: null })
+    await waitFor(() => expect(vm.allVolunteerOptions.length).toBe(3))
+    vm.form.status = 'Completed'
+    vm.form.serviceDate = new Date(2030, 2, 10)
+    vm.selectedVolunteer = option(vm, '9')
+    await waitFor(() => expect(vm.form.volunteerPersonId).toBe('9'))
+    expect(option(vm, '9').disabled).toBe(false)
+    expect(option(vm, '10').disabled).toBe(false)
+    expect(vm.pauseConflict).toBeNull()
+    expect(screen.queryByTestId('pause-conflict')).toBeNull()
+    expect(saveButton().disabled).toBe(false)
   })
 })
 

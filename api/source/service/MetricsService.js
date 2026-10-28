@@ -105,12 +105,11 @@ module.exports.getMetaMetricsPersons = async function ({ villageIds, personVilla
 
   const [members, volunteers] = await Promise.all([
     roster('member', 'memberPersonId', `r.status = 'Active'`, 'r.status'),
-    roster('volunteer', 'volunteerPersonId', 'r.active = 1', 'r.active')
+    roster('volunteer', 'volunteerPersonId', `r.status = 'Active'`, 'r.status')
   ])
   return {
     range: { start, end },
     members: members.map(m => ({ ...m, deceased: m.deceased === true })),
-    // volunteer.active is a nullable BIT(1); the pool casts it to boolean or null.
-    volunteers: volunteers.map(v => ({ ...v, active: v.active === true, deceased: v.deceased === true }))
+    volunteers: volunteers.map(v => ({ ...v, deceased: v.deceased === true }))
   }
 }

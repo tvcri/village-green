@@ -19,7 +19,7 @@ test('vetting notes and additionalData survive a save and come back', async () =
   const p = await vgCall('createPerson', {}, { token: staff, body: { villageId: String(villages.scratch.id), firstName: 'Throwaway', lastName: 'Vet' } })
   const personId = p.json.personId
   const vettings = [{ vettingTypeId, dateEntered: '2026-02-02', dateExpired: null, additionalData: 'ref 42', notes: 'email from Joanne' }]
-  const put = await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { active: true, vettings } })
+  const put = await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { status: 'Active', vettings } })
   assert.equal(put.status, 200)
   const v = put.json.volunteer.vettings[0]
   assert.equal(v.notes, 'email from Joanne')

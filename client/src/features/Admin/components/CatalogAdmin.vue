@@ -17,13 +17,16 @@ import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
 import { getTrainings, createTraining, patchTraining, deleteTraining } from '../../Trainings/api/trainingApi.js'
 import { getPositions, createPosition, patchPosition, deletePosition } from '../../Positions/api/positionApi.js'
-import { getMemberDropReasons, createMemberDropReason, patchMemberDropReason, deleteMemberDropReason } from '../api/dropReasonApi.js'
+import {
+  getMemberDropReasons, createMemberDropReason, patchMemberDropReason, deleteMemberDropReason,
+  getVolunteerDropReasons, createVolunteerDropReason, patchVolunteerDropReason, deleteVolunteerDropReason,
+} from '../api/dropReasonApi.js'
 import { apiErrorMessage } from '../../../shared/api/apiClient.js'
 import { plural } from '../../../shared/lib.js'
 import { scopeLabel } from '../../../shared/lib/positionRules.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 
-const props = defineProps({ kind: { type: String, required: true } }) // 'training' | 'position' | 'memberDropReason'
+const props = defineProps({ kind: { type: String, required: true } }) // 'training' | 'position' | 'memberDropReason' | 'volunteerDropReason'
 
 const CONFIG = {
   training: {
@@ -42,6 +45,12 @@ const CONFIG = {
     subtitle: 'The reasons staff can choose when they mark a member Dropped. Retire a reason to stop offering it; members who already have it keep it.',
     create: createMemberDropReason, patch: patchMemberDropReason, remove: deleteMemberDropReason,
   },
+  volunteerDropReason: {
+    title: 'Drop Reasons', singular: 'drop reason', idKey: 'volunteerDropReasonId', countHeader: 'Volunteers', hasScope: false,
+    holderNoun: 'volunteer', permission: 'drop_reason:admin', hasRetired: true,
+    subtitle: 'The reasons staff can choose when they mark a volunteer Dropped. Retire a reason to stop offering it; volunteers who already have it keep it.',
+    create: createVolunteerDropReason, patch: patchVolunteerDropReason, remove: deleteVolunteerDropReason,
+  },
 }
 const cfg = computed(() => CONFIG[props.kind])
 useRequirePermission(cfg.value.permission ?? `${props.kind}:admin`)
@@ -51,7 +60,7 @@ const toast = useToast()
 const trainings = ref([])
 const positions = ref([])
 const dropReasons = ref([])
-const rows = computed(() => [...({ training: trainings, position: positions, memberDropReason: dropReasons }[props.kind].value)]
+const rows = computed(() => [...({ training: trainings, position: positions, memberDropReason: dropReasons, volunteerDropReason: dropReasons }[props.kind].value)]
   .sort((a, b) => a.name.localeCompare(b.name)))
 const trainingName = (id) => trainings.value.find(t => t.trainingId === id)?.name
 const positionsExpecting = (trainingId) => positions.value.filter(p => p.trainingIds.includes(trainingId))
@@ -64,6 +73,7 @@ const inactiveNote = (row) => (row?.inactiveHolderCount ? ` (${row.inactiveHolde
 
 async function load () {
   if (props.kind === 'memberDropReason') { dropReasons.value = await getMemberDropReasons(); return }
+  if (props.kind === 'volunteerDropReason') { dropReasons.value = await getVolunteerDropReasons(); return }
   const [t, p] = await Promise.all([getTrainings(), getPositions()])
   trainings.value = t
   positions.value = p

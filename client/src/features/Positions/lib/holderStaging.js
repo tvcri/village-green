@@ -26,7 +26,7 @@ export function holderGroups ({ position, holders, villages, circles, adds }) {
 // position there (village positions: own or associate village). Everyone else
 // is left out rather than listed greyed (agreed with staff 2026-10-08).
 export function isPositionCandidate (volunteer, group, position) {
-  if (!volunteer.active) return false
+  if (volunteer.status !== 'Active') return false
   const associates = (volunteer.associateVillages ?? []).map(v => v.villageId)
   return isPositionEligible({ scope: position.scope, villageId: group.villageId }, volunteer.village?.villageId, associates)
 }

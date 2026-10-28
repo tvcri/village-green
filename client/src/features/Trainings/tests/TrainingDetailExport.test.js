@@ -32,9 +32,9 @@ import { createSheet } from '../../../shared/services/googleSheetsService.js'
 
 const barrington = { villageId: '1', name: 'Barrington' }
 const warwick = { villageId: '7', name: 'Warwick' }
-const abbott = { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, active: true }
-const nguyen = { personId: '3', fullName: 'Nguyen, Linh', displayName: 'Linh Nguyen', village: warwick, active: false }
-const quinn = { personId: '16', fullName: 'Quinn, Robert', displayName: 'Robert Quinn', village: null, active: true }
+const abbott = { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, status: 'Active' }
+const nguyen = { personId: '3', fullName: 'Nguyen, Linh', displayName: 'Linh Nguyen', village: warwick, status: 'Dropped' }
+const quinn = { personId: '16', fullName: 'Quinn, Robert', displayName: 'Robert Quinn', village: null, status: 'Active' }
 
 // getPersons summary rows: email/phone at the root, the rest under `detail`.
 const personRow = (p, first, last, extra = {}) => ({
@@ -95,7 +95,7 @@ describe('TrainingDetail export', () => {
     expect(lines[1]).toMatch(/^"Abbott, Lorraine",Barrington,Active,2026-05-12,"Refresher, spring",Lorraine,,Abbott,/)
     expect(lines[2]).toMatch(/^"Abbott, Lorraine",Barrington,Active,2025-04-01,,Lorraine,,Abbott,/)
     // Undated: blank, never "No date" and never a reformatted date.
-    expect(lines[3]).toMatch(/^"Nguyen, Linh",Warwick,Inactive,,,Linh,,Nguyen,/)
+    expect(lines[3]).toMatch(/^"Nguyen, Linh",Warwick,Dropped,,,Linh,,Nguyen,/)
     expect(lines[4]).toMatch(/^"Quinn, Robert",Hub volunteer,Active,2026-01-20,,Robert,,Quinn,Jr\.,/)
     expect(lines[1]).toContain('lorraine@example.com,401-555-0100,401-555-0199')
     expect(lines[1]).toContain('1950-02-03')
