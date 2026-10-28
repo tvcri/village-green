@@ -57,7 +57,7 @@ test('only an Active volunteer can be paused', async () => {
   const personId = await makeVolunteer('PPending', 'Pending')
   const res = await pause(personId, { startDate: null, endDate: null, scope: 'all' })
   assert.equal(res.status, 422)
-  assert.match(text(res), /Only an Active volunteer can be paused\./)
+  assert.match(text(res), /Active volunteer/)
 })
 
 test('window without both dates is 422; start after end is 422', async () => {

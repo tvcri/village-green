@@ -3,6 +3,14 @@
 // pauseCovers and pauseSentence mirror api/source/service/volunteerPause.js;
 // keep the wording identical.
 
+// User-facing pause wording lives here and nowhere else in the client, so a
+// copy change is one edit. The sentence must stay identical to PAUSE_WORDING
+// in api/source/service/volunteerPause.js (one pinned test on each side).
+export const PAUSE_WORDING = {
+  tag: 'Email paused',
+  sentence: (displayName) => `Service email for ${displayName} is paused`,
+}
+
 // The zone the server computes "today" in for pause rules.
 export const PAUSE_TIME_ZONE = 'America/New_York'
 
@@ -44,17 +52,17 @@ export function pauseTag (pause, today) {
   const state = pauseState(pause, today)
   if (state === 'none' || state === 'expired') return null
   const { startDate, endDate, scope } = pause
-  if (scope === 'window' && startDate && endDate) return `Paused ${formatRange(startDate, endDate, today)}`
+  if (scope === 'window' && startDate && endDate) return `${PAUSE_WORDING.tag} ${formatRange(startDate, endDate, today)}`
   if (state === 'scheduled') {
-    return endDate ? `Paused ${formatRange(startDate, endDate, today)}` : `Paused from ${formatPauseDate(startDate, today)}`
+    return endDate ? `${PAUSE_WORDING.tag} ${formatRange(startDate, endDate, today)}` : `${PAUSE_WORDING.tag} from ${formatPauseDate(startDate, today)}`
   }
-  return endDate ? `Paused until ${formatPauseDate(endDate, today)}` : 'Paused'
+  return endDate ? `${PAUSE_WORDING.tag} until ${formatPauseDate(endDate, today)}` : PAUSE_WORDING.tag
 }
 
 export function pauseSentence (displayName, pause, today) {
   const { startDate, endDate } = pause
-  if (startDate && endDate) return `${displayName} is paused ${formatPauseDate(startDate, today)} – ${formatPauseDate(endDate, today)}.`
-  if (startDate) return `${displayName} is paused from ${formatPauseDate(startDate, today)}.`
-  if (endDate) return `${displayName} is paused until ${formatPauseDate(endDate, today)}.`
-  return `${displayName} is paused.`
+  if (startDate && endDate) return `${PAUSE_WORDING.sentence(displayName)} ${formatPauseDate(startDate, today)} – ${formatPauseDate(endDate, today)}.`
+  if (startDate) return `${PAUSE_WORDING.sentence(displayName)} from ${formatPauseDate(startDate, today)}.`
+  if (endDate) return `${PAUSE_WORDING.sentence(displayName)} until ${formatPauseDate(endDate, today)}.`
+  return `${PAUSE_WORDING.sentence(displayName)}.`
 }

@@ -26,15 +26,19 @@ async function mount (pause = null) {
     props: { visible: true, personId: '5', pause },
     global: { plugins: [PrimeVue] }
   })
-  await screen.findByText('Pause Volunteer')
+  await screen.findByRole('dialog')
   return r
 }
-const windowRadio = () => screen.getByLabelText(/Only requests with a service date in these dates/)
+// Found by id and test id, never by wording: the copy is still being reworked.
+const allRadio = () => document.getElementById('pause-scope-all')
+const windowRadio = () => document.getElementById('pause-scope-window')
+const saveButton = () => screen.getByTestId('pause-save')
+const unpauseButton = () => screen.queryByTestId('pause-unpause')
 
 describe('VolunteerPauseDialog', () => {
-  it('renders both scope labels', async () => {
+  it('offers both scopes, all selected by default', async () => {
     await mount(null)
-    expect(screen.getByLabelText('All new-request emails')).toBeInTheDocument()
+    expect(allRadio()).toBeChecked()
     expect(windowRadio()).toBeInTheDocument()
   })
 
@@ -48,7 +52,7 @@ describe('VolunteerPauseDialog', () => {
 
   it('Save sends civil date strings and scope', async () => {
     const { emitted } = await mount({ startDate: '2026-12-01', endDate: '2026-12-15', scope: 'window' })
-    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await fireEvent.click(saveButton())
     await waitFor(() => expect(putVolunteerPause).toHaveBeenCalledWith('5',
       { startDate: '2026-12-01', endDate: '2026-12-15', scope: 'window' }))
     await waitFor(() => expect(emitted().saved).toHaveLength(1))
@@ -57,29 +61,29 @@ describe('VolunteerPauseDialog', () => {
 
   it('Unpause shows only when a pause exists and calls delete', async () => {
     await mount(null)
-    expect(screen.queryByRole('button', { name: 'Unpause' })).toBeNull()
+    expect(unpauseButton()).toBeNull()
     cleanup()
     const { emitted } = await mount({ startDate: null, endDate: null, scope: 'all' })
-    await fireEvent.click(screen.getByRole('button', { name: 'Unpause' }))
+    await fireEvent.click(unpauseButton())
     await waitFor(() => expect(deleteVolunteerPause).toHaveBeenCalledWith('5'))
     await waitFor(() => expect(emitted().saved).toHaveLength(1))
   })
 
   it('blank dates send null', async () => {
     await mount(null)
-    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await fireEvent.click(saveButton())
     await waitFor(() => expect(putVolunteerPause).toHaveBeenCalledWith('5',
       { startDate: null, endDate: null, scope: 'all' }))
   })
 
   it('a past end date shows the warning and Save stays enabled', async () => {
     await mount({ startDate: null, endDate: '2026-11-19', scope: 'all' })
-    expect(screen.getByText('The end date has passed, so this pause would have no effect.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.getByTestId('pause-end-passed')).toBeInTheDocument()
+    expect(saveButton()).toBeEnabled()
   })
 
   it('no warning when the end date is today', async () => {
     await mount({ startDate: null, endDate: '2026-11-20', scope: 'all' })
-    expect(screen.queryByText(/end date has passed/)).toBeNull()
+    expect(screen.queryByTestId('pause-end-passed')).toBeNull()
   })
 })

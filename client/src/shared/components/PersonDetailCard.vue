@@ -96,10 +96,11 @@ const memberStatusTag = computed(() => roleStatusTag(props.person.status, props.
 // volunteer's status fields arrive prefixed).
 const volunteerStatusTag = computed(() => roleStatusTag(props.person.volunteerStatus, props.person.deceased))
 
-// New-request emails: only an Active volunteer can be paused. The wording is
-// computed against the Eastern civil date the server uses for pause rules.
-const showPauseRow = computed(() => props.person.volunteerStatus === 'Active' && !props.person.deceased)
-const pauseText = computed(() => pauseTag(props.person.pause, todayCivilDateIn(PAUSE_TIME_ZONE)) ?? 'Sending')
+// Pause tag and actions sit beside the volunteer status tag: only an Active
+// volunteer can be paused. The wording is computed against the Eastern civil
+// date the server uses for pause rules; null means unpaused (no tag).
+const showPause = computed(() => props.person.volunteerStatus === 'Active' && !props.person.deceased)
+const pauseText = computed(() => pauseTag(props.person.pause, todayCivilDateIn(PAUSE_TIME_ZONE)))
 
 const hasContact = computed(() => !!(props.person.email || props.person.phone || props.person.cell
   || props.person.preferredContactMethod))
@@ -352,6 +353,10 @@ const copyEmail = async (email) => {
         <div class="section-header-row">
           <h3 class="section-header">Volunteer Information</h3>
           <Tag v-if="volunteerStatusTag" :value="volunteerStatusTag.value" :severity="volunteerStatusTag.severity" class="member-status-tag" />
+          <template v-if="showPause">
+            <Tag v-if="pauseText" :value="pauseText" severity="info" icon="pi pi-pause" class="member-status-tag" data-testid="pause-tag" />
+            <slot name="volunteer-pause-actions" />
+          </template>
         </div>
         <div v-if="person.volunteerStatus === 'Dropped' && person.volunteerDropReasonName" class="detail-field">
           <span class="label">Drop Reason</span>
@@ -360,13 +365,6 @@ const copyEmail = async (email) => {
         <div v-if="person.volunteerStatusChangeNotes" class="detail-field notes-field">
           <span class="label">Status Change Notes</span>
           <span class="value">{{ person.volunteerStatusChangeNotes }}</span>
-        </div>
-        <div v-if="showPauseRow" class="detail-field">
-          <span class="label">New-request emails</span>
-          <span class="value pause-row">
-            {{ pauseText }}
-            <slot name="volunteer-pause-actions" />
-          </span>
         </div>
         <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities</span>
@@ -524,13 +522,6 @@ const copyEmail = async (email) => {
   color: var(--color-text-dim);
 }
 
-.pause-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-}
-
 .value {
   color: var(--color-text-primary);
   font-size: 1rem;
@@ -565,7 +556,8 @@ const copyEmail = async (email) => {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
 }
 
 .subgroup {

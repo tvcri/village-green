@@ -58,7 +58,7 @@ const flatPerson = computed(() => {
   return flattenRoles(rest, member, volunteer)
 })
 
-// New-request emails row (Volunteer Information panel). A scheduled or active
+// Pause actions beside the volunteer status tag. A scheduled or active
 // pause offers Change + Unpause; none or expired offers Pause….
 const pauseDialogOpen = ref(false)
 const hasLivePause = computed(() => {
@@ -68,19 +68,19 @@ const hasLivePause = computed(() => {
 
 function unpauseVolunteer () {
   confirm.require({
-    header: 'Unpause Volunteer',
-    message: 'Unpause this volunteer? They will be emailed about new requests and can be assigned again.',
+    header: 'Unpause Service Email',
+    message: 'Unpause service email? This volunteer will be emailed about new requests again and can be assigned to requests in the paused dates.',
     acceptLabel: 'Unpause',
     rejectLabel: 'Cancel',
     rejectProps: { severity: 'secondary' },
     accept: async () => {
       try {
         await deleteVolunteerPause(personId.value)
-        toast.add({ severity: 'success', summary: 'Volunteer unpaused', life: 2000 })
+        toast.add({ severity: 'success', summary: 'Service email unpaused', life: 2000 })
         await refresh()
       }
       catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to unpause', life: 3000 })
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to unpause service email', life: 3000 })
       }
     }
   })
@@ -139,10 +139,10 @@ function removePerson () {
       :has-volunteer-detail="hasVolunteerDetail"
     >
       <template v-if="canWriteVolunteer" #volunteer-pause-actions>
-        <Button v-if="!hasLivePause" label="Pause…" link size="small" @click="pauseDialogOpen = true" />
+        <Button v-if="!hasLivePause" label="Pause service email…" icon="pi pi-pause" outlined size="small" data-testid="pause-open" @click="pauseDialogOpen = true" />
         <template v-else>
-          <Button label="Change" link size="small" @click="pauseDialogOpen = true" />
-          <Button label="Unpause" link size="small" @click="unpauseVolunteer" />
+          <Button label="Change" icon="pi pi-pencil" outlined size="small" data-testid="pause-change" @click="pauseDialogOpen = true" />
+          <Button label="Unpause" icon="pi pi-play" outlined size="small" data-testid="pause-unpause" @click="unpauseVolunteer" />
         </template>
       </template>
     </PersonDetailCard>

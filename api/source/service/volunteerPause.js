@@ -4,6 +4,13 @@
 // end: compared lexicographically, formatted by splitting, never hydrated
 // into a JS Date.
 
+// User-facing wording, in one place. The sentence must stay identical to
+// PAUSE_WORDING in client/src/shared/lib/volunteerPause.js (one pinned test
+// on each side).
+const PAUSE_WORDING = {
+  sentence: (displayName) => `Service email for ${displayName} is paused`,
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 // Inclusive on both ends; a null bound is open.
@@ -22,10 +29,10 @@ function formatPauseDate (date, today) {
 
 function pauseSentence (displayName, pause, today) {
   const { startDate, endDate } = pause
-  if (startDate && endDate) return `${displayName} is paused ${formatPauseDate(startDate, today)} – ${formatPauseDate(endDate, today)}.`
-  if (startDate) return `${displayName} is paused from ${formatPauseDate(startDate, today)}.`
-  if (endDate) return `${displayName} is paused until ${formatPauseDate(endDate, today)}.`
-  return `${displayName} is paused.`
+  if (startDate && endDate) return `${PAUSE_WORDING.sentence(displayName)} ${formatPauseDate(startDate, today)} – ${formatPauseDate(endDate, today)}.`
+  if (startDate) return `${PAUSE_WORDING.sentence(displayName)} from ${formatPauseDate(startDate, today)}.`
+  if (endDate) return `${PAUSE_WORDING.sentence(displayName)} until ${formatPauseDate(endDate, today)}.`
+  return `${PAUSE_WORDING.sentence(displayName)}.`
 }
 
 // Scalar subquery for a volunteer read: the pause object, or NULL.
@@ -54,4 +61,4 @@ async function findCoveringPause (connection, volunteerPersonId, date) {
   return rows[0] ?? null
 }
 
-module.exports = { pauseCovers, pauseSentence, pauseJsonSql, findCoveringPause }
+module.exports = { PAUSE_WORDING, pauseCovers, pauseSentence, pauseJsonSql, findCoveringPause }

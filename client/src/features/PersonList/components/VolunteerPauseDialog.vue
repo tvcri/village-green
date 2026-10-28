@@ -59,30 +59,28 @@ async function run (call, done, failed) {
 
 const save = () => run(
   () => putVolunteerPause(props.personId, { startDate: startDate.value, endDate: endDate.value, scope: scope.value }),
-  'Pause saved', 'Failed to save the pause')
-const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Volunteer unpaused', 'Failed to unpause')
+  'Service email paused', 'Failed to pause service email')
+const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Service email unpaused', 'Failed to unpause service email')
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" modal header="Pause Volunteer" :style="{ width: '28rem' }">
+  <Dialog v-model:visible="visible" modal header="Pause Service Email" :style="{ width: '28rem' }">
     <div class="pause-form">
       <div class="field">
         <label for="pause-start">Start date</label>
-        <DatePicker inputId="pause-start" :modelValue="serviceDateToDate(startDate)" dateFormat="mm/dd/yy" showIcon showButtonBar fluid
+        <DatePicker inputId="pause-start" :modelValue="serviceDateToDate(startDate)" dateFormat="mm/dd/yy" placeholder="Today if blank" showIcon showButtonBar fluid
                     @update:modelValue="d => { startDate = dateToServiceDate(d) }" />
-        <small class="help">Today if blank</small>
       </div>
       <div class="field">
         <label for="pause-end">End date</label>
-        <DatePicker inputId="pause-end" :modelValue="serviceDateToDate(endDate)" dateFormat="mm/dd/yy" showIcon showButtonBar fluid
+        <DatePicker inputId="pause-end" :modelValue="serviceDateToDate(endDate)" dateFormat="mm/dd/yy" placeholder="Until unpaused" showIcon showButtonBar fluid
                     @update:modelValue="d => { endDate = dateToServiceDate(d) }" />
-        <small class="help">Until unpaused</small>
       </div>
-      <Message v-if="endPassed" severity="warn" :closable="false">The end date has passed, so this pause would have no effect.</Message>
+      <Message v-if="endPassed" severity="warn" :closable="false" data-testid="pause-end-passed">The end date has passed, so this pause would have no effect.</Message>
       <fieldset class="scope">
         <legend>Applies to</legend>
-        <label class="radio"><RadioButton v-model="scope" value="all" inputId="pause-scope-all" /> All new-request emails</label>
-        <small class="help">No new-request emails while paused. Can't be assigned to requests dated in the pause.</small>
+        <label class="radio"><RadioButton v-model="scope" value="all" inputId="pause-scope-all" /> All open-request emails</label>
+        <small class="help">No open-request emails while paused. Can't be assigned to requests dated in the pause.</small>
         <label class="radio" :class="{ disabled: !windowAllowed }">
           <RadioButton v-model="scope" value="window" inputId="pause-scope-window" :disabled="!windowAllowed" /> Only requests with a service date in these dates
         </label>
@@ -91,9 +89,9 @@ const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Volunteer
       <Message v-if="errorText" severity="error" :closable="false">{{ errorText }}</Message>
     </div>
     <template #footer>
-      <Button v-if="pause" label="Unpause" severity="danger" text :disabled="saving" @click="unpause" />
-      <Button label="Cancel" severity="secondary" text :disabled="saving" @click="visible = false" />
-      <Button label="Save" :loading="saving" @click="save" />
+      <Button v-if="pause" label="Unpause" severity="danger" text :disabled="saving" data-testid="pause-unpause" @click="unpause" />
+      <Button label="Cancel" severity="secondary" text :disabled="saving" data-testid="pause-cancel" @click="visible = false" />
+      <Button label="Save" :loading="saving" data-testid="pause-save" @click="save" />
     </template>
   </Dialog>
 </template>
@@ -105,5 +103,7 @@ const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Volunteer
 .scope { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .scope legend { font-size: 0.875rem; margin-bottom: 0.25rem; }
 .radio { display: flex; align-items: center; gap: 0.5rem; }
+/* Separates the second option from the first option's hint. */
+.help + .radio { margin-top: 0.75rem; }
 .radio.disabled { opacity: 0.6; }
 </style>

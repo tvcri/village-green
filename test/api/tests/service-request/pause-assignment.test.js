@@ -38,7 +38,9 @@ async function setPause (personId, body) {
 }
 
 const window = { startDate: '2030-03-01', endDate: '2030-03-15', scope: 'window' }
-const SENTENCE = /Pat \w+ is paused Mar 1, 2030 – Mar 15, 2030\./
+// Asserts the name and the dates (the logic), not the wording: the sentence's
+// wording is pinned once, in api/source/test/volunteerPause.test.js.
+const SENTENCE = /Pat \w+\b.* Mar 1, 2030 – Mar 15, 2030\./
 
 async function create (volunteerPersonId, serviceDate) {
   const res = await vgCall('createServiceRequest', {}, {
@@ -82,7 +84,7 @@ test('no-date pause blocks any date', async () => {
   await setPause(v, { startDate: null, endDate: null, scope: 'all' })
   const res = await create(v, '2030-07-04')
   assert.equal(res.status, 422)
-  assert.match(text(res), /Pat PANoDate is paused\./)
+  assert.match(text(res), /Pat PANoDate\b[^.]*\./)
 })
 
 test('expired pause does not block assignment', async () => {

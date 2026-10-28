@@ -218,7 +218,7 @@ module.exports.putVolunteerPause = async function (personId, { startDate = null,
     transactionFn: async (connection) => {
       const [[vol]] = await connection.query('SELECT id, status FROM volunteer WHERE personId = ? FOR UPDATE', [personId])
       if (!vol) throw new SmError.NotFoundError()
-      if (vol.status !== 'Active') throw new SmError.UnprocessableError('Only an Active volunteer can be paused.')
+      if (vol.status !== 'Active') throw new SmError.UnprocessableError('Service email can only be paused for an Active volunteer.')
       if (scope === 'window' && (!startDate || !endDate)) {
         throw new SmError.UnprocessableError('A date-window pause needs a start and an end date.')
       }

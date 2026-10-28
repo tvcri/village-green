@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import PrimeVue from 'primevue/config'
 import PersonDetailCard from './PersonDetailCard.vue'
+import { PAUSE_WORDING } from '../lib/volunteerPause.js'
 
 vi.mock('../../components/PersonMap.vue', () => ({ default: { template: '<div />' } }))
 
@@ -195,40 +196,52 @@ describe('PersonDetailCard — volunteer trainings and positions', () => {
   })
 })
 
-describe('PersonDetailCard — New-request emails row', () => {
+describe('PersonDetailCard — pause beside the volunteer status tag', () => {
   const vol = { ...base, volunteerStatus: 'Active', capabilities: ['Driving'] }
+  const actions = { 'volunteer-pause-actions': '<button data-testid="pause-open">Pause</button>' }
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-20T15:00:00Z')) })
   afterEach(() => vi.useRealTimers())
 
-  it('shows Sending for an unpaused Active volunteer', () => {
-    mount({ ...vol, pause: null }, 'volunteer')
-    expect(screen.getByText('New-request emails').nextElementSibling.textContent.trim()).toBe('Sending')
-  })
-
-  it('shows the pause wording', () => {
-    mount({ ...vol, pause: { startDate: '2026-12-01', endDate: '2026-12-15', scope: 'window' } }, 'volunteer')
-    expect(screen.getByText('New-request emails').nextElementSibling.textContent.trim()).toBe('Paused Dec 1–15')
-  })
-
-  it('reads Sending once the pause has expired', () => {
-    mount({ ...vol, pause: { startDate: null, endDate: '2026-11-19', scope: 'all' } }, 'volunteer')
-    expect(screen.getByText('New-request emails').nextElementSibling.textContent.trim()).toBe('Sending')
-  })
-
-  it('hides the row for a Dropped volunteer and a deceased person', () => {
-    mount({ ...vol, volunteerStatus: 'Dropped' }, 'volunteer')
-    expect(screen.queryByText('New-request emails')).toBeNull()
-    cleanup()
-    mount({ ...vol, deceased: true }, 'volunteer')
-    expect(screen.queryByText('New-request emails')).toBeNull()
-  })
-
-  it('renders the volunteer-pause-actions slot', () => {
-    render(PersonDetailCard, {
-      props: { person: vol, personType: 'volunteer' },
-      slots: { 'volunteer-pause-actions': '<button>Pause…</button>' },
+  function mountWithActions (person) {
+    return render(PersonDetailCard, {
+      props: { person, personType: 'volunteer' },
+      slots: actions,
       global: { plugins: [PrimeVue] }
     })
-    expect(screen.getByRole('button', { name: 'Pause…' })).toBeInTheDocument()
+  }
+  const header = () => screen.getByText('Volunteer Information').parentElement
+
+  it('shows no pause tag for an unpaused Active volunteer', () => {
+    mountWithActions({ ...vol, pause: null })
+    expect(screen.queryByTestId('pause-tag')).toBeNull()
+  })
+
+  it('shows the pause wording in the header, beside the status tag', () => {
+    mountWithActions({ ...vol, pause: { startDate: '2026-12-01', endDate: '2026-12-15', scope: 'window' } })
+    const tag = screen.getByTestId('pause-tag')
+    expect(tag).toHaveTextContent(`${PAUSE_WORDING.tag} Dec 1–15`)
+    expect(header()).toContainElement(tag)
+    expect(header()).toHaveTextContent('Active')
+  })
+
+  it('shows no tag once the pause has expired', () => {
+    mountWithActions({ ...vol, pause: { startDate: null, endDate: '2026-11-19', scope: 'all' } })
+    expect(screen.queryByTestId('pause-tag')).toBeNull()
+  })
+
+  it('renders the pause actions in the header', () => {
+    mountWithActions({ ...vol, pause: null })
+    expect(header()).toContainElement(screen.getByTestId('pause-open'))
+  })
+
+  it('hides tag and actions for a Dropped volunteer and a deceased person', () => {
+    const paused = { startDate: null, endDate: null, scope: 'all' }
+    mountWithActions({ ...vol, volunteerStatus: 'Dropped', pause: paused })
+    expect(screen.queryByTestId('pause-tag')).toBeNull()
+    expect(screen.queryByTestId('pause-open')).toBeNull()
+    cleanup()
+    mountWithActions({ ...vol, deceased: true, pause: paused })
+    expect(screen.queryByTestId('pause-tag')).toBeNull()
+    expect(screen.queryByTestId('pause-open')).toBeNull()
   })
 })

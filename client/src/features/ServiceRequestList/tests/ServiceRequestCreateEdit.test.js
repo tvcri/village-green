@@ -3,6 +3,7 @@ import { render, screen, waitFor, cleanup } from '@testing-library/vue'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import ServiceRequestCreateEdit from '../components/ServiceRequestCreateEdit.vue'
+import { PAUSE_WORDING } from '../../../shared/lib/volunteerPause.js'
 
 const routeParams = { value: {} }
 // Shared spy (vi.hoisted, same reasoning as toastAdd below) so tests can
@@ -1172,7 +1173,7 @@ describe('volunteer pause on the request form', () => {
     const vm = await mountCreateWithVolunteers()
     vm.form.serviceDate = new Date(2030, 2, 10)
     await waitFor(() => expect(option(vm, '9').disabled).toBe(true))
-    expect(option(vm, '9').pauseLabel).toBe('Paused Mar 1–15')
+    expect(option(vm, '9').pauseLabel).toBe(`${PAUSE_WORDING.tag} Mar 1–15`)
     expect(option(vm, '11').disabled).toBe(false)
   })
 
@@ -1262,7 +1263,7 @@ describe('volunteer pause on the request form', () => {
     const vm = await mountCreateWithVolunteers()
     vm.selectedVolunteer = option(vm, '9')
     vm.form.serviceDate = new Date(2030, 2, 10)
-    await waitFor(() => expect(screen.getByTestId('pause-conflict').textContent).toBe('Pat Example is paused Mar 1 – Mar 15.'))
+    await waitFor(() => expect(screen.getByTestId('pause-conflict').textContent).toBe(`${PAUSE_WORDING.sentence('Pat Example')} Mar 1 – Mar 15.`))
   })
 
   it('recording Completed with a paused volunteer is allowed', async () => {
