@@ -570,9 +570,29 @@ watch([name, phone, email, selectedVillage], async () => {
 }
 
 /* Role tags are plain spans, not PrimeVue Tags: ~2,000 rows rule out a
-   component (or tooltip directive) per tag. Colours follow the Aura tag
-   tokens, with the primitives as fallback because the --p-tag-* vars only
-   exist once a Tag has mounted somewhere. */
+   component (or tooltip directive) per tag. The --p-tag-* theme vars exist
+   only once a Tag has mounted, so the colours come from the palette
+   primitives (always present) and follow the app's dark mode, the
+   `.app-dark` class on <html>, with the same light/dark pairs Aura's Tag
+   uses. */
+.person-table {
+  --tag-member-bg: var(--p-sky-100);
+  --tag-member-fg: var(--p-sky-700);
+  --tag-volunteer-bg: var(--p-green-100);
+  --tag-volunteer-fg: var(--p-green-700);
+  --tag-muted-bg: var(--p-surface-100);
+  --tag-muted-fg: var(--p-surface-600);
+}
+
+:global(.app-dark) .person-table {
+  --tag-member-bg: color-mix(in srgb, var(--p-sky-500), transparent 84%);
+  --tag-member-fg: var(--p-sky-300);
+  --tag-volunteer-bg: color-mix(in srgb, var(--p-green-500), transparent 84%);
+  --tag-volunteer-fg: var(--p-green-300);
+  --tag-muted-bg: var(--p-surface-800);
+  --tag-muted-fg: var(--p-surface-300);
+}
+
 .role-tag {
   display: inline-flex;
   align-items: center;
@@ -585,18 +605,18 @@ watch([name, phone, email, selectedVillage], async () => {
 }
 
 .role-tag--member {
-  background: var(--p-tag-info-background, var(--p-sky-100));
-  color: var(--p-tag-info-color, var(--p-sky-700));
+  background: var(--tag-member-bg);
+  color: var(--tag-member-fg);
 }
 
 .role-tag--volunteer {
-  background: var(--p-tag-success-background, var(--p-green-100));
-  color: var(--p-tag-success-color, var(--p-green-700));
+  background: var(--tag-volunteer-bg);
+  color: var(--tag-volunteer-fg);
 }
 
 .role-tag--dropped {
-  background: var(--p-tag-secondary-background, var(--p-surface-100));
-  color: var(--p-tag-secondary-color, var(--p-surface-600));
+  background: var(--tag-muted-bg);
+  color: var(--tag-muted-fg);
 }
 
 /* Pending: outline only, in the role's own colour. */
@@ -613,8 +633,8 @@ watch([name, phone, email, selectedVillage], async () => {
   padding: 0.125rem 0.5rem;
   border-radius: 999px;
   font-size: 0.8rem;
-  background: var(--p-tag-secondary-background, var(--p-surface-100));
-  color: var(--p-tag-secondary-color, var(--p-surface-600));
+  background: var(--tag-muted-bg);
+  color: var(--tag-muted-fg);
 }
 
 .role-tags {
