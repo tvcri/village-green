@@ -77,6 +77,7 @@ describe('PersonList grid', () => {
     await renderList()
     const tag = screen.getByLabelText('Member, pending')
     expect(tag).toHaveClass('role-tag', 'role-tag--member', 'role-tag--pending')
+    expect(tag).toHaveTextContent(/^member$/)
   })
 
   it('masks a deceased row and shows its tags as dropped', async () => {
@@ -99,11 +100,11 @@ describe('PersonList grid', () => {
     setRows([
       row({
         personId: 1, fullName: 'Alpha, Ann', volunteerStatus: 'Active',
-        volunteerPause: { scope: 'until', startDate: null, endDate: '2026-11-10' }
+        volunteerPause: { scope: 'all', startDate: null, endDate: '2026-11-10' }
       }),
       row({
         personId: 2, fullName: 'Beta, Bob', volunteerStatus: 'Active',
-        volunteerPause: { scope: 'until', startDate: null, endDate: '2026-10-01' }
+        volunteerPause: { scope: 'all', startDate: null, endDate: '2026-10-01' }
       })
     ])
     await renderList()
@@ -111,6 +112,21 @@ describe('PersonList grid', () => {
     const mark = within(rows[0]).getByTitle('Email paused until Nov 10')
     expect(mark.closest('.role-tag')).toHaveClass('role-tag--volunteer')
     expect(rows[1].querySelector('.pause-mark')).toBeNull()
+  })
+
+  it('drops the pause mark once the pause ends, on the next rebuild of the rows', async () => {
+    setRows([
+      row({
+        personId: 1, fullName: 'Alpha, Ann', volunteerStatus: 'Active',
+        volunteerPause: { scope: 'all', startDate: null, endDate: '2026-11-01' }
+      }),
+      row({ personId: 2, fullName: 'Beta, Bob', volunteerStatus: 'Active' })
+    ])
+    await renderList()
+    expect(screen.getByTitle('Email paused until Nov 1')).toBeInTheDocument()
+    vi.setSystemTime(new Date('2026-11-02T15:00:00Z'))
+    await fireEvent.update(screen.getByPlaceholderText('Name'), 'a')
+    await waitFor(() => expect(screen.queryByTitle(/Email paused/)).toBeNull())
   })
 
   describe('Filters panel', () => {

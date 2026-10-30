@@ -134,25 +134,30 @@ function parsePhoneObj(val) {
   return {}
 }
 
-// Today's civil date, as the server computes it for pause rules; the pause
-// mark and its tooltip are both derived from it.
-const today = computed(() => todayCivilDateIn(PAUSE_TIME_ZONE))
-
 // Role tags for a row: member and volunteer only (circles have their own
 // column). A deceased person reads as dropped in every role and says so.
-function roleTags (p) {
+function roleTags (p, today) {
   return rowTagKeys(p)
     .filter(key => !key.startsWith('circle:'))
     .map(key => {
       const [kind, status] = key.split(':')
       const role = kind === 'member' ? 'Member' : 'Volunteer'
       const label = p.deceased ? `${role} (deceased)` : tagLabel(key, circleNameById.value)
-      const pause = kind === 'volunteer' && isEmailPaused(p, today.value)
-        ? pauseTag(p.volunteerPause, today.value)
+      const pause = kind === 'volunteer' && isEmailPaused(p, today)
+        ? pauseTag(p.volunteerPause, today)
         : null
       return { key, kind, status, role, label, pause }
     })
 }
+
+// Tags per row, rebuilt whenever the displayed rows change. Today's civil date
+// (as the server computes it for pause rules) is read fresh on each rebuild,
+// the same way the Email-paused filter reads it, so the mark and the filter
+// agree after midnight.
+const tagsByPerson = computed(() => {
+  const today = todayCivilDateIn(PAUSE_TIME_ZONE)
+  return new Map((sortedPersons.value ?? []).map(p => [p.personId, roleTags(p, today)]))
+})
 
 const isCreatingSheet = ref(false)
 const isFetchingExport = ref(false)
@@ -181,12 +186,12 @@ function detailRowForCsv(p) {
   }
 }
 
-// Fetch projection=detail at export time — full rows (with circles/disabilities
-// subqueries) are paid only here, never for the live list — and keep exactly
-// the people on screen, in screen order. Statuses come from the on-screen
-// summary row (what the grid shows this caller), not the export fetch. The village goes to the server too,
-// so its birthDate/demographics gating matches canReadBirthDate and
-// canReadDemographics above.
+// Fetch projection=detail at export time and keep exactly the people on
+// screen, in screen order. Full rows (with circles/disabilities subqueries)
+// are paid only here, never for the live list. Statuses come from the
+// on-screen summary row (what the grid shows this caller), not the export
+// fetch. The village goes to the server too, so its birthDate/demographics
+// gating matches canReadBirthDate and canReadDemographics above.
 async function fetchRowsForExport() {
   try {
     isFetchingExport.value = true
@@ -341,6 +346,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           class="clear-filters-icon"
           tabindex="0"
           title="Clear all filters"
+          aria-label="Clear all filters"
           @click.prevent="clearFilters()"
           @keydown.enter.prevent="clearFilters()"
           @keydown.space.prevent="clearFilters()"
@@ -380,7 +386,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
       <div class="filter-groups">
         <div class="filter-group" role="group" aria-label="Member">
-          <span class="filter-group-label">Member</span>
+          <span class="filter-group-label">member</span>
           <div class="picker-items">
             <button
               v-for="s in memberStatuses"
@@ -391,7 +397,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               :aria-pressed="isSelected(`member:${s}`)"
               @click="toggleTag(`member:${s}`)"
             >
-              <span class="role-tag role-tag--member" :class="`role-tag--${s}`">Member</span>
+              <span class="role-tag role-tag--member" :class="`role-tag--${s}`">member</span>
               <span class="picker-caption">{{ s }}</span>
             </button>
           </div>
@@ -409,7 +415,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               :aria-pressed="isSelected(`volunteer:${s}`)"
               @click="toggleTag(`volunteer:${s}`)"
             >
-              <span class="role-tag role-tag--volunteer" :class="`role-tag--${s}`">Volunteer</span>
+              <span class="role-tag role-tag--volunteer" :class="`role-tag--${s}`">volunteer</span>
               <span class="picker-caption">{{ s }}</span>
             </button>
           </div>
@@ -505,14 +511,15 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           <td>
             <div class="role-tags">
               <span
-                v-for="t in roleTags(p)"
+                v-for="t in tagsByPerson.get(p.personId)"
                 :key="t.key"
                 class="role-tag"
                 :class="[`role-tag--${t.kind}`, `role-tag--${t.status}`]"
+                role="img"
                 :title="t.label"
                 :aria-label="t.pause ? `${t.label}, ${t.pause}` : t.label"
               >
-                {{ t.role }}
+                {{ t.kind }}
                 <i v-if="t.pause" class="pi pi-pause-circle pause-mark" :title="t.pause" />
               </span>
             </div>

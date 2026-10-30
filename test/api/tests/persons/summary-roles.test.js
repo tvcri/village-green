@@ -67,10 +67,26 @@ test('deceased keeps stored status for staff, nothing for sc', async () => {
   assert.equal((await vgCall('patchPerson', { personId: p.personId }, { token: staff, body: { deceased: true } })).status, 200)
   const s = await rowFor(staff, p)
   assert.strictEqual(s.memberStatus, 'Active')
+  assert.strictEqual(s.volunteerStatus, 'Active')
   assert.strictEqual(s.deceased, true)
   const c = await rowFor(sc, p)
   assert.strictEqual(c.memberStatus, null)
   assert.strictEqual(c.volunteerStatus, null)
+})
+
+test('sc gets no pause for a volunteer who is not current', async () => {
+  const p = await makePerson()
+  assert.equal((await putVolunteer(p.personId, 'Active')).status, 200)
+  const pause = await vgCall('putPersonVolunteerPause', { personId: p.personId }, { token: staff, body: { scope: 'window', startDate: '2030-01-01', endDate: '2030-01-31' } })
+  assert.equal(pause.status, 200)
+  assert.deepEqual((await rowFor(sc, p)).volunteerPause, { startDate: '2030-01-01', endDate: '2030-01-31', scope: 'window' })
+  assert.equal((await vgCall('patchPerson', { personId: p.personId }, { token: staff, body: { deceased: true } })).status, 200)
+  const s = await rowFor(staff, p)
+  assert.strictEqual(s.volunteerStatus, 'Active')
+  assert.deepEqual(s.volunteerPause, { startDate: '2030-01-01', endDate: '2030-01-31', scope: 'window' })
+  const c = await rowFor(sc, p)
+  assert.strictEqual(c.volunteerStatus, null)
+  assert.strictEqual(c.volunteerPause, null)
 })
 
 test('pause and circles ride along', async () => {

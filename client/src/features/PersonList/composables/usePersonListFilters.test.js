@@ -18,7 +18,7 @@ const rows = () => [
   row(5),
   row(6, { memberStatus: 'Active', circles: [{ circleId: 1, name: 'Circle of Pride' }] }),
   row(7, { isVeteran: true, fullName: 'Núñez, José', email: 'jose@example.org' }),
-  row(8, { volunteerStatus: 'Active', volunteerPause: { startDate: null, endDate: null, scope: 'indefinite' } })
+  row(8, { volunteerStatus: 'Active', volunteerPause: { startDate: null, endDate: null, scope: 'all' } })
 ]
 const villages = [{ villageId: 1, name: 'Alpha' }, { villageId: 2, name: 'Beta' }]
 const circles = [{ circleId: 1, name: 'Circle of Pride' }]
