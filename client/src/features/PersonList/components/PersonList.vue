@@ -9,6 +9,9 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
+import Checkbox from 'primevue/checkbox'
+import Badge from 'primevue/badge'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
 import { getPersons, getCircles } from '../api/personApi.js'
@@ -52,9 +55,38 @@ const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
 )
 
 const {
-  name, phone, email, selectedVillage, selectedVillageId,
-  filteredPersons, hasFilter, circleNameById, clearAll: clearFilters
+  name, phone, email, selectedVillage, selectedVillageId, selectedTags, matchMode,
+  emailPausedOnly, veteranOnly, filteredPersons, activeFilterCount, hasFilter,
+  sentence, circleNameById, clearAll: clearFilters
 } = usePersonListFilters(persons, allVillages, allCircles)
+
+// Federation-scope checks, matching the unscoped list fetch: who may see
+// dropped/pending members and volunteers, and filter on veteran status.
+const canSeeNoncurrentMember = computed(() => hasPermission('member:read_inactive'))
+const canSeeNoncurrentVolunteer = computed(() => hasPermission('volunteer:read_inactive'))
+const canFilterVeteran = computed(() => hasPermission('person:read_demographics'))
+
+const filtersCollapsed = ref(false)
+const matchOptions = [
+  { label: 'Any', value: 'any' },
+  { label: 'All', value: 'all' },
+  { label: 'Exactly these', value: 'exact' }
+]
+
+// Picker contents: role statuses (active only without the read_inactive
+// grant) and every catalog circle by name.
+const memberStatuses = computed(() => canSeeNoncurrentMember.value ? ['active', 'pending', 'dropped'] : ['active'])
+const volunteerStatuses = computed(() => canSeeNoncurrentVolunteer.value ? ['active', 'pending', 'dropped'] : ['active'])
+const circleChoices = computed(() =>
+  [...(allCircles.value ?? [])]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => ({ key: `circle:${c.circleId}`, name: c.name, short: circleShortName(c.name) })))
+function isSelected (key) { return selectedTags.value.includes(key) }
+function toggleTag (key) {
+  selectedTags.value = isSelected(key)
+    ? selectedTags.value.filter(k => k !== key)
+    : [...selectedTags.value, key]
+}
 
 // person:read_birth_date: the API omits birthDate for holders without it, so
 // the export drops the column rather than shipping it empty. With a village
@@ -257,26 +289,27 @@ watch(hasFilter, (now, was) => {
   if (now && !was) trackEvent('filter_applied')
 })
 
-// The table header sticks below the filter bar, whose height varies (the
-// filters wrap on narrower windows), so its offset follows the measured bar.
+// The table header sticks below the filters header row (the only sticky part
+// of the panel), whose height varies when it wraps, so its offset follows the
+// measured row.
 const listRoot = ref(null)
-const toolbar = ref(null)
-let toolbarObserver = null
+const filtersHeader = ref(null)
+let headerObserver = null
 onMounted(() => {
-  toolbarObserver = new ResizeObserver(() => {
-    listRoot.value?.style.setProperty('--toolbar-height', `${toolbar.value?.offsetHeight ?? 0}px`)
+  headerObserver = new ResizeObserver(() => {
+    listRoot.value?.style.setProperty('--toolbar-height', `${filtersHeader.value?.offsetHeight ?? 0}px`)
   })
-  toolbarObserver.observe(toolbar.value)
+  headerObserver.observe(filtersHeader.value)
 })
-onBeforeUnmount(() => toolbarObserver?.disconnect())
+onBeforeUnmount(() => headerObserver?.disconnect())
 
 // When a filter changes while scrolled down the list, bring the first matches
 // up under the sticky header instead of leaving the view somewhere mid-list.
-watch([name, phone, email, selectedVillage], async () => {
+watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPausedOnly, veteranOnly], async () => {
   await nextTick()
   const table = listRoot.value?.querySelector('.person-table')
-  if (!table || !toolbar.value) return
-  const stuckAt = toolbar.value.getBoundingClientRect().bottom
+  if (!table || !filtersHeader.value) return
+  const stuckAt = filtersHeader.value.getBoundingClientRect().bottom
   const tableTop = table.getBoundingClientRect().top
   if (tableTop < stuckAt) window.scrollBy(0, tableTop - stuckAt)
 })
@@ -293,48 +326,144 @@ watch([name, phone, email, selectedVillage], async () => {
       </div>
     </div>
 
-    <div ref="toolbar" class="toolbar">
-      <div class="filters">
-        <Select
-          v-model="selectedVillage"
-          :options="villageOptions"
-          placeholder="Village"
-          class="filter-village"
-          :pt="{ root: { style: 'width: 12rem;' } }"
-        />
-        <IconField class="filter-input filter-name">
-          <InputIcon class="pi pi-user" />
-          <InputText v-model="name" placeholder="Name" />
-        </IconField>
-        <IconField class="filter-input">
-          <InputIcon class="pi pi-phone" />
-          <InputText v-model="phone" placeholder="Phone" />
-        </IconField>
-        <IconField class="filter-input">
-          <InputIcon class="pi pi-envelope" />
-          <InputText v-model="email" placeholder="Email" />
-        </IconField>
-        <div class="filter-actions">
-          <Button
-            icon="pi pi-times"
-            severity="secondary"
-            text
-            aria-label="Clear filters"
-            :disabled="!hasFilter"
-            @click="clearFilters"
+    <div class="filter-section">
+      <div ref="filtersHeader" class="filters-header">
+        <Button
+          type="button"
+          class="filters-btn"
+          outlined
+          :aria-expanded="!filtersCollapsed"
+          @click="filtersCollapsed = !filtersCollapsed"
+        >
+          <i class="pi pi-filter" aria-hidden="true" />
+          <span class="filters-btn-label">Filters</span>
+          <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
+          <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: filtersCollapsed }" aria-hidden="true" />
+        </Button>
+        <span v-if="filteredPersons !== null" class="filter-count-tag">
+          {{ filteredPersons.length }} of {{ persons.length }} {{ persons.length === 1 ? 'person' : 'persons' }}
+          <span
+            v-if="hasFilter"
+            role="button"
+            class="clear-filters-icon"
+            tabindex="0"
+            title="Clear all filters"
+            @click.prevent="clearFilters()"
+            @keydown.enter.prevent="clearFilters()"
+            @keydown.space.prevent="clearFilters()"
+          >✕</span>
+        </span>
+        <div class="header-export">
+          <ExportButton
+            :disabled="isLoading || isCreatingSheet || isFetchingExport || !filteredPersons?.length"
+            @download="handleDownloadCsv"
+            @export="handleCreateSheet"
           />
         </div>
       </div>
 
-      <div class="role-filters">
-        <span v-if="filteredPersons !== null" class="result-count">
-          {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
-        </span>
-        <ExportButton
-          :disabled="isLoading || isCreatingSheet || isFetchingExport || !filteredPersons?.length"
-          @download="handleDownloadCsv"
-          @export="handleCreateSheet"
-        />
+      <div v-if="!filtersCollapsed" class="filters-content">
+        <div class="filters-line">
+          <Select
+            v-model="selectedVillage"
+            :options="villageOptions"
+            placeholder="Village"
+            class="filter-village"
+            :pt="{ root: { style: 'width: 12rem;' } }"
+          />
+          <IconField class="filter-input filter-name">
+            <InputIcon class="pi pi-user" />
+            <InputText v-model="name" placeholder="Name" />
+          </IconField>
+          <IconField class="filter-input">
+            <InputIcon class="pi pi-phone" />
+            <InputText v-model="phone" placeholder="Phone" />
+          </IconField>
+          <IconField class="filter-input">
+            <InputIcon class="pi pi-envelope" />
+            <InputText v-model="email" placeholder="Email" />
+          </IconField>
+        </div>
+
+        <div class="filter-groups">
+          <div class="filter-group" role="group" aria-label="Member">
+            <span class="filter-group-label">Member</span>
+            <div class="picker-items">
+              <button
+                v-for="s in memberStatuses"
+                :key="`member:${s}`"
+                type="button"
+                class="picker-item"
+                :class="{ selected: isSelected(`member:${s}`) }"
+                :aria-pressed="isSelected(`member:${s}`)"
+                @click="toggleTag(`member:${s}`)"
+              >
+                <span class="role-tag role-tag--member" :class="`role-tag--${s}`">Member</span>
+                <span class="picker-caption">{{ s }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-group" role="group" aria-label="Volunteer">
+            <span class="filter-group-label">Volunteer</span>
+            <div class="picker-items">
+              <button
+                v-for="s in volunteerStatuses"
+                :key="`volunteer:${s}`"
+                type="button"
+                class="picker-item"
+                :class="{ selected: isSelected(`volunteer:${s}`) }"
+                :aria-pressed="isSelected(`volunteer:${s}`)"
+                @click="toggleTag(`volunteer:${s}`)"
+              >
+                <span class="role-tag role-tag--volunteer" :class="`role-tag--${s}`">Volunteer</span>
+                <span class="picker-caption">{{ s }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-group" role="group" aria-label="Circles">
+            <span class="filter-group-label">Circles</span>
+            <div class="picker-items">
+              <button
+                v-for="c in circleChoices"
+                :key="c.key"
+                type="button"
+                class="picker-item"
+                :class="{ selected: isSelected(c.key) }"
+                :aria-pressed="isSelected(c.key)"
+                :title="c.name"
+                @click="toggleTag(c.key)"
+              >
+                <span class="circle-pill">{{ c.short }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-group" role="group" aria-label="Match">
+            <span class="filter-group-label">Match</span>
+            <SelectButton
+              v-model="matchMode"
+              :options="matchOptions"
+              option-label="label"
+              option-value="value"
+              :allow-empty="false"
+            />
+            <span v-if="sentence" class="selection-sentence">{{ sentence }}</span>
+          </div>
+
+          <div class="filter-group" role="group" aria-label="Also">
+            <span class="filter-group-label">Also</span>
+            <label class="also-option">
+              <Checkbox v-model="emailPausedOnly" binary />
+              <span>Email paused</span>
+            </label>
+            <label v-if="canFilterVeteran" class="also-option">
+              <Checkbox v-model="veteranOnly" binary />
+              <span>Veteran</span>
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -343,7 +472,11 @@ watch([name, phone, email, selectedVillage], async () => {
     </div>
 
     <div v-else-if="!isLoading && filteredPersons.length === 0" class="empty-state">
-      No persons found.
+      <template v-if="hasFilter">
+        No persons match these filters.
+        <div v-if="sentence">{{ sentence }}</div>
+      </template>
+      <template v-else>No persons found.</template>
     </div>
 
     <table v-else class="person-table">
@@ -434,35 +567,85 @@ watch([name, phone, email, selectedVillage], async () => {
   color: var(--color-text-primary);
 }
 
-/* Filters + role checkboxes stick under the breadcrumbs while the list
-   scrolls; opaque so rows pass beneath it. */
-.toolbar {
+.filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Only the header row sticks under the breadcrumbs; opaque so rows pass
+   beneath it. The panel below scrolls away. */
+.filters-header {
   position: sticky;
   top: var(--breadcrumb-height);
   z-index: 2;
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin: -0.75rem 0;
-  padding: 0.75rem 0;
+  align-items: center;
+  gap: 0.75rem;
+  margin: -0.5rem 0;
+  padding: 0.5rem 0;
   background: var(--color-background-dark);
 }
 
-.filter-name {
-  flex-grow: 2;
+.filters-btn-label { font-weight: 700; }
+.filters-chevron { font-size: 0.75rem; transition: transform 0.2s ease; }
+.filters-chevron.collapsed { transform: rotate(-90deg); }
+
+.filter-count-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background-color: var(--color-background-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.filters {
+.clear-filters-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  color: var(--color-text-dim);
+  font-size: 0.75rem;
+  font-weight: bold;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+.clear-filters-icon:hover { color: var(--color-text-primary); }
+
+.header-export {
+  margin-left: auto;
+}
+
+.filters-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: var(--color-background-light);
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+}
+
+.filters-line {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
 }
 
+.filter-name {
+  flex-grow: 2;
+}
+
 /* Inputs grow to share the leftover horizontal space (min-width keeps them
-   readable before wrapping); the action buttons stay their natural size and
-   push flush-right, dropping to a second line only when the row can't hold
-   everything. */
+   readable before wrapping). */
 .filter-input {
   flex: 1 1 9rem;
   min-width: 9rem;
@@ -472,34 +655,82 @@ watch([name, phone, email, selectedVillage], async () => {
   width: 100%;
 }
 
-.filter-actions {
+.filter-groups {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  margin-left: auto;
+  flex-wrap: wrap;
+  gap: 1rem 0;
 }
 
-.role-filters {
+.filter-group {
   display: flex;
-  gap: 1.5rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 1.25rem;
+  border-left: 1px solid var(--color-border-default);
 }
 
-/* Count beside Download: always in view in the sticky bar, and it is the
-   number of rows the download will hold. */
-.result-count {
-  margin-left: auto;
+.filter-group:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.filter-group-label {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+}
+
+.picker-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* The picker reuses the grid's tag and pill visuals; unselected dimmed,
+   selected ringed. */
+.picker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.4rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--color-text-dim);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.picker-item:hover,
+.picker-item:focus-visible {
+  opacity: 1;
+}
+
+.picker-item.selected {
+  opacity: 1;
+  border-color: var(--p-primary-color);
+  box-shadow: 0 0 0 1px var(--p-primary-color);
+  color: var(--color-text-primary);
+}
+
+.selection-sentence {
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+}
+
+.also-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
 }
 
 .role-tags {
   display: flex;
   gap: 0.25rem;
   flex-wrap: wrap;
-}
-
-.result-count {
-  font-size: 0.9rem;
-  color: var(--color-text-dim);
 }
 
 .person-table {
@@ -574,8 +805,8 @@ watch([name, phone, email, selectedVillage], async () => {
    only once a Tag has mounted, so the colours come from the palette
    primitives (always present) and follow the app's dark mode, the
    `.app-dark` class on <html>, with the same light/dark pairs Aura's Tag
-   uses. */
-.person-table {
+   uses. Defined on the component root so the filter picker shares them. */
+.person-list {
   --tag-member-bg: var(--p-sky-100);
   --tag-member-fg: var(--p-sky-700);
   --tag-volunteer-bg: var(--p-green-100);
@@ -584,7 +815,7 @@ watch([name, phone, email, selectedVillage], async () => {
   --tag-muted-fg: var(--p-surface-600);
 }
 
-:global(.app-dark) .person-table {
+:global(.app-dark) .person-list {
   --tag-member-bg: color-mix(in srgb, var(--p-sky-500), transparent 84%);
   --tag-member-fg: var(--p-sky-300);
   --tag-volunteer-bg: color-mix(in srgb, var(--p-green-500), transparent 84%);
@@ -665,25 +896,29 @@ watch([name, phone, email, selectedVillage], async () => {
   .person-list {
     padding: 1rem;
   }
-  /* The stacked filters would cover the screen; let them scroll away. */
-  .toolbar {
+  /* Nothing sticks on small screens: the stacked panel would cover the view. */
+  .filters-header {
     position: static;
   }
   .person-table thead th {
     top: var(--breadcrumb-height);
   }
-  .filters {
+  .filters-line {
     flex-direction: column;
     align-items: stretch;
   }
-  /* Let fields fill the column on narrow screens. */
   .filter-village,
   .filter-village :deep(.p-select),
   .filter-input {
     width: 100% !important;
   }
-  .filter-actions {
-    margin-left: 0;
+  .filter-groups {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .filter-group {
+    padding: 0;
+    border-left: 0;
   }
 }
 </style>
