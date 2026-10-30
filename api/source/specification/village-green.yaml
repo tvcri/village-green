@@ -4349,6 +4349,10 @@ components:
         - personId
         - fullName
         - deceased
+        - memberStatus
+        - volunteerStatus
+        - volunteerPause
+        - circles
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
@@ -4357,6 +4361,26 @@ components:
           maxLength: 200
         deceased:
           type: boolean
+        memberStatus:
+          # Stored status for read_inactive holders; others see null unless
+          # the role is current (Active and not deceased).
+          type: string
+          nullable: true
+          enum: [Active, Pending, Dropped, null]
+        volunteerStatus:
+          type: string
+          nullable: true
+          enum: [Active, Pending, Dropped, null]
+        volunteerPause:
+          $ref: '#/components/schemas/VolunteerPause'
+        circles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Circle'
+        isVeteran:
+          # Omitted without person:read_demographics.
+          type: boolean
+          nullable: true
         village:
           # Always an object (built inline via JSON_OBJECT), but a villageless
           # (global) person yields null members — a LEFT JOIN with no village.

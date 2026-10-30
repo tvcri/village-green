@@ -405,10 +405,15 @@ function applicationColumn ({ member, volunteer }) {
 //   birthDate         - include p.birthDate (person:read_birth_date)
 //   demographics      - include gender/ethnicity/races/isVeteran (person:read_demographics)
 //   openRequestCount  - include openServiceRequestCount (full rows only; getPerson)
+//   memberNoncurrent, volunteerNoncurrent - summary rows report the stored
+//                       status (Pending/Dropped, or any status on a deceased
+//                       person) instead of null (member:read_inactive /
+//                       volunteer:read_inactive)
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const {
     summary = false, detail = false, member = null, volunteer = null, application = null,
-    birthDate = false, demographics = false, openRequestCount = false
+    birthDate = false, demographics = false, openRequestCount = false,
+    memberNoncurrent = false, volunteerNoncurrent = false
   } = inOptions
 
   const columns = summary
@@ -418,6 +423,11 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       'p.deceased',
       VILLAGE_COLUMN,
       ACTIVE_AS_COLUMN,
+      `${memberNoncurrent ? 'mb' : 'm'}.status AS memberStatus`,
+      `${volunteerNoncurrent ? 'vb' : 'vol'}.status AS volunteerStatus`,
+      `${pauseJsonSql(volunteerNoncurrent ? 'vb' : 'vol')} AS volunteerPause`,
+      CIRCLES_COLUMN,
+      ...(demographics ? ['p.isVeteran'] : []),
       `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,
       'p.email'
     ]
@@ -463,6 +473,12 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
     'LEFT JOIN active_member m ON m.personId = p.id',
     'LEFT JOIN active_volunteer vol ON vol.personId = p.id'
   ])
+  // Base-table joins for the summary's gated statuses: active_* hide
+  // non-current rows, which read_inactive holders are allowed to see.
+  if (summary) {
+    joins.add('LEFT JOIN member mb ON mb.personId = p.id')
+    joins.add('LEFT JOIN volunteer vb ON vb.personId = p.id')
+  }
   // The cm/g/e aliases are referenced by the detail projection too, so the
   // joins must be present whenever `detail` is on, not only for full rows.
   if (!summary || detail) RECORD_JOINS.forEach(j => joins.add(j))
@@ -605,6 +621,8 @@ module.exports.getPersons = async function ({ villageIdsGranted, villageId, firs
       detail: projection?.includes('detail'),
       birthDate: keyForVillages(userObject, 'person:read_birth_date', villageId),
       demographics: keyForVillages(userObject, 'person:read_demographics', villageId),
+      memberNoncurrent: keyForVillages(userObject, 'member:read_inactive', villageId),
+      volunteerNoncurrent: keyForVillages(userObject, 'volunteer:read_inactive', villageId),
     }
   )
 }
