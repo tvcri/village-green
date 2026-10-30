@@ -812,7 +812,8 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   --tag-muted-fg: var(--p-surface-600);
 }
 
-:global(.app-dark .person-list) {
+/* html.app-dark out-specifies the scoped light rule, so source order is irrelevant. */
+:global(html.app-dark .person-list) {
   --tag-member-bg: color-mix(in srgb, var(--p-sky-500), transparent 84%);
   --tag-member-fg: var(--p-sky-300);
   --tag-volunteer-bg: color-mix(in srgb, var(--p-green-500), transparent 84%);
