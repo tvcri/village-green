@@ -327,121 +327,121 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
     </div>
 
     <div ref="filtersHeader" class="filters-header">
-        <Button
-          type="button"
-          class="filters-btn"
-          outlined
-          :aria-expanded="!filtersCollapsed"
-          @click="filtersCollapsed = !filtersCollapsed"
-        >
-          <i class="pi pi-filter" aria-hidden="true" />
-          <span class="filters-btn-label">Filters</span>
-          <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
-          <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: filtersCollapsed }" aria-hidden="true" />
-        </Button>
-        <span v-if="filteredPersons !== null" class="filter-count-tag">
-          {{ filteredPersons.length }} of {{ persons.length }} {{ persons.length === 1 ? 'person' : 'persons' }}
-          <span
-            v-if="hasFilter"
-            role="button"
-            class="clear-filters-icon"
-            tabindex="0"
-            title="Clear all filters"
-            @click.prevent="clearFilters()"
-            @keydown.enter.prevent="clearFilters()"
-            @keydown.space.prevent="clearFilters()"
-          >✕</span>
-        </span>
-        <div class="header-export">
-          <ExportButton
-            :disabled="isLoading || isCreatingSheet || isFetchingExport || !filteredPersons?.length"
-            @download="handleDownloadCsv"
-            @export="handleCreateSheet"
-          />
-        </div>
+      <Button
+        type="button"
+        class="filters-btn"
+        outlined
+        :aria-expanded="!filtersCollapsed"
+        @click="filtersCollapsed = !filtersCollapsed"
+      >
+        <i class="pi pi-filter" aria-hidden="true" />
+        <span class="filters-btn-label">Filters</span>
+        <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
+        <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: filtersCollapsed }" aria-hidden="true" />
+      </Button>
+      <span v-if="filteredPersons !== null" class="filter-count-tag">
+        {{ filteredPersons.length }} of {{ persons.length }} {{ persons.length === 1 ? 'person' : 'persons' }}
+        <span
+          v-if="hasFilter"
+          role="button"
+          class="clear-filters-icon"
+          tabindex="0"
+          title="Clear all filters"
+          @click.prevent="clearFilters()"
+          @keydown.enter.prevent="clearFilters()"
+          @keydown.space.prevent="clearFilters()"
+        >✕</span>
+      </span>
+      <div class="header-export">
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet || isFetchingExport || !filteredPersons?.length"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
+      </div>
     </div>
 
-      <div v-if="!filtersCollapsed" class="filters-content">
-        <div class="filters-line">
-          <Select
-            v-model="selectedVillage"
-            :options="villageOptions"
-            placeholder="Village"
-            class="filter-village"
-            :pt="{ root: { style: 'width: 12rem;' } }"
-          />
-          <IconField class="filter-input filter-name">
-            <InputIcon class="pi pi-user" />
-            <InputText v-model="name" placeholder="Name" />
-          </IconField>
-          <IconField class="filter-input">
-            <InputIcon class="pi pi-phone" />
-            <InputText v-model="phone" placeholder="Phone" />
-          </IconField>
-          <IconField class="filter-input">
-            <InputIcon class="pi pi-envelope" />
-            <InputText v-model="email" placeholder="Email" />
-          </IconField>
+    <div v-if="!filtersCollapsed" class="filters-content">
+      <div class="filters-line">
+        <Select
+          v-model="selectedVillage"
+          :options="villageOptions"
+          placeholder="Village"
+          class="filter-village"
+          :pt="{ root: { style: 'width: 12rem;' } }"
+        />
+        <IconField class="filter-input filter-name">
+          <InputIcon class="pi pi-user" />
+          <InputText v-model="name" placeholder="Name" />
+        </IconField>
+        <IconField class="filter-input">
+          <InputIcon class="pi pi-phone" />
+          <InputText v-model="phone" placeholder="Phone" />
+        </IconField>
+        <IconField class="filter-input">
+          <InputIcon class="pi pi-envelope" />
+          <InputText v-model="email" placeholder="Email" />
+        </IconField>
+      </div>
+
+      <div class="filter-groups">
+        <div class="filter-group" role="group" aria-label="Member">
+          <span class="filter-group-label">Member</span>
+          <div class="picker-items">
+            <button
+              v-for="s in memberStatuses"
+              :key="`member:${s}`"
+              type="button"
+              class="picker-item"
+              :class="{ selected: isSelected(`member:${s}`) }"
+              :aria-pressed="isSelected(`member:${s}`)"
+              @click="toggleTag(`member:${s}`)"
+            >
+              <span class="role-tag role-tag--member" :class="`role-tag--${s}`">Member</span>
+              <span class="picker-caption">{{ s }}</span>
+            </button>
+          </div>
         </div>
 
-        <div class="filter-groups">
-          <div class="filter-group" role="group" aria-label="Member">
-            <span class="filter-group-label">Member</span>
-            <div class="picker-items">
-              <button
-                v-for="s in memberStatuses"
-                :key="`member:${s}`"
-                type="button"
-                class="picker-item"
-                :class="{ selected: isSelected(`member:${s}`) }"
-                :aria-pressed="isSelected(`member:${s}`)"
-                @click="toggleTag(`member:${s}`)"
-              >
-                <span class="role-tag role-tag--member" :class="`role-tag--${s}`">Member</span>
-                <span class="picker-caption">{{ s }}</span>
-              </button>
-            </div>
+        <div class="filter-group" role="group" aria-label="Volunteer">
+          <span class="filter-group-label">Volunteer</span>
+          <div class="picker-items">
+            <button
+              v-for="s in volunteerStatuses"
+              :key="`volunteer:${s}`"
+              type="button"
+              class="picker-item"
+              :class="{ selected: isSelected(`volunteer:${s}`) }"
+              :aria-pressed="isSelected(`volunteer:${s}`)"
+              @click="toggleTag(`volunteer:${s}`)"
+            >
+              <span class="role-tag role-tag--volunteer" :class="`role-tag--${s}`">Volunteer</span>
+              <span class="picker-caption">{{ s }}</span>
+            </button>
           </div>
+        </div>
 
-          <div class="filter-group" role="group" aria-label="Volunteer">
-            <span class="filter-group-label">Volunteer</span>
-            <div class="picker-items">
-              <button
-                v-for="s in volunteerStatuses"
-                :key="`volunteer:${s}`"
-                type="button"
-                class="picker-item"
-                :class="{ selected: isSelected(`volunteer:${s}`) }"
-                :aria-pressed="isSelected(`volunteer:${s}`)"
-                @click="toggleTag(`volunteer:${s}`)"
-              >
-                <span class="role-tag role-tag--volunteer" :class="`role-tag--${s}`">Volunteer</span>
-                <span class="picker-caption">{{ s }}</span>
-              </button>
-            </div>
+        <div class="filter-group" role="group" aria-label="Circles">
+          <span class="filter-group-label">Circles</span>
+          <div class="picker-items">
+            <button
+              v-for="c in circleChoices"
+              :key="c.key"
+              type="button"
+              class="picker-item"
+              :class="{ selected: isSelected(c.key) }"
+              :aria-pressed="isSelected(c.key)"
+              :title="c.name"
+              @click="toggleTag(c.key)"
+            >
+              <span class="circle-pill">{{ c.short }}</span>
+            </button>
           </div>
+        </div>
 
-          <div class="filter-group" role="group" aria-label="Circles">
-            <span class="filter-group-label">Circles</span>
-            <div class="picker-items">
-              <button
-                v-for="c in circleChoices"
-                :key="c.key"
-                type="button"
-                class="picker-item"
-                :class="{ selected: isSelected(c.key) }"
-                :aria-pressed="isSelected(c.key)"
-                :title="c.name"
-                @click="toggleTag(c.key)"
-              >
-                <span class="circle-pill">{{ c.short }}</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="filter-group" role="group" aria-label="Match">
-            <span class="filter-group-label">Match</span>
-            <div class="match-row">
+        <div class="filter-group" role="group" aria-label="Match">
+          <span class="filter-group-label">Match</span>
+          <div class="match-row">
             <SelectButton
               v-model="matchMode"
               :options="matchOptions"
@@ -449,23 +449,23 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               option-value="value"
               :allow-empty="false"
             />
-            </div>
             <span v-if="sentence" class="selection-sentence">{{ sentence }}</span>
           </div>
+        </div>
 
-          <div class="filter-group" role="group" aria-label="Also">
-            <span class="filter-group-label">Also</span>
-            <label class="also-option">
-              <Checkbox v-model="emailPausedOnly" binary />
-              <span>Email paused</span>
-            </label>
-            <label v-if="canFilterVeteran" class="also-option">
-              <Checkbox v-model="veteranOnly" binary />
-              <span>Veteran</span>
-            </label>
-          </div>
+        <div class="filter-group" role="group" aria-label="Also">
+          <span class="filter-group-label">Also</span>
+          <label class="also-option">
+            <Checkbox v-model="emailPausedOnly" binary />
+            <span>Email paused</span>
+          </label>
+          <label v-if="canFilterVeteran" class="also-option">
+            <Checkbox v-model="veteranOnly" binary />
+            <span>Veteran</span>
+          </label>
         </div>
       </div>
+    </div>
 
     <div v-if="filteredPersons === null" class="empty-state">
       {{ isLoading ? 'Loading persons…' : 'Persons could not be loaded.' }}
