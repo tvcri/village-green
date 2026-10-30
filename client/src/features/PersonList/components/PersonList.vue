@@ -326,8 +326,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
       </div>
     </div>
 
-    <div class="filter-section">
-      <div ref="filtersHeader" class="filters-header">
+    <div ref="filtersHeader" class="filters-header">
         <Button
           type="button"
           class="filters-btn"
@@ -360,7 +359,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
             @export="handleCreateSheet"
           />
         </div>
-      </div>
+    </div>
 
       <div v-if="!filtersCollapsed" class="filters-content">
         <div class="filters-line">
@@ -442,6 +441,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
           <div class="filter-group" role="group" aria-label="Match">
             <span class="filter-group-label">Match</span>
+            <div class="match-row">
             <SelectButton
               v-model="matchMode"
               :options="matchOptions"
@@ -449,6 +449,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               option-value="value"
               :allow-empty="false"
             />
+            </div>
             <span v-if="sentence" class="selection-sentence">{{ sentence }}</span>
           </div>
 
@@ -465,7 +466,6 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           </div>
         </div>
       </div>
-    </div>
 
     <div v-if="filteredPersons === null" class="empty-state">
       {{ isLoading ? 'Loading persons…' : 'Persons could not be loaded.' }}
@@ -567,12 +567,6 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   color: var(--color-text-primary);
 }
 
-.filter-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
 /* Only the header row sticks under the breadcrumbs; opaque so rows pass
    beneath it. The panel below scrolls away. */
 .filters-header {
@@ -627,6 +621,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  margin-top: -0.75rem;
   padding: 1rem;
   background-color: var(--color-background-light);
   border: 1px solid var(--color-border-default);
@@ -690,8 +685,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
    selected ringed. */
 .picker-item {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.2rem;
   padding: 0.2rem 0.4rem;
   background: transparent;
   border: 1px solid transparent;
@@ -713,6 +709,13 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   border-color: var(--p-primary-color);
   box-shadow: 0 0 0 1px var(--p-primary-color);
   color: var(--color-text-primary);
+}
+
+.match-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
 }
 
 .selection-sentence {
