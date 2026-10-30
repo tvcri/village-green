@@ -812,7 +812,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   --tag-muted-fg: var(--p-surface-600);
 }
 
-:global(.app-dark) .person-list {
+:global(.app-dark .person-list) {
   --tag-member-bg: color-mix(in srgb, var(--p-sky-500), transparent 84%);
   --tag-member-fg: var(--p-sky-300);
   --tag-volunteer-bg: color-mix(in srgb, var(--p-green-500), transparent 84%);
@@ -908,6 +908,10 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   .filter-village :deep(.p-select),
   .filter-input {
     width: 100% !important;
+  }
+  /* In a column the 9rem flex-basis would become the field's height. */
+  .filter-input {
+    flex: 0 0 auto;
   }
   .filter-groups {
     flex-direction: column;
