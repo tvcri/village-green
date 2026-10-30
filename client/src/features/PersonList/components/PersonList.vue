@@ -8,17 +8,19 @@ import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
-import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
-import { getPersons } from '../api/personApi.js'
+import { getPersons, getCircles } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { personExportColumns, personExportValues } from '../../../shared/lib/personExport.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
+import { usePersonListFilters } from '../composables/usePersonListFilters.js'
+import { rowTagKeys, tagLabel, circleShortName, isEmailPaused } from '../lib/personTags.js'
+import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
+import { PAUSE_TIME_ZONE, pauseTag } from '../../../shared/lib/volunteerPause.js'
 
 defineOptions({ name: 'PersonList' })
 
@@ -34,26 +36,26 @@ onMounted(() => {
 
 useScrollRestore('meta-persons', 'meta-person-detail')
 
-const name = ref('')
-const phone = ref('')
-const email = ref('')
-const selectedVillage = ref('All villages')
-
-const showMembers = ref(false)
-const showVolunteers = ref(false)
-
-// Village options for the filter; 'All villages' is the sentinel meaning no
-// village restriction.
+// Village and circle catalogs for the filters and tag labels.
 const { state: allVillages } = useAsyncState(() => getVillages(), { immediate: true })
+const { state: allCircles } = useAsyncState(() => getCircles(), { immediate: true })
 const villageOptions = computed(() => [
   'All villages',
   ...(allVillages.value ?? []).map(v => v.name)
 ])
 
-const selectedVillageId = computed(() => {
-  if (selectedVillage.value === 'All villages') return undefined
-  return (allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId
-})
+// The list opens fully populated: every person the caller can read, with or
+// without an active role. All filtering is client-side and live, as you type.
+const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
+  () => getPersons({}),
+  { immediate: true }
+)
+
+const {
+  name, phone, email, selectedVillage, selectedVillageId,
+  filteredPersons, hasFilter, circleNameById, clearAll: clearFilters
+} = usePersonListFilters(persons, allVillages, allCircles)
+
 // person:read_birth_date: the API omits birthDate for holders without it, so
 // the export drops the column rather than shipping it empty. With a village
 // filter the check is for that village (village-scoped holders); across all
@@ -61,17 +63,6 @@ const selectedVillageId = computed(() => {
 const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', selectedVillageId.value))
 // person:read_demographics, the same way, for gender/ethnicity/race/veteran.
 const canReadDemographics = computed(() => hasPermission('person:read_demographics', selectedVillageId.value))
-
-const hasFilter = computed(() =>
-  !!(name.value.trim() || phone.value.trim() || email.value.trim() || selectedVillageId.value)
-)
-
-function clearFilters () {
-  name.value = ''
-  phone.value = ''
-  email.value = ''
-  selectedVillage.value = 'All villages'
-}
 
 // Every person renders in one list. A plain table rather than a DataTable:
 // DataTable's per-row overhead made ~2,000 rows take over 5 s to mount. The
@@ -89,56 +80,12 @@ function sortIcon (field) {
   return sortOrder.value === 1 ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'
 }
 
-// The list opens fully populated: every person the caller can read, with or
-// without an active role. All filtering is client-side and live, as you type.
-const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
-  () => getPersons({}),
-  { immediate: true }
-)
-
 // keep-alive holds the list while a person is opened; re-fetch on return so
 // creates and edits show up (the first activation is the initial load).
 let activatedOnce = false
 onActivated(() => {
   if (activatedOnce) fetchPersons()
   activatedOnce = true
-})
-
-// Case- and accent-insensitive, like the MySQL LIKE the server search used.
-function fold (value) {
-  return (value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-}
-
-// Name matches word by word against fullName ("Last, First, Suffix"), so
-// "naomi brown", "brown, n" and "nao" all find "Brown, Naomi".
-const nameWords = computed(() => fold(name.value).split(/[\s,]+/).filter(Boolean))
-
-function matchesFilters (p) {
-  if (selectedVillageId.value && p.village?.villageId !== selectedVillageId.value) return false
-  if (nameWords.value.length) {
-    const fullName = fold(p.fullName)
-    if (!nameWords.value.every(w => fullName.includes(w))) return false
-  }
-  const phoneQuery = phone.value.trim()
-  if (phoneQuery) {
-    const { phone: ph, cell } = parsePhoneObj(p.phone)
-    if (!(ph ?? '').includes(phoneQuery) && !(cell ?? '').includes(phoneQuery)) return false
-  }
-  const emailQuery = fold(email.value.trim())
-  if (emailQuery && !fold(p.email).includes(emailQuery)) return false
-  return true
-}
-
-function matchesRoleFilter(p) {
-  if (!showMembers.value && !showVolunteers.value) return true
-  const activeAs = parseJson(p.activeAs)
-  return (showMembers.value && activeAs.includes('member')) ||
-    (showVolunteers.value && activeAs.includes('volunteer'))
-}
-
-const filteredPersons = computed(() => {
-  if (!persons.value) return null
-  return persons.value.filter(p => matchesFilters(p) && matchesRoleFilter(p))
 })
 
 const sortedPersons = computed(() => {
@@ -163,10 +110,24 @@ function parsePhoneObj(val) {
   return {}
 }
 
-function getRoleSeverity(role) {
-  if (role === 'member') return 'info'
-  if (role === 'volunteer') return 'success'
-  return 'secondary'
+// Today's civil date, as the server computes it for pause rules; the pause
+// mark and its tooltip are both derived from it.
+const today = computed(() => todayCivilDateIn(PAUSE_TIME_ZONE))
+
+// Role tags for a row: member and volunteer only (circles have their own
+// column). A deceased person reads as dropped in every role and says so.
+function roleTags (p) {
+  return rowTagKeys(p)
+    .filter(key => !key.startsWith('circle:'))
+    .map(key => {
+      const [kind, status] = key.split(':')
+      const role = kind === 'member' ? 'Member' : 'Volunteer'
+      const label = p.deceased ? `${role} (deceased)` : tagLabel(key, circleNameById.value)
+      const pause = kind === 'volunteer' && isEmailPaused(p, today.value)
+        ? pauseTag(p.volunteerPause, today.value)
+        : null
+      return { key, kind, status, role, label, pause }
+    })
 }
 
 const isCreatingSheet = ref(false)
@@ -311,7 +272,7 @@ onBeforeUnmount(() => toolbarObserver?.disconnect())
 
 // When a filter changes while scrolled down the list, bring the first matches
 // up under the sticky header instead of leaving the view somewhere mid-list.
-watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async () => {
+watch([name, phone, email, selectedVillage], async () => {
   await nextTick()
   const table = listRoot.value?.querySelector('.person-table')
   if (!table || !toolbar.value) return
@@ -366,14 +327,6 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
       </div>
 
       <div class="role-filters">
-        <label class="role-filter-label">
-          <Checkbox v-model="showMembers" :binary="true" />
-          <span>Member</span>
-        </label>
-        <label class="role-filter-label">
-          <Checkbox v-model="showVolunteers" :binary="true" />
-          <span>Volunteer</span>
-        </label>
         <span v-if="filteredPersons !== null" class="result-count">
           {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
         </span>
@@ -395,8 +348,8 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
 
     <table v-else class="person-table">
       <colgroup>
-        <col style="width: 20%"><col style="width: 14%"><col style="width: 15%">
-        <col style="width: 12%"><col style="width: 12%"><col style="width: 27%">
+        <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10%">
+        <col style="width: 11%"><col style="width: 11%"><col style="width: 21%">
       </colgroup>
       <thead>
         <tr>
@@ -407,18 +360,44 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
             Village <i :class="sortIcon('village')" />
           </th>
           <th>Roles</th>
+          <th>Circles</th>
           <th>Phone</th>
           <th>Cell</th>
           <th>Email</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="p in sortedPersons" :key="p.personId" @click="navigateToPerson(p.personId, p.fullName)">
+        <tr
+          v-for="p in sortedPersons"
+          :key="p.personId"
+          :class="{ deceased: p.deceased }"
+          @click="navigateToPerson(p.personId, p.fullName)"
+        >
           <td>{{ p.fullName }}</td>
           <td>{{ p.village?.name }}</td>
           <td>
             <div class="role-tags">
-              <Tag v-for="role in parseJson(p.activeAs)" :key="role" :value="role" :severity="getRoleSeverity(role)" />
+              <span
+                v-for="t in roleTags(p)"
+                :key="t.key"
+                class="role-tag"
+                :class="[`role-tag--${t.kind}`, `role-tag--${t.status}`]"
+                :title="t.label"
+                :aria-label="t.pause ? `${t.label}, ${t.pause}` : t.label"
+              >
+                {{ t.role }}
+                <i v-if="t.pause" class="pi pi-pause-circle pause-mark" :title="t.pause" />
+              </span>
+            </div>
+          </td>
+          <td>
+            <div class="role-tags">
+              <span
+                v-for="c in p.circles ?? []"
+                :key="c.circleId"
+                class="circle-pill"
+                :title="c.name"
+              >{{ circleShortName(c.name) }}</span>
             </div>
           </td>
           <td>{{ parsePhoneObj(p.phone).phone || '—' }}</td>
@@ -512,14 +491,6 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
   margin-left: auto;
 }
 
-.role-filter-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
 .role-tags {
   display: flex;
   gap: 0.25rem;
@@ -598,8 +569,69 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
   background: var(--p-content-hover-background);
 }
 
+/* Role tags are plain spans, not PrimeVue Tags: ~2,000 rows rule out a
+   component (or tooltip directive) per tag. Colours follow the Aura tag
+   tokens, with the primitives as fallback because the --p-tag-* vars only
+   exist once a Tag has mounted somewhere. */
+.role-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--p-content-border-radius, 6px);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.role-tag--member {
+  background: var(--p-tag-info-background, var(--p-sky-100));
+  color: var(--p-tag-info-color, var(--p-sky-700));
+}
+
+.role-tag--volunteer {
+  background: var(--p-tag-success-background, var(--p-green-100));
+  color: var(--p-tag-success-color, var(--p-green-700));
+}
+
+.role-tag--dropped {
+  background: var(--p-tag-secondary-background, var(--p-surface-100));
+  color: var(--p-tag-secondary-color, var(--p-surface-600));
+}
+
+/* Pending: outline only, in the role's own colour. */
+.role-tag--pending {
+  background: transparent;
+  border: 1px dashed currentColor;
+}
+
+.pause-mark {
+  font-size: 0.8rem;
+}
+
+.circle-pill {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: var(--p-tag-secondary-background, var(--p-surface-100));
+  color: var(--p-tag-secondary-color, var(--p-surface-600));
+}
+
 .role-tags {
   flex-wrap: nowrap;
+}
+
+/* Deceased: hatched, dimmed, tags grey; the row still opens the record. */
+.person-table tbody tr.deceased {
+  background-image: repeating-linear-gradient(
+    135deg, transparent 0 6px,
+    color-mix(in srgb, var(--p-text-muted-color) 22%, transparent) 6px 7px);
+  color: var(--p-text-muted-color);
+}
+
+.person-table tbody tr.deceased .role-tag,
+.person-table tbody tr.deceased .circle-pill {
+  filter: grayscale(1);
 }
 
 .empty-state {
