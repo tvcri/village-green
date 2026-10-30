@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { render, screen, cleanup, within, fireEvent } from '@testing-library/vue'
+import { render, screen, cleanup, within, fireEvent, waitFor } from '@testing-library/vue'
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
 import PersonList from '../components/PersonList.vue'
 import { getPersons, getCircles } from '../api/personApi.js'
+import { downloadCsv } from '../../../shared/lib/csvUtils.js'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), afterEach: () => () => {} })
@@ -20,6 +21,11 @@ vi.mock('../../../shared/composables/useCurrentUser.js', () => ({
 vi.mock('../api/personApi.js', () => ({ getPersons: vi.fn(), getCircles: vi.fn() }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({
   getVillages: vi.fn().mockResolvedValue([{ villageId: 1, name: 'Testville' }])
+}))
+
+vi.mock('../../../shared/lib/csvUtils.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  downloadCsv: vi.fn()
 }))
 
 const base = {
@@ -189,6 +195,50 @@ describe('PersonList grid', () => {
       await fireEvent.click(within(screen.getByRole('group', { name: 'Volunteer' })).getByRole('button', { name: /active/i }))
       const empty = await screen.findByText(/No persons match/)
       expect(empty).toHaveTextContent('People who are an active volunteer')
+    })
+  })
+
+  describe('CSV export', () => {
+    // fullName is "Last, First", so cells are quoted; split on commas outside quotes.
+    const cellsOf = (line) => line.match(/("([^"]|"")*"|[^,]*)(,|$)/g).slice(0, -1).map(c => c.replace(/,$/, ''))
+    beforeEach(() => { perms.all = true })
+
+    it('exports member/volunteer status from the on-screen rows, filtered, in place of Roles', async () => {
+      const summary = [
+        row({ personId: 1, fullName: 'Alpha, Ann', memberStatus: 'Pending', volunteerStatus: null }),
+        row({ personId: 2, fullName: 'Beta, Bob', memberStatus: 'Active', volunteerStatus: 'Dropped' }),
+        row({ personId: 3, fullName: 'Gamma, Gus', memberStatus: 'Active', deceased: true })
+      ]
+      // The export fetch carries different (gated) statuses; they must be ignored.
+      const detail = summary.map(p => ({ ...p, memberStatus: null, volunteerStatus: null, detail: {} }))
+      getPersons.mockImplementation(async (params) => params?.projection?.includes('detail') ? detail : summary)
+      await renderList()
+      await fireEvent.click(within(screen.getByRole('group', { name: 'Member' })).getByRole('button', { name: /pending/i }))
+      await fireEvent.click(screen.getByRole('button', { name: /Export|Download/ }))
+      await fireEvent.click(await screen.findByText('Download'))
+      await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
+      const [csv] = downloadCsv.mock.calls[0]
+      const [head, ...lines] = csv.split('\n')
+      const headers = head.split(',')
+      expect(headers).toContain('Member Status')
+      expect(headers).toContain('Volunteer Status')
+      expect(headers).not.toContain('Roles')
+      expect(lines).toHaveLength(1)
+      const cells = cellsOf(lines[0])
+      expect(cells[headers.indexOf('Member Status')]).toBe('Pending')
+      expect(cells[headers.indexOf('Volunteer Status')]).toBe('')
+    })
+
+    it('a deceased Active member exports Active', async () => {
+      const summary = [row({ personId: 3, fullName: 'Gamma, Gus', memberStatus: 'Active', deceased: true })]
+      getPersons.mockImplementation(async (params) =>
+        params?.projection?.includes('detail') ? summary.map(p => ({ ...p, detail: {} })) : summary)
+      await renderList()
+      await fireEvent.click(screen.getByRole('button', { name: /Export|Download/ }))
+      await fireEvent.click(await screen.findByText('Download'))
+      await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
+      const [head, line] = downloadCsv.mock.calls[0][0].split('\n')
+      expect(cellsOf(line)[head.split(',').indexOf('Member Status')]).toBe('Active')
     })
   })
 })

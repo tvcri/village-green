@@ -126,14 +126,6 @@ const sortedPersons = computed(() => {
   return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
 })
 
-function parseJson(val) {
-  if (Array.isArray(val)) return val
-  if (typeof val === 'string') {
-    try { return JSON.parse(val) } catch { return [] }
-  }
-  return []
-}
-
 function parsePhoneObj(val) {
   if (val && typeof val === 'object') return val
   if (typeof val === 'string') {
@@ -171,7 +163,8 @@ const isFetchingExport = ref(false)
 const columnsForCsv = computed(() => [
   { header: 'Name', key: 'fullName' },
   { header: 'Village', key: 'villageName' },
-  { header: 'Roles', key: 'roles' },
+  { header: 'Member Status', key: 'memberStatus' },
+  { header: 'Volunteer Status', key: 'volunteerStatus' },
   ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
 ])
 
@@ -182,14 +175,16 @@ function detailRowForCsv(p) {
   return {
     fullName: p.fullName,
     villageName: p.village?.name ?? '',
-    roles: parseJson(p.activeAs).join(', '),
+    memberStatus: p.memberStatus,
+    volunteerStatus: p.volunteerStatus,
     ...personExportValues({ ...(p.detail ?? {}), email: p.email, phone, cell }),
   }
 }
 
 // Fetch projection=detail at export time — full rows (with circles/disabilities
 // subqueries) are paid only here, never for the live list — and keep exactly
-// the people on screen, in screen order. The village goes to the server too,
+// the people on screen, in screen order. Statuses come from the on-screen
+// summary row (what the grid shows this caller), not the export fetch. The village goes to the server too,
 // so its birthDate/demographics gating matches canReadBirthDate and
 // canReadDemographics above.
 async function fetchRowsForExport() {
@@ -201,9 +196,8 @@ async function fetchRowsForExport() {
     })
     const byId = new Map(detail.map(p => [p.personId, p]))
     return (sortedPersons.value ?? [])
-      .map(p => byId.get(p.personId))
-      .filter(Boolean)
-      .map(detailRowForCsv)
+      .filter(p => byId.has(p.personId))
+      .map(p => detailRowForCsv({ ...byId.get(p.personId), memberStatus: p.memberStatus, volunteerStatus: p.volunteerStatus }))
   } finally {
     isFetchingExport.value = false
   }
