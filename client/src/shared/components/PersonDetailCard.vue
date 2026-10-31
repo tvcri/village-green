@@ -141,7 +141,10 @@ const copyEmail = async (email) => {
       <!-- Personal Information: the edit form's subgroups. A subgroup with
            nothing to show is omitted, heading and all. -->
       <div class="section">
-        <h3 class="section-header">Personal Information</h3>
+        <div class="section-header-row">
+          <h3 class="section-header">Personal Information</h3>
+          <span v-if="$slots['personal-actions']" class="section-header-actions"><slot name="personal-actions" /></span>
+        </div>
 
         <div v-if="hasContact" class="subgroup">
           <h4 class="subsection-header">Contact</h4>
@@ -254,6 +257,7 @@ const copyEmail = async (email) => {
         <div class="section-header-row">
           <h3 class="section-header">Member Information</h3>
           <Tag v-if="memberStatusTag" :value="memberStatusTag.value" :severity="memberStatusTag.severity" class="member-status-tag" />
+          <span v-if="$slots['member-actions']" class="section-header-actions"><slot name="member-actions" /></span>
         </div>
         <div v-if="person.memberNumber" class="detail-field">
           <span class="label">Member #</span>
@@ -357,6 +361,7 @@ const copyEmail = async (email) => {
             <Tag v-if="pauseText" :value="pauseText" severity="info" icon="pi pi-pause" class="member-status-tag" data-testid="pause-tag" />
             <slot name="volunteer-pause-actions" />
           </template>
+          <span v-if="$slots['volunteer-actions']" class="section-header-actions"><slot name="volunteer-actions" /></span>
         </div>
         <div v-if="person.volunteerStatus === 'Dropped' && person.volunteerDropReasonName" class="detail-field">
           <span class="label">Drop Reason</span>
@@ -558,6 +563,14 @@ const copyEmail = async (email) => {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem 0.75rem;
+}
+
+/* Host-supplied header actions sit at the far right, apart from any status
+   tags or pause controls that precede them. */
+.section-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
 .subgroup {
