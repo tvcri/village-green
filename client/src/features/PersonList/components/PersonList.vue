@@ -522,18 +522,20 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
         <div class="filter-group" role="group" aria-label="Also">
           <span class="filter-group-label">Also</span>
-          <label class="also-option">
-            <Checkbox v-model="emailPausedOnly" binary />
-            <span>Email paused</span>
-          </label>
-          <label v-if="canFilterVeteran" class="also-option">
-            <Checkbox v-model="veteranOnly" binary />
-            <span>Veteran</span>
-          </label>
-          <label class="also-option">
-            <Checkbox v-model="deceasedOnly" binary />
-            <span>Deceased</span>
-          </label>
+          <div class="also-options">
+            <label class="also-option">
+              <Checkbox v-model="emailPausedOnly" binary />
+              <span>Email paused</span>
+            </label>
+            <label v-if="canFilterVeteran" class="also-option">
+              <Checkbox v-model="veteranOnly" binary />
+              <span>Veteran</span>
+            </label>
+            <label class="also-option">
+              <Checkbox v-model="deceasedOnly" binary />
+              <span>Deceased</span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -808,6 +810,15 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 .selection-sentence {
   font-size: 0.85rem;
   color: var(--color-text-dim);
+}
+
+/* Two per column at most; a third option starts a new column. */
+.also-options {
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 0.5rem 1.5rem;
 }
 
 .also-option {
