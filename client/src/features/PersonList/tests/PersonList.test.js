@@ -7,8 +7,9 @@ import PersonList from '../components/PersonList.vue'
 import { getPersons, getCircles } from '../api/personApi.js'
 import { downloadCsv } from '../../../shared/lib/csvUtils.js'
 
+const routerPush = vi.hoisted(() => vi.fn())
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn(), afterEach: () => () => {} })
+  useRouter: () => ({ push: routerPush, afterEach: () => () => {} })
 }))
 vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: vi.fn() }) }))
 vi.mock('../../../shared/api/analyticsApi.js', () => ({
@@ -96,6 +97,31 @@ describe('PersonList grid', () => {
     expect(pill).toHaveAttribute('title', 'Circle of Pride')
   })
 
+  it('copies the email from its button without opening the row', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    setRows([row({ personId: 1, fullName: 'Alpha, Ann', email: 'ann@example.com' })])
+    await renderList()
+    const button = screen.getByRole('button', { name: 'Copy email ann@example.com' })
+    const rowClick = vi.fn()
+    button.closest('tr').addEventListener('click', rowClick)
+    await fireEvent.click(button)
+    expect(writeText).toHaveBeenCalledWith('ann@example.com')
+    expect(rowClick).not.toHaveBeenCalled()
+    expect(await screen.findByRole('button', { name: 'Copied' })).toHaveClass('copied')
+    expect(routerPush).not.toHaveBeenCalled()
+
+    // The rest of the row still opens the person.
+    await fireEvent.click(screen.getByText('ann@example.com'))
+    expect(routerPush).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no copy button when there is no email', async () => {
+    setRows([row({ personId: 1, fullName: 'Alpha, Ann' })])
+    await renderList()
+    expect(screen.queryByRole('button', { name: /^Copy email/ })).toBeNull()
+  })
+
   it('marks an in-effect pause inside the volunteer tag and ignores an expired one', async () => {
     setRows([
       row({
@@ -152,6 +178,34 @@ describe('PersonList grid', () => {
       await fireEvent.click(btn)
       expect(btn).toHaveAttribute('aria-expanded', 'false')
       expect(screen.queryByPlaceholderText('Name')).toBeNull()
+    })
+
+    it('once the open panel scrolls away, the button reads collapsed and a click brings it back', async () => {
+      setRows(people())
+      await renderList()
+      const btn = screen.getByRole('button', { name: /Filters/ })
+      const content = document.querySelector('.filters-content')
+      const header = document.querySelector('.filters-header')
+      // Scrolled: the panel's bottom has passed under the sticky header row.
+      content.getBoundingClientRect = () => ({ bottom: 20 })
+      header.getBoundingClientRect = () => ({ bottom: 80 })
+      const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => { cb(); return 0 })
+      const scrollTo = vi.fn()
+      window.scrollTo = scrollTo
+      window.dispatchEvent(new Event('scroll'))
+      await waitFor(() => expect(btn).toHaveAttribute('aria-expanded', 'false'))
+
+      await fireEvent.click(btn)
+      expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+      expect(screen.getByPlaceholderText('Name')).toBeInTheDocument()
+
+      // Back in view: the button reads open, and a click collapses as before.
+      content.getBoundingClientRect = () => ({ bottom: 400 })
+      window.dispatchEvent(new Event('scroll'))
+      await waitFor(() => expect(btn).toHaveAttribute('aria-expanded', 'true'))
+      await fireEvent.click(btn)
+      expect(screen.queryByPlaceholderText('Name')).toBeNull()
+      frame.mockRestore()
     })
 
     it('a picked tag filters rows, badges the button and writes the sentence', async () => {

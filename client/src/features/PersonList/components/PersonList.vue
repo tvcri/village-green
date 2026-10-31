@@ -283,6 +283,24 @@ function navigateToPerson(personId, fullName) {
   })
 }
 
+// Copy an email without opening the row. One "copied" mark at a time; a
+// second copy moves it and restarts the timer.
+const copiedPersonId = ref(null)
+let copiedTimer = null
+async function copyEmail(p) {
+  try {
+    await navigator.clipboard.writeText(p.email)
+  } catch (err) {
+    console.error('Failed to copy email:', err)
+    toast?.add({ severity: 'error', summary: 'Copy failed', detail: 'The email could not be copied.', life: 4000 })
+    return
+  }
+  copiedPersonId.value = p.personId
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => { copiedPersonId.value = null }, 2000)
+}
+onBeforeUnmount(() => clearTimeout(copiedTimer))
+
 // One analytics event per filtering session, not per keystroke.
 watch(hasFilter, (now, was) => {
   if (now && !was) trackEvent('filter_applied')
@@ -301,6 +319,55 @@ onMounted(() => {
   headerObserver.observe(filtersHeader.value)
 })
 onBeforeUnmount(() => headerObserver?.disconnect())
+
+// The Filters button describes what is on screen. Once the open panel has
+// scrolled away under the sticky header row, the chevron reads collapsed and
+// a click brings the panel back (top of the list) instead of collapsing
+// something out of sight. Collapsed and scrolled, a click opens the panel
+// and brings it into view the same way.
+const filtersContent = ref(null)
+const panelInView = ref(true)
+function measurePanel() {
+  const content = filtersContent.value
+  if (!content || !filtersHeader.value) {
+    panelInView.value = true
+    return
+  }
+  const headerBottom = filtersHeader.value.getBoundingClientRect().bottom
+  // Nothing laid out yet (or no layout at all): call it in view.
+  panelInView.value = !headerBottom || content.getBoundingClientRect().bottom > headerBottom
+}
+let measureFrame = 0
+function onScroll() {
+  if (measureFrame) return
+  measureFrame = requestAnimationFrame(() => {
+    measureFrame = 0
+    measurePanel()
+  })
+}
+onMounted(() => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('resize', onScroll, { passive: true })
+})
+onActivated(measurePanel)
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('resize', onScroll)
+  cancelAnimationFrame(measureFrame)
+})
+watch(filtersContent, measurePanel)
+
+const filtersShownOpen = computed(() => !filtersCollapsed.value && panelInView.value)
+async function toggleFilters() {
+  if (filtersShownOpen.value) {
+    filtersCollapsed.value = true
+    return
+  }
+  filtersCollapsed.value = false
+  await nextTick()
+  measurePanel()
+  if (!panelInView.value) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 // When a filter changes while scrolled down the list, bring the first matches
 // up under the sticky header instead of leaving the view somewhere mid-list.
@@ -330,13 +397,13 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
         type="button"
         class="filters-btn"
         outlined
-        :aria-expanded="!filtersCollapsed"
-        @click="filtersCollapsed = !filtersCollapsed"
+        :aria-expanded="filtersShownOpen"
+        @click="toggleFilters"
       >
         <i class="pi pi-filter" aria-hidden="true" />
         <span class="filters-btn-label">Filters</span>
         <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
-        <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: filtersCollapsed }" aria-hidden="true" />
+        <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: !filtersShownOpen }" aria-hidden="true" />
       </Button>
       <span v-if="filteredPersons !== null" class="filter-count-tag">
         {{ filteredPersons.length }} of {{ persons.length }} {{ persons.length === 1 ? 'person' : 'persons' }}
@@ -361,7 +428,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
       </div>
     </div>
 
-    <div v-if="!filtersCollapsed" class="filters-content">
+    <div v-if="!filtersCollapsed" ref="filtersContent" class="filters-content">
       <div class="filters-line">
         <Select
           v-model="selectedVillage"
@@ -536,7 +603,22 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           </td>
           <td>{{ parsePhoneObj(p.phone).phone || '—' }}</td>
           <td>{{ parsePhoneObj(p.phone).cell || '—' }}</td>
-          <td>{{ p.email || '—' }}</td>
+          <td>
+            <div v-if="p.email" class="email-cell">
+              <span class="email-text">{{ p.email }}</span>
+              <button
+                type="button"
+                class="copy-email"
+                :class="{ copied: copiedPersonId === p.personId }"
+                :title="copiedPersonId === p.personId ? 'Copied!' : 'Copy email'"
+                :aria-label="copiedPersonId === p.personId ? 'Copied' : `Copy email ${p.email}`"
+                @click.stop="copyEmail(p)"
+              >
+                <i :class="copiedPersonId === p.personId ? 'pi pi-check' : 'pi pi-copy'" />
+              </button>
+            </div>
+            <template v-else>—</template>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -882,6 +964,81 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
 .role-tags {
   flex-wrap: nowrap;
+}
+
+/* Email cell (after STIG Manager's grid-cell toolbar): the address gets the
+   full width until the row is hovered; then a right margin opens, the
+   ellipsis moves left and the copy button shows in the space. The button
+   sits outside the flow, so hidden it takes no room. It is transparent rather
+   than visibility:hidden so it stays in the tab order; keyboard focus opens
+   the space too (not :focus-within, which a mouse click would leave holding
+   an empty gap). Touch screens can't hover, so it is always open. */
+.email-cell {
+  position: relative;
+}
+
+.email-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.person-table tbody tr:hover .email-text,
+.email-cell:has(.copy-email:focus-visible) .email-text,
+.email-cell:has(.copied) .email-text {
+  margin-right: 1.875rem;
+}
+
+.copy-email {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  margin: auto 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+  background: var(--p-content-background);
+  color: var(--color-text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: scale 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+}
+
+.person-table tbody tr:hover .copy-email,
+.copy-email:focus-visible,
+.copy-email.copied {
+  opacity: 1;
+}
+
+/* Muted until pointed at, then larger and in the primary colour. */
+.copy-email:hover {
+  scale: 1.1;
+  color: var(--p-primary-color);
+  border-color: var(--p-primary-color);
+}
+
+.copy-email.copied {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.copy-email i {
+  font-size: 0.75rem;
+}
+
+@media (hover: none) {
+  .email-text {
+    margin-right: 1.875rem;
+  }
+  .copy-email {
+    opacity: 1;
+  }
 }
 
 /* Circles wrap: a person in several circles gets a taller row, not a
