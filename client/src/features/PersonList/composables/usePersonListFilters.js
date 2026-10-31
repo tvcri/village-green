@@ -34,6 +34,7 @@ export function usePersonListFilters (persons, villages, circles) {
   const matchMode = ref('any')
   const emailPausedOnly = ref(false)
   const veteranOnly = ref(false)
+  const deceasedOnly = ref(false)
 
   const selectedVillageId = computed(() => {
     if (selectedVillage.value === ALL_VILLAGES) return undefined
@@ -77,7 +78,8 @@ export function usePersonListFilters (persons, villages, circles) {
       matchesText(p) &&
       matchesTags(rowTagKeys(p), selectedTags.value, matchMode.value) &&
       (!emailPausedOnly.value || isEmailPaused(p, today)) &&
-      (!veteranOnly.value || p.isVeteran === true))
+      (!veteranOnly.value || p.isVeteran === true) &&
+      (!deceasedOnly.value || p.deceased === true))
   })
 
   // Each text field, the village, each selected tag and each toggle counts one.
@@ -89,7 +91,8 @@ export function usePersonListFilters (persons, villages, circles) {
     (selectedVillageId.value ? 1 : 0) +
     selectedTags.value.length +
     (emailPausedOnly.value ? 1 : 0) +
-    (veteranOnly.value ? 1 : 0))
+    (veteranOnly.value ? 1 : 0) +
+    (deceasedOnly.value ? 1 : 0))
   const hasFilter = computed(() => activeFilterCount.value > 0)
 
   const sentence = computed(() =>
@@ -104,11 +107,12 @@ export function usePersonListFilters (persons, villages, circles) {
     matchMode.value = 'any'
     emailPausedOnly.value = false
     veteranOnly.value = false
+    deceasedOnly.value = false
   }
 
   return {
     name, phone, email, selectedVillage, selectedVillageId, selectedTags, matchMode,
-    emailPausedOnly, veteranOnly, filteredPersons, activeFilterCount, hasFilter,
+    emailPausedOnly, veteranOnly, deceasedOnly, filteredPersons, activeFilterCount, hasFilter,
     sentence, circleNameById, clearAll
   }
 }

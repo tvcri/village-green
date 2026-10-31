@@ -111,6 +111,18 @@ describe('usePersonListFilters', () => {
     expect(ids(f)).toEqual([8])
   })
 
+  it('deceasedOnly keeps only deceased people, ANDed with tags', () => {
+    const f = make()
+    f.deceasedOnly.value = true
+    expect(ids(f)).toEqual([4])
+    expect(f.activeFilterCount.value).toBe(1)
+    // A deceased person's Active role shows as dropped, so it matches there.
+    f.selectedTags.value = ['member:dropped']
+    expect(ids(f)).toEqual([4])
+    f.selectedTags.value = ['member:active']
+    expect(ids(f)).toEqual([])
+  })
+
   it('an expired pause does not count as email paused', () => {
     const f = make([row(1, { volunteerStatus: 'Active', volunteerPause: { startDate: '2026-01-01', endDate: '2026-02-01', scope: 'window' } })])
     f.emailPausedOnly.value = true
@@ -148,7 +160,7 @@ describe('usePersonListFilters', () => {
     f.name.value = 'a'; f.phone.value = '1'; f.email.value = 'e'
     f.selectedVillage.value = 'Beta'
     f.selectedTags.value = ['member:active']
-    f.emailPausedOnly.value = true; f.veteranOnly.value = true
+    f.emailPausedOnly.value = true; f.veteranOnly.value = true; f.deceasedOnly.value = true
     f.matchMode.value = 'exact'
     f.clearAll()
     expect([f.name.value, f.phone.value, f.email.value]).toEqual(['', '', ''])
@@ -156,6 +168,7 @@ describe('usePersonListFilters', () => {
     expect(f.selectedTags.value).toEqual([])
     expect(f.emailPausedOnly.value).toBe(false)
     expect(f.veteranOnly.value).toBe(false)
+    expect(f.deceasedOnly.value).toBe(false)
     expect(f.matchMode.value).toBe('any')
   })
 })

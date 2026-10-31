@@ -56,7 +56,7 @@ const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
 
 const {
   name, phone, email, selectedVillage, selectedVillageId, selectedTags, matchMode,
-  emailPausedOnly, veteranOnly, filteredPersons, activeFilterCount, hasFilter,
+  emailPausedOnly, veteranOnly, deceasedOnly, filteredPersons, activeFilterCount, hasFilter,
   sentence, circleNameById, clearAll: clearFilters
 } = usePersonListFilters(persons, allVillages, allCircles)
 
@@ -371,7 +371,7 @@ async function toggleFilters() {
 
 // When a filter changes while scrolled down the list, bring the first matches
 // up under the sticky header instead of leaving the view somewhere mid-list.
-watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPausedOnly, veteranOnly], async () => {
+watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPausedOnly, veteranOnly, deceasedOnly], async () => {
   await nextTick()
   const table = listRoot.value?.querySelector('.person-table')
   if (!table || !filtersHeader.value) return
@@ -529,6 +529,10 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           <label v-if="canFilterVeteran" class="also-option">
             <Checkbox v-model="veteranOnly" binary />
             <span>Veteran</span>
+          </label>
+          <label class="also-option">
+            <Checkbox v-model="deceasedOnly" binary />
+            <span>Deceased</span>
           </label>
         </div>
       </div>

@@ -257,6 +257,18 @@ describe('PersonList grid', () => {
       expect(screen.getByLabelText('Email paused')).toBeInTheDocument()
     })
 
+    it('the Deceased box lists only deceased people, whatever the caller may see of their roles', async () => {
+      perms.denied = new Set(['member:read_inactive'])
+      setRows([
+        row({ personId: 1, fullName: 'Alpha, Ann', memberStatus: null, deceased: true }),
+        row({ personId: 2, fullName: 'Beta, Bob', memberStatus: 'Active' })
+      ])
+      await renderList()
+      await fireEvent.click(screen.getByLabelText('Deceased'))
+      expect(bodyRows().map(r => r.cells[0].textContent)).toEqual(['Alpha, Ann'])
+      expect(screen.getByRole('button', { name: /Filters/ })).toHaveTextContent('1')
+    })
+
     it('no matches shows the sentence in the empty state; old role checkboxes are gone', async () => {
       setRows(people())
       await renderList()
