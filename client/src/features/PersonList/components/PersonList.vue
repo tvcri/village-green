@@ -386,7 +386,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
       <div class="filter-groups">
         <div class="filter-group" role="group" aria-label="Member">
-          <span class="filter-group-label">member</span>
+          <span class="filter-group-label">Member</span>
           <div class="picker-items">
             <button
               v-for="s in memberStatuses"
@@ -481,7 +481,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
     <table v-else class="person-table">
       <colgroup>
-        <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10%">
+        <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10rem">
         <col style="width: 11%"><col style="width: 11%"><col style="width: 21%">
       </colgroup>
       <thead>
@@ -525,7 +525,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
             </div>
           </td>
           <td>
-            <div class="role-tags">
+            <div class="circle-pills">
               <span
                 v-for="c in p.circles ?? []"
                 :key="c.circleId"
@@ -817,6 +817,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   --tag-volunteer-fg: var(--p-green-700);
   --tag-muted-bg: var(--p-surface-100);
   --tag-muted-fg: var(--p-surface-600);
+  --circle-bg: var(--p-violet-50);
+  --circle-border: var(--p-violet-200);
+  --circle-fg: var(--p-violet-700);
 }
 
 /* html.app-dark out-specifies the scoped light rule, so source order is irrelevant. */
@@ -827,6 +830,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   --tag-volunteer-fg: var(--p-green-300);
   --tag-muted-bg: var(--p-surface-800);
   --tag-muted-fg: var(--p-surface-300);
+  --circle-bg: color-mix(in srgb, var(--p-violet-500), transparent 84%);
+  --circle-border: color-mix(in srgb, var(--p-violet-400), transparent 50%);
+  --circle-fg: var(--p-violet-300);
 }
 
 .role-tag {
@@ -867,14 +873,23 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
 .circle-pill {
   padding: 0.125rem 0.5rem;
+  border: 1px solid var(--circle-border);
   border-radius: 999px;
   font-size: 0.8rem;
-  background: var(--tag-muted-bg);
-  color: var(--tag-muted-fg);
+  background: var(--circle-bg);
+  color: var(--circle-fg);
 }
 
 .role-tags {
   flex-wrap: nowrap;
+}
+
+/* Circles wrap: a person in several circles gets a taller row, not a
+   clipped pill. */
+.circle-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 /* Deceased: hatched, dimmed, tags grey; the row still opens the record. */
