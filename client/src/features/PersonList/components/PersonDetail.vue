@@ -138,6 +138,18 @@ function removePerson () {
       :has-member-detail="hasMemberDetail"
       :has-volunteer-detail="hasVolunteerDetail"
     >
+      <!-- Pencil shortcuts to the same editors as the top buttons. Each
+           section renders only when its role record exists, so these are
+           always edits, never Add … Role. -->
+      <template v-if="canWritePerson" #personal-actions>
+        <Button icon="pi pi-pencil" text rounded size="small" aria-label="Edit person" v-tooltip.top="'Edit person'" data-testid="edit-person-shortcut" @click="goEdit" />
+      </template>
+      <template v-if="canWriteMember && !person?.deceased" #member-actions>
+        <Button icon="pi pi-pencil" text rounded size="small" aria-label="Edit member" v-tooltip.top="'Edit member'" data-testid="edit-member-shortcut" @click="goMember" />
+      </template>
+      <template v-if="canWriteVolunteer && !person?.deceased" #volunteer-actions>
+        <Button icon="pi pi-pencil" text rounded size="small" aria-label="Edit volunteer" v-tooltip.top="'Edit volunteer'" data-testid="edit-volunteer-shortcut" @click="goVolunteer" />
+      </template>
       <template v-if="canWriteVolunteer" #volunteer-pause-actions>
         <Button v-if="!hasLivePause" label="Pause service email…" icon="pi pi-pause" outlined size="small" data-testid="pause-open" @click="pauseDialogOpen = true" />
         <template v-else>

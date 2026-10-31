@@ -245,3 +245,25 @@ describe('PersonDetailCard — pause beside the volunteer status tag', () => {
     expect(screen.queryByTestId('pause-open')).toBeNull()
   })
 })
+
+describe('PersonDetailCard — section header actions', () => {
+  const both = { ...base, status: 'Active', volunteerStatus: 'Dropped', capabilities: ['Driving'] }
+  const slots = {
+    'personal-actions': '<button data-testid="personal-action">P</button>',
+    'member-actions': '<button data-testid="member-action">M</button>',
+    'volunteer-actions': '<button data-testid="volunteer-action">V</button>',
+  }
+  const header = text => screen.getByText(text).parentElement
+
+  it('renders each slot in its own section header', () => {
+    render(PersonDetailCard, { props: { person: both, personType: 'member, volunteer' }, slots, global: { plugins: [PrimeVue] } })
+    expect(header('Personal Information')).toContainElement(screen.getByTestId('personal-action'))
+    expect(header('Member Information')).toContainElement(screen.getByTestId('member-action'))
+    expect(header('Volunteer Information')).toContainElement(screen.getByTestId('volunteer-action'))
+  })
+
+  it('renders no action wrapper when a host fills no slots', () => {
+    const { container } = render(PersonDetailCard, { props: { person: both, personType: 'member, volunteer' }, global: { plugins: [PrimeVue] } })
+    expect(container.querySelector('.section-header-actions')).toBeNull()
+  })
+})
