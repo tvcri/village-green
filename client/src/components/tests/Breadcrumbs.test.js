@@ -77,6 +77,18 @@ describe('Breadcrumbs: Hub person pages', () => {
     expect(trail()).toContain('Jones, Alice')
   })
 
+  // The person page's Persons crumb switches Hub sections; the pages under it
+  // dropped that droplist.
+  it.each(['meta-person-detail', 'meta-person-create', 'meta-person-edit', 'meta-person-member', 'meta-person-volunteer'])(
+    'keeps the Persons sections droplist on %s',
+    (name) => {
+      mount(name, { personId: '5' })
+      const persons = screen.getByText('Persons')
+      expect(persons).toHaveClass('breadcrumb-link-label')
+      expect(persons.nextElementSibling).toHaveClass('breadcrumb-link-dropdown')
+    }
+  )
+
   it('ignores a loaded person from another page', () => {
     setCrumbPerson({ personId: '9', fullName: 'Other, Person' })
     mount('meta-person-volunteer', { personId: '5' })

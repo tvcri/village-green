@@ -255,24 +255,24 @@ const breadcrumbs = computed(() => {
       break
     case 'meta-person-create':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
       crumbs.push({ label: 'New Person' })
       break
     case 'meta-person-edit':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
       crumbs.push(hubPersonCrumb(false))
       crumbs.push({ label: 'Edit' })
       break
     case 'meta-person-member':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
       crumbs.push(hubPersonCrumb(false))
       crumbs.push({ label: 'Member' })
       break
     case 'meta-person-volunteer':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
       crumbs.push(hubPersonCrumb(false))
       crumbs.push({ label: 'Volunteer' })
       break
