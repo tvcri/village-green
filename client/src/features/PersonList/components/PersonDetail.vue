@@ -16,6 +16,7 @@ import VolunteerPauseDialog from './VolunteerPauseDialog.vue'
 import { PAUSE_TIME_ZONE, pauseState } from '../../../shared/lib/volunteerPause.js'
 import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
+import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,7 +29,8 @@ const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const personId = computed(() => route.params.personId)
 
 const { state: person, execute: refresh } = useAsyncState(
-  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] }),
+  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] })
+    .then(p => { setCrumbPerson(p); return p }),
   { immediate: true }
 )
 

@@ -17,6 +17,7 @@ import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { positionsLostOnVillageChange } from '../../../shared/lib/positionRules.js'
+import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -112,6 +113,7 @@ onMounted(async () => {
     await lookupsReady
     if (isEdit.value) {
       const p = await getPerson(personId.value, hasPermission('volunteer:read') ? ['volunteer'] : [])
+      setCrumbPerson(p)
       Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
       form.villageId = p.village?.villageId ?? null
       originalVillageId.value = form.villageId

@@ -21,6 +21,7 @@ import { volunteerSnapshot, summarizeVolunteerChanges } from '../lib/volunteerCh
 import { validateVolunteerForm } from '../lib/volunteerFormValidation.js'
 import { dropReasonSent } from '../lib/memberFormValidation.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
+import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -110,6 +111,7 @@ onMounted(async () => {
     circleOptions.value = circles
     const p = await getPerson(personId.value, ['volunteer'])
     person.value = p
+    setCrumbPerson(p)
     if (p.volunteer) {
       hasVolunteer.value = true
       const d = p.volunteer

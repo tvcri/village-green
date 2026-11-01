@@ -13,6 +13,7 @@ import { putMember, patchMember, deleteMember } from '../api/roleApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 import { validateMemberForm, dropReasonSent } from '../lib/memberFormValidation.js'
 import { todayCivilDate } from '../../../shared/lib/civilDate.js'
+import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -54,6 +55,7 @@ onMounted(async () => {
   try {
     const p = await getPerson(personId.value, ['member'])
     person.value = p
+    setCrumbPerson(p)
     if (p.member) {
       hasMember.value = true
       const d = p.member

@@ -105,6 +105,14 @@ describe('VolunteerEdit', () => {
     expect(patchVolunteer).not.toHaveBeenCalled()
   })
 
+  // Cancel and save push to the person page without :personName; the
+  // breadcrumb names the person from this instead.
+  it('hands the loaded person to the breadcrumb', async () => {
+    const { crumbPerson } = await import('../../../shared/lib/crumbPerson.js')
+    render(VolunteerEdit, { global: globalOpts })
+    await waitFor(() => expect(crumbPerson.value).toEqual({ personId: '5', fullName: 'Smith, Alice' }))
+  })
+
   it('loads and displays the existing volunteer values', async () => {
     render(VolunteerEdit, { global: globalOpts })
     await waitFor(() => expect(screen.getByDisplayValue('Existing notes')).toBeInTheDocument())
