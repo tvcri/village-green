@@ -16,6 +16,7 @@ import VolunteerPositionsFields from './VolunteerPositionsFields.vue'
 import { isPositionEligible } from '../../../shared/lib/positionRules.js'
 import { volunteerSnapshot, summarizeVolunteerChanges } from '../lib/volunteerChanges.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
+import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -95,6 +96,7 @@ onMounted(async () => {
     circleOptions.value = circles
     const p = await getPerson(personId.value, ['volunteer'])
     person.value = p
+    setCrumbPerson(p)
     if (p.volunteer) {
       hasVolunteer.value = true
       const d = p.volunteer

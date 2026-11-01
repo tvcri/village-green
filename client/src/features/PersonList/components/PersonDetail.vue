@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
@@ -9,6 +9,7 @@ import { apiCall } from '../../../shared/api/apiClient.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
 import { deletePerson } from '../api/personApi.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
+import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,6 +25,7 @@ const { state: person } = useAsyncState(
   () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] }),
   { immediate: true }
 )
+watch(person, setCrumbPerson)
 
 const isMember = computed(() => (person.value?.activeAs ?? []).includes('member'))
 const isVolunteer = computed(() => (person.value?.activeAs ?? []).includes('volunteer'))

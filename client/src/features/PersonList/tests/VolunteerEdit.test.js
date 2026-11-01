@@ -95,6 +95,14 @@ describe('VolunteerEdit', () => {
     expect(screen.getByText('Driving')).toBeInTheDocument()
   })
 
+  // Cancel and save push to the person page without :personName; the
+  // breadcrumb names the person from this instead.
+  it('hands the loaded person to the breadcrumb', async () => {
+    const { crumbPerson } = await import('../../../shared/lib/crumbPerson.js')
+    render(VolunteerEdit, { global: globalOpts })
+    await waitFor(() => expect(crumbPerson.value).toEqual({ personId: '5', fullName: 'Smith, Alice' }))
+  })
+
   it('saves edited notes and toggled active checkbox', async () => {
     const { patchVolunteer } = await import('../api/roleApi.js')
     render(VolunteerEdit, { global: globalOpts })

@@ -17,6 +17,7 @@ import { getVillages } from '../../VillageList/api/villageApi.js'
 import { useRequirePermission } from '../../../shared/composables/useRequirePermission.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { positionsLostOnVillageChange } from '../../../shared/lib/positionRules.js'
+import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -117,6 +118,7 @@ onMounted(async () => {
       heldPositions.value = p.volunteer?.positions ?? []
       associateIds.value = (p.volunteer?.associateVillages ?? []).map(v => v.villageId)
       personDisplayName.value = p.displayName
+      setCrumbPerson(p)
       circleNames.value = new Set(p.circles.map(c => c.name))
       disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
       Object.assign(personFields, personFormFromApi(p))
