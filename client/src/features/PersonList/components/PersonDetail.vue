@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
@@ -22,10 +22,10 @@ const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const personId = computed(() => route.params.personId)
 
 const { state: person } = useAsyncState(
-  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] }),
+  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] })
+    .then(p => { setCrumbPerson(p); return p }),
   { immediate: true }
 )
-watch(person, setCrumbPerson)
 
 const isMember = computed(() => (person.value?.activeAs ?? []).includes('member'))
 const isVolunteer = computed(() => (person.value?.activeAs ?? []).includes('volunteer'))

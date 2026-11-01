@@ -112,13 +112,13 @@ onMounted(async () => {
     await lookupsReady
     if (isEdit.value) {
       const p = await getPerson(personId.value, hasPermission('volunteer:read') ? ['volunteer'] : [])
+      setCrumbPerson(p)
       Object.keys(form).forEach(k => { if (p[k] !== undefined && p[k] !== null) form[k] = p[k] })
       form.villageId = p.village?.villageId ?? null
       originalVillageId.value = form.villageId
       heldPositions.value = p.volunteer?.positions ?? []
       associateIds.value = (p.volunteer?.associateVillages ?? []).map(v => v.villageId)
       personDisplayName.value = p.displayName
-      setCrumbPerson(p)
       circleNames.value = new Set(p.circles.map(c => c.name))
       disabilities.value = new Map(p.disabilities.map(d => [d.name, d.note]))
       Object.assign(personFields, personFormFromApi(p))
