@@ -1,14 +1,22 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
+import { DECEASED_ROLE_NOTE } from '../../../shared/lib/deceased.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { apiCall } from '../../../shared/api/apiClient.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
+import { flattenRoles } from '../../../shared/lib/roleStatus.js'
 import { deletePerson } from '../api/personApi.js'
+import { deleteVolunteerPause } from '../api/roleApi.js'
+import VolunteerPauseDialog from './VolunteerPauseDialog.vue'
+import { PAUSE_TIME_ZONE, pauseState } from '../../../shared/lib/volunteerPause.js'
+import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
+import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,8 +28,9 @@ const canWriteMember = computed(() => hasPermission('member:write'))
 const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const personId = computed(() => route.params.personId)
 
-const { state: person } = useAsyncState(
-  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] }),
+const { state: person, execute: refresh } = useAsyncState(
+  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] })
+    .then(p => { setCrumbPerson(p); return p }),
   { immediate: true }
 )
 
@@ -40,13 +49,46 @@ const personType = computed(() => {
 const hasMemberDetail = computed(() => !!person.value?.member)
 const hasVolunteerDetail = computed(() => !!person.value?.volunteer)
 
-const canDelete = computed(() => !(person.value?.activeAs ?? []).length)
+// Any role row blocks the delete, whatever its status. activeAs can't tell:
+// it reads the active_* views, which omit Dropped, Pending and deceased.
+const canDelete = computed(() => !hasMemberDetail.value && !hasVolunteerDetail.value)
+const deleteBlockedTip = computed(() => person.value?.deceased
+  ? 'Untick Deceased on the person form to change their roles, then remove them before deleting.'
+  : 'Remove member and volunteer roles before deleting this person')
 
 const flatPerson = computed(() => {
   if (!person.value) return null
   const { member, volunteer, ...rest } = person.value
-  return { ...rest, ...member, ...volunteer }
+  return flattenRoles(rest, member, volunteer)
 })
+
+// Pause actions beside the volunteer status tag. A scheduled or active
+// pause offers Change + Unpause; none or expired offers Pause….
+const pauseDialogOpen = ref(false)
+const hasLivePause = computed(() => {
+  const s = pauseState(person.value?.volunteer?.pause ?? null, todayCivilDateIn(PAUSE_TIME_ZONE))
+  return s === 'scheduled' || s === 'active'
+})
+
+function unpauseVolunteer () {
+  confirm.require({
+    header: 'Unpause Service Email',
+    message: 'Unpause service email? This volunteer will be emailed about new requests again and can be assigned to requests in the paused dates.',
+    acceptLabel: 'Unpause',
+    rejectLabel: 'Cancel',
+    rejectProps: { severity: 'secondary' },
+    accept: async () => {
+      try {
+        await deleteVolunteerPause(personId.value)
+        toast.add({ severity: 'success', summary: 'Service email unpaused', life: 2000 })
+        await refresh()
+      }
+      catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to unpause service email', life: 3000 })
+      }
+    }
+  })
+}
 
 function goEdit () { router.push({ name: 'meta-person-edit', params: { personId: personId.value } }) }
 function goMember () { router.push({ name: 'meta-person-member', params: { personId: personId.value } }) }
@@ -82,22 +124,50 @@ function removePerson () {
            role's editor (pencil, like Edit Person); without one it opens the
            same form, whose submit grants the role. hasMember/VolunteerDetail
            is the test MemberEdit/VolunteerEdit use to pick Save vs Grant. -->
-      <Button v-if="canWriteMember" :label="hasMemberDetail ? 'Edit Member' : 'Add Member Role'"
+      <Button v-if="canWriteMember && !person?.deceased" :label="hasMemberDetail ? 'Edit Member' : 'Add Member Role'"
               :icon="hasMemberDetail ? 'pi pi-pencil' : 'pi pi-plus'"
               :severity="hasMemberDetail ? undefined : 'secondary'" @click="goMember" />
-      <Button v-if="canWriteVolunteer" :label="hasVolunteerDetail ? 'Edit Volunteer' : 'Add Volunteer Role'"
+      <Button v-if="canWriteVolunteer && !person?.deceased" :label="hasVolunteerDetail ? 'Edit Volunteer' : 'Add Volunteer Role'"
               :icon="hasVolunteerDetail ? 'pi pi-pencil' : 'pi pi-plus'"
               :severity="hasVolunteerDetail ? undefined : 'secondary'" @click="goVolunteer" />
-      <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : 'Remove member and volunteer roles before deleting this person'">
+      <span v-if="canWritePerson" style="margin-left:auto;" v-tooltip.top="canDelete ? null : deleteBlockedTip">
         <Button label="Delete" icon="pi pi-trash" severity="danger" :disabled="!canDelete" @click="removePerson" />
       </span>
     </div>
+    <Message v-if="person?.deceased" severity="info" :closable="false" class="deceased-note">{{ DECEASED_ROLE_NOTE }}</Message>
     <PersonDetailCard
       v-if="flatPerson"
       :person="flatPerson"
       :person-type="personType"
       :has-member-detail="hasMemberDetail"
       :has-volunteer-detail="hasVolunteerDetail"
+    >
+      <!-- Pencil shortcuts to the same editors as the top buttons. Each
+           section renders only when its role record exists, so these are
+           always edits, never Add … Role. -->
+      <template v-if="canWritePerson" #personal-actions>
+        <Button icon="pi pi-pencil" text rounded size="small" aria-label="Edit person" v-tooltip.top="'Edit person'" data-testid="edit-person-shortcut" @click="goEdit" />
+      </template>
+      <template v-if="canWriteMember && !person?.deceased" #member-actions>
+        <Button icon="pi pi-pencil" text rounded size="small" aria-label="Edit member" v-tooltip.top="'Edit member'" data-testid="edit-member-shortcut" @click="goMember" />
+      </template>
+      <template v-if="canWriteVolunteer && !person?.deceased" #volunteer-actions>
+        <Button icon="pi pi-pencil" text rounded size="small" aria-label="Edit volunteer" v-tooltip.top="'Edit volunteer'" data-testid="edit-volunteer-shortcut" @click="goVolunteer" />
+      </template>
+      <template v-if="canWriteVolunteer" #volunteer-pause-actions>
+        <Button v-if="!hasLivePause" label="Pause service email…" icon="pi pi-pause" outlined size="small" data-testid="pause-open" @click="pauseDialogOpen = true" />
+        <template v-else>
+          <Button label="Change" icon="pi pi-pencil" outlined size="small" data-testid="pause-change" @click="pauseDialogOpen = true" />
+          <Button label="Unpause" icon="pi pi-play" outlined size="small" data-testid="pause-unpause" @click="unpauseVolunteer" />
+        </template>
+      </template>
+    </PersonDetailCard>
+    <VolunteerPauseDialog
+      v-if="canWriteVolunteer && person"
+      v-model:visible="pauseDialogOpen"
+      :person-id="String(personId)"
+      :pause="hasLivePause ? person.volunteer.pause : null"
+      @saved="refresh"
     />
   </div>
 </template>

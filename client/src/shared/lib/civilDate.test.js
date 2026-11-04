@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { formatCivilDate } from './civilDate.js'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { formatCivilDate, todayCivilDateIn } from './civilDate.js'
 
 describe('formatCivilDate', () => {
   it('formats a civil date without constructing a Date', () => {
@@ -8,5 +8,15 @@ describe('formatCivilDate', () => {
   })
   it('returns an empty string for null', () => {
     expect(formatCivilDate(null)).toBe('')
+  })
+})
+
+describe('todayCivilDateIn', () => {
+  afterEach(() => vi.useRealTimers())
+  it('reads the civil date in the named zone, not UTC', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-01T03:30:00Z'))
+    expect(todayCivilDateIn('America/New_York')).toBe('2026-10-31')
+    expect(todayCivilDateIn('UTC')).toBe('2026-11-01')
   })
 })

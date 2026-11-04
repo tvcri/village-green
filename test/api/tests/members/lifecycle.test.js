@@ -25,6 +25,15 @@ async function makePerson (lastName, body = {}) {
   return res.json.personId
 }
 
+// Dropping a member requires a catalog reason (spec 5.2 rule 1).
+async function makeDropReason () {
+  const res = await vgCall('createMemberDropReason', {}, {
+    token: tokens.users.admin, body: { name: `Moved away ${Date.now()}-${Math.round(Math.random() * 1e6)}` },
+  })
+  assert.equal(res.status, 201, 'precondition: drop reason created')
+  return res.json.memberDropReasonId
+}
+
 // member_welcome is payload-driven: no serviceRequestId to key on, so match on
 // the event type plus the JSON payload path.
 //
@@ -98,8 +107,9 @@ test('member row visibility tracks status + caller\'s member:read_inactive', asy
   })
   assert.ok(active.json.member, 'Active member projects for a plain reader')
 
+  const dropReasonId = await makeDropReason()
   const patched = await vgCall('patchPersonMember', { personId }, {
-    token: staff, body: { status: 'Dropped', dropReason: 'Moved away' },
+    token: staff, body: { status: 'Dropped', dropReasonId: dropReasonId },
   })
   assert.equal(patched.status, 200)
   const droppedPlain = await vgCall('getPerson', { personId, projection: ['member'] }, {
@@ -278,8 +288,9 @@ test('reactivation (Active -> Dropped -> Active) enqueues nothing further', asyn
   })
   assert.equal((await welcomeEvents(personId)).length, 1, 'precondition: welcomed on activation')
 
+  const dropReasonId = await makeDropReason()
   await vgCall('patchPersonMember', { personId }, {
-    token: staff, body: { status: 'Dropped', dropReason: 'Moved away' },
+    token: staff, body: { status: 'Dropped', dropReasonId: dropReasonId },
   })
   await vgCall('patchPersonMember', { personId }, {
     token: staff, body: { status: 'Active' },

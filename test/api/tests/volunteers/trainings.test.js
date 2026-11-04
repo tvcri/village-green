@@ -16,7 +16,7 @@ const uniq = (s) => `${s} ${Date.now()}-${Math.round(Math.random() * 1e6)}`
 async function makeVolunteer (lastName) {
   const p = await vgCall('createPerson', {}, { token: staff, body: { villageId: scratch, firstName: 'Throwaway', lastName } })
   assert.equal(p.status, 201)
-  assert.equal((await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { active: true } })).status, 200)
+  assert.equal((await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { status: 'Active' } })).status, 200)
   return p.json.personId
 }
 async function makeTraining () {
@@ -93,7 +93,7 @@ test('PUT without trainings clears them; volunteer delete removes them', async (
   const personId = await makeVolunteer('TClear')
   const a = await makeTraining()
   await patch(personId, { trainings: [{ trainingId: a }] })
-  const put = await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { active: true } })
+  const put = await vgCall('putPersonVolunteer', { personId }, { token: staff, body: { status: 'Active' } })
   assert.deepEqual(put.json.volunteer.trainings, [])
   await patch(personId, { trainings: [{ trainingId: a }] })
   const volunteerId = await volunteerIdFor(personId)

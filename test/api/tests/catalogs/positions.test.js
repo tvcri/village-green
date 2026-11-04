@@ -50,7 +50,7 @@ test('a held position: scope change -> 409, delete -> 409', async () => {
   const created = await vgCall('createPosition', {}, { token: admin, body: { name: uniq('Held'), scope: 'federation' } })
   const positionId = created.json.positionId
   const p = await vgCall('createPerson', {}, { token: staff, body: { villageId: '4', firstName: 'Throwaway', lastName: 'PosHeld' } })
-  await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { active: true, positions: [{ positionId }] } })
+  await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { status: 'Active', positions: [{ positionId }] } })
   assert.equal((await vgCall('patchPosition', { positionId }, { token: admin, body: { scope: 'village' } })).status, 409)
   assert.equal((await vgCall('patchPosition', { positionId }, { token: admin, body: { name: uniq('Renamed') } })).status, 200, 'rename still works')
   assert.equal((await vgCall('deletePosition', { positionId }, { token: admin })).status, 409)

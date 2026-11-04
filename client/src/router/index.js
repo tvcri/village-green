@@ -117,6 +117,12 @@ const routes = [
     meta: { requiresPermission: 'training:admin' },
   },
   {
+    path: '/admin/drop-reasons',
+    name: 'admin-drop-reasons',
+    component: () => import('../features/Admin/components/DropReasonsAdmin.vue'),
+    meta: { requiresPermission: 'drop_reason:admin' },
+  },
+  {
     path: '/admin/positions',
     name: 'admin-positions',
     component: () => import('../features/Admin/components/PositionsAdmin.vue'),

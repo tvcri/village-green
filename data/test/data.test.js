@@ -96,9 +96,11 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
 
   for (const row of m.volunteer) {
     assert.ok(personIds.has(row.personId))
-    assert.ok(row.active === 0 || row.active === 1)
+    assert.ok(['Active', 'Pending', 'Dropped'].includes(row.status))
+    assert.equal(row.dropReasonId ?? null, null, 'drop-reason list starts empty')
   }
-  assert.ok(m.volunteer.some(r => r.active === 1) && m.volunteer.some(r => r.active === 0))
+  assert.ok(m.volunteer.some(r => r.status === 'Active') && m.volunteer.some(r => r.status !== 'Active'))
+  assert.ok(m.volunteer.some(r => r.status === 'Pending') && m.volunteer.some(r => r.status === 'Dropped'))
 
   // overlap: persons who are BOTH member and volunteer <= 10% of volunteers
   // (members receive services; volunteers provide them — mostly distinct populations)
@@ -110,7 +112,7 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   const inactiveMembers = m.member.filter(r => r.status !== 'Active')
   const inactiveShare = inactiveMembers.length / m.member.length
   assert.ok(inactiveShare > 0.02 && inactiveShare < 0.08, `inactive member share ${inactiveShare.toFixed(2)} not ~0.05`)
-  const inactiveVolShare = m.volunteer.filter(r => r.active === 0).length / m.volunteer.length
+  const inactiveVolShare = m.volunteer.filter(r => r.status !== 'Active').length / m.volunteer.length
   assert.ok(inactiveVolShare > 0.02 && inactiveVolShare < 0.08, `inactive volunteer share ${inactiveVolShare.toFixed(2)} not ~0.05`)
 
   // dataset-wide mix is now volunteer-heavy overall (most villages default to
@@ -396,7 +398,7 @@ test('privacy: one published rule, acknowledged by every user (incl. the loader 
 test('vss: ~25% of active volunteers get accounts; modifiedUserId is the VSS marker', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630)
   const vssUsers = ds.user_data.filter(u => u.username.endsWith('@residents.test'))
-  const activeVols = ds.volunteer.filter(v => v.active === 1).length
+  const activeVols = ds.volunteer.filter(v => v.status === 'Active').length
   assert.ok(Math.abs(vssUsers.length - activeVols * 0.25) <= activeVols * 0.08)
   // acks cover VSS users too (privacy built after them)
   assert.equal(ds.privacy_acknowledgement.length, ds.user_data.length)
@@ -469,7 +471,7 @@ test('circles: catalog matches the 0027 static seed; ~10-15% tagged; big-village
   const keys = ds.person_circle.map(pc => `${pc.personId}:${pc.circleId}`)
   assert.equal(keys.length, new Set(keys).size, 'unique (person, circle)')
   const activeMemberIds = new Set(ds.member.filter(m => m.status === 'Active').map(m => m.personId))
-  const activeVolIds = new Set(ds.volunteer.filter(v => v.active === 1).map(v => v.personId))
+  const activeVolIds = new Set(ds.volunteer.filter(v => v.status === 'Active').map(v => v.personId))
   const personVillage = Object.fromEntries(ds.person.map(p => [p.id, p.villageId]))
   // each big village (1=Arkham, 2=Quahog) shows an active member in both
   // circles, and an active volunteer in the Veteran's Circle
@@ -532,7 +534,7 @@ test('plants: every scenario exists and is recorded', () => {
   // guarantees hold even where probabilities could round to zero
   assert.ok(ds.member.some(m => m.primaryPersonId !== null), 'dual household')
   assert.ok(ds.member.some(m => m.status !== 'Active'), 'inactive member')
-  assert.ok(ds.volunteer.some(v => v.active === 0), 'inactive volunteer')
+  assert.ok(ds.volunteer.some(v => v.status !== 'Active'), 'inactive volunteer')
   assert.ok(ds.member.some(m => m.scNotes), 'service coordinator notes')
   assert.ok(ds.service_request.some(sr => sr.serviceName.startsWith('Ride:') && sr.timesFlexible === 1), 'flexible ride')
   assert.ok(ds.service_request.some(sr => sr.destination === 'Home'), 'out->home ride')
@@ -549,5 +551,5 @@ test('plants: every scenario exists and is recorded', () => {
 test('plants: guarantees survive a tiny config', () => {
   const ds = buildDataset(fullContentWithDest(), 20260630, { villages: 'Cabinet', members: 3, volunteers: 3 })
   assert.ok(ds.member.some(m => m.status !== 'Active'), 'forced inactive member')
-  assert.ok(ds.volunteer.some(v => v.active === 0), 'forced inactive volunteer')
+  assert.ok(ds.volunteer.some(v => v.status !== 'Active'), 'forced inactive volunteer')
 })

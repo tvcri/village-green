@@ -61,16 +61,16 @@ export function applyPlants (ds, rng) {
     const m = ds.member[ds.member.length - 1]
     m.status = 'Inactive'; m.dropReason = 'Moved away'
   }
-  if (!ds.volunteer.some(v => v.active === 0)) {
+  if (!ds.volunteer.some(v => v.status !== 'Active')) {
     // VSS identity = active volunteers only — prefer flipping a volunteer with
     // no VSS account so a tiny config can't silently knock out a demoable VSS login
     const vssUsernames = new Set(ds.user_data.map(u => u.username))
     const noVssAccount = (v) => !vssUsernames.has(personById[v.personId]?.email)
     const target = ds.volunteer.filter(noVssAccount).at(-1) || ds.volunteer[ds.volunteer.length - 1]
-    target.active = 0
+    target.status = 'Dropped'
   }
   plants.inactiveMembers = ds.member.filter(m => m.status !== 'Active').map(m => ({ ...who(m.personId), status: m.status }))
-  plants.inactiveVolunteers = ds.volunteer.filter(v => v.active === 0).map(v => who(v.personId))
+  plants.inactiveVolunteers = ds.volunteer.filter(v => v.status !== 'Active').map(v => who(v.personId))
 
   // service-coordinator-notes member (0.4 prob — force if absent)
   let conf = ds.member.find(m => m.scNotes)

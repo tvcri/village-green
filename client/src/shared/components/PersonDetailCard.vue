@@ -2,8 +2,10 @@
 import { computed, ref } from 'vue'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
+import { roleStatusTag } from '../lib/roleStatus.js'
 import PersonMap from '../../components/PersonMap.vue'
-import { formatCivilDate } from '../lib/civilDate.js'
+import { formatCivilDate, todayCivilDateIn } from '../lib/civilDate.js'
+import { PAUSE_TIME_ZONE, pauseTag } from '../lib/volunteerPause.js'
 import { positionPlace } from '../lib/positionRules.js'
 
 const props = defineProps({
@@ -88,6 +90,18 @@ const titleAside = computed(() => [
   props.person.nickname ? `“${props.person.nickname}”` : null,
   props.person.pronouns,
 ].filter(Boolean).join(' · '))
+// The member status tag in the Member Information header.
+const memberStatusTag = computed(() => roleStatusTag(props.person.status, props.person.deceased))
+// The volunteer's own (see flattenRoles: a person can be both, so the
+// volunteer's status fields arrive prefixed).
+const volunteerStatusTag = computed(() => roleStatusTag(props.person.volunteerStatus, props.person.deceased))
+
+// Pause tag and actions sit beside the volunteer status tag: only an Active
+// volunteer can be paused. The wording is computed against the Eastern civil
+// date the server uses for pause rules; null means unpaused (no tag).
+const showPause = computed(() => props.person.volunteerStatus === 'Active' && !props.person.deceased)
+const pauseText = computed(() => pauseTag(props.person.pause, todayCivilDateIn(PAUSE_TIME_ZONE)))
+
 const hasContact = computed(() => !!(props.person.email || props.person.phone || props.person.cell
   || props.person.preferredContactMethod))
 
@@ -119,7 +133,7 @@ const copyEmail = async (email) => {
         <div class="title-tags">
           <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
           <Tag v-for="circle in person.circles ?? []" :key="circle.circleId" :value="circle.name" severity="secondary" class="village-tag" />
-          <Tag v-if="person.deceasedDate" value="Deceased" severity="contrast" class="village-tag" />
+          <Tag v-if="person.deceased" value="Deceased" severity="contrast" class="village-tag" />
         </div>
       </div>
     </template>
@@ -127,7 +141,10 @@ const copyEmail = async (email) => {
       <!-- Personal Information: the edit form's subgroups. A subgroup with
            nothing to show is omitted, heading and all. -->
       <div class="section">
-        <h3 class="section-header">Personal Information</h3>
+        <div class="section-header-row">
+          <h3 class="section-header">Personal Information</h3>
+          <span v-if="$slots['personal-actions']" class="section-header-actions"><slot name="personal-actions" /></span>
+        </div>
 
         <div v-if="hasContact" class="subgroup">
           <h4 class="subsection-header">Contact</h4>
@@ -185,15 +202,15 @@ const copyEmail = async (email) => {
           </div>
         </div>
 
-        <div v-if="person.birthDate || person.deceasedDate" class="subgroup span-2">
+        <div v-if="person.birthDate || person.deceased" class="subgroup span-2">
           <h4 class="subsection-header">Dates</h4>
           <div v-if="person.birthDate" class="detail-field">
             <span class="label">Birth Date</span>
             <span class="value">{{ person.birthDate }}</span>
           </div>
-          <div v-if="person.deceasedDate" class="detail-field">
+          <div v-if="person.deceased" class="detail-field">
             <span class="label">Deceased Date</span>
-            <span class="value">{{ person.deceasedDate }}</span>
+            <span class="value">{{ person.deceasedDate ?? 'Date unknown' }}</span>
           </div>
         </div>
 
@@ -237,7 +254,11 @@ const copyEmail = async (email) => {
 
       <!-- Member-specific Section -->
       <div v-if="isMember" class="section">
-        <h3 class="section-header">Member Information</h3>
+        <div class="section-header-row">
+          <h3 class="section-header">Member Information</h3>
+          <Tag v-if="memberStatusTag" :value="memberStatusTag.value" :severity="memberStatusTag.severity" class="member-status-tag" />
+          <span v-if="$slots['member-actions']" class="section-header-actions"><slot name="member-actions" /></span>
+        </div>
         <div v-if="person.memberNumber" class="detail-field">
           <span class="label">Member #</span>
           <span class="value">{{ person.memberNumber }}</span>
@@ -273,14 +294,9 @@ const copyEmail = async (email) => {
           <span class="value">{{ person.secondaryType }}</span>
         </div>
 
-        <div v-if="person.status" class="detail-field">
-          <span class="label">Status</span>
-          <span class="value">{{ person.status }}</span>
-        </div>
-
-        <div v-if="person.status === 'Dropped' && person.dropReason" class="detail-field">
+        <div v-if="person.status === 'Dropped' && person.dropReasonName" class="detail-field">
           <span class="label">Drop Reason</span>
-          <span class="value">{{ person.dropReason }}</span>
+          <span class="value">{{ person.dropReasonName }}</span>
         </div>
 
         <div v-if="person.householdSize != null" class="detail-field">
@@ -337,8 +353,24 @@ const copyEmail = async (email) => {
       </div>
 
       <!-- Volunteer-specific Section -->
-      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.positions?.length || person.trainings?.length || person.active != null)" class="section">
-        <h3 class="section-header">Volunteer Information</h3>
+      <div v-if="isVolunteer && (person.capabilities?.length || person.associateVillages?.length || person.vettings?.length || person.positions?.length || person.trainings?.length || person.volunteerStatus != null)" class="section">
+        <div class="section-header-row">
+          <h3 class="section-header">Volunteer Information</h3>
+          <Tag v-if="volunteerStatusTag" :value="volunteerStatusTag.value" :severity="volunteerStatusTag.severity" class="member-status-tag" />
+          <template v-if="showPause">
+            <Tag v-if="pauseText" :value="pauseText" severity="info" icon="pi pi-pause" class="member-status-tag" data-testid="pause-tag" />
+            <slot name="volunteer-pause-actions" />
+          </template>
+          <span v-if="$slots['volunteer-actions']" class="section-header-actions"><slot name="volunteer-actions" /></span>
+        </div>
+        <div v-if="person.volunteerStatus === 'Dropped' && person.volunteerDropReasonName" class="detail-field">
+          <span class="label">Drop Reason</span>
+          <span class="value">{{ person.volunteerDropReasonName }}</span>
+        </div>
+        <div v-if="person.volunteerStatusChangeNotes" class="detail-field notes-field">
+          <span class="label">Status Change Notes</span>
+          <span class="value">{{ person.volunteerStatusChangeNotes }}</span>
+        </div>
         <div v-if="person.capabilities?.length" class="detail-field capabilities-field">
           <span class="label">Capabilities</span>
           <div class="capabilities-list">
@@ -375,10 +407,6 @@ const copyEmail = async (email) => {
           <span class="value">{{ line.text }}</span>
         </div>
 
-        <div v-if="person.active != null" class="detail-field">
-          <span class="label">Active</span>
-          <span class="value">{{ person.active ? 'Yes' : 'No' }}</span>
-        </div>
         <template v-if="person.vettings?.length">
           <div v-for="vetting in person.vettings" :key="`${vetting.vettingTypeId}-${vetting.dateEntered}`" class="detail-field">
             <span class="label">{{ vetting.name }}</span>
@@ -527,6 +555,22 @@ const copyEmail = async (email) => {
   font-size: 1.15rem;
   font-weight: 600;
   color: var(--color-text-primary);
+}
+
+.section-header-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+/* Host-supplied header actions sit at the far right, apart from any status
+   tags or pause controls that precede them. */
+.section-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
 .subgroup {

@@ -286,7 +286,7 @@ function attachPoolEventHandlers(pool) {
 // field.buffer() is null for a SQL NULL. The old `|| [0]` fallback collapsed
 // NULL to false, so a nullable BIT(1) could never read back as null even
 // though every such field is `nullable: true` in the OAS (person.isVeteran,
-// volunteer.active, member.printedNewsletter). Shared by the pool and the
+// member.printedNewsletter). Shared by the pool and the
 // appdata export's own stream, so the two cannot drift apart again.
 function castBit (field) {
   if (field.type !== 'BIT' || field.length !== 1) return undefined

@@ -42,7 +42,7 @@ async function dropRoles () {
 }
 
 before(async () => {
-  await withDb(conn => conn.query('INSERT INTO volunteer (id, personId, active) VALUES (?, ?, 1)',
+  await withDb(conn => conn.query("INSERT INTO volunteer (id, personId, status) VALUES (?, ?, 'Active')",
     [DUAL_VOLUNTEER, persons.quahogMember.id]))
 })
 

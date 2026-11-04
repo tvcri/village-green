@@ -8,6 +8,7 @@ import { getPositions } from '../features/Positions/api/positionApi.js'
 import { getUsers as getAdminUsers } from '../features/Admin/api/userGrantApi.js'
 import { siblingGroups, detailToListMap } from '../shared/config/siblingGroups.js'
 import { setPendingHighlight } from '../shared/lib/pendingHighlight.js'
+import { crumbPerson } from '../shared/lib/crumbPerson.js'
 import { useCurrentUser } from '../shared/composables/useCurrentUser.js'
 import Menu from 'primevue/menu'
 
@@ -115,6 +116,9 @@ const breadcrumbs = computed(() => {
       case 'admin-positions':
         crumbs.push({ label: 'Positions' })
         break
+      case 'admin-drop-reasons':
+        crumbs.push({ label: 'Drop Reasons' })
+        break
     }
     return crumbs
   }
@@ -175,6 +179,14 @@ const breadcrumbs = computed(() => {
 
   // Add page-specific breadcrumb
   const personName = route.params.personName
+
+  // Hub person pages: the loaded person's fullName wins (it is current after a
+  // rename); the list's :personName param covers the moment before it loads.
+  const loadedPerson = crumbPerson.value?.personId === route.params.personId ? crumbPerson.value : null
+  const hubPersonCrumb = (current) => ({
+    label: loadedPerson?.fullName || personName || 'Person',
+    ...(current ? {} : { route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
+  })
   const metaSiblings = villages.value?.length
     ? [
         { label: 'Hub', route: { name: 'meta' } },
@@ -239,28 +251,29 @@ const breadcrumbs = computed(() => {
     case 'meta-person-detail':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
-      crumbs.push({ label: route.params.personName || 'Person' })
+      crumbs.push(hubPersonCrumb(true))
       break
     case 'meta-person-create':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
       crumbs.push({ label: 'New Person' })
       break
     case 'meta-person-edit':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
-      crumbs.push({ label: 'Edit Person' })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
+      crumbs.push(hubPersonCrumb(false))
+      crumbs.push({ label: 'Edit' })
       break
     case 'meta-person-member':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
-      crumbs.push({ label: 'Person', route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
+      crumbs.push(hubPersonCrumb(false))
       crumbs.push({ label: 'Member' })
       break
     case 'meta-person-volunteer':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
-      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' } })
-      crumbs.push({ label: 'Person', route: { name: 'meta-person-detail', params: { personId: route.params.personId } } })
+      crumbs.push({ label: 'Persons', route: { name: 'meta-persons' }, siblings: otherMetaSections('meta-persons') })
+      crumbs.push(hubPersonCrumb(false))
       crumbs.push({ label: 'Volunteer' })
       break
     case 'members':

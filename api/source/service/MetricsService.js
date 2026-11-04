@@ -79,6 +79,7 @@ module.exports.getMetaMetricsPersons = async function ({ villageIds, personVilla
         p.fullName,
         CAST(p.villageId AS CHAR) AS villageId,
         ${statusCol},
+        p.deceased AS deceased,
         COALESCE(t.cnt, 0) AS count,
         COALESCE(t.rt, 0) AS completedRoundTrips
       FROM ${table} r
@@ -93,7 +94,7 @@ module.exports.getMetaMetricsPersons = async function ({ villageIds, personVilla
           AND sr.serviceDate BETWEEN ? AND ?
           ${srScopeSql}
         GROUP BY sr.${personCol}) t ON t.pid = p.id
-      WHERE (${activeSql} OR t.cnt > 0)
+      WHERE ((${activeSql} AND NOT p.deceased) OR t.cnt > 0)
         ${personScopeSql}
       ORDER BY p.fullName`
     const binds = [start, end]
@@ -104,12 +105,11 @@ module.exports.getMetaMetricsPersons = async function ({ villageIds, personVilla
 
   const [members, volunteers] = await Promise.all([
     roster('member', 'memberPersonId', `r.status = 'Active'`, 'r.status'),
-    roster('volunteer', 'volunteerPersonId', 'r.active = 1', 'r.active')
+    roster('volunteer', 'volunteerPersonId', `r.status = 'Active'`, 'r.status')
   ])
   return {
     range: { start, end },
-    members,
-    // volunteer.active is a nullable BIT(1); the pool casts it to boolean or null.
-    volunteers: volunteers.map(v => ({ ...v, active: v.active === true }))
+    members: members.map(m => ({ ...m, deceased: m.deceased === true })),
+    volunteers: volunteers.map(v => ({ ...v, deceased: v.deceased === true }))
   }
 }

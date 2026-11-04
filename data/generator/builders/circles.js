@@ -33,7 +33,7 @@ export function buildCircles (plan, membership, rng, villagesList, villageIdByNa
   // guarantee, per big village: an active member in each circle and an active
   // volunteer in the Veteran's Circle, so there is always something to show
   const activeMembers = new Set(membership.member.filter(m => m.status === 'Active').map(m => m.personId))
-  const activeVols = new Set(membership.volunteer.filter(v => v.active === 1).map(v => v.personId))
+  const activeVols = new Set(membership.volunteer.filter(v => v.status === 'Active').map(v => v.personId))
   const ensure = (pool, activeSet, circleId) => {
     if (pool.some(pid => activeSet.has(pid) && tagged.has(`${pid}:${circleId}`))) return
     const pick = pool.filter(pid => activeSet.has(pid))

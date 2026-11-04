@@ -19,7 +19,7 @@ async function makeVolunteer (lastName) {
   })
   assert.equal(p.status, 201)
   const put = await vgCall('putPersonVolunteer', { personId: p.json.personId }, {
-    token: staff, body: { active: true },
+    token: staff, body: { status: 'Active' },
   })
   assert.equal(put.status, 200)
   return p.json.personId

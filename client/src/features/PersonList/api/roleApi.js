@@ -7,3 +7,6 @@ export const deleteMember = (personId)        => apiCall('deletePersonMember', {
 export const putVolunteer    = (personId, body) => apiCall('putPersonVolunteer', { personId }, body)
 export const patchVolunteer  = (personId, body) => apiCall('patchPersonVolunteer', { personId }, body)
 export const deleteVolunteer = (personId)        => apiCall('deletePersonVolunteer', { personId })
+
+export const putVolunteerPause    = (personId, body) => apiCall('putPersonVolunteerPause', { personId }, body)
+export const deleteVolunteerPause = (personId)        => apiCall('deletePersonVolunteerPause', { personId })

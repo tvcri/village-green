@@ -29,7 +29,7 @@ function renderWith ({ positions, associates = ['7'], trainings = [], active = t
       positions: model.value, 'onUpdate:positions': (v) => { model.value = v },
       adding: adding.value, 'onUpdate:adding': (v) => { adding.value = v },
       positionOptions, homeVillage: { villageId: '1', name: 'Barrington' }, associateVillageIds: assoc.value,
-      villageOptions, circleOptions: [], trainings: tr.value, trainingOptions, active,
+      villageOptions, circleOptions: [], trainings: tr.value, trainingOptions, volunteerActive: active,
     }),
   }, { global: { plugins: [PrimeVue] } })
   return { model, adding, assoc, tr, ...utils }
@@ -51,13 +51,13 @@ async function pick (label, option) {
 }
 
 describe('VolunteerPositionsFields', () => {
-  it('an inactive volunteer keeps their positions, with a note that they are hidden', () => {
+  it('a Pending or Dropped volunteer keeps their positions, with a note that they are hidden', () => {
     renderWith({ positions: [bod], active: false })
     expect(screen.getByText('Board of Directors')).toBeInTheDocument()
     expect(screen.getByTestId('positions-hidden-note')).toHaveTextContent('kept but hidden from position pages')
   })
 
-  it('no hidden note for an active volunteer, or an inactive one with no positions', () => {
+  it('no hidden note for an active volunteer, or a Dropped one with no positions', () => {
     renderWith({ positions: [bod] })
     expect(screen.queryByTestId('positions-hidden-note')).toBeNull()
     cleanup()

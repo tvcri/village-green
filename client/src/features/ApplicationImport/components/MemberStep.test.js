@@ -15,6 +15,7 @@ vi.mock('../../PersonList/api/roleApi.js', () => ({
   putMember: vi.fn().mockResolvedValue({}),
   patchMember: vi.fn().mockResolvedValue({}),
 }))
+vi.mock('../../Admin/api/dropReasonApi.js', () => ({ getMemberDropReasons: vi.fn().mockResolvedValue([]) }))
 vi.mock('../../VillageList/api/villageApi.js', () => ({ getVillages: vi.fn().mockResolvedValue([]) }))
 vi.mock('../../MemberList/api/memberApi.js', () => ({ getVillageMembers: vi.fn().mockResolvedValue([]) }))
 
@@ -99,5 +100,21 @@ describe('MemberStep — status default', () => {
     await fireEvent.click(await screen.findByText('Update Member & Continue'))
     await waitFor(() => expect(patchMember).toHaveBeenCalled())
     expect(patchMember.mock.calls[0][1].status).toBe('Active')
+  })
+})
+
+describe('MemberStep — deceased person', () => {
+  it('shows the note, offers no grant, and skips on Continue', async () => {
+    getPerson.mockResolvedValue({ personId: '5', deceased: true, deceasedDate: null })
+    getCircles.mockResolvedValue([])
+    const { emitted } = render(MemberStep, {
+      props: { extraction: extraction(), memberIndex: 0, personId: '5' },
+      global: { plugins: [PrimeVue], directives: { tooltip: {} } },
+    })
+    await screen.findByText(/This person is marked deceased/)
+    expect(screen.queryByText('Grant Member Role & Continue')).toBeNull()
+    await fireEvent.click(screen.getByText('Continue'))
+    expect(emitted()['member-skipped']).toBeTruthy()
+    expect(putMember).not.toHaveBeenCalled()
   })
 })

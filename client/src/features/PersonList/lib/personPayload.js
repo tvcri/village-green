@@ -4,7 +4,7 @@
 
 export function emptyPersonFields () {
   return {
-    suffix: '', pronouns: '', deceasedDate: '', preferredContactMethodId: null,
+    suffix: '', pronouns: '', deceased: false, deceasedDate: '', dateUnknown: false, preferredContactMethodId: null,
     genderId: null, ethnicityId: null, isVeteran: null, raceIds: [],
     languageIds: [], preferredLanguageId: null,
   }
@@ -18,7 +18,9 @@ export function personFormFromApi (p) {
   return {
     suffix: p.suffix ?? '',
     pronouns: p.pronouns ?? '',
+    deceased: p.deceased ?? false,
     deceasedDate: p.deceasedDate ?? '',
+    dateUnknown: (p.deceased ?? false) && !p.deceasedDate,
     preferredContactMethodId: p.preferredContactMethod?.contactMethodId ?? null,
     genderId: p.gender?.genderId ?? null,
     ethnicityId: p.ethnicity?.ethnicityId ?? null,
@@ -29,7 +31,7 @@ export function personFormFromApi (p) {
   }
 }
 
-const SCALARS = ['suffix', 'pronouns', 'deceasedDate', 'preferredContactMethodId']
+const SCALARS = ['suffix', 'pronouns', 'preferredContactMethodId']
 const DEMOGRAPHIC_SCALARS = ['genderId', 'ethnicityId', 'isVeteran']
 
 // Blank on edit sends null so a cleared field is cleared server-side; blank on
@@ -43,6 +45,14 @@ function putScalar (payload, key, value, isEdit) {
 
 export function addPersonFields (payload, fields, { isEdit, showDemographics }) {
   for (const k of SCALARS) putScalar(payload, k, fields[k], isEdit)
+  // deceased and deceasedDate travel together: the API 422s a date left behind
+  // on deceased:false, so unticking sends deceasedDate null explicitly.
+  const deceased = !!fields.deceased
+  const date = deceased && !fields.dateUnknown && fields.deceasedDate ? fields.deceasedDate : null
+  if (isEdit || deceased) {
+    payload.deceased = deceased
+    payload.deceasedDate = date
+  }
   // Omitted, never nulled, without person:read_demographics — like birthDate,
   // a coordinator who cannot see the values must not clear them.
   if (showDemographics) {

@@ -14,7 +14,7 @@ const uniq = (s) => `${s}${Date.now()}${Math.round(Math.random() * 1e6)}`
 
 async function makeVolunteer (lastName, { villageId = scratch } = {}) {
   const p = await vgCall('createPerson', {}, { token: staff, body: { firstName: 'Batch', lastName, ...(villageId && { villageId }) } })
-  await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { active: true } })
+  await vgCall('putPersonVolunteer', { personId: p.json.personId }, { token: staff, body: { status: 'Active' } })
   return p.json.personId
 }
 const makeTraining = async () => (await vgCall('createTraining', {}, { token: admin, body: { name: uniq('Session') } })).json.trainingId

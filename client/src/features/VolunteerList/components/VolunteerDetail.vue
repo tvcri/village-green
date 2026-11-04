@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getPerson } from '../../PersonList/api/personApi.js'
 import PersonDetailCard from '../../../shared/components/PersonDetailCard.vue'
+import { flattenRoles } from '../../../shared/lib/roleStatus.js'
 
 const route = useRoute()
 
@@ -21,7 +22,7 @@ const { state: person } = useAsyncState(
 const volunteer = computed(() => {
   if (!person.value) return null
   const { volunteer: volunteerData, ...rest } = person.value
-  return { ...rest, ...((person.value.activeAs ?? []).includes('volunteer') ? volunteerData : null) }
+  return flattenRoles(rest, null, (person.value.activeAs ?? []).includes('volunteer') ? volunteerData : null)
 })
 </script>
 

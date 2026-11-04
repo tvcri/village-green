@@ -64,7 +64,7 @@ export function buildGuide (ds) {
     const m = ds.member.filter(x => pids.has(x.personId))
     const v = ds.volunteer.filter(x => pids.has(x.personId))
     return `${m.length} members (${m.filter(x => x.status !== 'Active').length} inactive), ` +
-      `${v.length} volunteers (${v.filter(x => x.active === 0).length} inactive)`
+      `${v.length} volunteers (${v.filter(x => x.status !== 'Active').length} inactive)`
   }
   for (const v of ds.village) lines.push(`- **${v.name}** — ${counts(v.id)}`)
 

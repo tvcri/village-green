@@ -8,17 +8,23 @@ import InputText from 'primevue/inputtext'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
-import Tag from 'primevue/tag'
+import SelectButton from 'primevue/selectbutton'
+import Checkbox from 'primevue/checkbox'
+import Badge from 'primevue/badge'
 import { useToast } from 'primevue/usetoast'
 import ExportButton from '../../../components/ExportButton.vue'
-import { getPersons } from '../api/personApi.js'
+import { getPersons, getCircles } from '../api/personApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { toCsv, downloadCsv } from '../../../shared/lib/csvUtils.js'
 import { personExportColumns, personExportValues } from '../../../shared/lib/personExport.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
+import { usePersonListFilters } from '../composables/usePersonListFilters.js'
+import { rowTagKeys, tagLabel, circleShortName, isEmailPaused } from '../lib/personTags.js'
+import { parsePhoneObj } from '../lib/parsePhoneObj.js'
+import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
+import { PAUSE_TIME_ZONE, pauseTag } from '../../../shared/lib/volunteerPause.js'
 
 defineOptions({ name: 'PersonList' })
 
@@ -34,26 +40,55 @@ onMounted(() => {
 
 useScrollRestore('meta-persons', 'meta-person-detail')
 
-const name = ref('')
-const phone = ref('')
-const email = ref('')
-const selectedVillage = ref('All villages')
-
-const showMembers = ref(false)
-const showVolunteers = ref(false)
-
-// Village options for the filter; 'All villages' is the sentinel meaning no
-// village restriction.
+// Village and circle catalogs for the filters and tag labels.
 const { state: allVillages } = useAsyncState(() => getVillages(), { immediate: true })
+const { state: allCircles } = useAsyncState(() => getCircles(), { immediate: true })
 const villageOptions = computed(() => [
   'All villages',
   ...(allVillages.value ?? []).map(v => v.name)
 ])
 
-const selectedVillageId = computed(() => {
-  if (selectedVillage.value === 'All villages') return undefined
-  return (allVillages.value ?? []).find(v => v.name === selectedVillage.value)?.villageId
-})
+// The list opens fully populated: every person the caller can read, with or
+// without an active role. All filtering is client-side and live, as you type.
+const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
+  () => getPersons({}),
+  { immediate: true }
+)
+
+const {
+  name, phone, email, selectedVillage, selectedVillageId, selectedTags, matchMode,
+  emailPausedOnly, veteranOnly, deceasedOnly, filteredPersons, activeFilterCount, hasFilter,
+  sentence, circleNameById, clearAll: clearFilters
+} = usePersonListFilters(persons, allVillages, allCircles)
+
+// Federation-scope checks, matching the unscoped list fetch: who may see
+// dropped/pending members and volunteers, and filter on veteran status.
+const canSeeNoncurrentMember = computed(() => hasPermission('member:read_inactive'))
+const canSeeNoncurrentVolunteer = computed(() => hasPermission('volunteer:read_inactive'))
+const canFilterVeteran = computed(() => hasPermission('person:read_demographics'))
+
+const filtersCollapsed = ref(false)
+const matchOptions = [
+  { label: 'Any', value: 'any' },
+  { label: 'All', value: 'all' },
+  { label: 'Exactly these', value: 'exact' }
+]
+
+// Picker contents: role statuses (active only without the read_inactive
+// grant) and every catalog circle by name.
+const memberStatuses = computed(() => canSeeNoncurrentMember.value ? ['active', 'pending', 'dropped'] : ['active'])
+const volunteerStatuses = computed(() => canSeeNoncurrentVolunteer.value ? ['active', 'pending', 'dropped'] : ['active'])
+const circleChoices = computed(() =>
+  [...(allCircles.value ?? [])]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => ({ key: `circle:${c.circleId}`, name: c.name, short: circleShortName(c.name) })))
+function isSelected (key) { return selectedTags.value.includes(key) }
+function toggleTag (key) {
+  selectedTags.value = isSelected(key)
+    ? selectedTags.value.filter(k => k !== key)
+    : [...selectedTags.value, key]
+}
+
 // person:read_birth_date: the API omits birthDate for holders without it, so
 // the export drops the column rather than shipping it empty. With a village
 // filter the check is for that village (village-scoped holders); across all
@@ -61,17 +96,6 @@ const selectedVillageId = computed(() => {
 const canReadBirthDate = computed(() => hasPermission('person:read_birth_date', selectedVillageId.value))
 // person:read_demographics, the same way, for gender/ethnicity/race/veteran.
 const canReadDemographics = computed(() => hasPermission('person:read_demographics', selectedVillageId.value))
-
-const hasFilter = computed(() =>
-  !!(name.value.trim() || phone.value.trim() || email.value.trim() || selectedVillageId.value)
-)
-
-function clearFilters () {
-  name.value = ''
-  phone.value = ''
-  email.value = ''
-  selectedVillage.value = 'All villages'
-}
 
 // Every person renders in one list. A plain table rather than a DataTable:
 // DataTable's per-row overhead made ~2,000 rows take over 5 s to mount. The
@@ -89,13 +113,6 @@ function sortIcon (field) {
   return sortOrder.value === 1 ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'
 }
 
-// The list opens fully populated: every person the caller can read, with or
-// without an active role. All filtering is client-side and live, as you type.
-const { state: persons, isLoading, execute: fetchPersons } = useAsyncState(
-  () => getPersons({}),
-  { immediate: true }
-)
-
 // keep-alive holds the list while a person is opened; re-fetch on return so
 // creates and edits show up (the first activation is the initial load).
 let activatedOnce = false
@@ -104,70 +121,36 @@ onActivated(() => {
   activatedOnce = true
 })
 
-// Case- and accent-insensitive, like the MySQL LIKE the server search used.
-function fold (value) {
-  return (value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-}
-
-// Name matches word by word against fullName ("Last, First, Suffix"), so
-// "naomi brown", "brown, n" and "nao" all find "Brown, Naomi".
-const nameWords = computed(() => fold(name.value).split(/[\s,]+/).filter(Boolean))
-
-function matchesFilters (p) {
-  if (selectedVillageId.value && p.village?.villageId !== selectedVillageId.value) return false
-  if (nameWords.value.length) {
-    const fullName = fold(p.fullName)
-    if (!nameWords.value.every(w => fullName.includes(w))) return false
-  }
-  const phoneQuery = phone.value.trim()
-  if (phoneQuery) {
-    const { phone: ph, cell } = parsePhoneObj(p.phone)
-    if (!(ph ?? '').includes(phoneQuery) && !(cell ?? '').includes(phoneQuery)) return false
-  }
-  const emailQuery = fold(email.value.trim())
-  if (emailQuery && !fold(p.email).includes(emailQuery)) return false
-  return true
-}
-
-function matchesRoleFilter(p) {
-  if (!showMembers.value && !showVolunteers.value) return true
-  const activeAs = parseJson(p.activeAs)
-  return (showMembers.value && activeAs.includes('member')) ||
-    (showVolunteers.value && activeAs.includes('volunteer'))
-}
-
-const filteredPersons = computed(() => {
-  if (!persons.value) return null
-  return persons.value.filter(p => matchesFilters(p) && matchesRoleFilter(p))
-})
-
 const sortedPersons = computed(() => {
   if (!filteredPersons.value) return null
   const key = sortKey[sortField.value]
   return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
 })
 
-function parseJson(val) {
-  if (Array.isArray(val)) return val
-  if (typeof val === 'string') {
-    try { return JSON.parse(val) } catch { return [] }
-  }
-  return []
+// Role tags for a row: member and volunteer only (circles have their own
+// column). A deceased person reads as dropped in every role and says so.
+function roleTags (p, today) {
+  return rowTagKeys(p)
+    .filter(key => !key.startsWith('circle:'))
+    .map(key => {
+      const [kind, status] = key.split(':')
+      const role = kind === 'member' ? 'Member' : 'Volunteer'
+      const label = p.deceased ? `${role} (deceased)` : tagLabel(key, circleNameById.value)
+      const pause = kind === 'volunteer' && isEmailPaused(p, today)
+        ? pauseTag(p.volunteerPause, today)
+        : null
+      return { key, kind, status, role, label, pause }
+    })
 }
 
-function parsePhoneObj(val) {
-  if (val && typeof val === 'object') return val
-  if (typeof val === 'string') {
-    try { return JSON.parse(val) } catch { return {} }
-  }
-  return {}
-}
-
-function getRoleSeverity(role) {
-  if (role === 'member') return 'info'
-  if (role === 'volunteer') return 'success'
-  return 'secondary'
-}
+// Tags per row, rebuilt whenever the displayed rows change. Today's civil date
+// (as the server computes it for pause rules) is read fresh on each rebuild,
+// the same way the Email-paused filter reads it, so the mark and the filter
+// agree after midnight.
+const tagsByPerson = computed(() => {
+  const today = todayCivilDateIn(PAUSE_TIME_ZONE)
+  return new Map((sortedPersons.value ?? []).map(p => [p.personId, roleTags(p, today)]))
+})
 
 const isCreatingSheet = ref(false)
 const isFetchingExport = ref(false)
@@ -178,7 +161,8 @@ const isFetchingExport = ref(false)
 const columnsForCsv = computed(() => [
   { header: 'Name', key: 'fullName' },
   { header: 'Village', key: 'villageName' },
-  { header: 'Roles', key: 'roles' },
+  { header: 'Member Status', key: 'memberStatus' },
+  { header: 'Volunteer Status', key: 'volunteerStatus' },
   ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
 ])
 
@@ -189,16 +173,18 @@ function detailRowForCsv(p) {
   return {
     fullName: p.fullName,
     villageName: p.village?.name ?? '',
-    roles: parseJson(p.activeAs).join(', '),
+    memberStatus: p.memberStatus,
+    volunteerStatus: p.volunteerStatus,
     ...personExportValues({ ...(p.detail ?? {}), email: p.email, phone, cell }),
   }
 }
 
-// Fetch projection=detail at export time — full rows (with circles/disabilities
-// subqueries) are paid only here, never for the live list — and keep exactly
-// the people on screen, in screen order. The village goes to the server too,
-// so its birthDate/demographics gating matches canReadBirthDate and
-// canReadDemographics above.
+// Fetch projection=detail at export time and keep exactly the people on
+// screen, in screen order. Full rows (with circles/disabilities subqueries)
+// are paid only here, never for the live list. Statuses come from the
+// on-screen summary row (what the grid shows this caller), not the export
+// fetch. The village goes to the server too, so its birthDate/demographics
+// gating matches canReadBirthDate and canReadDemographics above.
 async function fetchRowsForExport() {
   try {
     isFetchingExport.value = true
@@ -208,9 +194,8 @@ async function fetchRowsForExport() {
     })
     const byId = new Map(detail.map(p => [p.personId, p]))
     return (sortedPersons.value ?? [])
-      .map(p => byId.get(p.personId))
-      .filter(Boolean)
-      .map(detailRowForCsv)
+      .filter(p => byId.has(p.personId))
+      .map(p => detailRowForCsv({ ...byId.get(p.personId), memberStatus: p.memberStatus, volunteerStatus: p.volunteerStatus }))
   } finally {
     isFetchingExport.value = false
   }
@@ -291,31 +276,99 @@ function navigateToPerson(personId, fullName) {
   })
 }
 
+// Copy an email without opening the row. One "copied" mark at a time; a
+// second copy moves it and restarts the timer.
+const copiedPersonId = ref(null)
+let copiedTimer = null
+async function copyEmail(p) {
+  try {
+    await navigator.clipboard.writeText(p.email)
+  } catch (err) {
+    console.error('Failed to copy email:', err)
+    toast?.add({ severity: 'error', summary: 'Copy failed', detail: 'The email could not be copied.', life: 4000 })
+    return
+  }
+  copiedPersonId.value = p.personId
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => { copiedPersonId.value = null }, 2000)
+}
+onBeforeUnmount(() => clearTimeout(copiedTimer))
+
 // One analytics event per filtering session, not per keystroke.
 watch(hasFilter, (now, was) => {
   if (now && !was) trackEvent('filter_applied')
 })
 
-// The table header sticks below the filter bar, whose height varies (the
-// filters wrap on narrower windows), so its offset follows the measured bar.
+// The table header sticks below the filters header row (the only sticky part
+// of the panel), whose height varies when it wraps, so its offset follows the
+// measured row.
 const listRoot = ref(null)
-const toolbar = ref(null)
-let toolbarObserver = null
+const filtersHeader = ref(null)
+let headerObserver = null
 onMounted(() => {
-  toolbarObserver = new ResizeObserver(() => {
-    listRoot.value?.style.setProperty('--toolbar-height', `${toolbar.value?.offsetHeight ?? 0}px`)
+  headerObserver = new ResizeObserver(() => {
+    listRoot.value?.style.setProperty('--toolbar-height', `${filtersHeader.value?.offsetHeight ?? 0}px`)
   })
-  toolbarObserver.observe(toolbar.value)
+  headerObserver.observe(filtersHeader.value)
 })
-onBeforeUnmount(() => toolbarObserver?.disconnect())
+onBeforeUnmount(() => headerObserver?.disconnect())
+
+// The Filters button describes what is on screen. Once the open panel has
+// scrolled away under the sticky header row, the chevron reads collapsed and
+// a click brings the panel back (top of the list) instead of collapsing
+// something out of sight. Collapsed and scrolled, a click opens the panel
+// and brings it into view the same way.
+const filtersContent = ref(null)
+const panelInView = ref(true)
+function measurePanel() {
+  const content = filtersContent.value
+  if (!content || !filtersHeader.value) {
+    panelInView.value = true
+    return
+  }
+  const headerBottom = filtersHeader.value.getBoundingClientRect().bottom
+  // Nothing laid out yet (or no layout at all): call it in view.
+  panelInView.value = !headerBottom || content.getBoundingClientRect().bottom > headerBottom
+}
+let measureFrame = 0
+function onScroll() {
+  if (measureFrame) return
+  measureFrame = requestAnimationFrame(() => {
+    measureFrame = 0
+    measurePanel()
+  })
+}
+onMounted(() => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('resize', onScroll, { passive: true })
+})
+onActivated(measurePanel)
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('resize', onScroll)
+  cancelAnimationFrame(measureFrame)
+})
+watch(filtersContent, measurePanel)
+
+const filtersShownOpen = computed(() => !filtersCollapsed.value && panelInView.value)
+async function toggleFilters() {
+  if (filtersShownOpen.value) {
+    filtersCollapsed.value = true
+    return
+  }
+  filtersCollapsed.value = false
+  await nextTick()
+  measurePanel()
+  if (!panelInView.value) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 // When a filter changes while scrolled down the list, bring the first matches
 // up under the sticky header instead of leaving the view somewhere mid-list.
-watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async () => {
+watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPausedOnly, veteranOnly, deceasedOnly], async () => {
   await nextTick()
   const table = listRoot.value?.querySelector('.person-table')
-  if (!table || !toolbar.value) return
-  const stuckAt = toolbar.value.getBoundingClientRect().bottom
+  if (!table || !filtersHeader.value) return
+  const stuckAt = filtersHeader.value.getBoundingClientRect().bottom
   const tableTop = table.getBoundingClientRect().top
   if (tableTop < stuckAt) window.scrollBy(0, tableTop - stuckAt)
 })
@@ -332,8 +385,44 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
       </div>
     </div>
 
-    <div ref="toolbar" class="toolbar">
-      <div class="filters">
+    <div ref="filtersHeader" class="filters-header">
+      <Button
+        type="button"
+        class="filters-btn"
+        outlined
+        :aria-expanded="filtersShownOpen"
+        @click="toggleFilters"
+      >
+        <i class="pi pi-filter" aria-hidden="true" />
+        <span class="filters-btn-label">Filters</span>
+        <Badge v-if="activeFilterCount > 0" :value="activeFilterCount" />
+        <i class="pi pi-chevron-down filters-chevron" :class="{ collapsed: !filtersShownOpen }" aria-hidden="true" />
+      </Button>
+      <span v-if="filteredPersons !== null" class="filter-count-tag">
+        {{ filteredPersons.length }} of {{ persons.length }} {{ persons.length === 1 ? 'person' : 'persons' }}
+        <span
+          v-if="hasFilter"
+          role="button"
+          class="clear-filters-icon"
+          tabindex="0"
+          title="Clear all filters"
+          aria-label="Clear all filters"
+          @click.prevent="clearFilters()"
+          @keydown.enter.prevent="clearFilters()"
+          @keydown.space.prevent="clearFilters()"
+        >✕</span>
+      </span>
+      <div class="header-export">
+        <ExportButton
+          :disabled="isLoading || isCreatingSheet || isFetchingExport || !filteredPersons?.length"
+          @download="handleDownloadCsv"
+          @export="handleCreateSheet"
+        />
+      </div>
+    </div>
+
+    <div v-if="!filtersCollapsed" ref="filtersContent" class="filters-content">
+      <div class="filters-line">
         <Select
           v-model="selectedVillage"
           :options="villageOptions"
@@ -353,35 +442,94 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
           <InputIcon class="pi pi-envelope" />
           <InputText v-model="email" placeholder="Email" />
         </IconField>
-        <div class="filter-actions">
-          <Button
-            icon="pi pi-times"
-            severity="secondary"
-            text
-            aria-label="Clear filters"
-            :disabled="!hasFilter"
-            @click="clearFilters"
-          />
-        </div>
       </div>
 
-      <div class="role-filters">
-        <label class="role-filter-label">
-          <Checkbox v-model="showMembers" :binary="true" />
-          <span>Member</span>
-        </label>
-        <label class="role-filter-label">
-          <Checkbox v-model="showVolunteers" :binary="true" />
-          <span>Volunteer</span>
-        </label>
-        <span v-if="filteredPersons !== null" class="result-count">
-          {{ filteredPersons.length }} {{ filteredPersons.length === 1 ? 'person' : 'persons' }}
-        </span>
-        <ExportButton
-          :disabled="isLoading || isCreatingSheet || isFetchingExport || !filteredPersons?.length"
-          @download="handleDownloadCsv"
-          @export="handleCreateSheet"
-        />
+      <div class="filter-groups">
+        <div class="filter-group" role="group" aria-label="Member">
+          <span class="filter-group-label">Member</span>
+          <div class="picker-items">
+            <button
+              v-for="s in memberStatuses"
+              :key="`member:${s}`"
+              type="button"
+              class="picker-item"
+              :class="{ selected: isSelected(`member:${s}`) }"
+              :aria-pressed="isSelected(`member:${s}`)"
+              @click="toggleTag(`member:${s}`)"
+            >
+              <span class="role-tag role-tag--member" :class="`role-tag--${s}`">member</span>
+              <span class="picker-caption">{{ s }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-group" role="group" aria-label="Volunteer">
+          <span class="filter-group-label">Volunteer</span>
+          <div class="picker-items">
+            <button
+              v-for="s in volunteerStatuses"
+              :key="`volunteer:${s}`"
+              type="button"
+              class="picker-item"
+              :class="{ selected: isSelected(`volunteer:${s}`) }"
+              :aria-pressed="isSelected(`volunteer:${s}`)"
+              @click="toggleTag(`volunteer:${s}`)"
+            >
+              <span class="role-tag role-tag--volunteer" :class="`role-tag--${s}`">volunteer</span>
+              <span class="picker-caption">{{ s }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-group" role="group" aria-label="Circles">
+          <span class="filter-group-label">Circles</span>
+          <div class="picker-items">
+            <button
+              v-for="c in circleChoices"
+              :key="c.key"
+              type="button"
+              class="picker-item"
+              :class="{ selected: isSelected(c.key) }"
+              :aria-pressed="isSelected(c.key)"
+              :title="c.name"
+              @click="toggleTag(c.key)"
+            >
+              <span class="circle-pill">{{ c.short }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-group" role="group" aria-label="Match">
+          <span class="filter-group-label">Match</span>
+          <div class="match-row">
+            <SelectButton
+              v-model="matchMode"
+              :options="matchOptions"
+              option-label="label"
+              option-value="value"
+              :allow-empty="false"
+            />
+            <span v-if="sentence" class="selection-sentence">{{ sentence }}</span>
+          </div>
+        </div>
+
+        <div class="filter-group" role="group" aria-label="Also">
+          <span class="filter-group-label">Also</span>
+          <div class="also-options">
+            <label class="also-option">
+              <Checkbox v-model="emailPausedOnly" binary />
+              <span>Email paused</span>
+            </label>
+            <label v-if="canFilterVeteran" class="also-option">
+              <Checkbox v-model="veteranOnly" binary />
+              <span>Veteran</span>
+            </label>
+            <label class="also-option">
+              <Checkbox v-model="deceasedOnly" binary />
+              <span>Deceased</span>
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -390,13 +538,17 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
     </div>
 
     <div v-else-if="!isLoading && filteredPersons.length === 0" class="empty-state">
-      No persons found.
+      <template v-if="hasFilter">
+        No persons match these filters.
+        <div v-if="sentence">{{ sentence }}</div>
+      </template>
+      <template v-else>No persons found.</template>
     </div>
 
     <table v-else class="person-table">
       <colgroup>
-        <col style="width: 20%"><col style="width: 14%"><col style="width: 15%">
-        <col style="width: 12%"><col style="width: 12%"><col style="width: 27%">
+        <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10rem">
+        <col style="width: 11%"><col style="width: 11%"><col style="width: 21%">
       </colgroup>
       <thead>
         <tr>
@@ -407,23 +559,65 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
             Village <i :class="sortIcon('village')" />
           </th>
           <th>Roles</th>
+          <th>Circles</th>
           <th>Phone</th>
           <th>Cell</th>
           <th>Email</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="p in sortedPersons" :key="p.personId" @click="navigateToPerson(p.personId, p.fullName)">
+        <tr
+          v-for="p in sortedPersons"
+          :key="p.personId"
+          :class="{ deceased: p.deceased }"
+          @click="navigateToPerson(p.personId, p.fullName)"
+        >
           <td>{{ p.fullName }}</td>
           <td>{{ p.village?.name }}</td>
           <td>
             <div class="role-tags">
-              <Tag v-for="role in parseJson(p.activeAs)" :key="role" :value="role" :severity="getRoleSeverity(role)" />
+              <span
+                v-for="t in tagsByPerson.get(p.personId)"
+                :key="t.key"
+                class="role-tag"
+                :class="[`role-tag--${t.kind}`, `role-tag--${t.status}`]"
+                role="img"
+                :title="t.label"
+                :aria-label="t.pause ? `${t.label}, ${t.pause}` : t.label"
+              >
+                {{ t.kind }}
+                <i v-if="t.pause" class="pi pi-pause-circle pause-mark" :title="t.pause" />
+              </span>
+            </div>
+          </td>
+          <td>
+            <div class="circle-pills">
+              <span
+                v-for="c in p.circles ?? []"
+                :key="c.circleId"
+                class="circle-pill"
+                :title="c.name"
+              >{{ circleShortName(c.name) }}</span>
             </div>
           </td>
           <td>{{ parsePhoneObj(p.phone).phone || '—' }}</td>
           <td>{{ parsePhoneObj(p.phone).cell || '—' }}</td>
-          <td>{{ p.email || '—' }}</td>
+          <td>
+            <div v-if="p.email" class="email-cell">
+              <span class="email-text">{{ p.email }}</span>
+              <button
+                type="button"
+                class="copy-email"
+                :class="{ copied: copiedPersonId === p.personId }"
+                :title="copiedPersonId === p.personId ? 'Copied!' : 'Copy email'"
+                :aria-label="copiedPersonId === p.personId ? 'Copied' : `Copy email ${p.email}`"
+                @click.stop="copyEmail(p)"
+              >
+                <i :class="copiedPersonId === p.personId ? 'pi pi-check' : 'pi pi-copy'" />
+              </button>
+            </div>
+            <template v-else>—</template>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -455,35 +649,80 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
   color: var(--color-text-primary);
 }
 
-/* Filters + role checkboxes stick under the breadcrumbs while the list
-   scrolls; opaque so rows pass beneath it. */
-.toolbar {
+/* Only the header row sticks under the breadcrumbs; opaque so rows pass
+   beneath it. The panel below scrolls away. */
+.filters-header {
   position: sticky;
   top: var(--breadcrumb-height);
   z-index: 2;
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin: -0.75rem 0;
-  padding: 0.75rem 0;
+  align-items: center;
+  gap: 0.75rem;
+  margin: -0.5rem 0;
+  padding: 0.5rem 0;
   background: var(--color-background-dark);
 }
 
-.filter-name {
-  flex-grow: 2;
+.filters-btn-label { font-weight: 700; }
+.filters-chevron { font-size: 0.75rem; transition: transform 0.2s ease; }
+.filters-chevron.collapsed { transform: rotate(-90deg); }
+
+.filter-count-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background-color: var(--color-background-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.filters {
+.clear-filters-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  color: var(--color-text-dim);
+  font-size: 0.75rem;
+  font-weight: bold;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+.clear-filters-icon:hover { color: var(--color-text-primary); }
+
+.header-export {
+  margin-left: auto;
+}
+
+.filters-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: -0.75rem;
+  padding: 1rem;
+  background-color: var(--color-background-light);
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+}
+
+.filters-line {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
 }
 
+.filter-name {
+  flex-grow: 2;
+}
+
 /* Inputs grow to share the leftover horizontal space (min-width keeps them
-   readable before wrapping); the action buttons stay their natural size and
-   push flush-right, dropping to a second line only when the row can't hold
-   everything. */
+   readable before wrapping). */
 .filter-input {
   flex: 1 1 9rem;
   min-width: 9rem;
@@ -493,42 +732,99 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
   width: 100%;
 }
 
-.filter-actions {
+.filter-groups {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  margin-left: auto;
+  flex-wrap: wrap;
+  gap: 1rem 0;
 }
 
-.role-filters {
+.filter-group {
   display: flex;
-  gap: 1.5rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 1.25rem;
+  border-left: 1px solid var(--color-border-default);
+}
+
+.filter-group:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.filter-group-label {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+}
+
+.picker-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* The picker reuses the grid's tag and pill visuals; unselected dimmed,
+   selected ringed. */
+.picker-item {
+  display: inline-flex;
+  flex-direction: column;
   align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.4rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--color-text-dim);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0.6;
 }
 
-/* Count beside Download: always in view in the sticky bar, and it is the
-   number of rows the download will hold. */
-.result-count {
-  margin-left: auto;
+.picker-item:hover,
+.picker-item:focus-visible {
+  opacity: 1;
 }
 
-.role-filter-label {
+.picker-item.selected {
+  opacity: 1;
+  border-color: var(--p-primary-color);
+  box-shadow: 0 0 0 1px var(--p-primary-color);
+  color: var(--color-text-primary);
+}
+
+.match-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.selection-sentence {
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+}
+
+/* Two per column at most; a third option starts a new column. */
+.also-options {
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 0.5rem 1.5rem;
+}
+
+.also-option {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  font-size: 0.9rem;
 }
 
 .role-tags {
   display: flex;
   gap: 0.25rem;
   flex-wrap: wrap;
-}
-
-.result-count {
-  font-size: 0.9rem;
-  color: var(--color-text-dim);
 }
 
 .person-table {
@@ -598,8 +894,180 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
   background: var(--p-content-hover-background);
 }
 
+/* Role tags are plain spans, not PrimeVue Tags: ~2,000 rows rule out a
+   component (or tooltip directive) per tag. The --p-tag-* theme vars exist
+   only once a Tag has mounted, so the colours come from the palette
+   primitives (always present) and follow the app's dark mode, the
+   `.app-dark` class on <html>, with the same light/dark pairs Aura's Tag
+   uses. Defined on the component root so the filter picker shares them. */
+.person-list {
+  --tag-member-bg: var(--p-sky-100);
+  --tag-member-fg: var(--p-sky-700);
+  --tag-volunteer-bg: var(--p-green-100);
+  --tag-volunteer-fg: var(--p-green-700);
+  --tag-muted-bg: var(--p-surface-100);
+  --tag-muted-fg: var(--p-surface-600);
+  --circle-bg: var(--p-violet-50);
+  --circle-border: var(--p-violet-200);
+  --circle-fg: var(--p-violet-700);
+}
+
+/* html.app-dark out-specifies the scoped light rule, so source order is irrelevant. */
+:global(html.app-dark .person-list) {
+  --tag-member-bg: color-mix(in srgb, var(--p-sky-500), transparent 84%);
+  --tag-member-fg: var(--p-sky-300);
+  --tag-volunteer-bg: color-mix(in srgb, var(--p-green-500), transparent 84%);
+  --tag-volunteer-fg: var(--p-green-300);
+  --tag-muted-bg: var(--p-surface-800);
+  --tag-muted-fg: var(--p-surface-300);
+  --circle-bg: color-mix(in srgb, var(--p-violet-500), transparent 84%);
+  --circle-border: color-mix(in srgb, var(--p-violet-400), transparent 50%);
+  --circle-fg: var(--p-violet-300);
+}
+
+.role-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--p-content-border-radius, 6px);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.role-tag--member {
+  background: var(--tag-member-bg);
+  color: var(--tag-member-fg);
+}
+
+.role-tag--volunteer {
+  background: var(--tag-volunteer-bg);
+  color: var(--tag-volunteer-fg);
+}
+
+.role-tag--dropped {
+  background: var(--tag-muted-bg);
+  color: var(--tag-muted-fg);
+}
+
+/* Pending: outline only, in the role's own colour. */
+.role-tag--pending {
+  background: transparent;
+  border: 1px dashed currentColor;
+}
+
+.pause-mark {
+  font-size: 0.8rem;
+}
+
+.circle-pill {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--circle-border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: var(--circle-bg);
+  color: var(--circle-fg);
+}
+
 .role-tags {
   flex-wrap: nowrap;
+}
+
+/* Email cell (after STIG Manager's grid-cell toolbar): the address gets the
+   full width until the row is hovered; then a right margin opens, the
+   ellipsis moves left and the copy button shows in the space. The button
+   sits outside the flow, so hidden it takes no room. It is transparent rather
+   than visibility:hidden so it stays in the tab order; keyboard focus opens
+   the space too (not :focus-within, which a mouse click would leave holding
+   an empty gap). Touch screens can't hover, so it is always open. */
+.email-cell {
+  position: relative;
+}
+
+.email-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.person-table tbody tr:hover .email-text,
+.email-cell:has(.copy-email:focus-visible) .email-text,
+.email-cell:has(.copied) .email-text {
+  margin-right: 1.875rem;
+}
+
+.copy-email {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  margin: auto 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+  background: var(--p-content-background);
+  color: var(--color-text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: scale 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+}
+
+.person-table tbody tr:hover .copy-email,
+.copy-email:focus-visible,
+.copy-email.copied {
+  opacity: 1;
+}
+
+/* Muted until pointed at, then larger and in the primary colour. */
+.copy-email:hover {
+  scale: 1.1;
+  color: var(--p-primary-color);
+  border-color: var(--p-primary-color);
+}
+
+.copy-email.copied {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.copy-email i {
+  font-size: 0.75rem;
+}
+
+@media (hover: none) {
+  .email-text {
+    margin-right: 1.875rem;
+  }
+  .copy-email {
+    opacity: 1;
+  }
+}
+
+/* Circles wrap: a person in several circles gets a taller row, not a
+   clipped pill. */
+.circle-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* Deceased: hatched, dimmed, tags grey; the row still opens the record. */
+.person-table tbody tr.deceased {
+  background-image: repeating-linear-gradient(
+    135deg, transparent 0 6px,
+    color-mix(in srgb, var(--p-text-muted-color) 22%, transparent) 6px 7px);
+  color: var(--p-text-muted-color);
+}
+
+.person-table tbody tr.deceased .role-tag,
+.person-table tbody tr.deceased .circle-pill {
+  filter: grayscale(1);
 }
 
 .empty-state {
@@ -613,25 +1081,33 @@ watch([name, phone, email, selectedVillage, showMembers, showVolunteers], async 
   .person-list {
     padding: 1rem;
   }
-  /* The stacked filters would cover the screen; let them scroll away. */
-  .toolbar {
+  /* Nothing sticks on small screens: the stacked panel would cover the view. */
+  .filters-header {
     position: static;
   }
   .person-table thead th {
     top: var(--breadcrumb-height);
   }
-  .filters {
+  .filters-line {
     flex-direction: column;
     align-items: stretch;
   }
-  /* Let fields fill the column on narrow screens. */
   .filter-village,
   .filter-village :deep(.p-select),
   .filter-input {
     width: 100% !important;
   }
-  .filter-actions {
-    margin-left: 0;
+  /* In a column the 9rem flex-basis would become the field's height. */
+  .filter-input {
+    flex: 0 0 auto;
+  }
+  .filter-groups {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .filter-group {
+    padding: 0;
+    border-left: 0;
   }
 }
 </style>

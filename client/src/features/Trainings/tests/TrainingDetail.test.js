@@ -31,12 +31,12 @@ beforeEach(() => {
   getPositions.mockResolvedValue([{ positionId: '5', name: 'Local Service Coordinator', scope: 'village', trainingIds: ['4'], holderCount: 1 }])
   getTrainingCompletions.mockResolvedValue([
     { volunteerTrainingId: '9', completedDate: '2026-05-12', notes: null,
-      person: { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, active: true } },
+      person: { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, status: 'Active' } },
   ])
   getVolunteerRoster.mockResolvedValue([
-    { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, active: true, associateVillages: [] },
-    { personId: '3', fullName: 'Nguyen, Linh', displayName: 'Linh Nguyen', village: { villageId: '7', name: 'Warwick' }, active: true, associateVillages: [] },
-    { personId: '16', fullName: 'Quinn, Robert', displayName: 'Robert Quinn', village: null, active: true, associateVillages: [] },
+    { personId: '1', fullName: 'Abbott, Lorraine', displayName: 'Lorraine Abbott', village: barrington, status: 'Active', associateVillages: [] },
+    { personId: '3', fullName: 'Nguyen, Linh', displayName: 'Linh Nguyen', village: { villageId: '7', name: 'Warwick' }, status: 'Active', associateVillages: [] },
+    { personId: '16', fullName: 'Quinn, Robert', displayName: 'Robert Quinn', village: null, status: 'Active', associateVillages: [] },
   ])
   getPositionHolders.mockResolvedValue([{ volunteerPositionId: '20', village: barrington, circle: null, person: { personId: '1' } }])
   recordTrainingCompletions.mockResolvedValue({ recorded: ['3', '16'], skipped: [], assigned: ['3'], notAssigned: [{ personId: '16', reason: 'noHomeVillage' }] })

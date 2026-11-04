@@ -2,6 +2,7 @@
 const dbUtils = require('./utils')
 const PersonService = require('./PersonService')
 const AuditService = require('./audit/AuditService')
+const { applyDropReasonRules } = require('./dropReasonRules')
 
 // A member is welcomed when they genuinely become Active. Prior 'Active' is the
 // hazard this guard exists for: ~712 existing Active members with email would
@@ -57,8 +58,9 @@ module.exports.putMember = async function (personId, body, userObject) {
       // status comes back alongside id: it is the before-state the welcome
       // guard compares against. Undefined on the insert branch (no prior row).
       const [existing] = await connection.query(
-        'SELECT id, status FROM member WHERE personId = ?', [personId]
+        'SELECT id, status, CAST(dropReasonId AS CHAR) AS dropReasonId FROM member WHERE personId = ?', [personId]
       )
+      await applyDropReasonRules(existing[0], fields, connection, 'member_drop_reason')
       await AuditService.auditUpdate(connection,
         { entityType: 'member', entityId: existing[0]?.id ?? null, userId: userObject.userId },
         async () => {
@@ -102,8 +104,9 @@ module.exports.patchMember = async function (personId, body, userObject) {
       // Read the before-state inside the transaction: this is the path a
       // Pending -> Active activation actually takes from the client.
       const [existing] = await connection.query(
-        'SELECT id, status FROM member WHERE personId = ?', [personId]
+        'SELECT id, status, CAST(dropReasonId AS CHAR) AS dropReasonId FROM member WHERE personId = ?', [personId]
       )
+      await applyDropReasonRules(existing[0], fields, connection, 'member_drop_reason')
       const memberId = existing[0]?.id
       // No member row: the mutation is a no-op UPDATE and there is no entity
       // to audit, so it runs unwrapped (auditUpdate would demand a new id).

@@ -73,7 +73,7 @@ module.exports.getPerson = async function getPerson (req, res, next) {
   try {
     const personId = req.params.personId
     const projection = req.query.projection ?? []
-    const response = await PersonService.getPerson(personId, projection, req.userObject)
+    const response = await PersonService.getPerson(personId, projection, req.userObject, { openRequestCount: true })
     if (!response) {
       throw new SmError.NotFoundError()
     }

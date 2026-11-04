@@ -9,6 +9,7 @@ import IftaLabel from 'primevue/iftalabel'
 import AutoComplete from 'primevue/autocomplete'
 import { getVillageMembers } from '../../MemberList/api/memberApi.js'
 import { uncertainText as sharedUncertainText } from '../lib/uncertainText.js'
+import RoleStatusRow from './RoleStatusRow.vue'
 
 const props = defineProps({
   errors: { type: Object, default: () => ({}) },
@@ -19,6 +20,8 @@ const props = defineProps({
   createdDate: { type: String, default: '' },
   showCreatedDate: { type: Boolean, default: false },
   circles: { type: Array, default: () => [] },   // [{ circleId, name }] — the catalog
+  dropReasons: { type: Array, default: () => [] }, // member drop-reason catalog rows
+  loadedDropReasonId: { type: String, default: null }, // stored reason, offered even when retired
 })
 const emit = defineEmits(['edited'])
 
@@ -27,7 +30,7 @@ const memberNumber = defineModel('memberNumber')
 const memberLevel = defineModel('memberLevel')
 const primaryPersonId = defineModel('primaryPersonId')
 const joinDate = defineModel('joinDate')
-const dropReason = defineModel('dropReason')
+const dropReasonId = defineModel('dropReasonId')
 const householdSize = defineModel('householdSize')
 const householdDues = defineModel('householdDues')
 const quickbooksKey = defineModel('quickbooksKey')
@@ -47,7 +50,6 @@ function togglePreference (id, checked) {
   emit('edited', 'circlePreferences')
 }
 
-const statusOptions = ['Active', 'Pending', 'Dropped'].map(s => ({ label: s, value: s }))
 const memberLevelOptions = ['Primary', 'Secondary'].map(s => ({ label: s, value: s }))
 
 // Clear a field's validation error as soon as the user changes it, so the
@@ -93,15 +95,9 @@ watch(memberLevel, (level) => {
   <div class="section">
     <h3 class="section-header">Membership</h3>
 
-    <div class="form-field status-row">
-      <IftaLabel>
-        <Select id="status" v-model="status" :options="statusOptions"
-                optionLabel="label" optionValue="value" placeholder="Select status" class="w-full" @update:modelValue="edited('status')" />
-        <label for="status">Status
-          <i v-if="uncertain.status" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('status')" />
-        </label>
-      </IftaLabel>
-    </div>
+    <RoleStatusRow v-model:status="status" v-model:dropReasonId="dropReasonId"
+                   :reasons="dropReasons" :loadedDropReasonId="loadedDropReasonId"
+                   :errors="errors" :uncertain="uncertain" @edited="edited" />
 
     <div v-if="showCreatedDate" class="form-field">
       <IftaLabel>
@@ -153,15 +149,6 @@ watch(memberLevel, (level) => {
         </label>
       </IftaLabel>
       <small class="field-error" v-if="errors.joinDate">{{ errors.joinDate }}</small>
-    </div>
-
-    <div v-if="status === 'Dropped'" class="form-field">
-      <IftaLabel>
-        <InputText id="dropReason" v-model="dropReason" class="w-full" @input="edited('dropReason')" />
-        <label for="dropReason">Drop Reason
-          <i v-if="uncertain.dropReason" class="pi pi-exclamation-triangle uncertain-icon" v-tooltip.top="uncertainText('dropReason')" />
-        </label>
-      </IftaLabel>
     </div>
   </div>
 
@@ -291,11 +278,6 @@ watch(memberLevel, (level) => {
   grid-column: span 2;
 }
 
-.status-row {
-  grid-column: 1 / -1;
-  width: calc(25% - 1.125rem);
-}
-
 .checkbox-field {
   justify-content: flex-end;
 }
@@ -308,9 +290,6 @@ watch(memberLevel, (level) => {
   .notes-section .form-field {
     grid-column: span 2;
   }
-  .status-row {
-    width: calc(50% - 0.75rem);
-  }
 }
 
 @media (max-width: 600px) {
@@ -320,9 +299,6 @@ watch(memberLevel, (level) => {
   }
   .notes-section .form-field {
     grid-column: span 1;
-  }
-  .status-row {
-    width: 100%;
   }
 }
 </style>

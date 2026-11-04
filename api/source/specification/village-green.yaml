@@ -1765,6 +1765,31 @@ paths:
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer ] } ]
 
+  /persons/{personId}/volunteer/pause:
+    put:
+      summary: Pause or replace the pause on an Active volunteer
+      tags: [Volunteer]
+      operationId: putPersonVolunteerPause
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VolunteerPausePut' }
+      responses:
+        '200': { description: The stored pause, content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerPause' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a volunteer's pause (idempotent)
+      tags: [Volunteer]
+      operationId: deletePersonVolunteerPause
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      responses:
+        '204': { description: Pause removed or none existed }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
   /circles:
     get:
       summary: List all circles
@@ -1908,6 +1933,100 @@ paths:
                 items: { $ref: '#/components/schemas/VettingType' }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:person:read ] } ]
+
+  /member-drop-reasons:
+    get:
+      summary: List member drop reasons
+      tags: [MemberDropReason]
+      operationId: getMemberDropReasons
+      responses:
+        '200':
+          description: The drop-reason catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MemberDropReason' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a drop reason to the catalog (drop_reason:admin)
+      tags: [MemberDropReason]
+      operationId: createMemberDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReasonCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+
+  /member-drop-reasons/{memberDropReasonId}:
+    parameters: [ { $ref: '#/components/parameters/MemberDropReasonIdPath' } ]
+    patch:
+      summary: Rename, redescribe or retire a drop reason (drop_reason:admin)
+      tags: [MemberDropReason]
+      operationId: patchMemberDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReasonPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MemberDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+    delete:
+      summary: Remove a drop reason no member uses (drop_reason:admin); 409 when in use
+      tags: [MemberDropReason]
+      operationId: deleteMemberDropReason
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:member ] } ]
+
+  /volunteer-drop-reasons:
+    get:
+      summary: List volunteer drop reasons
+      tags: [VolunteerDropReason]
+      operationId: getVolunteerDropReasons
+      responses:
+        '200':
+          description: The drop-reason catalog, by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/VolunteerDropReason' } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:person:read ] } ]
+    post:
+      summary: Add a drop reason to the catalog (drop_reason:admin)
+      tags: [VolunteerDropReason]
+      operationId: createVolunteerDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerDropReasonCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+
+  /volunteer-drop-reasons/{volunteerDropReasonId}:
+    parameters: [ { $ref: '#/components/parameters/VolunteerDropReasonIdPath' } ]
+    patch:
+      summary: Rename, redescribe or retire a drop reason (drop_reason:admin)
+      tags: [VolunteerDropReason]
+      operationId: patchVolunteerDropReason
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerDropReasonPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/VolunteerDropReason' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
+    delete:
+      summary: Remove a drop reason no volunteer uses (drop_reason:admin); 409 when in use
+      tags: [VolunteerDropReason]
+      operationId: deleteVolunteerDropReason
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:volunteer ] } ]
 
   /trainings:
     get:
@@ -3891,12 +4010,9 @@ components:
           format: date
         status:
           type: string
-          maxLength: 50
-          nullable: true
-        dropReason:
-          type: string
-          maxLength: 100
-          nullable: true
+          enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
         householdSize:
           type: integer
           nullable: true
@@ -3940,8 +4056,9 @@ components:
         secondaryType:   { type: string, maxLength: 50 }
         serviceNotes:    { type: string }
         joinDate:        { type: string, format: date }
-        status:          { type: string, maxLength: 50 }
-        dropReason:      { type: string, maxLength: 100 }
+        status:          { type: string, enum: [Active, Pending, Dropped] }
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
         householdSize:   { type: integer }
         circlePreferences:
           type: array
@@ -4027,12 +4144,13 @@ components:
           nullable: true
         status:
           type: string
-          maxLength: 50
-          nullable: true
-        dropReason:
+          enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
+        dropReasonName:
           type: string
-          maxLength: 100
           nullable: true
+          readOnly: true
         householdSize:
           type: integer
           nullable: true
@@ -4063,6 +4181,7 @@ components:
       type: object
       required:
       - personId
+      - deceased
       - fullName
       - circles
       - disabilities
@@ -4145,6 +4264,12 @@ components:
           type: string
           format: date
           nullable: true
+        deceased:
+          type: boolean
+        openServiceRequestCount:
+          description: Open and Confirmed requests the person is on. Returned by getPerson only.
+          type: integer
+          minimum: 0
         deceasedDate:
           type: string
           format: date
@@ -4224,12 +4349,39 @@ components:
       required:
         - personId
         - fullName
+        - deceased
+        - memberStatus
+        - volunteerStatus
+        - volunteerPause
+        - circles
       properties:
         personId:
           $ref: '#/components/schemas/PersonId'
         fullName:
           type: string
           maxLength: 200
+        deceased:
+          type: boolean
+        memberStatus:
+          # Stored status for read_inactive holders; others see null unless
+          # the role is current (Active and not deceased).
+          type: string
+          nullable: true
+          enum: [Active, Pending, Dropped, null]
+        volunteerStatus:
+          type: string
+          nullable: true
+          enum: [Active, Pending, Dropped, null]
+        volunteerPause:
+          $ref: '#/components/schemas/VolunteerPause'
+        circles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Circle'
+        isVeteran:
+          # Omitted without person:read_demographics.
+          type: boolean
+          nullable: true
         village:
           # Always an object (built inline via JSON_OBJECT), but a villageless
           # (global) person yields null members — a LEFT JOIN with no village.
@@ -4266,6 +4418,7 @@ components:
       additionalProperties: false
       type: object
       required:
+      - deceased
       - circles
       - disabilities
       - languages
@@ -4330,6 +4483,8 @@ components:
           type: string
           format: date
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
@@ -4449,6 +4604,8 @@ components:
           type: string
           maxLength: 30
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
@@ -4559,6 +4716,8 @@ components:
           type: string
           maxLength: 30
           nullable: true
+        deceased:
+          type: boolean
         deceasedDate:
           type: string
           format: date
@@ -5787,6 +5946,7 @@ components:
       - fullName
       - villageId
       - status
+      - deceased
       - count
       - completedRoundTrips
       properties:
@@ -5799,8 +5959,9 @@ components:
           $ref: '#/components/schemas/VillageId'
         status:
           type: string
-          maxLength: 50
-          nullable: true
+          enum: [Active, Pending, Dropped]
+        deceased:
+          type: boolean
         count:
           type: integer
         completedRoundTrips:
@@ -5812,7 +5973,8 @@ components:
       - personId
       - fullName
       - villageId
-      - active
+      - status
+      - deceased
       - count
       - completedRoundTrips
       properties:
@@ -5823,7 +5985,10 @@ components:
           maxLength: 200
         villageId:
           $ref: '#/components/schemas/VillageIdNullable'
-        active:
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
+        deceased:
           type: boolean
         count:
           type: integer
@@ -6026,9 +6191,14 @@ components:
         displayName:
           type: string
           maxLength: 300
-        active:
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
+        pause:
+          $ref: '#/components/schemas/VolunteerPause'
+        deceased:
+          description: Returned by the all-volunteers list only.
           type: boolean
-          nullable: true
         village:
           type: object
           nullable: true
@@ -6095,6 +6265,62 @@ components:
       properties:
         name: { $ref: '#/components/schemas/CatalogName' }
         description: { $ref: '#/components/schemas/CatalogDescription' }
+    MemberDropReasonId:
+      $ref: '#/components/schemas/StringIntId'
+    MemberDropReason:
+      additionalProperties: false
+      type: object
+      required: [ memberDropReasonId, name, description, retired, holderCount ]
+      properties:
+        memberDropReasonId: { $ref: '#/components/schemas/MemberDropReasonId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean, description: Retired reasons stay on existing members but can't be newly chosen }
+        holderCount: { type: integer, minimum: 0, description: Members dropped with this reason }
+    MemberDropReasonCreate:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
+    MemberDropReasonPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
+    VolunteerDropReasonId:
+      $ref: '#/components/schemas/StringIntId'
+    VolunteerDropReason:
+      additionalProperties: false
+      type: object
+      required: [ volunteerDropReasonId, name, description, retired, holderCount ]
+      properties:
+        volunteerDropReasonId: { $ref: '#/components/schemas/VolunteerDropReasonId' }
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean, description: Retired reasons stay on existing volunteers but can't be newly chosen }
+        holderCount: { type: integer, minimum: 0, description: Volunteers dropped with this reason }
+    VolunteerDropReasonCreate:
+      additionalProperties: false
+      type: object
+      required: [ name ]
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
+    VolunteerDropReasonPatch:
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      properties:
+        name: { $ref: '#/components/schemas/CatalogName' }
+        description: { $ref: '#/components/schemas/CatalogDescription' }
+        retired: { type: boolean }
     PositionId:
       $ref: '#/components/schemas/StringIntId'
     PositionScope:
@@ -6143,7 +6369,7 @@ components:
     VolunteerPersonRef:
       additionalProperties: false
       type: object
-      required: [ personId, fullName, displayName, village, active ]
+      required: [ personId, fullName, displayName, village, status, deceased ]
       properties:
         personId: { $ref: '#/components/schemas/PersonId' }
         fullName: { type: string }
@@ -6154,7 +6380,8 @@ components:
           properties:
             villageId: { $ref: '#/components/schemas/VillageId' }
             name: { type: string }
-        active: { type: boolean, nullable: true }
+        status: { type: string, enum: [Active, Pending, Dropped] }
+        deceased: { type: boolean }
     TrainingCompletion:
       additionalProperties: false
       type: object
@@ -6275,6 +6502,24 @@ components:
         positionId: { $ref: '#/components/schemas/PositionId' }
         villageId: { $ref: '#/components/schemas/VillageIdNullable' }
         circleId: { $ref: '#/components/schemas/StringIntIdNullable' }
+    VolunteerPause:
+      description: A volunteer's pause rule; null when not paused.
+      type: object
+      nullable: true
+      additionalProperties: false
+      required: [startDate, endDate, scope]
+      properties:
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        scope: { type: string, enum: [all, window] }
+    VolunteerPausePut:
+      type: object
+      additionalProperties: false
+      required: [startDate, endDate, scope]
+      properties:
+        startDate: { type: string, format: date, nullable: true, description: 'null stores today (Eastern civil date).' }
+        endDate: { type: string, format: date, nullable: true }
+        scope: { type: string, enum: [all, window] }
     VolunteerDetail:
       additionalProperties: false
       type: object
@@ -6293,9 +6538,20 @@ components:
         notes:
           type: string
           nullable: true
-        active:
-          type: boolean
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
+        dropReasonName:
+          type: string
           nullable: true
+          readOnly: true
+        statusChangeNotes:
+          type: string
+          nullable: true
+        pause:
+          $ref: '#/components/schemas/VolunteerPause'
         capabilities:
           type: array
           items:
@@ -6380,8 +6636,13 @@ components:
         notes:
           type: string
           nullable: true
-        active:
-          type: boolean
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
+        statusChangeNotes:
+          type: string
           nullable: true
         capabilityIds:
           type: array
@@ -6413,8 +6674,13 @@ components:
         notes:
           type: string
           nullable: true
-        active:
-          type: boolean
+        status:
+          type: string
+          enum: [Active, Pending, Dropped]
+        dropReasonId:
+          $ref: '#/components/schemas/StringIntIdNullable'
+        statusChangeNotes:
+          type: string
           nullable: true
         capabilityIds:
           type: array
@@ -6838,6 +7104,18 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/PersonId'
+    MemberDropReasonIdPath:
+      name: memberDropReasonId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/MemberDropReasonId'
+    VolunteerDropReasonIdPath:
+      name: volunteerDropReasonId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/VolunteerDropReasonId'
     TrainingIdPath:
       name: trainingId
       in: path

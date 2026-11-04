@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { plural } from '../../../shared/lib.js'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import IftaLabel from 'primevue/iftalabel'
@@ -31,6 +32,10 @@ const props = defineProps({
   // the Circle of Pride?" = Yes pre-ticks it); a coordinator confirms or
   // unticks before anything is saved. VolunteerStep still hides the section.
   showCircles: { type: Boolean, default: true },
+  // Open service requests for this person (getPerson only; the import wizard
+  // creates people, so it passes none). Drives the warning on ticking Deceased.
+  openRequestCount: { type: Number, default: 0 },
+  displayName: { type: String, default: '' },
 })
 const emit = defineEmits(['edited', 'toggle-circle', 'toggle-disability', 'edit-disability-note'])
 
@@ -55,7 +60,36 @@ const emergencyContactPhone = defineModel('emergencyContactPhone')
 const emergencyContactEmail = defineModel('emergencyContactEmail')
 const suffix = defineModel('suffix', { type: String })
 const pronouns = defineModel('pronouns', { type: String })
+const deceased = defineModel('deceased', { type: Boolean, default: false })
 const deceasedDate = defineModel('deceasedDate', { type: String })
+// "Date unknown" is form state only; it never reaches the API (a deceased
+// person with no date is deceased + deceasedDate null). Hosts that load a
+// record bind it; otherwise it starts from the loaded values.
+const dateUnknown = defineModel('dateUnknown', { type: Boolean, default: undefined })
+if (dateUnknown.value === undefined) dateUnknown.value = deceased.value && !deceasedDate.value
+
+// The warning belongs to ticking Deceased in this session, not to loading a
+// person who is already deceased.
+const deceasedTicked = ref(false)
+const showOpenRequestWarning = computed(() => deceasedTicked.value && deceased.value && props.openRequestCount > 0)
+const openRequestWarning = computed(() =>
+  `${props.displayName} has ${plural(props.openRequestCount, 'open service request')}. Cancel them separately if they no longer apply.`)
+
+function setDeceased (v) {
+  deceased.value = v
+  deceasedTicked.value = v
+  if (!v) {
+    deceasedDate.value = null
+    dateUnknown.value = false
+  }
+  edited('deceasedDate')
+}
+
+function setDateUnknown (v) {
+  dateUnknown.value = v
+  if (v) deceasedDate.value = ''
+  edited('deceasedDate')
+}
 const preferredContactMethodId = defineModel('preferredContactMethodId', { type: String, default: null })
 const genderId = defineModel('genderId', { type: String, default: null })
 const ethnicityId = defineModel('ethnicityId', { type: String, default: null })
@@ -430,7 +464,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="subgroup span-2">
+    <!-- span-4 keeps Birth Date, Deceased and Deceased Date on one row. -->
+    <div class="subgroup span-4">
       <h4 class="subsection-header">Dates</h4>
 
       <div v-if="showBirthDate" class="form-field">
@@ -451,6 +486,14 @@ onMounted(() => {
       </div>
 
       <div class="form-field">
+        <label class="checkbox-item">
+          <Checkbox :modelValue="deceased" binary @update:modelValue="setDeceased" />
+          <span class="checkbox-label">Deceased</span>
+        </label>
+        <small class="field-hint" v-if="showOpenRequestWarning">{{ openRequestWarning }}</small>
+      </div>
+
+      <div class="form-field" v-if="deceased">
         <IftaLabel>
           <InputText
             id="deceasedDate"
@@ -458,10 +501,15 @@ onMounted(() => {
             placeholder="YYYY-MM-DD"
             class="w-full"
             :class="{ 'p-invalid': errors.deceasedDate }"
+            :disabled="dateUnknown"
             @input="edited('deceasedDate')"
           />
           <label for="deceasedDate">Deceased Date</label>
         </IftaLabel>
+        <label class="checkbox-item">
+          <Checkbox :modelValue="dateUnknown" binary @update:modelValue="setDateUnknown" />
+          <span class="checkbox-label">Date unknown</span>
+        </label>
         <small class="field-error" v-if="errors.deceasedDate">{{ errors.deceasedDate }}</small>
       </div>
     </div>
@@ -619,7 +667,7 @@ onMounted(() => {
 }
 
 /* Languages opens its own row so it pairs with Disabilities, not with the
-   Civic information and Dates pair above (2 + 2 + 2 would fill that row). */
+   Civic information and Dates pair above. */
 .subgroup.row-start {
   grid-column: 1 / span 2;
 }
