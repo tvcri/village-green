@@ -182,10 +182,11 @@ const allVolunteerOptions = computed(() => {
   const date = chosenServiceDate.value
   return villageVolunteers.value.map(v => {
     const pause = v.pause || null
-    // With no date yet, only an open-ended pause can be known to apply.
+    // With no date yet, only an open-ended pause already under way can be
+    // known to apply. A later date that lands in any pause hits pauseConflict.
     const disabled = pauseRuleApplies.value && !!pause && (date
       ? pauseCovers(pause, date)
-      : pause.endDate == null && pauseState(pause, today) !== 'expired')
+      : pause.endDate == null && pauseState(pause, today) === 'active')
     return {
       label: v.personFullName || v.fullName,
       value: String(v.personId || v.id),

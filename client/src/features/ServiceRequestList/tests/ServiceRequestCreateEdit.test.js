@@ -1189,6 +1189,19 @@ describe('volunteer pause on the request form', () => {
     expect(option(vm, '9').disabled).toBe(false)
   })
 
+  it('a no-end pause that starts later stays selectable before a date is chosen', async () => {
+    const { getVillageVolunteers } = await import('../../VolunteerList/api/volunteerApi.js')
+    getVillageVolunteers.mockResolvedValue([
+      { personId: '9', personFullName: 'Example, Pat', displayName: 'Pat Example', pause: { startDate: '2030-03-01', endDate: null, scope: 'all' } },
+      { personId: '10', personFullName: 'Sample, Sam', displayName: 'Sam Sample', pause: { startDate: '2030-01-01', endDate: null, scope: 'all' } },
+      { personId: '11', personFullName: 'Other, Olive', displayName: 'Olive Other', pause: null }
+    ])
+    const vm = await mountCreateWithVolunteers()
+    expect(option(vm, '9').disabled).toBe(false)
+    expect(option(vm, '9').pauseLabel).toBe(`${PAUSE_WORDING.tag} from Mar 1`)
+    expect(option(vm, '10').disabled).toBe(true)
+  })
+
   it('choosing a covered date after the volunteer shows the error and disables Save', async () => {
     const vm = await mountCreateWithVolunteers()
     vm.form.memberPersonId = '7'
