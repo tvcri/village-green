@@ -10,7 +10,8 @@ import { _resetPersonLookups } from '../composables/usePersonLookups.js'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
-  useRoute: () => ({ params: { personId: '5' } })
+  useRoute: () => ({ params: { personId: '5' } }),
+  onBeforeRouteLeave: () => {},
 }))
 const confirmRequire = vi.fn()
 vi.mock('primevue/useconfirm', () => ({ useConfirm: () => ({ require: confirmRequire }) }))

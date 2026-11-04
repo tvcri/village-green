@@ -9,7 +9,11 @@ const { safeReadBody } = require('../utils/safeReadBody')
 // not configuration — see controllers/OAuth.js, which hardcodes the Google
 // token endpoint while config holds only credentials.
 const CENSUS_URL = 'https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress'
-const TIMEOUT_MS = 10000
+// The whole budget for one lookup, retries included. A person save waits on
+// this, so a Census outage must cost seconds. Healthy lookups take well under
+// one; an address that runs out of budget stays unresolved until it is
+// retried later.
+const BUDGET_MS = 5000
 const UNRESOLVED = { town: null, latitude: null, longitude: null }
 
 // Pure. Pull the coordinates off the first candidate match.
@@ -92,17 +96,27 @@ async function resolveTown ({ street, city, state, zip }) {
   if (!street?.trim() || !zip?.trim()) return { ...UNRESOLVED }
 
   try {
+    const signal = AbortSignal.timeout(BUDGET_MS)
     const json = await retry(async (bail) => {
-      const res = await fetch(buildUrl({ street, city, state, zip }), {
-        signal: AbortSignal.timeout(TIMEOUT_MS)
-      })
+      let res
+      try {
+        res = await fetch(buildUrl({ street, city, state, zip }), { signal })
+      }
+      catch (err) {
+        if (signal.aborted) {
+          bail(err)
+          return
+        }
+        throw err
+      }
       if (!res.ok) {
         const text = await safeReadBody(res)
         const error = new Error(`Census geocoder returned ${res.status}: ${text}`)
         error.status = res.status
         // 4xx (except 429, rate-limited) means the request itself is bad —
         // a malformed address, for example — and retrying cannot help.
-        // 5xx, network errors, and timeouts can plausibly succeed on retry.
+        // 5xx and network errors can plausibly succeed on retry, budget
+        // permitting.
         if (res.status >= 400 && res.status < 500 && res.status !== 429) {
           bail(error)
           return

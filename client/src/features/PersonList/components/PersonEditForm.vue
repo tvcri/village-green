@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import Card from 'primevue/card'
@@ -68,6 +68,16 @@ async function loadVillages () {
 // a failed load would otherwise PATCH null over every field.
 const loaded = ref(false)
 
+// A save can wait several seconds on the municipality lookup. Leaving is
+// blocked meanwhile: the form's fields are gone once it unmounts, so a late
+// lookup result could no longer reach the payload.
+const saving = ref(false)
+onBeforeRouteLeave(() => {
+  if (!saving.value) return true
+  toast.add({ severity: 'info', summary: 'Saving', detail: 'Still saving. This page will update when it finishes.', life: 3000 })
+  return false
+})
+
 const confirm = useConfirm()
 // The volunteer projection's positions and associates, for the revocation
 // warning (UI spec 7.2). Empty when the caller can't read volunteers.
@@ -132,7 +142,7 @@ onMounted(async () => {
   }
 })
 
-function buildPayload () {
+function buildPayload (editing) {
   const payload = {}
   Object.entries(form).forEach(([k, v]) => {
     if (k === 'villageId') return
@@ -140,7 +150,7 @@ function buildPayload () {
     if (v === '') {
       // On edit, send null so a cleared field is actually cleared server-side
       // instead of being omitted (and thus left at its prior value).
-      if (isEdit.value) payload[k] = null
+      if (editing) payload[k] = null
     }
     else if (v !== null) payload[k] = v
   })
@@ -152,36 +162,44 @@ function buildPayload () {
     disabilityId: disabilityNameToId.value.get(n),
     note: note || null,
   }))
-  addPersonFields(payload, personFields, { isEdit: isEdit.value, showDemographics: showDemographics.value })
+  addPersonFields(payload, personFields, { isEdit: editing, showDemographics: showDemographics.value })
   return payload
 }
 
 async function handleSubmit () {
-  if (!loaded.value) return
+  if (!loaded.value || saving.value) return
   if (!validatePersonForm(form, errors, { deceased: personFields.deceased, deceasedDate: personFields.deceasedDate, dateUnknown: personFields.dateUnknown })) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Please fix the highlighted fields', life: 3000 })
     return
   }
-  const removedList = lostPositions.value.length ? lostList() : ''
-  if (removedList && !(await confirmVillageChange())) return
+  // Fixed at the click. The route can change during the waits below, and it
+  // must never decide which record this save writes.
+  const editing = isEdit.value
+  let id = personId.value
+  saving.value = true
   try {
+    const removedList = lostPositions.value.length ? lostList() : ''
+    if (removedList && !(await confirmVillageChange())) return
     // An edited address may have a municipality lookup still in flight (or,
     // for an Enter-key submit, not yet started) — settle it before reading
     // form.town into the payload.
     await fields.value?.townSettled()
-    let id = personId.value
-    if (isEdit.value) {
-      await patchPerson(id, buildPayload())
+    if (editing) {
+      await patchPerson(id, buildPayload(editing))
     }
     else {
-      const created = await createPerson(buildPayload())
+      const created = await createPerson(buildPayload(editing))
       id = created.personId
     }
-    toast.add({ severity: 'success', summary: 'Saved', detail: isEdit.value ? (removedList ? `Person updated. Removed ${removedList}.` : 'Person updated') : 'Person created', life: 2000 })
+    toast.add({ severity: 'success', summary: 'Saved', detail: editing ? (removedList ? `Person updated. Removed ${removedList}.` : 'Person updated') : 'Person created', life: 2000 })
+    saving.value = false   // before the push, or the leave guard blocks it
     router.push({ name: 'meta-person-detail', params: { personId: id } })
   }
   catch {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to save person', life: 3000 })
+  }
+  finally {
+    saving.value = false
   }
 }
 
@@ -272,8 +290,8 @@ function cancel () {
 
         <!-- Footer: Save / Cancel buttons -->
         <div class="form-footer">
-          <Button type="button" label="Cancel" severity="secondary" @click="cancel" />
-          <Button type="button" label="Save" :disabled="!loaded" @click="handleSubmit" />
+          <Button type="button" label="Cancel" severity="secondary" :disabled="saving" @click="cancel" />
+          <Button type="button" label="Save" :disabled="!loaded || saving" :loading="saving" @click="handleSubmit" />
         </div>
 
       </form>
