@@ -4267,6 +4267,7 @@ components:
         deceased:
           type: boolean
         openServiceRequestCount:
+          description: Open and Confirmed requests the person is on. Returned by getPerson only.
           type: integer
           minimum: 0
         deceasedDate:

@@ -528,7 +528,9 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
   return rows
 }
 
-module.exports.getPerson = async function (personId, projections = [], userObject = null) {
+// openRequestCount is opt-in: most callers want the person only for its village
+// or role rows, and the count is a subquery over service_request.
+module.exports.getPerson = async function (personId, projections = [], userObject = null, { openRequestCount = false } = {}) {
   // The member/volunteer projections carry village-scoped gated content:
   // sensitive fields (financial/scNote) and inactive-row visibility
   // (read_inactive), and birthDate is gated the same way
@@ -590,7 +592,7 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     {
       birthDate,
       demographics,
-      openRequestCount: true,
+      openRequestCount,
       member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
       volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null,
       application: wantsApplication ? { member: memberApplication, volunteer: volunteerApplication } : null

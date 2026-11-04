@@ -91,6 +91,13 @@ test('open request count', async () => {
   assert.equal(after.json.openServiceRequestCount, 1)
 })
 
+test('only the single-person GET carries the open request count', async () => {
+  const { json: p } = await makePerson('DecOpenSrPatch')
+  const patched = await vgCall('patchPerson', { personId: p.personId }, { token: staff, body: { firstName: 'Pat' } })
+  assert.equal(patched.status, 200)
+  assert.equal(Object.hasOwn(patched.json, 'openServiceRequestCount'), false)
+})
+
 test('getPersons summary rows carry deceased', async () => {
   const { json: p } = await makePerson('DecSummary')
   assert.equal((await patch(p.personId, { deceased: true })).status, 200)
