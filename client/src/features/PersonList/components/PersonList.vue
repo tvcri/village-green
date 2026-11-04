@@ -22,6 +22,7 @@ import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { usePersonListFilters } from '../composables/usePersonListFilters.js'
 import { rowTagKeys, tagLabel, circleShortName, isEmailPaused } from '../lib/personTags.js'
+import { parsePhoneObj } from '../lib/parsePhoneObj.js'
 import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
 import { PAUSE_TIME_ZONE, pauseTag } from '../../../shared/lib/volunteerPause.js'
 
@@ -125,14 +126,6 @@ const sortedPersons = computed(() => {
   const key = sortKey[sortField.value]
   return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
 })
-
-function parsePhoneObj(val) {
-  if (val && typeof val === 'object') return val
-  if (typeof val === 'string') {
-    try { return JSON.parse(val) } catch { return {} }
-  }
-  return {}
-}
 
 // Role tags for a row: member and volunteer only (circles have their own
 // column). A deceased person reads as dropped in every role and says so.

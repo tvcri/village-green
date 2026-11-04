@@ -2,21 +2,13 @@ import { ref, computed } from 'vue'
 import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
 import { PAUSE_TIME_ZONE } from '../../../shared/lib/volunteerPause.js'
 import { rowTagKeys, matchesTags, selectionSentence, isEmailPaused } from '../lib/personTags.js'
+import { parsePhoneObj } from '../lib/parsePhoneObj.js'
 
 const ALL_VILLAGES = 'All villages'
 
 // Case- and accent-insensitive, like the MySQL LIKE the server search used.
 function fold (value) {
   return (value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-}
-
-// The phone column may arrive as an object or a JSON string.
-function parsePhoneObj (val) {
-  if (val && typeof val === 'object') return val
-  if (typeof val === 'string') {
-    try { return JSON.parse(val) } catch { return {} }
-  }
-  return {}
 }
 
 /**

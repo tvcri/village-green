@@ -4,14 +4,7 @@
 // phone and cell come from the summary row root, since `detail` omits them.
 import { getPersons } from '../api/personApi.js'
 import { personExportValues } from '../../../shared/lib/personExport.js'
-
-function parsePhoneObj (val) {
-  if (val && typeof val === 'object') return val
-  if (typeof val === 'string') {
-    try { return JSON.parse(val) } catch { return {} }
-  }
-  return {}
-}
+import { parsePhoneObj } from './parsePhoneObj.js'
 
 // rows: the page's own export rows, in order. Each comes back with the person
 // block merged in. A person on several rows gets the same block on each; a
