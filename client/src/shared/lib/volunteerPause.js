@@ -1,7 +1,7 @@
 // Volunteer pause rules. Dates are civil 'YYYY-MM-DD' strings: compared
 // lexicographically, formatted by splitting, never parsed into a Date.
-// pauseCovers and pauseSentence mirror api/source/service/volunteerPause.js;
-// keep the wording identical.
+// pauseCovers mirrors findCoveringPause's SQL and pauseSentence the function of
+// the same name, both in api/source/service/volunteerPause.js; keep them identical.
 
 // User-facing pause wording lives here and nowhere else in the client, so a
 // copy change is one edit. The sentence must stay identical to PAUSE_WORDING

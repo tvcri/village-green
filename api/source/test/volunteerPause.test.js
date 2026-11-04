@@ -1,27 +1,7 @@
 'use strict'
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { PAUSE_WORDING, pauseCovers, pauseSentence, pauseJsonSql } = require('../service/volunteerPause')
-
-const D = '2027-03-10'
-
-test('pauseCovers: null pause covers nothing', () => {
-  assert.equal(pauseCovers(null, D), false)
-})
-
-test('pauseCovers: no dates covers every date', () => {
-  assert.equal(pauseCovers({ startDate: null, endDate: null }, D), true)
-})
-
-test('pauseCovers: start date is inclusive; day before is not covered', () => {
-  assert.equal(pauseCovers({ startDate: D, endDate: null }, D), true)
-  assert.equal(pauseCovers({ startDate: '2027-03-11', endDate: null }, D), false)
-})
-
-test('pauseCovers: end date is inclusive; day after is not covered', () => {
-  assert.equal(pauseCovers({ startDate: null, endDate: D }, D), true)
-  assert.equal(pauseCovers({ startDate: null, endDate: '2027-03-09' }, D), false)
-})
+const { PAUSE_WORDING, pauseSentence, pauseJsonSql } = require('../service/volunteerPause')
 
 // The one literal: pins the wording shared with the client's PAUSE_WORDING.
 test('pauseSentence: pins the sentence wording shared with the client', () => {

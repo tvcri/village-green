@@ -13,13 +13,6 @@ const PAUSE_WORDING = {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// Inclusive on both ends; a null bound is open.
-function pauseCovers (pause, date) {
-  if (!pause) return false
-  return (pause.startDate == null || pause.startDate <= date) &&
-    (pause.endDate == null || pause.endDate >= date)
-}
-
 // "Mon D" in the current Eastern year, "Mon D, YYYY" otherwise.
 function formatPauseDate (date, today) {
   const [y, m, d] = date.split('-')
@@ -45,6 +38,7 @@ function pauseJsonSql (volunteerAlias) {
 }
 
 // The pause (with the volunteer's displayName) covering `date`, or null.
+// Inclusive on both ends; a null bound is open.
 // `date` is bound as a string; no database clock is involved.
 async function findCoveringPause (connection, volunteerPersonId, date) {
   const [rows] = await connection.query(
@@ -61,4 +55,4 @@ async function findCoveringPause (connection, volunteerPersonId, date) {
   return rows[0] ?? null
 }
 
-module.exports = { PAUSE_WORDING, pauseCovers, pauseSentence, pauseJsonSql, findCoveringPause }
+module.exports = { PAUSE_WORDING, pauseSentence, pauseJsonSql, findCoveringPause }
