@@ -49,7 +49,9 @@ const personType = computed(() => {
 const hasMemberDetail = computed(() => !!person.value?.member)
 const hasVolunteerDetail = computed(() => !!person.value?.volunteer)
 
-const canDelete = computed(() => !(person.value?.activeAs ?? []).length)
+// Any role row blocks the delete, whatever its status. activeAs can't tell:
+// it reads the active_* views, which omit Dropped, Pending and deceased.
+const canDelete = computed(() => !hasMemberDetail.value && !hasVolunteerDetail.value)
 const deleteBlockedTip = computed(() => person.value?.deceased
   ? 'Untick Deceased on the person form to change their roles, then remove them before deleting.'
   : 'Remove member and volunteer roles before deleting this person')

@@ -87,3 +87,30 @@ describe('PersonDetail — section header edit shortcuts', () => {
     }
   })
 })
+
+describe('PersonDetail — delete guard', () => {
+  const deleteButton = () => screen.getByRole('button', { name: 'Delete' })
+
+  it('allows the delete only with no role rows', async () => {
+    granted = ALL
+    await mount(person({ activeAs: [], member: null, volunteer: null }))
+    expect(deleteButton()).toBeEnabled()
+  })
+
+  it('blocks a role that is not active, which activeAs omits', async () => {
+    granted = ALL
+    await mount(person({ activeAs: [], member: { status: 'Dropped' }, volunteer: null }))
+    expect(deleteButton()).toBeDisabled()
+    cleanup()
+    await mount(person({ activeAs: [], member: null, volunteer: { volunteerStatus: 'Pending', capabilities: [], pause: null } }))
+    expect(deleteButton()).toBeDisabled()
+  })
+
+  it('blocks a deceased person with roles and says to untick Deceased', async () => {
+    granted = ALL
+    await mount(person({ activeAs: [], deceased: true }))
+    expect(deleteButton()).toBeDisabled()
+    await fireEvent.mouseEnter(deleteButton().parentElement)
+    expect(await screen.findByText(/^Untick Deceased/)).toBeInTheDocument()
+  })
+})
