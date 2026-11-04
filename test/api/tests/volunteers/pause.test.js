@@ -26,6 +26,23 @@ const pause = (personId, body, token = staff) => vgCall('putPersonVolunteerPause
 const unpause = (personId, token = staff) => vgCall('deletePersonVolunteerPause', { personId }, { token })
 const pauseOf = async (personId) => (await vgCall('getPerson', { personId, projection: ['volunteer'] }, { token: staff })).json.volunteer.pause
 
+const todayEastern = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+
+test('a blank start date is stored as today', async () => {
+  const personId = await makeVolunteer('PBlankStart')
+  const res = await pause(personId, { startDate: null, endDate: null, scope: 'all' })
+  assert.equal(res.status, 200, text(res))
+  assert.deepEqual(res.json, { startDate: todayEastern(), endDate: null, scope: 'all' })
+  assert.deepEqual(await pauseOf(personId), res.json)
+})
+
+test('a blank start with an end already past is rejected', async () => {
+  const personId = await makeVolunteer('PBlankPastEnd')
+  const res = await pause(personId, { startDate: null, endDate: '2020-01-31', scope: 'all' })
+  assert.equal(res.status, 422)
+  assert.match(text(res), /start date must be on or before the end date/)
+})
+
 test('PUT creates and replaces a pause', async () => {
   const personId = await makeVolunteer('PCreate')
   const first = { startDate: '2027-03-01', endDate: '2027-03-15', scope: 'window' }
@@ -33,7 +50,7 @@ test('PUT creates and replaces a pause', async () => {
   assert.equal(res.status, 200)
   assert.deepEqual(res.json, first)
   assert.deepEqual(await pauseOf(personId), first)
-  const second = { startDate: null, endDate: null, scope: 'all' }
+  const second = { startDate: '2027-04-01', endDate: null, scope: 'all' }
   assert.deepEqual((await pause(personId, second)).json, second)
   assert.deepEqual(await pauseOf(personId), second)
 })

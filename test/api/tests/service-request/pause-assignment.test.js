@@ -79,12 +79,19 @@ test('boundary dates are covered', async () => {
   assert.equal((await create(v, '2030-02-28')).status, 201)
 })
 
-test('no-date pause blocks any date', async () => {
+test('no-date pause blocks any date from today on', async () => {
   const v = await makeVolunteer('PANoDate')
   await setPause(v, { startDate: null, endDate: null, scope: 'all' })
   const res = await create(v, '2030-07-04')
   assert.equal(res.status, 422)
   assert.match(text(res), /Pat PANoDate\b[^.]*\./)
+})
+
+test('no-date pause leaves dates before it was set assignable', async () => {
+  const v = await makeVolunteer('PANoDatePast')
+  await setPause(v, { startDate: null, endDate: null, scope: 'all' })
+  const res = await create(v, '2020-07-04')
+  assert.equal(res.status, 201, text(res))
 })
 
 test('expired pause does not block assignment', async () => {

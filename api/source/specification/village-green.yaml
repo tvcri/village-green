@@ -6516,7 +6516,7 @@ components:
       additionalProperties: false
       required: [startDate, endDate, scope]
       properties:
-        startDate: { type: string, format: date, nullable: true }
+        startDate: { type: string, format: date, nullable: true, description: 'null stores today (Eastern civil date).' }
         endDate: { type: string, format: date, nullable: true }
         scope: { type: string, enum: [all, window] }
     VolunteerDetail:

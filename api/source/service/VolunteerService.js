@@ -5,6 +5,8 @@ const AuditService = require('./audit/AuditService')
 const volunteerAssignments = require('./volunteerAssignments')
 const { applyDropReasonRules } = require('./dropReasonRules')
 const SmError = require('../utils/error')
+const config = require('../utils/config')
+const { todayCivil } = require('../utils/metricsRange')
 
 // Ensure a volunteer row exists for the person; return its id.
 async function ensureVolunteer (connection, personId, status) {
@@ -222,7 +224,10 @@ module.exports.putVolunteerPause = async function (personId, { startDate = null,
       if (scope === 'window' && (!startDate || !endDate)) {
         throw new SmError.UnprocessableError('A date-window pause needs a start and an end date.')
       }
-      if (startDate && endDate && startDate > endDate) {
+      // A blank start means today, so a pause never reaches back before it was
+      // set. Resolved here and stored, unlike the sidecar's per-send "today".
+      const start = startDate ?? todayCivil(config.settings.civilTimeZone)
+      if (endDate && start > endDate) {
         throw new SmError.UnprocessableError('The start date must be on or before the end date.')
       }
       await AuditService.auditUpdate(connection,
@@ -231,7 +236,7 @@ module.exports.putVolunteerPause = async function (personId, { startDate = null,
           await connection.query(
             `INSERT INTO volunteer_pause (volunteerId, startDate, endDate, scope) VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE startDate = VALUES(startDate), endDate = VALUES(endDate), scope = VALUES(scope)`,
-            [vol.id, startDate, endDate, scope])
+            [vol.id, start, endDate, scope])
           return vol.id
         })
     },
