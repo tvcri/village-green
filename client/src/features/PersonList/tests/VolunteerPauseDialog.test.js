@@ -77,8 +77,27 @@ describe('VolunteerPauseDialog', () => {
   })
 
   it('a past end date shows the warning and Save stays enabled', async () => {
-    await mount({ startDate: null, endDate: '2026-11-19', scope: 'all' })
+    await mount({ startDate: '2026-11-01', endDate: '2026-11-19', scope: 'all' })
     expect(screen.getByTestId('pause-end-passed')).toBeInTheDocument()
+    expect(saveButton()).toBeEnabled()
+  })
+
+  it('a start after the end shows the error and disables Save', async () => {
+    await mount({ startDate: '2026-12-15', endDate: '2026-12-01', scope: 'all' })
+    expect(screen.getByTestId('pause-out-of-order')).toBeInTheDocument()
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it('a blank start counts as today against a past end date', async () => {
+    await mount({ startDate: null, endDate: '2026-11-19', scope: 'all' })
+    expect(screen.getByTestId('pause-out-of-order')).toBeInTheDocument()
+    expect(screen.queryByTestId('pause-end-passed')).toBeNull()
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it('a start on the end date is allowed', async () => {
+    await mount({ startDate: '2026-12-01', endDate: '2026-12-01', scope: 'all' })
+    expect(screen.queryByTestId('pause-out-of-order')).toBeNull()
     expect(saveButton()).toBeEnabled()
   })
 

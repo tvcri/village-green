@@ -39,6 +39,8 @@ const windowAllowed = computed(() => !!startDate.value && !!endDate.value)
 watch(windowAllowed, ok => { if (!ok && scope.value === 'window') scope.value = 'all' })
 
 const endPassed = computed(() => !!endDate.value && endDate.value < todayCivilDateIn(PAUSE_TIME_ZONE))
+// The API's rule, caught before the round trip. A blank start counts as today.
+const outOfOrder = computed(() => !!endDate.value && (startDate.value ?? todayCivilDateIn(PAUSE_TIME_ZONE)) > endDate.value)
 
 async function run (call, done, failed) {
   saving.value = true
@@ -76,7 +78,8 @@ const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Service e
         <DatePicker inputId="pause-end" :modelValue="serviceDateToDate(endDate)" dateFormat="mm/dd/yy" placeholder="Until unpaused" showIcon showButtonBar fluid
                     @update:modelValue="d => { endDate = dateToServiceDate(d) }" />
       </div>
-      <Message v-if="endPassed" severity="warn" :closable="false" data-testid="pause-end-passed">The end date has passed, so this pause would have no effect.</Message>
+      <Message v-if="outOfOrder" severity="error" :closable="false" data-testid="pause-out-of-order">The start date must be on or before the end date.</Message>
+      <Message v-else-if="endPassed" severity="warn" :closable="false" data-testid="pause-end-passed">The end date has passed, so this pause would have no effect.</Message>
       <fieldset class="scope">
         <legend>Applies to</legend>
         <label class="radio"><RadioButton v-model="scope" value="all" inputId="pause-scope-all" /> All open-request emails</label>
@@ -91,7 +94,7 @@ const unpause = () => run(() => deleteVolunteerPause(props.personId), 'Service e
     <template #footer>
       <Button v-if="pause" label="Unpause" severity="danger" text :disabled="saving" data-testid="pause-unpause" @click="unpause" />
       <Button label="Cancel" severity="secondary" text :disabled="saving" data-testid="pause-cancel" @click="visible = false" />
-      <Button label="Save" :loading="saving" data-testid="pause-save" @click="save" />
+      <Button label="Save" :loading="saving" :disabled="outOfOrder" data-testid="pause-save" @click="save" />
     </template>
   </Dialog>
 </template>
