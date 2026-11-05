@@ -1525,44 +1525,75 @@ describe('several destinations on a request', () => {
     const vm = await mountEditAndExpose(stored)
     await waitFor(() => expect(vm.form.destinations).toHaveLength(2))
     vm.form.destinations[1].destination = ''
+    await waitFor(() => expect(unref(vm.isFormValid)).toBe(true))
+    expect(vm.expandedBlocks).toEqual([false, false])
 
-    // Synchronous on purpose: handleSubmit reaches this before anything else
-    // has had a tick to run, so it is handleSubmit that must open the block.
-    vm.handleSubmit(false)
+    await vm.handleSubmit(false)
     expect(vm.expandedBlocks).toEqual([false, true])
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Each destination needs a name'
+    }))
+    await expectNotSaved()
+  })
+
+  // The real path, through the button: Save has to stay clickable or none of
+  // this reaches the coordinator.
+  it('clicking Save on an Errand with a collapsed blank extra block explains itself', async () => {
+    const vm = await mountNew('Errand: Shopping')
+    vm.form.destinations[0].destination = 'Corner Pharmacy'
+    await fireEvent.click(addButton())
+    await waitFor(() => expect(nameInputs()).toHaveLength(2))
+    await fireEvent.click(screen.getByRole('button', { name: 'Destination 2' }))
+    await waitFor(() => expect(nameInputs()).toHaveLength(1))
+
+    const save = screen.getByText('Save and Notify').closest('button')
+    expect(save.disabled).toBe(false)
+    await fireEvent.click(save)
+
+    await waitFor(() => expect(nameInputs()).toHaveLength(2))
+    expect(vm.expandedBlocks).toEqual([true, true])
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Each destination needs a name'
+    }))
+    await expectNotSaved()
+  })
+
+  // Only the Ride rule disables Save, so this is the one failing block that a
+  // save attempt can't open: a disabled button can't be clicked.
+  it("a Ride's nameless first block cannot stay collapsed", async () => {
+    const vm = await mountNew('Ride: Medical Appnt')
+    await fireEvent.click(screen.getByRole('button', { name: 'Destination' }))
+    await waitFor(() => expect(vm.expandedBlocks).toEqual([true]))
+    expect(nameInputs()).toHaveLength(1)
+    expect(unref(vm.isFormValid)).toBe(false)
+  })
+
+  it('a collapsed blank block reopens when the service becomes a Ride', async () => {
+    const vm = await mountNew('Errand: Shopping')
+    await fireEvent.click(screen.getByRole('button', { name: 'Destination' }))
+    await waitFor(() => expect(vm.expandedBlocks).toEqual([false]))
+
+    vm.form.serviceName = 'Ride: Medical Appnt'
+    await waitFor(() => expect(vm.expandedBlocks).toEqual([true]))
+  })
+
+  it('a Ride names its first block with the Ride message, even with a blank extra', async () => {
+    const vm = await mountNew('Ride: Medical Appnt')
+    vm.form.timesFlexible = true
+    vm.form.destinations = [{ ...HOSPITAL, destination: '' }, { ...PHARMACY }]
+    vm.expandedBlocks = [true, true]
+    await vm.handleSubmit(false)
     expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
       detail: 'Destination is required for ride services'
     }))
     await expectNotSaved()
   })
 
-  // Save is disabled while a block fails, and a disabled button can't be
-  // clicked, so waiting for a save attempt to open the block would leave the
-  // coordinator with a dead button and nothing on screen to explain it.
-  it('a block missing a name cannot stay collapsed', async () => {
-    const vm = await mountNew('Errand: Shopping')
-    vm.form.destinations[0].destination = 'Corner Pharmacy'
-    await fireEvent.click(addButton())
-    await waitFor(() => expect(nameInputs()).toHaveLength(2))
-    await fireEvent.click(screen.getByRole('button', { name: 'Destination 2' }))
-    await waitFor(() => expect(vm.expandedBlocks[1]).toBe(true))
-    expect(nameInputs()).toHaveLength(2)
-  })
-
-  it('a lone blank Errand block collapsed before Add another destination reopens', async () => {
-    const vm = await mountNew('Errand: Shopping')
-    await fireEvent.click(screen.getByRole('button', { name: 'Destination' }))
-    await waitFor(() => expect(vm.expandedBlocks).toEqual([false]))
-
-    await fireEvent.click(addButton())
-    await waitFor(() => expect(vm.expandedBlocks).toEqual([true, true]))
-  })
-
   it('an Errand with a nameless extra block is blocked with its own message', async () => {
     const vm = await mountNew('Errand: Shopping')
     vm.form.destinations = [{ ...HOSPITAL }, { ...PHARMACY, destination: '   ' }]
     vm.expandedBlocks = [true, true]
-    await waitFor(() => expect(unref(vm.isFormValid)).toBe(false))
+    await waitFor(() => expect(unref(vm.isFormValid)).toBe(true))
 
     await vm.handleSubmit(false)
     expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
@@ -1574,8 +1605,10 @@ describe('several destinations on a request', () => {
   it('an Errand block with an address and no name is blocked', async () => {
     const vm = await mountNew('Errand: Shopping')
     vm.form.destinations[0].address = '100 Main St'
-    await waitFor(() => expect(unref(vm.isFormValid)).toBe(false))
     await vm.handleSubmit(false)
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Each destination needs a name'
+    }))
     await expectNotSaved()
   })
 

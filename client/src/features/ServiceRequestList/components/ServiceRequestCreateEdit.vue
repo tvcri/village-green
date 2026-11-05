@@ -751,31 +751,36 @@ const showLocationFields = computed(() => {
   return !noLocationServices.includes(form.value.serviceName)
 })
 
-// The destination rule, in one place so isFormValid and handleSubmit cannot
-// disagree: the index of the first block that fails it, or -1. A Ride needs a
-// name on the first block, and every block needs a name except a lone blank one,
-// which means "no destination". Trimmed, because destinationsForSave trims and
-// the API refuses a nameless destination. Hidden blocks can't be fixed and save
-// as [], so they never fail.
+// Trimmed, because destinationsForSave trims and the API refuses a nameless
+// destination.
+const hasDestinationName = (block) => !!block.destination?.trim()
+
+// The one destination rule that disables Save, as it always has.
+const rideLacksFirstDestination = computed(() =>
+  isRideService.value && !hasDestinationName(form.value.destinations[0]))
+
+// The full rule, checked by handleSubmit: the index of the first block that
+// fails it, or -1. Every block needs a name except a lone blank one, which means
+// "no destination". Hidden blocks can't be fixed and save as [], so they never
+// fail. Beyond the Ride rule above this stays out of isFormValid, so Save can be
+// clicked and explain itself (see the note above timesInOrder).
 const invalidDestinationIndex = computed(() => {
   if (!showLocationFields.value) return -1
+  if (rideLacksFirstDestination.value) return 0
   const blocks = form.value.destinations
-  const hasName = (block) => !!block.destination?.trim()
-  if (isRideService.value && !hasName(blocks[0])) return 0
   if (blocks.length === 1 && isBlankDestination(blocks[0])) return -1
-  return blocks.findIndex((block) => !hasName(block))
+  return blocks.findIndex((block) => !hasDestinationName(block))
 })
 
-// A failing block disables Save, and a disabled button can't be clicked to
-// explain itself (handleSubmit never runs; Enter doesn't submit this form
-// either). So a failing block may not stay collapsed, however it got there:
-// collapsed by hand, or a lone blank block that began failing when another was
-// added or the service became a Ride. Watching this true/false rather than the
-// index means collapsing an already failing block fires it too.
+// The Ride rule does disable Save, and a disabled button can't be clicked
+// (nor does Enter submit this form), so handleSubmit never gets to open the
+// block. Keep it open here instead, however it came to be collapsed: by hand, or
+// a collapsed blank block when the service became a Ride. Watching this
+// true/false means collapsing an already failing block fires it too.
 watch(
-  () => invalidDestinationIndex.value !== -1 && !expandedBlocks.value[invalidDestinationIndex.value],
-  (failingBlockIsHidden) => {
-    if (failingBlockIsHidden) expandedBlocks.value[invalidDestinationIndex.value] = true
+  () => rideLacksFirstDestination.value && !expandedBlocks.value[0],
+  (firstBlockIsHidden) => {
+    if (firstBlockIsHidden) expandedBlocks.value[0] = true
   }
 )
 
@@ -790,10 +795,9 @@ const isFormValid = computed(() => {
 
   if (!f.serviceName || !f.memberPersonId || !f.serviceDate) return false
 
-  if (invalidDestinationIndex.value !== -1) return false
-
   // Ride-specific requirements
   if (isRideService.value) {
+    if (rideLacksFirstDestination.value) return false
     if (!['Round Trip', 'One Way'].includes(f.transportationType)) return false
   }
 
@@ -908,7 +912,7 @@ const handleSubmit = async (notify = false) => {
       toast.add({
         severity: 'error',
         summary: 'Error',
-        detail: isRideService.value ? 'Destination is required for ride services' : 'Each destination needs a name',
+        detail: rideLacksFirstDestination.value ? 'Destination is required for ride services' : 'Each destination needs a name',
         life: 3000
       })
       return
