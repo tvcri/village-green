@@ -3,6 +3,8 @@
 
 const FIELDS = ['destination', 'address', 'city', 'state', 'zip', 'phone']
 
+export const stateOptions = ['RI', 'CT', 'MA']
+
 export function emptyDestination() {
   return { destination: '', address: '', city: '', state: '', zip: '', phone: '' }
 }

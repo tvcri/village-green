@@ -24,7 +24,9 @@ import { getPerson, geocodeTown } from '../../PersonList/api/personApi.js'
 import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
+import DestinationBlock from './DestinationBlock.vue'
 import DestinationLookupDialog from './DestinationLookupDialog.vue'
+import { destinationsForSave, emptyDestination, isBlankDestination, stateOptions } from '../lib/destinations.js'
 import {
   minutesToTimeString, timeStringToMinutes,
   dateToServiceDate, serviceDateToDate
@@ -83,11 +85,7 @@ const form = ref({
   finishTime: null,
   apptTime: null,
   returnTime: null,
-  state: '',
-  city: '',
-  zip: '',
-  address: '',
-  phone: '',
+  destinations: [emptyDestination()],
   start: '',
   startAddress: '',
   startCity: '',
@@ -95,9 +93,14 @@ const form = ref({
   startZip: '',
   startPhone: '',
   instructions: '',
-  description: '',
-  destination: ''
+  description: ''
 })
+
+// Which destination blocks are open, one boolean per entry in form.destinations
+// at the same index. Kept separate because it is screen state, not part of the
+// request, and it has to stay in step: anything that adds, removes or replaces
+// blocks must do the same here.
+const expandedBlocks = ref([true])
 
 const isSubmitting = ref(false)
 const isCancelling = ref(false)
@@ -107,6 +110,17 @@ const cancelPopover = ref(null)
 // isRideService watcher does not overwrite the API's transportationType.
 // Starts true in create mode (no load needed); starts false in edit mode.
 const formLoaded = ref(!isEdit.value)
+
+// Copies, with nulls turned to '' as the form's other fields are: the form edits
+// these objects, and existingRequest must keep what was actually loaded.
+function blocksFromRequest (destinations) {
+  if (!destinations?.length) return [emptyDestination()]
+  return destinations.map((d) => {
+    const block = emptyDestination()
+    for (const field of Object.keys(block)) block[field] = d[field] || ''
+    return block
+  })
+}
 
 watch(existingRequest, async (val) => {
   if (val && isEdit.value) {
@@ -133,11 +147,7 @@ watch(existingRequest, async (val) => {
       finishTime: timeStringToMinutes(val.finishTime),
       apptTime: timeStringToMinutes(val.apptTime),
       returnTime: timeStringToMinutes(val.returnTime),
-      state: val.state || '',
-      city: val.city || '',
-      zip: val.zip || '',
-      address: val.address || '',
-      phone: val.phone || '',
+      destinations: blocksFromRequest(val.destinations),
       start: val.start || '',
       startAddress: val.startAddress || '',
       startCity: val.startCity || '',
@@ -145,9 +155,9 @@ watch(existingRequest, async (val) => {
       startZip: val.startZip || '',
       startPhone: val.startPhone || '',
       instructions: val.instructions || '',
-      description: val.description || '',
-      destination: val.destination || ''
+      description: val.description || ''
     }
+    expandedBlocks.value = form.value.destinations.map(() => form.value.destinations.length < 2)
     await nextTick()
     formLoaded.value = true
   }
@@ -247,6 +257,9 @@ const selectedMemberCoords = ref(null)
 //               says why, rather than offering a choice it cannot honour.
 const memberCoordsStatus = ref('idle')
 const lookupVisible = ref(false)
+// Which destination block the lookup dialog fills. One dialog serves them all,
+// and it is modal, so this can't change while the dialog is open.
+const lookupIndex = ref(0)
 const startLookupVisible = ref(false)
 
 // The selected member's service coordinator notes, from the same fetch as the home
@@ -338,15 +351,17 @@ function applyMemberHomeToStart () {
   form.value.startPhone = h.phone
 }
 
-function applyMemberHomeToDestination () {
+function applyMemberHomeToDestination (i) {
   const h = selectedMemberHome.value
   if (!h) return
-  form.value.destination = MEMBER_HOME_LABEL
-  form.value.address = h.address
-  form.value.city = h.city
-  form.value.state = h.state
-  form.value.zip = h.zip
-  form.value.phone = h.phone
+  form.value.destinations[i] = {
+    destination: MEMBER_HOME_LABEL,
+    address: h.address,
+    city: h.city,
+    state: h.state,
+    zip: h.zip,
+    phone: h.phone
+  }
 }
 
 // Fill the start leg from a place chosen in the lookup dialog. A ride does not
@@ -367,16 +382,23 @@ function applyPlaceToStart (place) {
   form.value.startPhone = ''
 }
 
-// Fill the destination leg from a place chosen in the lookup dialog. Phone is
-// cleared rather than populated — see applyPlaceToStart.
+function openDestinationLookup (i) {
+  lookupIndex.value = i
+  lookupVisible.value = true
+}
+
+// Fill the block that opened the lookup dialog from the place chosen there.
+// Phone is cleared rather than populated — see applyPlaceToStart.
 function applyPlaceToDestination (place) {
   if (!place) return
-  form.value.destination = place.name
-  form.value.address = place.address
-  form.value.city = place.city
-  form.value.state = place.state
-  form.value.zip = place.zip
-  form.value.phone = ''
+  form.value.destinations[lookupIndex.value] = {
+    destination: place.name,
+    address: place.address,
+    city: place.city,
+    state: place.state,
+    zip: place.zip,
+    phone: ''
+  }
 }
 
 // Whether a leg currently holds the given member's home, rather than a real
@@ -406,13 +428,18 @@ function clearStart () {
   form.value.startPhone = ''
 }
 
-function clearDestination () {
-  form.value.destination = ''
-  form.value.address = ''
-  form.value.city = ''
-  form.value.state = ''
-  form.value.zip = ''
-  form.value.phone = ''
+function clearDestination (i) {
+  form.value.destinations[i] = emptyDestination()
+}
+
+function addDestination () {
+  form.value.destinations.push(emptyDestination())
+  expandedBlocks.value.push(true)
+}
+
+function removeDestination (i) {
+  form.value.destinations.splice(i, 1)
+  expandedBlocks.value.splice(i, 1)
 }
 
 const startIsEmpty = computed(() =>
@@ -439,10 +466,11 @@ const filterVolunteers = (event) => {
 // survive a member change and be submitted against the new member.
 //
 // The Start leg is member-derived by construction (it auto-fills with the
-// member's home), so it always clears. The Destination usually is not — it is
-// the doctor's office the coordinator typed or looked up — so it clears only
-// when it actually holds the outgoing member's home, the "Use member's home"
-// case for a return trip.
+// member's home), so it always clears. A destination usually is not — it is
+// the doctor's office the coordinator typed or looked up — so a block clears
+// only when it actually holds the outgoing member's home, the "Use member's
+// home" case for a return trip. A cleared block stays on the form, opened so
+// the coordinator sees what went.
 //
 // Must run BEFORE selectedMemberHome is replaced: it needs the outgoing home
 // to recognise it.
@@ -453,10 +481,12 @@ function clearOutgoingMemberLocations () {
     { address: form.value.startAddress, city: form.value.startCity, zip: form.value.startZip },
     outgoing
   )) clearStart()
-  if (legHoldsHome(
-    { address: form.value.address, city: form.value.city, zip: form.value.zip },
-    outgoing
-  )) clearDestination()
+  form.value.destinations.forEach((block, i) => {
+    if (legHoldsHome(block, outgoing)) {
+      clearDestination(i)
+      expandedBlocks.value[i] = true
+    }
+  })
 }
 
 watch(selectedMember, (val) => {
@@ -609,12 +639,6 @@ const serviceNameOptions = [
   'Errand: Other'
 ]
 
-const stateOptions = [
-  'RI',
-  'CT',
-  'MA'
-]
-
 // Times are stored as minutes-since-midnight (0..1425) so the Select value
 // always reflects the chosen slot and is trivial to seed/convert.
 const minutesToLabel = (mins) => {
@@ -727,6 +751,34 @@ const showLocationFields = computed(() => {
   return !noLocationServices.includes(form.value.serviceName)
 })
 
+// The destination rule, in one place so isFormValid and handleSubmit cannot
+// disagree: the index of the first block that fails it, or -1. A Ride needs a
+// name on the first block, and every block needs a name except a lone blank one,
+// which means "no destination". Trimmed, because destinationsForSave trims and
+// the API refuses a nameless destination. Hidden blocks can't be fixed and save
+// as [], so they never fail.
+const invalidDestinationIndex = computed(() => {
+  if (!showLocationFields.value) return -1
+  const blocks = form.value.destinations
+  const hasName = (block) => !!block.destination?.trim()
+  if (isRideService.value && !hasName(blocks[0])) return 0
+  if (blocks.length === 1 && isBlankDestination(blocks[0])) return -1
+  return blocks.findIndex((block) => !hasName(block))
+})
+
+// A failing block disables Save, and a disabled button can't be clicked to
+// explain itself (handleSubmit never runs; Enter doesn't submit this form
+// either). So a failing block may not stay collapsed, however it got there:
+// collapsed by hand, or a lone blank block that began failing when another was
+// added or the service became a Ride. Watching this true/false rather than the
+// index means collapsing an already failing block fires it too.
+watch(
+  () => invalidDestinationIndex.value !== -1 && !expandedBlocks.value[invalidDestinationIndex.value],
+  (failingBlockIsHidden) => {
+    if (failingBlockIsHidden) expandedBlocks.value[invalidDestinationIndex.value] = true
+  }
+)
+
 const availableTransportationTypes = computed(() => {
   return isRideService.value ? ['Round Trip', 'One Way'] : ['None']
 })
@@ -738,9 +790,10 @@ const isFormValid = computed(() => {
 
   if (!f.serviceName || !f.memberPersonId || !f.serviceDate) return false
 
+  if (invalidDestinationIndex.value !== -1) return false
+
   // Ride-specific requirements
   if (isRideService.value) {
-    if (!f.destination) return false
     if (!['Round Trip', 'One Way'].includes(f.transportationType)) return false
   }
 
@@ -788,11 +841,7 @@ const resetForNewRequest = () => {
     finishTime: null,
     apptTime: null,
     returnTime: null,
-    state: '',
-    city: '',
-    zip: '',
-    address: '',
-    phone: '',
+    destinations: [emptyDestination()],
     start: '',
     startAddress: '',
     startCity: '',
@@ -800,9 +849,9 @@ const resetForNewRequest = () => {
     startZip: '',
     startPhone: '',
     instructions: '',
-    description: '',
-    destination: ''
+    description: ''
   }
+  expandedBlocks.value = [true]
 }
 
 // Starting Location is a Rides-only concept. Prefill it from the member's home
@@ -854,11 +903,18 @@ const handleSubmit = async (notify = false) => {
       return
     }
 
+    if (invalidDestinationIndex.value !== -1) {
+      expandedBlocks.value[invalidDestinationIndex.value] = true
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: isRideService.value ? 'Destination is required for ride services' : 'Each destination needs a name',
+        life: 3000
+      })
+      return
+    }
+
     if (isRideService.value) {
-      if (!form.value.destination) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Destination is required for ride services', life: 3000 })
-        return
-      }
       if (!form.value.transportationType || !['Round Trip', 'One Way'].includes(form.value.transportationType)) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
         return
@@ -933,11 +989,7 @@ const handleSubmit = async (notify = false) => {
         ? minutesToTimeString(form.value.apptTime) : null,
       returnTime: (!form.value.timesFlexible && isRideService.value && form.value.transportationType === 'Round Trip')
         ? minutesToTimeString(form.value.returnTime) : null,
-      state: form.value.state || null,
-      city: form.value.city || null,
-      zip: form.value.zip || null,
-      address: form.value.address || null,
-      phone: form.value.phone || null,
+      destinations: showLocationFields.value ? destinationsForSave(form.value.destinations) : [],
       start: form.value.start || null,
       startAddress: form.value.startAddress || null,
       startCity: form.value.startCity || null,
@@ -945,8 +997,7 @@ const handleSubmit = async (notify = false) => {
       startZip: form.value.startZip || null,
       startPhone: form.value.startPhone || null,
       instructions: form.value.instructions || null,
-      description: form.value.description || null,
-      destination: form.value.destination || null
+      description: form.value.description || null
     }
 
     if (isEdit.value) {
@@ -1506,82 +1557,29 @@ const openPersonDialog = (personId) => {
 
             </template>
 
-            <!-- Destination Section -->
-            <div style="display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
-              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
-              <!-- The lookup is about the destination, not the ride: every
-                   service with a destination gets it, and so does Clear
-                   fields — a lookup that can fill has to be undoable.
-                   "Use member's home" stays Rides-only: an Errand's
-                   destination is a shop, not the member's house. -->
-              <div style="display: flex; gap: 0.5rem;">
-                <Button v-if="isRideService" type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
-                <Button type="button" size="small" outlined icon="pi pi-search" label="Look up…" aria-label="Look up destination" @click="lookupVisible = true" />
-                <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear destination" @click="clearDestination" />
-              </div>
-            </div>
-
-            <!-- Destination / Address Row -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Destination<span v-if="isRideService" class="req">*</span></label>
-                <InputText
-                  v-model="form.destination"
-                  placeholder="Enter destination"
-                  style="width: 100%;"
-                />
-              </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Address</label>
-                <InputText
-                  v-model="form.address"
-                  placeholder="Enter address"
-                  style="width: 100%;"
-                />
-              </div>
-            </div>
-
-            <!-- City / State / Zip / Phone Row -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr; gap: 1rem;">
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">City</label>
-                <InputText
-                  v-model="form.city"
-                  placeholder="City"
-                  style="width: 100%;"
-                />
-              </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">State</label>
-                <Select
-                  v-model="form.state"
-                  :options="stateOptions.map(s => ({ label: s, value: s }))"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="State"
-                  style="width: 100%;"
-                />
-              </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Zip</label>
-                <InputText
-                  v-model="form.zip"
-                  placeholder="Zip"
-                  style="width: 100%;"
-                />
-              </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Phone</label>
-                <InputText
-                  v-model="form.phone"
-                  placeholder="Phone"
-                  style="width: 100%;"
-                />
-              </div>
+            <!-- Destinations. Keyed by position: a block holds no state of its
+                 own, so after a removal each one simply redraws from the list.
+                 The write goes back through form.destinations[i] because a
+                 v-for variable can't be assigned to: replacing `block` would
+                 only change the local name, not the list. -->
+            <DestinationBlock
+              v-for="(block, i) in form.destinations"
+              :key="i"
+              :model-value="block"
+              :expanded="expandedBlocks[i]"
+              :index="i"
+              :total="form.destinations.length"
+              :is-ride="isRideService"
+              :home-disabled="!selectedMemberHome"
+              @update:model-value="form.destinations[i] = $event"
+              @update:expanded="expandedBlocks[i] = $event"
+              @remove="removeDestination(i)"
+              @lookup="openDestinationLookup(i)"
+              @use-home="applyMemberHomeToDestination(i)"
+              @clear="clearDestination(i)"
+            />
+            <div>
+              <Button type="button" icon="pi pi-plus" outlined size="small" label="Add another destination" @click="addDestination" />
             </div>
           </template>
 
