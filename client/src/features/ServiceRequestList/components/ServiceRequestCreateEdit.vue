@@ -96,12 +96,6 @@ const form = ref({
   description: ''
 })
 
-// Which destination blocks are open, one boolean per entry in form.destinations
-// at the same index. Kept separate because it is screen state, not part of the
-// request, and it has to stay in step: anything that adds, removes or replaces
-// blocks must do the same here.
-const expandedBlocks = ref([true])
-
 const isSubmitting = ref(false)
 const isCancelling = ref(false)
 const cancelPopover = ref(null)
@@ -157,7 +151,6 @@ watch(existingRequest, async (val) => {
       instructions: val.instructions || '',
       description: val.description || ''
     }
-    expandedBlocks.value = form.value.destinations.map(() => form.value.destinations.length < 2)
     await nextTick()
     formLoaded.value = true
   }
@@ -434,12 +427,10 @@ function clearDestination (i) {
 
 function addDestination () {
   form.value.destinations.push(emptyDestination())
-  expandedBlocks.value.push(true)
 }
 
 function removeDestination (i) {
   form.value.destinations.splice(i, 1)
-  expandedBlocks.value.splice(i, 1)
 }
 
 const startIsEmpty = computed(() =>
@@ -482,10 +473,7 @@ function clearOutgoingMemberLocations () {
     outgoing
   )) clearStart()
   form.value.destinations.forEach((block, i) => {
-    if (legHoldsHome(block, outgoing)) {
-      clearDestination(i)
-      expandedBlocks.value[i] = true
-    }
+    if (legHoldsHome(block, outgoing)) clearDestination(i)
   })
 }
 
@@ -759,31 +747,17 @@ const hasDestinationName = (block) => !!block.destination?.trim()
 const rideLacksFirstDestination = computed(() =>
   isRideService.value && !hasDestinationName(form.value.destinations[0]))
 
-// The full rule, checked by handleSubmit: the indexes of the blocks that
-// fail it, empty when none do. Every block needs a name except a lone blank one, which means
-// "no destination". Hidden blocks can't be fixed and save as [], so they never
-// fail. Beyond the Ride rule above this stays out of isFormValid, so Save can be
-// clicked and explain itself (see the note above timesInOrder).
-const invalidDestinationIndexes = computed(() => {
-  if (!showLocationFields.value) return []
+// The full rule, checked by handleSubmit. Every block needs a name except a lone
+// blank one, which means "no destination". Hidden blocks can't be fixed and save
+// as [], so they never fail. Beyond the Ride rule above this stays out of
+// isFormValid, so Save can be clicked and explain itself (see the note above
+// timesInOrder).
+const hasInvalidDestination = computed(() => {
+  if (!showLocationFields.value) return false
   const blocks = form.value.destinations
-  if (blocks.length === 1 && isBlankDestination(blocks[0]) && !rideLacksFirstDestination.value) return []
-  const bad = []
-  blocks.forEach((block, i) => { if (!hasDestinationName(block)) bad.push(i) })
-  return bad
+  if (blocks.length === 1 && isBlankDestination(blocks[0]) && !rideLacksFirstDestination.value) return false
+  return !blocks.every(hasDestinationName)
 })
-
-// The Ride rule does disable Save, and a disabled button can't be clicked
-// (nor does Enter submit this form), so handleSubmit never gets to open the
-// block. Keep it open here instead, however it came to be collapsed: by hand, or
-// a collapsed blank block when the service became a Ride. Watching this
-// true/false means collapsing an already failing block fires it too.
-watch(
-  () => rideLacksFirstDestination.value && !expandedBlocks.value[0],
-  (firstBlockIsHidden) => {
-    if (firstBlockIsHidden) expandedBlocks.value[0] = true
-  }
-)
 
 const availableTransportationTypes = computed(() => {
   return isRideService.value ? ['Round Trip', 'One Way'] : ['None']
@@ -856,7 +830,6 @@ const resetForNewRequest = () => {
     instructions: '',
     description: ''
   }
-  expandedBlocks.value = [true]
 }
 
 // Starting Location is a Rides-only concept. Prefill it from the member's home
@@ -908,8 +881,7 @@ const handleSubmit = async (notify = false) => {
       return
     }
 
-    if (invalidDestinationIndexes.value.length) {
-      for (const i of invalidDestinationIndexes.value) expandedBlocks.value[i] = true
+    if (hasInvalidDestination.value) {
       toast.add({
         severity: 'error',
         summary: 'Error',
@@ -1571,13 +1543,11 @@ const openPersonDialog = (personId) => {
               v-for="(block, i) in form.destinations"
               :key="i"
               :model-value="block"
-              :expanded="expandedBlocks[i]"
               :index="i"
               :total="form.destinations.length"
               :is-ride="isRideService"
               :home-disabled="!selectedMemberHome"
               @update:model-value="form.destinations[i] = $event"
-              @update:expanded="expandedBlocks[i] = $event"
               @remove="removeDestination(i)"
               @lookup="openDestinationLookup(i)"
               @use-home="applyMemberHomeToDestination(i)"

@@ -1350,7 +1350,7 @@ describe('several destinations on a request', () => {
   it('new request shows one open block, no cross', async () => {
     await mountNew('Ride: Medical Appnt')
     expect(nameInputs()).toHaveLength(1)
-    expect(screen.getByRole('button', { name: 'Destination' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('heading', { name: 'Destination' })).toBeTruthy()
     expect(removeButtons()).toHaveLength(0)
   })
 
@@ -1360,8 +1360,8 @@ describe('several destinations on a request', () => {
     await waitFor(() => expect(nameInputs()).toHaveLength(2))
     expect(removeButtons()).toHaveLength(2)
     // The lone block's plain heading becomes numbered once there is a second.
-    expect(screen.getByRole('button', { name: 'Destination 1' }).getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Destination 2' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('heading', { name: 'Destination 1' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Destination 2' })).toBeTruthy()
   })
 
   it('the cross removes that block; with one left the cross is gone', async () => {
@@ -1370,44 +1370,23 @@ describe('several destinations on a request', () => {
       destinations: [HOSPITAL, PHARMACY, { ...HOSPITAL, destination: 'Third Stop' }]
     })
     await waitFor(() => expect(removeButtons()).toHaveLength(3))
-    // Open only the third, so the check below proves expandedBlocks shifts with
-    // the list: left alone, the removal would hand block 3's "open" to nobody
-    // and block 2 would stay closed.
-    vm.expandedBlocks[2] = true
 
     await fireEvent.click(removeButtons()[0])
     await waitFor(() => expect(removeButtons()).toHaveLength(2))
     expect(vm.form.destinations.map(d => d.destination)).toEqual(['Corner Pharmacy', 'Third Stop'])
-    expect(vm.expandedBlocks).toEqual([false, true])
-    expect(nameInputs()[0].value).toBe('Third Stop')
+    expect(nameInputs().map(input => input.value)).toEqual(['Corner Pharmacy', 'Third Stop'])
 
     await fireEvent.click(removeButtons()[0])
     await waitFor(() => expect(removeButtons()).toHaveLength(0))
     expect(vm.form.destinations.map(d => d.destination)).toEqual(['Third Stop'])
-    expect(vm.expandedBlocks).toEqual([true])
   })
 
-  it('editing a request with two destinations starts both collapsed, each showing name and address', async () => {
+  it('editing a request with two destinations shows every block open', async () => {
     await mountEditAndExpose(stored)
-    await waitFor(() => expect(screen.getByText('Newport Hospital')).toBeTruthy())
-    expect(screen.getByText('Corner Pharmacy')).toBeTruthy()
-    expect(screen.getByText(/11 Friendship St, Newport, RI 02840/)).toBeTruthy()
-    expect(screen.getByText(/100 Main St, Wakefield, RI 02879/)).toBeTruthy()
-    expect(screen.queryAllByPlaceholderText('Enter destination')).toHaveLength(0)
-    expect(screen.getByRole('button', { name: 'Destination 1' }).getAttribute('aria-expanded')).toBe('false')
-    // The cross stays reachable on a collapsed block; the fill actions do not.
+    await waitFor(() => expect(nameInputs()).toHaveLength(2))
+    expect(nameInputs().map(input => input.value)).toEqual(['Newport Hospital', 'Corner Pharmacy'])
     expect(removeButtons()).toHaveLength(2)
-    expect(screen.queryAllByRole('button', { name: /^Look up destination/ })).toHaveLength(0)
-  })
-
-  it('the arrow opens a collapsed block and closes it again', async () => {
-    await mountEditAndExpose(stored)
-    const arrow = await screen.findByRole('button', { name: 'Destination 2' })
-    await fireEvent.click(arrow)
-    await waitFor(() => expect(nameInputs()).toHaveLength(1))
-    expect(nameInputs()[0].value).toBe('Corner Pharmacy')
-    await fireEvent.click(arrow)
-    await waitFor(() => expect(screen.queryAllByPlaceholderText('Enter destination')).toHaveLength(0))
+    expect(screen.getAllByRole('button', { name: /^Look up destination/ })).toHaveLength(2)
   })
 
   it('editing a request with one destination starts open', async () => {
@@ -1421,7 +1400,6 @@ describe('several destinations on a request', () => {
     const vm = await mountEditAndExpose({ ...stored, serviceName: 'Errand: Shopping', destinations: [] })
     await waitFor(() => expect(nameInputs()).toHaveLength(1))
     expect(vm.form.destinations).toHaveLength(1)
-    expect(vm.expandedBlocks).toEqual([true])
   })
 
   it('editing a block leaves the loaded request untouched', async () => {
@@ -1457,7 +1435,6 @@ describe('several destinations on a request', () => {
   it('the lookup fills only the block that opened it', async () => {
     const vm = await mountNew('Errand: Shopping')
     vm.form.destinations = [{ ...HOSPITAL }, { ...PHARMACY }]
-    vm.expandedBlocks = [true, true]
 
     await waitFor(() => expect(nameInputs()).toHaveLength(2))
     await fireEvent.click(screen.getByRole('button', { name: 'Look up destination 2' }))
@@ -1491,24 +1468,21 @@ describe('several destinations on a request', () => {
   it('Clear fields empties only its block', async () => {
     const vm = await mountNew('Errand: Shopping')
     vm.form.destinations = [{ ...HOSPITAL }, { ...PHARMACY }]
-    vm.expandedBlocks = [true, true]
     await waitFor(() => expect(nameInputs()).toHaveLength(2))
     await fireEvent.click(screen.getByRole('button', { name: 'Clear destination 1' }))
     await waitFor(() => expect(vm.form.destinations[0].destination).toBe(''))
     expect(vm.form.destinations[1]).toEqual(PHARMACY)
   })
 
-  it('changing member clears a block holding the outgoing home and opens it; other blocks are untouched', async () => {
+  it('changing member clears a block holding the outgoing home; other blocks are untouched', async () => {
     const vm = await mountNew('Ride: Medical Appnt')
     vm.form.destinations = [{ ...HOSPITAL }, { ...PHARMACY }]
     vm.applyMemberHomeToDestination(1)
-    vm.expandedBlocks = [false, false]
 
     vm.selectedMember = { label: 'Other Member', value: '8' }
     await waitFor(() => expect(vm.form.destinations[1].address).toBe(''))
     expect(vm.form.destinations[1].destination).toBe('')
     expect(vm.form.destinations[0]).toEqual(HOSPITAL)
-    expect(vm.expandedBlocks).toEqual([false, true])
   })
 
   it('a lone block holding the outgoing home stays, empty', async () => {
@@ -1518,70 +1492,30 @@ describe('several destinations on a request', () => {
     vm.selectedMember = { label: 'Other Member', value: '8' }
     await waitFor(() => expect(vm.form.destinations[0].address).toBe(''))
     expect(vm.form.destinations).toHaveLength(1)
-    expect(vm.expandedBlocks).toEqual([true])
-  })
-
-  it('saving with a collapsed block missing a name opens it and does not submit', async () => {
-    const vm = await mountEditAndExpose(stored)
-    await waitFor(() => expect(vm.form.destinations).toHaveLength(2))
-    vm.form.destinations[1].destination = ''
-    await waitFor(() => expect(unref(vm.isFormValid)).toBe(true))
-    expect(vm.expandedBlocks).toEqual([false, false])
-
-    await vm.handleSubmit(false)
-    expect(vm.expandedBlocks).toEqual([false, true])
-    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
-      detail: 'Each destination needs a name'
-    }))
-    await expectNotSaved()
   })
 
   // The real path, through the button: Save has to stay clickable or none of
   // this reaches the coordinator.
-  it('clicking Save on an Errand with a collapsed blank extra block explains itself', async () => {
+  it('clicking Save on an Errand with a blank extra block explains itself', async () => {
     const vm = await mountNew('Errand: Shopping')
     vm.form.destinations[0].destination = 'Corner Pharmacy'
     await fireEvent.click(addButton())
     await waitFor(() => expect(nameInputs()).toHaveLength(2))
-    await fireEvent.click(screen.getByRole('button', { name: 'Destination 2' }))
-    await waitFor(() => expect(nameInputs()).toHaveLength(1))
 
     const save = screen.getByText('Save and Notify').closest('button')
     expect(save.disabled).toBe(false)
     await fireEvent.click(save)
 
-    await waitFor(() => expect(nameInputs()).toHaveLength(2))
-    expect(vm.expandedBlocks).toEqual([true, true])
-    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+    await waitFor(() => expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
       detail: 'Each destination needs a name'
-    }))
+    })))
     await expectNotSaved()
-  })
-
-  // Only the Ride rule disables Save, so this is the one failing block that a
-  // save attempt can't open: a disabled button can't be clicked.
-  it("a Ride's nameless first block cannot stay collapsed", async () => {
-    const vm = await mountNew('Ride: Medical Appnt')
-    await fireEvent.click(screen.getByRole('button', { name: 'Destination' }))
-    await waitFor(() => expect(vm.expandedBlocks).toEqual([true]))
-    expect(nameInputs()).toHaveLength(1)
-    expect(unref(vm.isFormValid)).toBe(false)
-  })
-
-  it('a collapsed blank block reopens when the service becomes a Ride', async () => {
-    const vm = await mountNew('Errand: Shopping')
-    await fireEvent.click(screen.getByRole('button', { name: 'Destination' }))
-    await waitFor(() => expect(vm.expandedBlocks).toEqual([false]))
-
-    vm.form.serviceName = 'Ride: Medical Appnt'
-    await waitFor(() => expect(vm.expandedBlocks).toEqual([true]))
   })
 
   it('a Ride names its first block with the Ride message, even with a blank extra', async () => {
     const vm = await mountNew('Ride: Medical Appnt')
     vm.form.timesFlexible = true
     vm.form.destinations = [{ ...HOSPITAL, destination: '' }, { ...PHARMACY }]
-    vm.expandedBlocks = [true, true]
     await vm.handleSubmit(false)
     expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
       detail: 'Destination is required for ride services'
@@ -1589,26 +1523,9 @@ describe('several destinations on a request', () => {
     await expectNotSaved()
   })
 
-  it('a failed save opens every nameless collapsed block, not just the first', async () => {
-    const vm = await mountEditAndExpose({ ...stored, serviceName: 'Errand: Shopping', transportationType: 'None' })
-    await waitFor(() => expect(vm.form.destinations).toHaveLength(2))
-    vm.form.destinations[0].destination = ''
-    vm.form.destinations[1].destination = ''
-    await waitFor(() => expect(unref(vm.isFormValid)).toBe(true))
-    expect(vm.expandedBlocks).toEqual([false, false])
-
-    await vm.handleSubmit(false)
-    expect(vm.expandedBlocks).toEqual([true, true])
-    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
-      detail: 'Each destination needs a name'
-    }))
-    await expectNotSaved()
-  })
-
   it('an Errand with a nameless extra block is blocked with its own message', async () => {
     const vm = await mountNew('Errand: Shopping')
     vm.form.destinations = [{ ...HOSPITAL }, { ...PHARMACY, destination: '   ' }]
-    vm.expandedBlocks = [true, true]
     await waitFor(() => expect(unref(vm.isFormValid)).toBe(true))
 
     await vm.handleSubmit(false)
@@ -1707,11 +1624,9 @@ describe('several destinations on a request', () => {
   it('after a create the form is back to one open blank block', async () => {
     const vm = await mountNew('Errand: Shopping')
     vm.form.destinations = [{ ...HOSPITAL }, { ...PHARMACY }]
-    vm.expandedBlocks = [false, false]
     await savedPayload(vm)
     await waitFor(() => expect(vm.form.destinations).toHaveLength(1))
     expect(vm.form.destinations[0].destination).toBe('')
-    expect(vm.expandedBlocks).toEqual([true])
   })
 })
 
