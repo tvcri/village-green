@@ -55,7 +55,7 @@ function setField (field, value) {
         size="small"
         text
         severity="secondary"
-        aria-label="Remove destination"
+        :aria-label="`Remove ${titleInSentence}`"
         @click="emit('remove')"
       />
     </div>

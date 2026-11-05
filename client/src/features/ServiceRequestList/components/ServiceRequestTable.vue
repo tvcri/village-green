@@ -74,9 +74,7 @@ const compareDateTime = (a, b) =>
 // DataTable: PrimeVue's sort() substitutes nullSortOrder whenever either side
 // is empty, so the table relocates empty values on its own. Without this guard
 // the cards keep them mid-list and the two views disagree.
-const compareField = (field, dir) => (a, b) => {
-  const av = a?.[field]
-  const bv = b?.[field]
+const compareValues = (av, bv, dir) => {
   if (av == null && bv == null) return 0
   if (av == null) return 1
   if (bv == null) return -1
@@ -87,11 +85,14 @@ const compareField = (field, dir) => (a, b) => {
 }
 
 // The Destination column sorts on the first destination's city, which the API
-// no longer sends as a flat field. Add it here so compareField can read it.
-const rowsWithSortKeys = computed(() => props.rows.map((row) => ({
-  ...row,
-  firstCity: row.destinations?.[0]?.city ?? null
-})))
+// no longer sends as a flat field; read it through an accessor.
+const sortAccessors = {
+  firstCity: (row) => row.destinations?.[0]?.city
+}
+const compareField = (field, dir) => {
+  const read = sortAccessors[field] ?? ((row) => row?.[field])
+  return (a, b) => compareValues(read(a), read(b), dir)
+}
 
 const sortedRows = computed(() => {
   const field = sortField.value
@@ -100,7 +101,7 @@ const sortedRows = computed(() => {
   // Sorting by date means date+time IS the primary key; there is no separate
   // tiebreak to append.
   if (field === DATE_SORT_FIELD) {
-    return [...rowsWithSortKeys.value].sort((a, b) => dir * compareDateTime(a, b))
+    return [...props.rows].sort((a, b) => dir * compareDateTime(a, b))
   }
 
   // Otherwise: date+time pass first, then a stable sort by the chosen column.
@@ -108,7 +109,7 @@ const sortedRows = computed(() => {
   // the chosen column keep the date order established by the first pass. The
   // appended key stays ascending even when the primary is descending -- within
   // one member or village, dates should still read earliest-first.
-  return [...rowsWithSortKeys.value]
+  return [...props.rows]
     .sort(compareDateTime)
     .sort(compareField(field, dir))
 })

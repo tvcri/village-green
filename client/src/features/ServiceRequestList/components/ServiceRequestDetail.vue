@@ -8,7 +8,8 @@ import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
 import DestinationDetails from '../../../components/DestinationDetails.vue'
-import { placeQuery } from '../lib/destinations.js'
+import { useRequestDestinations } from '../composables/useRequestDestinations.js'
+import DestinationMaps from '../../../components/DestinationMaps.vue'
 import NotificationHistoryList from './NotificationHistoryList.vue'
 import { formatServiceDate, timeStringToLabel } from '../lib/timeFields.js'
 
@@ -53,18 +54,7 @@ const mapOrigin = computed(() => {
   return startAddress.value
 })
 
-const destinations = computed(() => request.value?.destinations ?? [])
-const isMulti = computed(() => destinations.value.length > 1)
-// One place map per destination that has an address or city.
-const mappedPlaces = computed(() =>
-  destinations.value
-    .map((d, i) => ({ name: d.destination || `Destination ${i + 1}`, query: placeQuery(d) }))
-    .filter(p => p.query)
-)
-const mapDestination = computed(() => placeQuery(destinations.value[0]))
-const showMapSection = computed(() =>
-  isMulti.value ? mappedPlaces.value.length > 0 : !!(mapOrigin.value && mapDestination.value)
-)
+const { destinations, isMulti, mappedPlaces, mapDestination, showMapSection } = useRequestDestinations(request, mapOrigin)
 
 const mapWaypoint = computed(() => {
   // Pickup = the start leg, meaningful as a waypoint only when a volunteer
@@ -278,10 +268,7 @@ const timeDisplay = computed(() => {
           </button>
           <template v-if="showMap">
             <template v-if="isMulti">
-              <template v-for="(p, i) in mappedPlaces" :key="i">
-                <p class="map-route-label">{{ p.name }}</p>
-                <ServiceRequestMap :place="p.query" class="place-map" />
-              </template>
+              <DestinationMaps :places="mappedPlaces" />
             </template>
             <template v-else>
               <p class="map-route-label">
@@ -520,10 +507,6 @@ const timeDisplay = computed(() => {
   vertical-align: middle;
   position: relative;
   top: -1px;
-}
-
-.place-map {
-  margin-bottom: 1.5rem;
 }
 
 .map-toggle {

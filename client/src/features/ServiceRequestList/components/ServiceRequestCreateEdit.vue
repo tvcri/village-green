@@ -460,7 +460,7 @@ const filterVolunteers = (event) => {
 // member's home), so it always clears. A destination usually is not — it is
 // the doctor's office the coordinator typed or looked up — so a block clears
 // only when it actually holds the outgoing member's home, the "Use member's
-// home" case for a return trip. A cleared block stays on the form, opened so
+// home" case for a return trip. A cleared block stays on the form, so
 // the coordinator sees what went.
 //
 // Must run BEFORE selectedMemberHome is replaced: it needs the outgoing home

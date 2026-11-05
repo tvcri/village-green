@@ -455,6 +455,12 @@ module.exports.SERVICE_CATEGORIES = [
   { category: 'Tech Support', capability: 'Tech Support', match: { exact: 'Tech Support' } },
 ]
 
+// True when serviceName is in the Rides category (the `Ride:` prefix vocabulary).
+module.exports.isRide = function (serviceName) {
+  const { prefix } = module.exports.SERVICE_CATEGORIES.find(c => c.category === 'Rides').match
+  return typeof serviceName === 'string' && serviceName.startsWith(prefix)
+}
+
 // serviceName -> category as a SQL CASE over `colExpr`. Vocabulary values are
 // developer-controlled literals (closed set), not user input — safe to inline.
 module.exports.buildServiceNameCategoryCase = function (colExpr) {

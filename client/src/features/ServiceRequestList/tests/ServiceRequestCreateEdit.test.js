@@ -1317,7 +1317,7 @@ describe('several destinations on a request', () => {
     serviceDate: '2026-08-01', status: 'Open', volunteerPersonId: null,
     timesFlexible: true, destinations: [HOSPITAL, PHARMACY]
   }
-  const removeButtons = () => screen.queryAllByRole('button', { name: 'Remove destination' })
+  const removeButtons = () => screen.queryAllByRole('button', { name: /^Remove destination/ })
   const addButton = () => screen.getByRole('button', { name: 'Add another destination' })
   const nameInputs = () => screen.getAllByPlaceholderText('Enter destination')
 
@@ -1359,6 +1359,7 @@ describe('several destinations on a request', () => {
     await fireEvent.click(addButton())
     await waitFor(() => expect(nameInputs()).toHaveLength(2))
     expect(removeButtons()).toHaveLength(2)
+    expect(removeButtons().map(b => b.getAttribute('aria-label'))).toEqual(['Remove destination 1', 'Remove destination 2'])
     // The lone block's plain heading becomes numbered once there is a second.
     expect(screen.getByRole('heading', { name: 'Destination 1' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Destination 2' })).toBeTruthy()

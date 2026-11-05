@@ -151,6 +151,14 @@ test('a destination with an empty name returns 400', async () => {
   assert.equal((await patch(json.serviceRequestId, { destinations: [{ destination: '' }] })).status, 400)
 })
 
+test('a whitespace-only destination name returns 400; surrounding spaces are accepted', async () => {
+  assert.equal((await create({ destinations: [{ destination: '   ' }] })).status, 400)
+  const { json } = await create({})
+  assert.equal((await patch(json.serviceRequestId, { destinations: [{ destination: '   ' }] })).status, 400)
+  const ok = await create({ destinations: [{ destination: ' Clinic ' }] })
+  assert.equal(ok.status, 201)
+})
+
 test('the flat destination field is rejected on POST and PATCH', async () => {
   assert.equal((await create({ destination: 'Clinic' })).status, 400)
   const { json } = await create({})
@@ -181,7 +189,7 @@ test('audit: changing destinations records a before/after difference', async () 
   const rows = await auditRows('serviceRequest', id)
   const last = rows[rows.length - 1]
   assert.equal(last.action, 'update')
-  assert.deepEqual(last.changes.diff.destinations, { added: ['Pharmacy'] })
+  assert.deepEqual(last.changes.diff.destinations, { added: ['2. Pharmacy'] })
 })
 
 test('PATCH that sends the same list unchanged records no destinations difference in the audit', async () => {
@@ -191,6 +199,24 @@ test('PATCH that sends the same list unchanged records no destinations differenc
   const rows = await auditRows('serviceRequest', id)
   const last = rows[rows.length - 1]
   assert.deepEqual(Object.keys(last.changes.diff), ['description'])
+})
+
+test('audit: reordering destinations is recorded', async () => {
+  const { json } = await create({ destinations: [clinic, pharmacy] })
+  const id = json.serviceRequestId
+  assert.equal((await patch(id, { destinations: [pharmacy, clinic] })).status, 200)
+  const rows = await auditRows('serviceRequest', id)
+  const last = rows[rows.length - 1]
+  assert.ok(last.changes.diff.destinations, 'reorder produces a destinations diff')
+})
+
+test('audit: removing the second of two identical destinations is recorded', async () => {
+  const { json } = await create({ destinations: [clinic, clinic] })
+  const id = json.serviceRequestId
+  assert.equal((await patch(id, { destinations: [clinic] })).status, 200)
+  const rows = await auditRows('serviceRequest', id)
+  const last = rows[rows.length - 1]
+  assert.ok(last.changes.diff.destinations, 'duplicate removal produces a destinations diff')
 })
 
 test('PATCH an Errand with no destinations into a Ride returns 422, whether or not a list is sent', async () => {

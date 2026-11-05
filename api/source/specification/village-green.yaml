@@ -5604,7 +5604,7 @@ components:
       type: object
       required: [destination]
       properties:
-        destination: {type: string, minLength: 1}
+        destination: {type: string, minLength: 1, pattern: '\S'}
         address: {type: string, nullable: true}
         city: {type: string, maxLength: 100, nullable: true}
         state: {type: string, maxLength: 50, nullable: true}

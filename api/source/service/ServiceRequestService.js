@@ -328,8 +328,7 @@ function flatFromDestinations (destinations) {
 }
 
 // Ids are reissued on every save; order is id ascending, so insert in list order.
-async function replaceDestinations (connection, serviceRequestId, destinations) {
-  await connection.query('DELETE FROM service_request_destination WHERE serviceRequestId = ?', [serviceRequestId])
+async function insertDestinations (connection, serviceRequestId, destinations) {
   if (!destinations.length) return
   await connection.query(
     'INSERT INTO service_request_destination (serviceRequestId, destination, address, city, state, zip, phone) VALUES ?',
@@ -338,8 +337,15 @@ async function replaceDestinations (connection, serviceRequestId, destinations) 
   )
 }
 
-function assertRideHasDestination (serviceName, destinations) {
-  if (serviceName?.startsWith('Ride:') && !destinations.length) {
+// PATCH only: a create has nothing to delete, and DELETE on a brand-new id
+// can gap-lock and deadlock concurrent creates.
+async function replaceDestinations (connection, serviceRequestId, destinations) {
+  await connection.query('DELETE FROM service_request_destination WHERE serviceRequestId = ?', [serviceRequestId])
+  await insertDestinations(connection, serviceRequestId, destinations)
+}
+
+function assertRideHasDestination (serviceName, destinationCount) {
+  if (dbUtils.isRide(serviceName) && !destinationCount) {
     throw new SmError.UnprocessableError('A ride service request must have at least one destination.')
   }
 }
@@ -349,7 +355,7 @@ module.exports.createServiceRequest = async function (payload, userId) {
     transactionFn: async (connection) => {
       const resolvedStatus = deriveStatus(payload.status, payload.volunteerPersonId)
       const destinations = payload.destinations ?? []
-      assertRideHasDestination(payload.serviceName, destinations)
+      assertRideHasDestination(payload.serviceName, destinations.length)
 
       const insertFields = {
         villageId: payload.villageId,
@@ -389,7 +395,7 @@ module.exports.createServiceRequest = async function (payload, userId) {
         insertFields
       )
       const serviceRequestId = result.insertId
-      await replaceDestinations(connection, serviceRequestId, destinations)
+      await insertDestinations(connection, serviceRequestId, destinations)
 
       if (payload.notify) {
         await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
@@ -460,14 +466,14 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
 
       // The list replaces wholesale; the flat columns follow its first entry.
       if (payload.destinations !== undefined) {
-        assertRideHasDestination(payload.serviceName ?? current.serviceName, payload.destinations)
+        assertRideHasDestination(payload.serviceName ?? current.serviceName, payload.destinations.length)
         Object.assign(updateFields, flatFromDestinations(payload.destinations))
-      } else if (payload.serviceName?.startsWith('Ride:') && !current.serviceName?.startsWith('Ride:')) {
+      } else if (dbUtils.isRide(payload.serviceName) && !dbUtils.isRide(current.serviceName)) {
         // A change INTO a Ride must already have destinations; legacy Rides
         // with none stay patchable because this only fires on the change.
         const [[{ n }]] = await connection.query(
           'SELECT COUNT(*) AS n FROM service_request_destination WHERE serviceRequestId = ?', [serviceRequestId])
-        if (!n) assertRideHasDestination(payload.serviceName, [])
+        assertRideHasDestination(payload.serviceName, n)
       }
 
       const newVolunteerPersonId = payload.volunteerPersonId !== undefined
