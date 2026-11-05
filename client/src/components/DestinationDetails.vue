@@ -36,6 +36,9 @@ defineProps({
         </div>
       </div>
     </div>
+    <!-- display: contents leaves the host grid shared, so end the groups with a
+         full-width rule; whatever follows starts on a new row. -->
+    <div v-if="destinations.length > 1" class="destination-end" />
   </div>
 </template>
 
@@ -45,6 +48,11 @@ defineProps({
 .destination-details,
 .destination-group {
   display: contents;
+}
+
+.destination-end {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--color-border-default);
 }
 
 .destination-title {

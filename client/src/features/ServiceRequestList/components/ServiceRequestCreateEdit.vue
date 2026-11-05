@@ -759,17 +759,18 @@ const hasDestinationName = (block) => !!block.destination?.trim()
 const rideLacksFirstDestination = computed(() =>
   isRideService.value && !hasDestinationName(form.value.destinations[0]))
 
-// The full rule, checked by handleSubmit: the index of the first block that
-// fails it, or -1. Every block needs a name except a lone blank one, which means
+// The full rule, checked by handleSubmit: the indexes of the blocks that
+// fail it, empty when none do. Every block needs a name except a lone blank one, which means
 // "no destination". Hidden blocks can't be fixed and save as [], so they never
 // fail. Beyond the Ride rule above this stays out of isFormValid, so Save can be
 // clicked and explain itself (see the note above timesInOrder).
-const invalidDestinationIndex = computed(() => {
-  if (!showLocationFields.value) return -1
-  if (rideLacksFirstDestination.value) return 0
+const invalidDestinationIndexes = computed(() => {
+  if (!showLocationFields.value) return []
   const blocks = form.value.destinations
-  if (blocks.length === 1 && isBlankDestination(blocks[0])) return -1
-  return blocks.findIndex((block) => !hasDestinationName(block))
+  if (blocks.length === 1 && isBlankDestination(blocks[0]) && !rideLacksFirstDestination.value) return []
+  const bad = []
+  blocks.forEach((block, i) => { if (!hasDestinationName(block)) bad.push(i) })
+  return bad
 })
 
 // The Ride rule does disable Save, and a disabled button can't be clicked
@@ -907,8 +908,8 @@ const handleSubmit = async (notify = false) => {
       return
     }
 
-    if (invalidDestinationIndex.value !== -1) {
-      expandedBlocks.value[invalidDestinationIndex.value] = true
+    if (invalidDestinationIndexes.value.length) {
+      for (const i of invalidDestinationIndexes.value) expandedBlocks.value[i] = true
       toast.add({
         severity: 'error',
         summary: 'Error',

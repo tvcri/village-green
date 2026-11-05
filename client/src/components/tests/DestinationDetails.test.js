@@ -29,6 +29,14 @@ describe('DestinationDetails', () => {
     expect(getByText('Kingston, RI')).toBeTruthy()
   })
 
+  it('ends the groups with a full-width row only when there are two or more', () => {
+    const two = render(DestinationDetails, { props: { destinations: [cvs, clinic] } })
+    expect(two.container.querySelector('.destination-end')).not.toBeNull()
+    cleanup()
+    const one = render(DestinationDetails, { props: { destinations: [cvs] } })
+    expect(one.container.querySelector('.destination-end')).toBeNull()
+  })
+
   it('showPhone renders a tel: link per destination; default renders no phone', () => {
     const on = render(DestinationDetails, { props: { destinations: [cvs, clinic], showPhone: true } })
     const hrefs = [...on.container.querySelectorAll('a')].map(a => a.getAttribute('href'))

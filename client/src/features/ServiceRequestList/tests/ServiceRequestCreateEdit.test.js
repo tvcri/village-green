@@ -1589,6 +1589,22 @@ describe('several destinations on a request', () => {
     await expectNotSaved()
   })
 
+  it('a failed save opens every nameless collapsed block, not just the first', async () => {
+    const vm = await mountEditAndExpose({ ...stored, serviceName: 'Errand: Shopping', transportationType: 'None' })
+    await waitFor(() => expect(vm.form.destinations).toHaveLength(2))
+    vm.form.destinations[0].destination = ''
+    vm.form.destinations[1].destination = ''
+    await waitFor(() => expect(unref(vm.isFormValid)).toBe(true))
+    expect(vm.expandedBlocks).toEqual([false, false])
+
+    await vm.handleSubmit(false)
+    expect(vm.expandedBlocks).toEqual([true, true])
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Each destination needs a name'
+    }))
+    await expectNotSaved()
+  })
+
   it('an Errand with a nameless extra block is blocked with its own message', async () => {
     const vm = await mountNew('Errand: Shopping')
     vm.form.destinations = [{ ...HOSPITAL }, { ...PHARMACY, destination: '   ' }]
