@@ -249,7 +249,18 @@ const shapes = {
     // vssUserId/vssModifiedAt) are captured like every other column now;
     // their VSS meaning is documented where they are written.
     relatedTables: ['notification_event'],
-    sets: {},
+    sets: {
+      // Values, not keyed: ids are reissued on every save, so the label carries
+      // the row's content and any edit reads as remove + add.
+      destinations: {
+        kind: 'values',
+        table: 'service_request_destination',
+        sourceColumns: ['id', 'serviceRequestId', 'destination', 'address', 'city', 'state', 'zip', 'phone'],
+        sql: `SELECT CONCAT_WS(', ', destination, address, city, state, zip, phone) AS label
+              FROM service_request_destination
+              WHERE serviceRequestId = ?`,
+      },
+    },
   },
 }
 
