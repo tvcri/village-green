@@ -431,6 +431,13 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
   return `cast(concat('[', group_concat(${distinct ? 'distinct ' : ''}${value} ${orderBy ? `order by ${orderBy}` : ''}), ']') as json)`
 }
 
+// A service request's destinations as a JSON array in entry order, [] when none.
+// Ids are not exposed: they are reissued on every save.
+module.exports.srDestinationsJson = function (srAlias) {
+  const value = `JSON_OBJECT('destination', d.destination, 'address', d.address, 'city', d.city, 'state', d.state, 'zip', d.zip, 'phone', d.phone)`
+  return `COALESCE((SELECT ${module.exports.jsonArrayAgg({ value, orderBy: 'd.id' })} FROM service_request_destination d WHERE d.serviceRequestId = ${srAlias}.id), JSON_ARRAY())`
+}
+
 // The closed category <-> serviceName vocabulary. Single source of truth for:
 //  - VolunteerRequestService.buildCapabilityPrefixCase (capability -> prefix)
 //  - metrics byCategory derivation (serviceName -> category)

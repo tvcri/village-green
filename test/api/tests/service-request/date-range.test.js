@@ -51,8 +51,8 @@ test('village SR list accepts the same date params and returns the full column s
     { token: tokens.users.admin })
   assert.equal(status, 200)
   assert.ok(json.length > 0, 'precondition: village has fixtures')
-  // Regression: VillageService used to omit sr.state, emptying the CSV column.
-  assert.ok('state' in json[0], 'state column must be present')
+  // Regression: VillageService used to omit the destination columns, emptying the CSV.
+  assert.ok(Array.isArray(json[0].destinations), 'destinations column must be present')
   assert.ok('villageName' in json[0], 'delegation must supply villageName')
   assert.ok('vssSignup' in json[0])
 })

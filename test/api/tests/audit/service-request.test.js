@@ -73,7 +73,7 @@ test('VSS sign-up and release write update audit rows attributed to the voluntee
       villageId: String(villages.quahog.id),
       memberPersonId: String(persons.quahogMember.id),
       serviceName: 'Ride: Medical appointment',
-      destination: 'Somewhere',
+      destinations: [{ destination: 'Somewhere' }],
       serviceDate: '2026-08-01',
     },
   })

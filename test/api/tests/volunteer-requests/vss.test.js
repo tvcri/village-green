@@ -50,7 +50,7 @@ async function openRequest ({ serviceName = 'Ride: Medical appointment', village
       villageId: String(villageId),
       memberPersonId: String(villageId === villages.quahog.id ? persons.quahogMember.id : persons.innsmouthMember.id),
       serviceName,
-      destination: 'Somewhere',
+      destinations: [{ destination: 'Somewhere' }],
       serviceDate: '2026-08-01',
     },
   })

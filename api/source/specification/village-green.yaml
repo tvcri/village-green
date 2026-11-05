@@ -5427,6 +5427,7 @@ components:
       required:
       - serviceRequestId
       - villageId
+      - destinations
       properties:
         serviceRequestId:
           $ref: '#/components/schemas/ServiceRequestId'
@@ -5536,24 +5537,10 @@ components:
         start:
           type: string
           nullable: true
-        destination:
-          type: string
-          nullable: true
-        address:
-          type: string
-          nullable: true
-        city:
-          type: string
-          maxLength: 100
-          nullable: true
-        zip:
-          type: string
-          maxLength: 20
-          nullable: true
-        phone:
-          type: string
-          maxLength: 50
-          nullable: true
+        destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceRequestDestination'
         apptTime:
           type: string
           pattern: '^\d{2}:\d{2}:\d{2}$'
@@ -5561,10 +5548,6 @@ components:
         returnTime:
           type: string
           pattern: '^\d{2}:\d{2}:\d{2}$'
-          nullable: true
-        state:
-          type: string
-          maxLength: 50
           nullable: true
         startAddress:
           type: string
@@ -5605,6 +5588,28 @@ components:
           nullable: true
           items:
             $ref: '#/components/schemas/ServiceRequestNotificationHistory'
+    ServiceRequestDestination:
+      additionalProperties: false
+      type: object
+      required: [destination, address, city, state, zip, phone]
+      properties:
+        destination: {type: string, nullable: true}
+        address: {type: string, nullable: true}
+        city: {type: string, nullable: true}
+        state: {type: string, nullable: true}
+        zip: {type: string, nullable: true}
+        phone: {type: string, nullable: true}
+    ServiceRequestDestinationInput:
+      additionalProperties: false
+      type: object
+      required: [destination]
+      properties:
+        destination: {type: string, minLength: 1}
+        address: {type: string, nullable: true}
+        city: {type: string, maxLength: 100, nullable: true}
+        state: {type: string, maxLength: 50, nullable: true}
+        zip: {type: string, maxLength: 20, nullable: true}
+        phone: {type: string, maxLength: 50, nullable: true}
     ServiceRequestId:
       $ref: '#/components/schemas/StringIntId'
     ServiceRequestPatch:
@@ -5691,24 +5696,10 @@ components:
         start:
           type: string
           nullable: true
-        destination:
-          type: string
-          nullable: true
-        address:
-          type: string
-          nullable: true
-        city:
-          type: string
-          maxLength: 100
-          nullable: true
-        zip:
-          type: string
-          maxLength: 20
-          nullable: true
-        phone:
-          type: string
-          maxLength: 50
-          nullable: true
+        destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceRequestDestinationInput'
         apptTime:
           type: string
           pattern: '^\d{2}:\d{2}:\d{2}$'
@@ -5716,10 +5707,6 @@ components:
         returnTime:
           type: string
           pattern: '^\d{2}:\d{2}:\d{2}$'
-          nullable: true
-        state:
-          type: string
-          maxLength: 50
           nullable: true
         startAddress:
           type: string
@@ -5801,24 +5788,10 @@ components:
         start:
           type: string
           nullable: true
-        destination:
-          type: string
-          nullable: true
-        address:
-          type: string
-          nullable: true
-        city:
-          type: string
-          maxLength: 100
-          nullable: true
-        zip:
-          type: string
-          maxLength: 20
-          nullable: true
-        phone:
-          type: string
-          maxLength: 50
-          nullable: true
+        destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceRequestDestinationInput'
         apptTime:
           type: string
           pattern: '^\d{2}:\d{2}:\d{2}$'
@@ -5826,10 +5799,6 @@ components:
         returnTime:
           type: string
           pattern: '^\d{2}:\d{2}:\d{2}$'
-          nullable: true
-        state:
-          type: string
-          maxLength: 50
           nullable: true
         startAddress:
           type: string
@@ -7383,24 +7352,10 @@ components:
           type: string
           pattern: '^\d{2}:\d{2}:\d{2}$'
           nullable: true
-        destination:
-          type: string
-          nullable: true
-        address:
-          type: string
-          nullable: true
-        city:
-          type: string
-          nullable: true
-        state:
-          type: string
-          nullable: true
-        zip:
-          type: string
-          nullable: true
-        phone:
-          type: string
-          nullable: true
+        destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceRequestDestination'
         member:
           $ref: '#/components/schemas/VolunteerMemberContact'
         emergencyContact:
@@ -7414,6 +7369,7 @@ components:
       - serviceRequestId
       - villageId
       - status
+      - destinations
     WebPreferences:
       type: object
       properties:

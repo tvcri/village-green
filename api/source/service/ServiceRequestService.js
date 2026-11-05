@@ -85,15 +85,10 @@ module.exports.getServiceRequest = async function (serviceRequestId, projections
     'sr.returnTime',
     // JSON boolean (0/1 tinyint would fail the OAS boolean type).
     "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
-    'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.`start` AS `start`',
-    'sr.destination AS destination',
-    'sr.address AS address',
-    'sr.city AS city',
-    'sr.zip AS zip',
-    'sr.phone AS phone',
+    `${dbUtils.srDestinationsJson('sr')} AS destinations`,
     'sr.startAddress AS startAddress',
     'sr.startCity AS startCity',
     'sr.startState AS startState',
@@ -198,15 +193,10 @@ module.exports.getServiceRequests = async function ({ villageIdsGranted, status,
     'sr.returnTime',
     // JSON boolean (0/1 tinyint would fail the OAS boolean type).
     "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
-    'sr.state AS state',
     'sr.instructions AS instructions',
     'sr.description AS description',
     'sr.`start` AS `start`',
-    'sr.destination AS destination',
-    'sr.address AS address',
-    'sr.city AS city',
-    'sr.zip AS zip',
-    'sr.phone AS phone',
+    `${dbUtils.srDestinationsJson('sr')} AS destinations`,
     'sr.startAddress AS startAddress',
     'sr.startCity AS startCity',
     'sr.startState AS startState',
@@ -323,10 +313,43 @@ async function assertRequestPersons (connection, payload, current = null) {
   }
 }
 
+// The flat destination columns mirror the first destination until they are
+// dropped; every save writes them.
+function flatFromDestinations (destinations) {
+  const first = destinations[0] ?? {}
+  return {
+    destination: first.destination || null,
+    address: first.address || null,
+    city: first.city || null,
+    state: first.state || null,
+    zip: first.zip || null,
+    phone: first.phone || null
+  }
+}
+
+// Ids are reissued on every save; order is id ascending, so insert in list order.
+async function replaceDestinations (connection, serviceRequestId, destinations) {
+  await connection.query('DELETE FROM service_request_destination WHERE serviceRequestId = ?', [serviceRequestId])
+  if (!destinations.length) return
+  await connection.query(
+    'INSERT INTO service_request_destination (serviceRequestId, destination, address, city, state, zip, phone) VALUES ?',
+    [destinations.map(d => [serviceRequestId, d.destination, d.address || null, d.city || null,
+      d.state || null, d.zip || null, d.phone || null])]
+  )
+}
+
+function assertRideHasDestination (serviceName, destinations) {
+  if (serviceName?.startsWith('Ride:') && !destinations.length) {
+    throw new SmError.UnprocessableError('A ride service request must have at least one destination.')
+  }
+}
+
 module.exports.createServiceRequest = async function (payload, userId) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const resolvedStatus = deriveStatus(payload.status, payload.volunteerPersonId)
+      const destinations = payload.destinations ?? []
+      assertRideHasDestination(payload.serviceName, destinations)
 
       const insertFields = {
         villageId: payload.villageId,
@@ -342,15 +365,10 @@ module.exports.createServiceRequest = async function (payload, userId) {
         finishTime: payload.finishTime || null,
         apptTime: payload.apptTime || null,
         returnTime: payload.returnTime || null,
-        state: payload.state || null,
         instructions: payload.instructions || null,
         description: payload.description || null,
         start: payload.start || null,
-        destination: payload.destination || null,
-        address: payload.address || null,
-        city: payload.city || null,
-        zip: payload.zip || null,
-        phone: payload.phone || null,
+        ...flatFromDestinations(destinations),
         startAddress: payload.startAddress || null,
         startCity: payload.startCity || null,
         startState: payload.startState || null,
@@ -371,6 +389,7 @@ module.exports.createServiceRequest = async function (payload, userId) {
         insertFields
       )
       const serviceRequestId = result.insertId
+      await replaceDestinations(connection, serviceRequestId, destinations)
 
       if (payload.notify) {
         await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
@@ -393,10 +412,10 @@ module.exports.createServiceRequest = async function (payload, userId) {
 module.exports.patchServiceRequest = async function (serviceRequestId, payload, userId) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const { row: before } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+      const { row: before, sets: beforeSets } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
 
       const [currentRows] = await connection.query(
-        "SELECT memberPersonId, volunteerPersonId, status, DATE_FORMAT(serviceDate, '%Y-%m-%d') AS serviceDate FROM service_request WHERE id = ?",
+        "SELECT memberPersonId, volunteerPersonId, status, serviceName, DATE_FORMAT(serviceDate, '%Y-%m-%d') AS serviceDate FROM service_request WHERE id = ?",
         [serviceRequestId]
       )
       const current = currentRows[0]
@@ -430,11 +449,6 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
       if (payload.finishTime !== undefined) updateFields.finishTime = payload.finishTime
       if (payload.apptTime !== undefined) updateFields.apptTime = payload.apptTime
       if (payload.returnTime !== undefined) updateFields.returnTime = payload.returnTime
-      if (payload.state !== undefined) updateFields.state = payload.state || null
-      if (payload.city !== undefined) updateFields.city = payload.city || null
-      if (payload.zip !== undefined) updateFields.zip = payload.zip || null
-      if (payload.address !== undefined) updateFields.address = payload.address || null
-      if (payload.phone !== undefined) updateFields.phone = payload.phone || null
       if (payload.startAddress !== undefined) updateFields.startAddress = payload.startAddress || null
       if (payload.startCity !== undefined) updateFields.startCity = payload.startCity || null
       if (payload.startState !== undefined) updateFields.startState = payload.startState || null
@@ -443,7 +457,13 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
       if (payload.instructions !== undefined) updateFields.instructions = payload.instructions || null
       if (payload.description !== undefined) updateFields.description = payload.description || null
       if (payload.start !== undefined) updateFields.start = payload.start || null
-      if (payload.destination !== undefined) updateFields.destination = payload.destination || null
+
+      // The list replaces wholesale; the flat columns follow its first entry.
+      // current.serviceName is only read when the list is sent.
+      if (payload.destinations !== undefined) {
+        assertRideHasDestination(payload.serviceName ?? current.serviceName, payload.destinations)
+        Object.assign(updateFields, flatFromDestinations(payload.destinations))
+      }
 
       const newVolunteerPersonId = payload.volunteerPersonId !== undefined
         ? (payload.volunteerPersonId || null)
@@ -496,15 +516,18 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
       }
 
       await connection.query('UPDATE service_request SET ? WHERE id = ?', [updateFields, serviceRequestId])
+      if (payload.destinations !== undefined) {
+        await replaceDestinations(connection, serviceRequestId, payload.destinations)
+      }
 
       if (payload.notify) {
         await writeNotificationEvent(connection, serviceRequestId, resolvedStatus)
       }
 
-      const { row: after } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
+      const { row: after, sets: afterSets } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
       await AuditService.record(connection, {
         entityType: 'serviceRequest', entityId: serviceRequestId, action: 'update',
-        userId, before, after,
+        userId, before, beforeSets, after, afterSets,
       })
 
       // Return only the id; the caller fetches the record after commit.
