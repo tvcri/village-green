@@ -16,6 +16,8 @@ import { getVolunteerRequest, signUpVolunteerRequest, releaseVolunteerRequest } 
 import { getUser } from '../../../shared/api/userApi.js'
 import { filterQualifying } from '../lib/serviceCategories.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
+import DestinationDetails from '../../../components/DestinationDetails.vue'
+import { placeQuery } from '../../ServiceRequestList/lib/destinations.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,11 +118,18 @@ const mapOrigin = computed(() => {
   return [mem.address, mem.city, mem.state, mem.zip].filter(Boolean).join(', ')
 })
 
-const mapDestination = computed(() => {
-  const r = request.value
-  if (!r || (!r.address && !r.city)) return ''
-  return [r.address, r.city, r.state].filter(Boolean).join(', ')
-})
+const destinations = computed(() => request.value?.destinations ?? [])
+const isMulti = computed(() => destinations.value.length > 1)
+// One place map per destination that has an address or city.
+const mappedPlaces = computed(() =>
+  destinations.value
+    .map((d, i) => ({ name: d.destination || `Destination ${i + 1}`, query: placeQuery(d) }))
+    .filter(p => p.query)
+)
+const mapDestination = computed(() => placeQuery(destinations.value[0]))
+const showMapSection = computed(() =>
+  isMulti.value ? mappedPlaces.value.length > 0 : !!(mapOrigin.value && mapDestination.value)
+)
 
 const mapWaypoint = computed(() => {
   if (!volunteerAddressString.value) return ''
@@ -378,38 +387,36 @@ async function doRelease() {
             <span class="label">Transportation Type:</span>
             <span class="value">{{ request.transportationType }}</span>
           </div>
-          <div v-if="request.destination" class="detail-field">
-            <span class="label">Destination:</span>
-            <span class="value">{{ request.destination }}</span>
-          </div>
-          <div v-if="request.address" class="detail-field">
-            <span class="label">Address:</span>
-            <span class="value">{{ request.address }}</span>
-          </div>
-          <div v-if="request.city || request.state" class="detail-field">
-            <span class="label">City/State:</span>
-            <span class="value">{{ [request.city, request.state].filter(Boolean).join(', ') }}</span>
-          </div>
+          <DestinationDetails :destinations="destinations" />
+
           <div v-if="request.instructions" class="detail-field">
             <span class="label">Instructions:</span>
             <span class="value">{{ request.instructions }}</span>
           </div>
         </div>
 
-        <div v-if="mapOrigin && mapDestination" class="map-section">
+        <div v-if="showMapSection" class="map-section">
           <button class="map-toggle" @click="toggleMap">
             {{ showMap ? 'Always Hide Maps' : 'Always Show Maps' }}
           </button>
           <template v-if="showMap">
-            <p class="map-route-label">
-              <template v-if="volunteerAddressString">You <span class="arrow">➜</span> Member <span class="arrow">➜</span> Destination</template>
-              <template v-else>Member <span class="arrow">➜</span> Destination</template>
-            </p>
-            <ServiceRequestMap
-              :origin="mapOrigin"
-              :destination="mapDestination"
-              :waypoint="mapWaypoint"
-            />
+            <template v-if="isMulti">
+              <template v-for="(p, i) in mappedPlaces" :key="i">
+                <p class="map-route-label">{{ p.name }}</p>
+                <ServiceRequestMap :place="p.query" class="place-map" />
+              </template>
+            </template>
+            <template v-else>
+              <p class="map-route-label">
+                <template v-if="volunteerAddressString">You <span class="arrow">➜</span> Member <span class="arrow">➜</span> Destination</template>
+                <template v-else>Member <span class="arrow">➜</span> Destination</template>
+              </p>
+              <ServiceRequestMap
+                :origin="mapOrigin"
+                :destination="mapDestination"
+                :waypoint="mapWaypoint"
+              />
+            </template>
           </template>
         </div>
 
@@ -562,13 +569,13 @@ async function doRelease() {
   padding-bottom: 0.75rem;
 }
 
-.detail-field {
+:deep(.detail-field) {
   display: flex;
   flex-direction: column;
   margin-bottom: 0;
 }
 
-.detail-field .label {
+:deep(.detail-field .label) {
   font-weight: 600;
   color: var(--color-text-dim);
   font-size: 0.85rem;
@@ -577,7 +584,7 @@ async function doRelease() {
   margin-bottom: 0.25rem;
 }
 
-.detail-field .value {
+:deep(.detail-field .value) {
   color: var(--color-text-primary);
   font-size: 1rem;
   font-weight: 600;
@@ -618,6 +625,10 @@ async function doRelease() {
   vertical-align: middle;
   position: relative;
   top: -1px;
+}
+
+.place-map {
+  margin-bottom: 1.5rem;
 }
 
 .map-toggle {
