@@ -192,3 +192,25 @@ test('PATCH that sends the same list unchanged records no destinations differenc
   const last = rows[rows.length - 1]
   assert.deepEqual(Object.keys(last.changes.diff), ['description'])
 })
+
+test('PATCH an Errand with no destinations into a Ride returns 422, whether or not a list is sent', async () => {
+  const { json } = await create({})
+  const id = json.serviceRequestId
+  assert.equal((await patch(id, { serviceName: 'Ride: Medical appointment' })).status, 422)
+  assert.equal((await patch(id, { serviceName: 'Ride: Medical appointment', destinations: [] })).status, 422)
+  const ok = await patch(id, { serviceName: 'Ride: Medical appointment', destinations: [clinic] })
+  assert.equal(ok.status, 200)
+})
+
+test('PATCH an Errand that has destinations into a Ride without sending a list succeeds', async () => {
+  const { json } = await create({ destinations: [clinic] })
+  assert.equal((await patch(json.serviceRequestId, { serviceName: 'Ride: Medical appointment' })).status, 200)
+})
+
+test('a legacy Ride with no destination rows still accepts a status PATCH', async () => {
+  const { json } = await create({ serviceName: 'Ride: Medical appointment', destinations: [clinic] })
+  const id = json.serviceRequestId
+  await withDb(c => c.query('DELETE FROM service_request_destination WHERE serviceRequestId = ?', [id]))
+  assert.equal((await patch(id, { status: 'Member cancelled' })).status, 200)
+  assert.equal((await patch(id, { serviceName: 'Ride: Harbor clinic' })).status, 200)
+})

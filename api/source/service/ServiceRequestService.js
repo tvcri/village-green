@@ -459,10 +459,15 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
       if (payload.start !== undefined) updateFields.start = payload.start || null
 
       // The list replaces wholesale; the flat columns follow its first entry.
-      // current.serviceName is only read when the list is sent.
       if (payload.destinations !== undefined) {
         assertRideHasDestination(payload.serviceName ?? current.serviceName, payload.destinations)
         Object.assign(updateFields, flatFromDestinations(payload.destinations))
+      } else if (payload.serviceName?.startsWith('Ride:') && !current.serviceName?.startsWith('Ride:')) {
+        // A change INTO a Ride must already have destinations; legacy Rides
+        // with none stay patchable because this only fires on the change.
+        const [[{ n }]] = await connection.query(
+          'SELECT COUNT(*) AS n FROM service_request_destination WHERE serviceRequestId = ?', [serviceRequestId])
+        if (!n) assertRideHasDestination(payload.serviceName, [])
       }
 
       const newVolunteerPersonId = payload.volunteerPersonId !== undefined
