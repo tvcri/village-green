@@ -7,6 +7,7 @@ import TableFooter from '../../../components/TableFooter.vue'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { formatServiceDate, serviceDateTimeSortKey } from '../lib/timeFields.js'
+import { summarize } from '../lib/destinations.js'
 
 defineOptions({ name: 'ServiceRequestTable' })
 
@@ -85,6 +86,13 @@ const compareField = (field, dir) => (a, b) => {
   return dir * result
 }
 
+// The Destination column sorts on the first destination's city, which the API
+// no longer sends as a flat field. Add it here so compareField can read it.
+const rowsWithSortKeys = computed(() => props.rows.map((row) => ({
+  ...row,
+  firstCity: row.destinations?.[0]?.city ?? null
+})))
+
 const sortedRows = computed(() => {
   const field = sortField.value
   const dir = sortOrderRef.value || 1
@@ -92,7 +100,7 @@ const sortedRows = computed(() => {
   // Sorting by date means date+time IS the primary key; there is no separate
   // tiebreak to append.
   if (field === DATE_SORT_FIELD) {
-    return [...props.rows].sort((a, b) => dir * compareDateTime(a, b))
+    return [...rowsWithSortKeys.value].sort((a, b) => dir * compareDateTime(a, b))
   }
 
   // Otherwise: date+time pass first, then a stable sort by the chosen column.
@@ -100,7 +108,7 @@ const sortedRows = computed(() => {
   // the chosen column keep the date order established by the first pass. The
   // appended key stays ascending even when the primary is descending -- within
   // one member or village, dates should still read earliest-first.
-  return [...props.rows]
+  return [...rowsWithSortKeys.value]
     .sort(compareDateTime)
     .sort(compareField(field, dir))
 })
@@ -165,7 +173,9 @@ const rowClass = computed(() => {
       </Column>
       <Column field="memberFullName" header="Member" sortable style="width: 15%"></Column>
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
-      <Column field="city" header="Destination" sortable style="width: 13%"></Column>
+      <Column field="firstCity" header="Destination" sortable style="width: 13%">
+        <template #body="slotProps">{{ summarize(slotProps.data.destinations, 'city') }}</template>
+      </Column>
       <Column field="displayNumber" header="#" sortable style="width: 6%;">
           
         <template #body="slotProps">{{ slotProps.data.displayNumber ?? '—' }}</template>
@@ -195,7 +205,7 @@ const rowClass = computed(() => {
         <div class="card-row"><span class="label">Member:</span><span>{{ request.memberFullName ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Volunteer:</span><span>{{ request.volunteerFullName ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Start:</span><span>{{ formatServiceDate(request.serviceDate, { weekday: true }) || '—' }}</span></div>
-        <div class="card-row"><span class="label">City:</span><span>{{ request.city ?? '—' }}</span></div>
+        <div class="card-row"><span class="label">City:</span><span>{{ summarize(request.destinations, 'city') || '—' }}</span></div>
       </div>
     </div>
   </div>

@@ -34,7 +34,7 @@ vi.mock('../api/serviceRequestApi.js', () => {
       memberFullName: 'Alice Anderson',
       volunteerFullName: 'Vera Volunteer',
       serviceDate: '2026-07-20',
-      city: 'Springfield',
+      destinations: [{ destination: 'Mercy Clinic', address: '1 Main St', city: 'Springfield', state: 'RI', zip: null, phone: null }],
       createdAt: '2026-07-01T12:00:00Z'
     },
     {
@@ -45,7 +45,7 @@ vi.mock('../api/serviceRequestApi.js', () => {
       memberFullName: 'Bob Baker',
       volunteerFullName: 'Wally Volunteer',
       serviceDate: '2026-07-21',
-      city: 'Springfield',
+      destinations: [{ destination: 'Mercy Clinic', address: '1 Main St', city: 'Springfield', state: 'RI', zip: null, phone: null }],
       createdAt: '2026-07-02T12:00:00Z'
     }
   ]
@@ -221,5 +221,30 @@ describe('VillageServiceRequestList CSV download', () => {
     expect(filename).toBe('Testville-service-requests.csv')
     expect(csv).toContain('Alice Anderson')
     expect(csv).not.toContain('Bob Baker')
+  })
+
+  it('exports multiple destinations as aligned, joined columns', async () => {
+    const { getVillageServiceRequests } = await import('../api/serviceRequestApi.js')
+    getVillageServiceRequests.mockResolvedValueOnce([
+      {
+        serviceRequestId: 1, displayNumber: 101, status: 'Open', serviceName: 'Ride to Clinic',
+        memberFullName: 'Alice Anderson', serviceDate: '2026-07-20',
+        destinations: [
+          { destination: 'CVS Pharmacy', address: '1 Main St', city: 'Wakefield', state: 'RI' },
+          { destination: 'Dr. Smith', address: '2 Elm St', city: 'Kingston', state: 'RI' }
+        ]
+      }
+    ])
+    render(VillageServiceRequestList, { global: { plugins: [PrimeVue] } })
+    await screen.findAllByText('Alice Anderson')
+    await fireEvent.click(screen.getAllByText('Download')[0])
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
+    const [csv] = downloadCsv.mock.calls[0]
+    const [header, row] = csv.split('\n')
+    const h = header.split(',')
+    expect(row).toContain('CVS Pharmacy; Dr. Smith')
+    expect(row).toContain('Wakefield; Kingston')
+    expect(h.indexOf('Destination')).toBeLessThan(h.indexOf('City'))
+    expect(row).toContain('1 Main St; 2 Elm St')
   })
 })

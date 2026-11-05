@@ -25,6 +25,10 @@ const mineRow = {
   startTime: '09:00:00',
   member: { fullName: 'Pat Member' },
   volunteerPersonId: '7',
+  destinations: [
+    { destination: 'CVS Pharmacy', city: 'Wakefield' },
+    { destination: 'Dr. Smith', city: 'Kingston' }
+  ]
 }
 
 vi.mock('../api/volunteerRequestApi.js', () => ({
@@ -81,5 +85,19 @@ describe('VolunteerHome Volunteer column (multi-volunteer accounts)', () => {
     await waitFor(() => expect(screen.getAllByText('Pat Member').length).toBeGreaterThan(0))
     expect(screen.queryByText('Volunteer')).toBeNull()
     expect(screen.queryByText('Jane Doe')).toBeNull()
+  })
+
+  it('VSS: table and card show "CVS Pharmacy +1"', async () => {
+    userMock.value = { volunteers: [TWO_VOLUNTEERS[0]] }
+    // The Destination column lives on the open-requests tab only.
+    routeMock.query = { tab: 'open' }
+    const { getVolunteerRequests } = await import('../api/volunteerRequestApi.js')
+    getVolunteerRequests.mockImplementation(() => Promise.resolve([mineRow]))
+    const { container } = render(VolunteerHome, { global: { plugins: [PrimeVue] } })
+    await waitFor(() => expect(screen.getAllByText('Pat Member').length).toBeGreaterThan(0))
+    expect(container.querySelector('.p-datatable-tbody').textContent).toContain('CVS Pharmacy +1')
+    const cardRows = Array.from(container.querySelectorAll('.request-cards .card-row'))
+      .filter(r => r.textContent.includes('Destination'))
+    expect(cardRows.map(r => r.textContent)).toContain('DestinationCVS Pharmacy +1')
   })
 })
