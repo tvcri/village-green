@@ -7,10 +7,10 @@ import { placeQuery } from '../lib/destinations.js'
 export function useRequestDestinations (request, mapOrigin) {
   const destinations = computed(() => request.value?.destinations ?? [])
   const isMulti = computed(() => destinations.value.length > 1)
-  // One place map per destination that has an address or city.
+  // Every destination that has an address or city, keeping its number on the page.
   const mappedPlaces = computed(() =>
     destinations.value
-      .map((d, i) => ({ name: d.destination || `Destination ${i + 1}`, query: placeQuery(d) }))
+      .map((d, i) => ({ number: i + 1, name: d.destination || `Destination ${i + 1}`, query: placeQuery(d) }))
       .filter(p => p.query)
   )
   const mapDestination = computed(() => placeQuery(destinations.value[0]))

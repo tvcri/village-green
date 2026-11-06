@@ -2,8 +2,6 @@
 defineProps({
   origin: { type: String, default: '' },
   destination: { type: String, default: '' },
-  // When set, shows a single place and origin/destination are ignored.
-  place: { type: String, default: '' },
   waypoint: { type: String, default: '' }
 })
 
@@ -20,25 +18,11 @@ function buildSrc(origin, destination, waypoint) {
   if (waypoint) params.append('waypoints', waypoint)
   return `${base}?${params.toString()}`
 }
-
-function buildPlaceSrc(place) {
-  const params = new URLSearchParams({ key: mapsKey, q: place })
-  return `https://www.google.com/maps/embed/v1/place?${params.toString()}`
-}
 </script>
 
 <template>
   <iframe
-    v-if="place"
-    :src="buildPlaceSrc(place)"
-    title="Map of destination"
-    class="service-request-map"
-    allowfullscreen
-    loading="lazy"
-    referrerpolicy="no-referrer-when-downgrade"
-  />
-  <iframe
-    v-else-if="origin && destination"
+    v-if="origin && destination"
     :src="buildSrc(origin, destination, waypoint)"
     title="Driving directions map"
     class="service-request-map"

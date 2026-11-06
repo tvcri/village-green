@@ -39,29 +39,30 @@ async function mountWith(destinations) {
   return utils
 }
 const frames = (c) => [...c.querySelectorAll('iframe')].map(f => f.getAttribute('src'))
+const pins = (c) => new URL(c.querySelector('img.destinations-map').getAttribute('src')).searchParams.getAll('markers')
 
 describe('VolunteerRequestDetail maps', () => {
   beforeEach(() => { localStorage.removeItem('vg.showMap') })
   afterEach(() => cleanup())
 
-  it('one destination: one route map, no place map', async () => {
+  it('one destination: one route map, no image', async () => {
     const { container } = await mountWith([dest('CVS', '1 Main St', 'Wakefield')])
     const srcs = frames(container)
     expect(srcs).toHaveLength(1)
     expect(srcs[0]).toContain('/directions?')
+    expect(container.querySelector('img.destinations-map')).toBeNull()
   })
 
-  it('two destinations: no route map, one place map per destination, each labelled with its name', async () => {
+  it('two destinations: no iframes, one image with a numbered pin each, and a link each', async () => {
     const { container } = await mountWith([dest('CVS', '1 Main St', 'Wakefield'), dest('Clinic', '2 Oak Ave', 'Kingston')])
-    const srcs = frames(container)
-    expect(srcs).toHaveLength(2)
-    expect(srcs.every(s => s.includes('/place?'))).toBe(true)
-    expect([...container.querySelectorAll('.map-route-label')].map(p => p.textContent)).toEqual(['CVS', 'Clinic'])
+    expect(frames(container)).toHaveLength(0)
+    expect(pins(container)).toEqual(['color:0x38669f|label:1|1 Main St, Wakefield, RI', 'color:0x38669f|label:2|2 Oak Ave, Kingston, RI'])
+    expect([...container.querySelectorAll('.map-links a')].map(a => a.textContent.trim())).toEqual(['1. CVS', '2. Clinic'])
   })
 
-  it('two destinations where one has no address: one place map', async () => {
-    const { container } = await mountWith([dest('CVS', '1 Main St', 'Wakefield'), dest('Clinic', null, null)])
-    expect(frames(container)).toHaveLength(1)
+  it('two destinations where one has no address: one pin, numbered as its heading', async () => {
+    const { container } = await mountWith([dest('Clinic', null, null), dest('CVS', '1 Main St', 'Wakefield')])
+    expect(pins(container)).toEqual(['color:0x38669f|label:2|1 Main St, Wakefield, RI'])
   })
 
   it('two name-only destinations: no map section and no Always Hide Maps button', async () => {
@@ -70,10 +71,10 @@ describe('VolunteerRequestDetail maps', () => {
     expect(queryByText('Always Hide Maps')).toBeNull()
   })
 
-  it('showMap false hides the place maps', async () => {
+  it('showMap false hides the map', async () => {
     const { container, getByText } = await mountWith([dest('CVS', '1 Main St', 'Wakefield'), dest('Clinic', '2 Oak Ave', 'Kingston')])
     await fireEvent.click(getByText('Always Hide Maps'))
-    expect(frames(container)).toHaveLength(0)
+    expect(container.querySelector('img.destinations-map')).toBeNull()
   })
 
   it('shows no destination phone', async () => {
