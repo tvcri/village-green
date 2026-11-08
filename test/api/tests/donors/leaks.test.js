@@ -81,3 +81,24 @@ test('editing a request whose member lost their member record still saves', asyn
   assert.equal(res.status, 200)
   await vgCall('patchServiceRequest', { serviceRequestId }, { token: sc, body: { status: 'Hub cancelled' } })
 })
+
+// Per slot: the member must hold a member record and the volunteer a volunteer
+// record (any status). The form always enforced this; now the API does too.
+test('the member slot refuses a volunteer-only person and the volunteer slot a member-only one', async () => {
+  const volunteerOnly = await makePerson()
+  assert.equal((await vgCall('putPersonVolunteer', { personId: volunteerOnly }, { token: staff, body: { status: 'Active' } })).status, 200)
+  const memberOnly = await makePerson()
+  assert.equal((await vgCall('putPersonMember', { personId: memberOnly }, { token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })).status, 200)
+
+  const asMember = await vgCall('createServiceRequest', {}, { token: sc, body: { villageId: quahog, memberPersonId: volunteerOnly, serviceDate: '2026-07-11' } })
+  assert.equal(asMember.status, 422)
+  const asVolunteer = await vgCall('createServiceRequest', {}, { token: sc, body: {
+    villageId: quahog, memberPersonId: memberOnly, volunteerPersonId: memberOnly, serviceDate: '2026-07-11',
+  } })
+  assert.equal(asVolunteer.status, 422)
+  const ok = await vgCall('createServiceRequest', {}, { token: sc, body: {
+    villageId: quahog, memberPersonId: memberOnly, volunteerPersonId: volunteerOnly, serviceDate: '2026-07-11',
+  } })
+  assert.equal(ok.status, 201)
+  await vgCall('patchServiceRequest', { serviceRequestId: ok.json.serviceRequestId }, { token: sc, body: { status: 'Hub cancelled' } })
+})

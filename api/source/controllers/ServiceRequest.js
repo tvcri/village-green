@@ -2,7 +2,8 @@
 
 const SmError = require('../utils/error')
 const ServiceRequestService = require('../service/ServiceRequestService')
-const PersonService = require('../service/PersonService')
+const MemberService = require('../service/MemberService')
+const VolunteerService = require('../service/VolunteerService')
 const { hasPermission } = require('../utils/authz')
 
 module.exports.getServiceRequests = async function getServiceRequests (req, res, next) {
@@ -41,15 +42,21 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
   }
 }
 
-// Named persons must hold a member or volunteer record: request reads expose
-// them to every sr:read holder, so a donor-only person can never be named.
+// A request is between a member and a volunteer: the member must hold a
+// member record and the volunteer a volunteer record (any status). The form
+// always offered only those; the API now enforces it too, which also keeps
+// donor-only persons off requests (whose reads reach every sr:read holder).
 // Only ids that change are checked (`existing` on patch): the edit form resends
-// both, and an old request must stay editable after its member loses the role.
+// both, and an old request must stay editable after a person loses the role.
+const REQUEST_PERSONS = [
+  { key: 'memberPersonId', exists: MemberService.memberExists, role: 'member' },
+  { key: 'volunteerPersonId', exists: VolunteerService.volunteerExists, role: 'volunteer' },
+]
 async function assertRequestPersons (body, existing = null) {
-  for (const key of ['memberPersonId', 'volunteerPersonId']) {
+  for (const { key, exists, role } of REQUEST_PERSONS) {
     if (body[key] == null || String(body[key]) === existing?.[key]) continue
-    if (!(await PersonService.hasMemberOrVolunteer(body[key]))) {
-      throw new SmError.UnprocessableError(`${key} must be a person with a member or volunteer record.`)
+    if (!(await exists(body[key]))) {
+      throw new SmError.UnprocessableError(`The request's ${role} must be a person with a ${role} record.`)
     }
   }
 }
