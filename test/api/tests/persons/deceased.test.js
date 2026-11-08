@@ -80,6 +80,8 @@ test('deceased person leaves the active views but keeps role status', async () =
 
 test('open request count', async () => {
   const { json: p } = await makePerson('DecOpenSr')
+  // A request's member must hold a member or volunteer record.
+  assert.equal((await vgCall('putPersonMember', { personId: p.personId }, { token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })).status, 200)
   const before = await vgCall('getPerson', { personId: p.personId }, { token: staff })
   assert.equal(before.json.openServiceRequestCount, 0)
   const created = await vgCall('createServiceRequest', {}, {

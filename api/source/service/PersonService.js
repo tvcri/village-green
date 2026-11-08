@@ -809,6 +809,16 @@ module.exports.patchPerson = async function (personId, body, userId) {
   return personId
 }
 
+// A service request's member and volunteer must hold a member or volunteer
+// record (any status). Request reads join person for every sr:read holder and
+// VSS volunteer, so a donor-only person must never be named on one.
+module.exports.hasMemberOrVolunteer = async function (personId) {
+  const [[{ found }]] = await dbUtils.pool.query(
+    'SELECT EXISTS (SELECT 1 FROM member WHERE personId = ?) OR EXISTS (SELECT 1 FROM volunteer WHERE personId = ?) AS found',
+    [personId, personId])
+  return !!found
+}
+
 // Any member/volunteer/donor row blocks a person delete (their FKs to person
 // have no cascade). Whatever the row's status.
 module.exports.hasAssociations = async function (personId) {

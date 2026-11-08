@@ -2,6 +2,7 @@
 
 const SmError = require('../utils/error')
 const ServiceRequestService = require('../service/ServiceRequestService')
+const PersonService = require('../service/PersonService')
 const { hasPermission } = require('../utils/authz')
 
 module.exports.getServiceRequests = async function getServiceRequests (req, res, next) {
@@ -40,12 +41,23 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
   }
 }
 
+// Named persons must hold a member or volunteer record: request reads expose
+// them to every sr:read holder, so a donor-only person can never be named.
+async function assertRequestPersons (body) {
+  for (const key of ['memberPersonId', 'volunteerPersonId']) {
+    if (body[key] != null && !(await PersonService.hasMemberOrVolunteer(body[key]))) {
+      throw new SmError.UnprocessableError(`${key} must be a person with a member or volunteer record.`)
+    }
+  }
+}
+
 module.exports.createServiceRequest = async function createServiceRequest (req, res, next) {
   try {
     const body = req.body
     if (!hasPermission(req.userObject, 'sr:write', { villageId: body.villageId })) {
       throw new SmError.PrivilegeError()
     }
+    await assertRequestPersons(body)
     // The service commits in a transaction and returns the new id; fetch the
     // full record afterward so the read sees committed data.
     const serviceRequestId = await ServiceRequestService.createServiceRequest(req.body, req.userObject.userId)
@@ -88,6 +100,7 @@ module.exports.patchServiceRequest = async function patchServiceRequest (req, re
     if (!hasPermission(req.userObject, 'sr:write', { villageId: existing.villageId })) {
       throw new SmError.PrivilegeError()
     }
+    await assertRequestPersons(req.body)
 
     // The service commits in a transaction and returns the id; fetch the full
     // record afterward so the read sees committed data.
