@@ -105,6 +105,13 @@ const shapes = {
     },
   },
 
+  // LGL-sourced; written only through the donor endpoints (import/integration).
+  donor: {
+    table: 'donor',
+    relatedTables: [],
+    sets: {},
+  },
+
   volunteer: {
     table: 'volunteer',
     relatedTables: [],
