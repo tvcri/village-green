@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { withDb } from '../../lib/db.js'
-import { villages } from '../../setup/fixtures.js'
+import { villages, users } from '../../setup/fixtures.js'
 
 // Donor writes: PUT (create/replace) and DELETE /persons/{id}/donor, gated by
 // donor:write. No role is granted donor:write — Admin holds it through the
@@ -85,4 +85,41 @@ test('delete removes the donor row; deleting again is 404', async () => {
 
 test('put on an unknown person is 404', async () => {
   assert.equal((await putDonor('999999', { lglConstituentId: '1' })).status, 404)
+})
+
+// A federation role holding donor:write but not donor:read: the integration's
+// account must also read donors (it looks persons up by constituent ID), and a
+// writer that can't read back what it wrote gets a null or donor-less body.
+async function withFederationRole (permissions, fn) {
+  const roleId = await withDb(async c => {
+    const [r] = await c.query("INSERT INTO role (name, scope, isSystem) VALUES (?, 'federation', 0)", [uniq('TmpDonorWriter')])
+    await c.query('INSERT INTO role_permission (roleId, permission) VALUES ?', [permissions.map(p => [r.insertId, p])])
+    await c.query('INSERT INTO role_grant (villageId, userId, roleId) VALUES (NULL, ?, ?)', [users.scratch.userId, r.insertId])
+    return r.insertId
+  })
+  try { await fn(tokens.users.scratch) }
+  finally {
+    await withDb(async c => {
+      await c.query('DELETE FROM role_grant WHERE roleId = ?', [roleId])
+      await c.query('DELETE FROM role_permission WHERE roleId = ?', [roleId])
+      await c.query('DELETE FROM role WHERE roleId = ?', [roleId])
+    })
+  }
+}
+
+test('donor writes also require donor:read', async () => {
+  const personId = await makePerson()
+  await withFederationRole(['person:read', 'member:read', 'volunteer:read', 'donor:write'], async (writer) => {
+    assert.equal((await putDonor(personId, { lglConstituentId: '77' }, writer)).status, 403)
+    assert.equal((await putDonor(personId, { lglConstituentId: '77' })).status, 200)
+    assert.equal((await delDonor(personId, writer)).status, 403)
+  })
+})
+
+test('concurrent first PUTs for one person all succeed with one row', async () => {
+  const personId = await makePerson()
+  const results = await Promise.all([1, 2, 3, 4].map(n => putDonor(personId, { lglConstituentId: `C${n}` })))
+  assert.deepEqual(results.map(r => r.status), [200, 200, 200, 200])
+  const [[{ n }]] = await withDb(db => db.query('SELECT COUNT(*) AS n FROM donor WHERE personId = ?', [Number(personId)]))
+  assert.equal(n, 1)
 })

@@ -2,8 +2,6 @@
 
 const SmError = require('../utils/error')
 const ServiceRequestService = require('../service/ServiceRequestService')
-const MemberService = require('../service/MemberService')
-const VolunteerService = require('../service/VolunteerService')
 const { hasPermission } = require('../utils/authz')
 
 module.exports.getServiceRequests = async function getServiceRequests (req, res, next) {
@@ -42,32 +40,12 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
   }
 }
 
-// A request is between a member and a volunteer: the member must hold a
-// member record and the volunteer a volunteer record (any status). The form
-// always offered only those; the API now enforces it too, which also keeps
-// donor-only persons off requests (whose reads reach every sr:read holder).
-// Only ids that change are checked (`existing` on patch): the edit form resends
-// both, and an old request must stay editable after a person loses the role.
-const REQUEST_PERSONS = [
-  { key: 'memberPersonId', exists: MemberService.memberExists, role: 'member' },
-  { key: 'volunteerPersonId', exists: VolunteerService.volunteerExists, role: 'volunteer' },
-]
-async function assertRequestPersons (body, existing = null) {
-  for (const { key, exists, role } of REQUEST_PERSONS) {
-    if (body[key] == null || String(body[key]) === existing?.[key]) continue
-    if (!(await exists(body[key]))) {
-      throw new SmError.UnprocessableError(`The request's ${role} must be a person with a ${role} record.`)
-    }
-  }
-}
-
 module.exports.createServiceRequest = async function createServiceRequest (req, res, next) {
   try {
     const body = req.body
     if (!hasPermission(req.userObject, 'sr:write', { villageId: body.villageId })) {
       throw new SmError.PrivilegeError()
     }
-    await assertRequestPersons(body)
     // The service commits in a transaction and returns the new id; fetch the
     // full record afterward so the read sees committed data.
     const serviceRequestId = await ServiceRequestService.createServiceRequest(req.body, req.userObject.userId)
@@ -110,7 +88,6 @@ module.exports.patchServiceRequest = async function patchServiceRequest (req, re
     if (!hasPermission(req.userObject, 'sr:write', { villageId: existing.villageId })) {
       throw new SmError.PrivilegeError()
     }
-    await assertRequestPersons(req.body, existing)
 
     // The service commits in a transaction and returns the id; fetch the full
     // record afterward so the read sees committed data.

@@ -136,9 +136,6 @@ module.exports.deletePerson = async function deletePerson (req, res, next) {
       throw new SmError.PrivilegeError()
     }
 
-    if (await PersonService.hasAssociations(personId)) {
-      throw new SmError.UnprocessableError('Remove this person\'s member, volunteer and donor records before deleting them.')
-    }
     await PersonService.deletePerson(personId, req.userObject.userId)
     res.json(existing)
   }

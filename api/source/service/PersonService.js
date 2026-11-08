@@ -809,20 +809,29 @@ module.exports.patchPerson = async function (personId, body, userId) {
   return personId
 }
 
-// Any member/volunteer/donor row blocks a person delete (their FKs to person
-// have no cascade). Whatever the row's status.
-module.exports.hasAssociations = async function (personId) {
-  const exists = ASSOCIATIONS.map(a => `EXISTS (SELECT 1 FROM ${a} WHERE personId = ?)`).join(' OR ')
-  const [[{ found }]] = await dbUtils.pool.query(`SELECT ${exists} AS found`, ASSOCIATIONS.map(() => personId))
-  return !!found
-}
-
+// A person still referenced cannot be deleted: any member/volunteer/donor row
+// (checked first, for a specific message), and anything else that points at
+// the person — service requests, friendly-call submissions, users — via the
+// FK refusal. Both answer 422, never a raw FK 500.
 module.exports.deletePerson = async function (personId, userId) {
-  return dbUtils.retryOnDeadlock2({
-    transactionFn: async (connection) => {
-      await AuditService.auditDelete(connection, { entityType: 'person', entityId: personId, userId },
-        () => connection.query('DELETE FROM person WHERE id = ?', [personId]))
-      return personId
-    },
-  })
+  try {
+    return await dbUtils.retryOnDeadlock2({
+      transactionFn: async (connection) => {
+        const exists = ASSOCIATIONS.map(a => `EXISTS (SELECT 1 FROM ${a} WHERE personId = ? FOR UPDATE)`).join(' OR ')
+        const [[{ found }]] = await connection.query(`SELECT ${exists} AS found`, ASSOCIATIONS.map(() => personId))
+        if (found) {
+          throw new SmError.UnprocessableError('Remove this person\'s member, volunteer and donor records before deleting them.')
+        }
+        await AuditService.auditDelete(connection, { entityType: 'person', entityId: personId, userId },
+          () => connection.query('DELETE FROM person WHERE id = ?', [personId]))
+        return personId
+      },
+    })
+  }
+  catch (err) {
+    if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+      throw new SmError.UnprocessableError('This person is still named on other records, such as service requests, and cannot be deleted.')
+    }
+    throw err
+  }
 }
