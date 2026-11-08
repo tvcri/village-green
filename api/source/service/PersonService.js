@@ -394,6 +394,25 @@ function applicationColumn ({ member, volunteer }) {
   return `JSON_OBJECT(${parts.join(', ')}) AS application`
 }
 
+// person:read is a scope, not "every person": a caller sees a person only if
+// the person has no member/volunteer/donor row, or the caller can read at
+// least one of those associations. Base tables, never the active_* views — a
+// Pending or Dropped member is still a member. Returns null (no predicate)
+// when every association is readable.
+// Each association is its table and its `<table>:read` key.
+const ASSOCIATIONS = ['member', 'volunteer', 'donor']
+function associationPredicate (reads) {
+  if (ASSOCIATIONS.every(a => reads[a])) return null
+  const exists = (table) => `EXISTS (SELECT 1 FROM ${table} ax WHERE ax.personId = p.id)`
+  const none = ASSOCIATIONS.map(a => `NOT ${exists(a)}`).join(' AND ')
+  const readable = ASSOCIATIONS.filter(a => reads[a]).map(exists)
+  return `((${none})${readable.map(e => ` OR ${e}`).join('')})`
+}
+// The caller's association read keys, for one village (or federation-wide).
+function associationReadsFor (userObject, opts) {
+  return Object.fromEntries(ASSOCIATIONS.map(a => [a, hasPermission(userObject, `${a}:read`, opts)]))
+}
+
 // Single query path for person reads: getPerson, getPersons, and
 // getPersonsByVillage all build here. These column fragments were once
 // copy-diverged across three functions (one copy dropped
@@ -415,6 +434,9 @@ function applicationColumn ({ member, volunteer }) {
 //   volunteer         - { inactive } projection gates
 //   application       - { member, volunteer } read_application gates (root object; base tables, never active_* views)
 //   donor             - include the donor projection (donor:read)
+//   associationReads  - { member, volunteer, donor } read keys the caller
+//                       holds; applies the association visibility rule. null
+//                       (internal callers with no user) skips it.
 //   birthDate         - include p.birthDate (person:read_birth_date)
 //   demographics      - include gender/ethnicity/races/isVeteran (person:read_demographics)
 //   openRequestCount  - include openServiceRequestCount (full rows only; getPerson)
@@ -425,6 +447,7 @@ function applicationColumn ({ member, volunteer }) {
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const {
     summary = false, detail = false, member = null, volunteer = null, application = null, donor = false,
+    associationReads = null,
     birthDate = false, demographics = false, openRequestCount = false,
     memberNoncurrent = false, volunteerNoncurrent = false
   } = inOptions
@@ -536,6 +559,11 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
     predicates.binds.push(`%${inPredicates.email}%`)
   }
 
+  if (associationReads) {
+    const visible = associationPredicate(associationReads)
+    if (visible) predicates.statements.push(visible)
+  }
+
   const orderBy = ['p.fullName']
   const sql = dbUtils.makeQueryString({ columns, joins, predicates, orderBy, format: true })
   const [rows] = await dbUtils.pool.query(sql)
@@ -581,12 +609,16 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   if (wantsDonor) {
     donorRead = hasPermission(userObject, 'donor:read')
   }
+  // Association visibility applies to reads on a caller's behalf only.
+  let associationReads = userObject ? associationReadsFor(userObject) : null
+  const allAssociationsReadable = !associationReads || ASSOCIATIONS.every(a => associationReads[a])
   const unresolved =
     !birthDate || !demographics ||
     (wantsMember && !(financial && scNote && memberInactive)) ||
     (wantsVolunteer && !volunteerInactive) ||
     (wantsApplication && !(memberApplication && volunteerApplication)) ||
-    (wantsDonor && !donorRead)
+    (wantsDonor && !donorRead) ||
+    !allAssociationsReadable
   // Without a userObject (internal Member/Volunteer controller calls) every
   // gate stays closed, so the village lookup cannot change anything — skip it.
   if (unresolved && userObject) {
@@ -609,6 +641,12 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     if (wantsDonor) {
       donorRead ||= hasPermission(userObject, 'donor:read', { villageId })
     }
+    // Outside the caller's person:read reach the rule stays off, so the
+    // controller's village check answers 403 rather than this hiding as 404.
+    if (!hasPermission(userObject, 'person:read', { villageId })) associationReads = null
+    else for (const a of ASSOCIATIONS) {
+      associationReads[a] ||= hasPermission(userObject, `${a}:read`, { villageId })
+    }
   }
   const rows = await queryPersons(
     { personId },
@@ -619,7 +657,8 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
       volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null,
       application: wantsApplication ? { member: memberApplication, volunteer: volunteerApplication } : null,
-      donor: wantsDonor && donorRead
+      donor: wantsDonor && donorRead,
+      associationReads
     }
   )
   return rows[0] ?? null
@@ -649,6 +688,7 @@ module.exports.getPersons = async function ({ villageIdsGranted, villageId, firs
       demographics: keyForVillages(userObject, 'person:read_demographics', villageId),
       memberNoncurrent: keyForVillages(userObject, 'member:read_inactive', villageId),
       volunteerNoncurrent: keyForVillages(userObject, 'volunteer:read_inactive', villageId),
+      associationReads: Object.fromEntries(ASSOCIATIONS.map(a => [a, keyForVillages(userObject, `${a}:read`, villageId)])),
     }
   )
 }
@@ -657,6 +697,7 @@ module.exports.getPersonsByVillage = async function (villageId, userObject) {
   return await queryPersons({ villageId }, {
     birthDate: hasPermission(userObject, 'person:read_birth_date', { villageId }),
     demographics: hasPermission(userObject, 'person:read_demographics', { villageId }),
+    associationReads: associationReadsFor(userObject, { villageId }),
   })
 }
 

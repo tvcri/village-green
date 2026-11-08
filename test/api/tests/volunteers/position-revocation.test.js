@@ -106,7 +106,8 @@ test('a village-scoped volunteer writer gets 403 dropping an associate village t
 test('a person writer without volunteer:write gets 403 moving a volunteer whose home-village position it would revoke', async () => {
   const s = await setup('RAuthMove')
   // person:write at both ends of the move, so only the revocation can refuse it.
-  await withScratchRole(['person:read', 'person:write'], async (writer) => {
+  // volunteer:read so the writer can see the volunteer at all (association rule).
+  await withScratchRole(['person:read', 'person:write', 'volunteer:read'], async (writer) => {
     const res = await vgCall('patchPerson', { personId: s.personId }, { token: writer, body: { villageId: innsmouth } })
     assert.equal(res.status, 403)
     assert.deepEqual(await heldIds(s.personId), [s.atHome, s.atAssoc, s.hub].sort(), 'nothing revoked')

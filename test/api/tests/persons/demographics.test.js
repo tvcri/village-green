@@ -20,7 +20,9 @@ const WRITER_ROLE = 91   // birthdate.test.js uses 90; distinct so the suites ca
 async function createWriterRole () {
   await withDb(async conn => {
     await conn.query(`INSERT INTO role (roleId, name, scope, description, isSystem) VALUES (?, 'Demographics Writer', 'federation', 'harness', 0)`, [WRITER_ROLE])
-    await conn.query(`INSERT INTO role_permission (roleId, permission) VALUES (?, 'person:read'), (?, 'person:write')`, [WRITER_ROLE, WRITER_ROLE])
+    // member:read/volunteer:read: person:read reaches only persons whose
+    // associations the caller can read (or who have none).
+    await conn.query(`INSERT INTO role_permission (roleId, permission) VALUES (?, 'person:read'), (?, 'person:write'), (?, 'member:read'), (?, 'volunteer:read')`, [WRITER_ROLE, WRITER_ROLE, WRITER_ROLE, WRITER_ROLE])
     await conn.query('INSERT INTO role_grant (userId, roleId, villageId) VALUES (?, ?, NULL)', [NOGRANTS, WRITER_ROLE])
   })
 }
