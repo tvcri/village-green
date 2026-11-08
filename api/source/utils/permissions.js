@@ -6,7 +6,7 @@
 // assignments. NOTE: "permission" here is RBAC authorization — unrelated to
 // the volunteer-skills `capability` table/domain.
 const catalog = {
-  'person:read':              { description: 'Read person records', requiresElevation: false },
+  'person:read':              { description: 'Read person records. Which persons is narrowed by village scope and by association: a person is visible if they have no member, volunteer or donor record, or if the caller can read at least one of them', requiresElevation: false },
   'person:write':             { description: 'Create/update person records', requiresElevation: false },
   'person:read_birth_date':   { description: 'See birth dates on person records', requiresElevation: false },
   'person:read_demographics': { description: 'See gender, ethnicity, race and veteran status on person records', requiresElevation: false },
@@ -18,6 +18,8 @@ const catalog = {
   'volunteer:read':           { description: 'Read volunteer rosters', requiresElevation: false },
   'volunteer:write':          { description: 'Manage volunteer records (not VSS self-service)', requiresElevation: false },
   'volunteer:read_application': { description: 'See the stored application-form extraction on volunteer records (contains birth-date and demographic answers)', requiresElevation: false },
+  'donor:read':               { description: 'Read donor data, and see persons whose only association is donor', requiresElevation: false },
+  'donor:write':              { description: 'Create/replace/remove donor records (LGL import and integration; no UI)', requiresElevation: false },
   'training:admin':           { description: 'Manage the list of volunteer trainings', requiresElevation: false },
   'drop_reason:admin':        { description: 'Manage the lists of member and volunteer drop reasons', requiresElevation: false },
   'position:admin':           { description: 'Manage the list of volunteer positions', requiresElevation: false },

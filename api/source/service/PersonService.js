@@ -372,6 +372,22 @@ function volunteerColumn ({ inactive }) {
     ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``
 }
 
+// ?projection=donor (donor:read): the LGL-sourced donor row, or NULL when the
+// person is not a donor. No status, so no view: the base table is the source.
+const DONOR_JSON = (alias) => `JSON_OBJECT(
+      'donorId', CAST(${alias}.id AS CHAR),
+      'personId', CAST(${alias}.personId AS CHAR),
+      'lglConstituentId', ${alias}.lglConstituentId,
+      'lastGiftDate', DATE_FORMAT(${alias}.lastGiftDate, '%Y-%m-%d')
+    )`
+const SUMMARY_DONOR_COLUMN = `(SELECT JSON_OBJECT(
+      'lglConstituentId', d3.lglConstituentId,
+      'lastGiftDate', DATE_FORMAT(d3.lastGiftDate, '%Y-%m-%d')
+    ) FROM donor d3 WHERE d3.personId = p.id) AS donor`
+function donorColumn () {
+  return `(SELECT ${DONOR_JSON('d2')} FROM donor d2 WHERE d2.personId = p.id) AS donor`
+}
+
 // ?projection=application: a root object whose keys appear only with their
 // read_application gate. Base tables, never the active_* views — a dropped
 // member's application must stay readable to those allowed to read it.
@@ -380,6 +396,25 @@ function applicationColumn ({ member, volunteer }) {
   if (member) parts.push(`'member', (SELECT ma.application FROM member ma WHERE ma.personId = p.id)`)
   if (volunteer) parts.push(`'volunteer', (SELECT va.application FROM volunteer va WHERE va.personId = p.id)`)
   return `JSON_OBJECT(${parts.join(', ')}) AS application`
+}
+
+// person:read is a scope, not "every person": a caller sees a person only if
+// the person has no member/volunteer/donor row, or the caller can read at
+// least one of those associations. Base tables, never the active_* views — a
+// Pending or Dropped member is still a member. Returns null (no predicate)
+// when every association is readable.
+// Each association is its table and its `<table>:read` key.
+const ASSOCIATIONS = ['member', 'volunteer', 'donor']
+function associationPredicate (reads) {
+  if (ASSOCIATIONS.every(a => reads[a])) return null
+  const exists = (table) => `EXISTS (SELECT 1 FROM ${table} ax WHERE ax.personId = p.id)`
+  const none = ASSOCIATIONS.map(a => `NOT ${exists(a)}`).join(' AND ')
+  const readable = ASSOCIATIONS.filter(a => reads[a]).map(exists)
+  return `((${none})${readable.map(e => ` OR ${e}`).join('')})`
+}
+// The caller's association read keys, for one village (or federation-wide).
+function associationReadsFor (userObject, opts) {
+  return Object.fromEntries(ASSOCIATIONS.map(a => [a, hasPermission(userObject, `${a}:read`, opts)]))
 }
 
 // Single query path for person reads: getPerson, getPersons, and
@@ -396,12 +431,18 @@ function applicationColumn ({ member, volunteer }) {
 //                       (unrestricted), [] = no grants (empty result),
 //                       array = restrict to those villages
 //   firstName, lastName, phone, email - LIKE searches
+//   lglConstituentId  - exact match on the donor row (caller must hold donor:read)
 // inOptions:
 //   summary           - PersonSummary column set instead of full Person
 //   detail            - add the `detail` object to summary rows (getPersons projection)
 //   member            - { financial, scNote, inactive } projection gates
 //   volunteer         - { inactive } projection gates
 //   application       - { member, volunteer } read_application gates (root object; base tables, never active_* views)
+//   donor             - include the donor projection (donor:read)
+//   summaryDonor      - summary rows carry `donor` { lglConstituentId, lastGiftDate } or null (donor:read)
+//   associationReads  - { member, volunteer, donor } read keys the caller
+//                       holds; applies the association visibility rule. null
+//                       (internal callers with no user) skips it.
 //   birthDate         - include p.birthDate (person:read_birth_date)
 //   demographics      - include gender/ethnicity/races/isVeteran (person:read_demographics)
 //   openRequestCount  - include openServiceRequestCount (full rows only; getPerson)
@@ -411,7 +452,8 @@ function applicationColumn ({ member, volunteer }) {
 //                       volunteer:read_inactive)
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const {
-    summary = false, detail = false, member = null, volunteer = null, application = null,
+    summary = false, detail = false, member = null, volunteer = null, application = null, donor = false,
+    associationReads = null, summaryDonor = false,
     birthDate = false, demographics = false, openRequestCount = false,
     memberNoncurrent = false, volunteerNoncurrent = false
   } = inOptions
@@ -426,6 +468,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       `${memberNoncurrent ? 'mb' : 'm'}.status AS memberStatus`,
       `${volunteerNoncurrent ? 'vb' : 'vol'}.status AS volunteerStatus`,
       `${pauseJsonSql(volunteerNoncurrent ? 'vb' : 'vol')} AS volunteerPause`,
+      ...(summaryDonor ? [SUMMARY_DONOR_COLUMN] : []),
       CIRCLES_COLUMN,
       ...(demographics ? ['p.isVeteran'] : []),
       `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,
@@ -466,6 +509,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
   if (member) columns.push(memberColumn(member))
   if (volunteer) columns.push(volunteerColumn(volunteer))
   if (application) columns.push(applicationColumn(application))
+  if (donor) columns.push(donorColumn())
 
   const joins = new Set([
     'person p',
@@ -517,9 +561,18 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
     predicates.statements.push('(p.phone LIKE ? OR p.cell LIKE ?)')
     predicates.binds.push(`%${inPredicates.phone}%`, `%${inPredicates.phone}%`)
   }
+  if (inPredicates.lglConstituentId) {
+    predicates.statements.push('EXISTS (SELECT 1 FROM donor dx WHERE dx.personId = p.id AND dx.lglConstituentId = ?)')
+    predicates.binds.push(inPredicates.lglConstituentId)
+  }
   if (inPredicates.email) {
     predicates.statements.push('p.email LIKE ?')
     predicates.binds.push(`%${inPredicates.email}%`)
+  }
+
+  if (associationReads) {
+    const visible = associationPredicate(associationReads)
+    if (visible) predicates.statements.push(visible)
   }
 
   const orderBy = ['p.fullName']
@@ -543,11 +596,13 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   const wantsMember = projections.includes('member')
   const wantsVolunteer = projections.includes('volunteer')
   const wantsApplication = projections.includes('application')
+  const wantsDonor = projections.includes('donor')
   let financial = false
   let scNote = false
   let memberInactive = false
   let volunteerInactive = false
   let memberApplication = false, volunteerApplication = false
+  let donorRead = false
   let birthDate = hasPermission(userObject, 'person:read_birth_date')
   let demographics = hasPermission(userObject, 'person:read_demographics')
   if (wantsMember) {
@@ -562,11 +617,19 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     memberApplication = hasPermission(userObject, 'member:read_application')
     volunteerApplication = hasPermission(userObject, 'volunteer:read_application')
   }
+  if (wantsDonor) {
+    donorRead = hasPermission(userObject, 'donor:read')
+  }
+  // Association visibility applies to reads on a caller's behalf only.
+  let associationReads = userObject ? associationReadsFor(userObject) : null
+  const allAssociationsReadable = !associationReads || ASSOCIATIONS.every(a => associationReads[a])
   const unresolved =
     !birthDate || !demographics ||
     (wantsMember && !(financial && scNote && memberInactive)) ||
     (wantsVolunteer && !volunteerInactive) ||
-    (wantsApplication && !(memberApplication && volunteerApplication))
+    (wantsApplication && !(memberApplication && volunteerApplication)) ||
+    (wantsDonor && !donorRead) ||
+    !allAssociationsReadable
   // Without a userObject (internal Member/Volunteer controller calls) every
   // gate stays closed, so the village lookup cannot change anything — skip it.
   if (unresolved && userObject) {
@@ -586,6 +649,15 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       memberApplication ||= hasPermission(userObject, 'member:read_application', { villageId })
       volunteerApplication ||= hasPermission(userObject, 'volunteer:read_application', { villageId })
     }
+    if (wantsDonor) {
+      donorRead ||= hasPermission(userObject, 'donor:read', { villageId })
+    }
+    // Outside the caller's person:read reach the rule stays off, so the
+    // controller's village check answers 403 rather than this hiding as 404.
+    if (!hasPermission(userObject, 'person:read', { villageId })) associationReads = null
+    else for (const a of ASSOCIATIONS) {
+      associationReads[a] ||= hasPermission(userObject, `${a}:read`, { villageId })
+    }
   }
   const rows = await queryPersons(
     { personId },
@@ -595,7 +667,9 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       openRequestCount,
       member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
       volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null,
-      application: wantsApplication ? { member: memberApplication, volunteer: volunteerApplication } : null
+      application: wantsApplication ? { member: memberApplication, volunteer: volunteerApplication } : null,
+      donor: wantsDonor && donorRead,
+      associationReads
     }
   )
   return rows[0] ?? null
@@ -610,21 +684,27 @@ function keyForVillages (userObject, key, villageIds) {
   return villageIds.every(v => hasPermission(userObject, key, { villageId: v }))
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, projection, userObject }) {
+module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, lglConstituentId, projection, userObject }) {
   // 'detail' adds a same-named object with the full person columns (exports).
   // Deliberately no member/volunteer options here: those projections carry
   // per-village-gated fields, and this endpoint can span villages (see
   // getPerson's gate logic). birthDate IS gated here, per-query, because the
   // detail object carries it.
+  const associationReads = Object.fromEntries(ASSOCIATIONS.map(a => [a, keyForVillages(userObject, `${a}:read`, villageId)]))
+  // Filtering on donor data without donor:read would reveal which visible
+  // persons are donors, so it is refused rather than ignored.
+  if (lglConstituentId && !associationReads.donor) throw new SmError.PrivilegeError()
   return queryPersons(
-    { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email },
+    { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email, lglConstituentId },
     {
       summary: true,
+      summaryDonor: associationReads.donor,
       detail: projection?.includes('detail'),
       birthDate: keyForVillages(userObject, 'person:read_birth_date', villageId),
       demographics: keyForVillages(userObject, 'person:read_demographics', villageId),
       memberNoncurrent: keyForVillages(userObject, 'member:read_inactive', villageId),
       volunteerNoncurrent: keyForVillages(userObject, 'volunteer:read_inactive', villageId),
+      associationReads,
     }
   )
 }
@@ -633,6 +713,7 @@ module.exports.getPersonsByVillage = async function (villageId, userObject) {
   return await queryPersons({ villageId }, {
     birthDate: hasPermission(userObject, 'person:read_birth_date', { villageId }),
     demographics: hasPermission(userObject, 'person:read_demographics', { villageId }),
+    associationReads: associationReadsFor(userObject, { villageId }),
   })
 }
 
@@ -728,12 +809,29 @@ module.exports.patchPerson = async function (personId, body, userId) {
   return personId
 }
 
+// A person still referenced cannot be deleted: any member/volunteer/donor row
+// (checked first, for a specific message), and anything else that points at
+// the person — service requests, friendly-call submissions, users — via the
+// FK refusal. Both answer 422, never a raw FK 500.
 module.exports.deletePerson = async function (personId, userId) {
-  return dbUtils.retryOnDeadlock2({
-    transactionFn: async (connection) => {
-      await AuditService.auditDelete(connection, { entityType: 'person', entityId: personId, userId },
-        () => connection.query('DELETE FROM person WHERE id = ?', [personId]))
-      return personId
-    },
-  })
+  try {
+    return await dbUtils.retryOnDeadlock2({
+      transactionFn: async (connection) => {
+        const exists = ASSOCIATIONS.map(a => `EXISTS (SELECT 1 FROM ${a} WHERE personId = ? FOR UPDATE)`).join(' OR ')
+        const [[{ found }]] = await connection.query(`SELECT ${exists} AS found`, ASSOCIATIONS.map(() => personId))
+        if (found) {
+          throw new SmError.UnprocessableError('Remove this person\'s member, volunteer and donor records before deleting them.')
+        }
+        await AuditService.auditDelete(connection, { entityType: 'person', entityId: personId, userId },
+          () => connection.query('DELETE FROM person WHERE id = ?', [personId]))
+        return personId
+      },
+    })
+  }
+  catch (err) {
+    if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+      throw new SmError.UnprocessableError('This person is still named on other records, such as service requests, and cannot be deleted.')
+    }
+    throw err
+  }
 }

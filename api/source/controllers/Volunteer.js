@@ -31,7 +31,9 @@ module.exports.getVolunteers = async function getVolunteers (req, res, next) {
 module.exports.putPersonVolunteer = async function putPersonVolunteer (req, res, next) {
   try {
     const personId = req.params.personId
-    const person = await PersonService.getPerson(personId)
+    // As the caller: a person they can't see (donor-only) is a 404, like a
+    // missing id, rather than a 403 that would mark it as hidden.
+    const person = await PersonService.getPerson(personId, [], req.userObject)
     if (!person) throw new SmError.NotFoundError()
     // The volunteer role is granted against the person's home village, not a
     // body field — gate on the person record being mutated, same as Member.

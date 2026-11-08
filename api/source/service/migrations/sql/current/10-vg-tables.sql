@@ -165,6 +165,22 @@ CREATE TABLE `disability` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `donor`
+--
+
+DROP TABLE IF EXISTS `donor`;
+CREATE TABLE `donor` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `personId` int NOT NULL,
+  `lglConstituentId` varchar(50) NOT NULL,
+  `lastGiftDate` date DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `donor_person_id` (`personId`),
+  KEY `donor_lgl_constituent_id` (`lglConstituentId`),
+  CONSTRAINT `donor_person_fk` FOREIGN KEY (`personId`) REFERENCES `person` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `enrollment_request`
 --
 
@@ -1042,4 +1058,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-27 22:25:02
+-- Dump completed on 2026-11-08  1:16:26

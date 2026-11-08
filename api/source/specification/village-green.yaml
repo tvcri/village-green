@@ -1523,6 +1523,14 @@ paths:
           description: Filter by email (contains, case-insensitive)
           schema:
             type: string
+        - name: lglConstituentId
+          in: query
+          description: >-
+            Persons whose donor record carries this LGL constituent ID (exact
+            match; a couple shares one). Requires donor:read.
+          schema:
+            type: string
+            maxLength: 50
         - name: projection
           in: query
           description: >-
@@ -1764,6 +1772,34 @@ paths:
         '204': { description: Volunteer role revoked }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:volunteer ] } ]
+
+  /persons/{personId}/donor:
+    put:
+      summary: Record or replace the donor association
+      description: >-
+        Donors come from LGL; this is the write path for the LGL import and
+        integration. There is no UI that writes donors. Requires donor:write.
+      tags: [Donor]
+      operationId: putPersonDonor
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DonorPut' }
+      responses:
+        '200': { description: Person with the donor projection, content: { application/json: { schema: { $ref: '#/components/schemas/Person' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:donor ] } ]
+    delete:
+      summary: Remove the donor association
+      tags: [Donor]
+      operationId: deletePersonDonor
+      parameters: [ { $ref: '#/components/parameters/PersonIdPath' } ]
+      responses:
+        '204': { description: Donor association removed }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:donor ] } ]
 
   /persons/{personId}/volunteer/pause:
     put:
@@ -3962,6 +3998,25 @@ components:
           type: boolean
     MemberId:
       $ref: '#/components/schemas/StringIntId'
+    Donor:
+      description: >-
+        A person's donor association, sourced from LGL. lglConstituentId is
+        shared by persons LGL records as one constituent (a couple).
+      additionalProperties: false
+      type: object
+      required: [donorId, personId, lglConstituentId, lastGiftDate]
+      properties:
+        donorId: { $ref: '#/components/schemas/StringIntId' }
+        personId: { $ref: '#/components/schemas/PersonId' }
+        lglConstituentId: { type: string, maxLength: 50 }
+        lastGiftDate: { type: string, format: date, nullable: true }
+    DonorPut:
+      additionalProperties: false
+      type: object
+      required: [lglConstituentId]
+      properties:
+        lglConstituentId: { type: string, minLength: 1, maxLength: 50 }
+        lastGiftDate: { type: string, format: date, nullable: true }
     ApplicationEnvelope:
       description: >-
         The import wizard's extraction of one application form, as the form
@@ -4330,6 +4385,10 @@ components:
         volunteer:
           $ref: '#/components/schemas/VolunteerDetail'
           nullable: true
+        donor:
+          description: Present only with ?projection=donor and donor:read; null when the person is not a donor.
+          $ref: '#/components/schemas/Donor'
+          nullable: true
         circles:
           type: array
           items: { $ref: '#/components/schemas/Circle' }
@@ -4374,6 +4433,15 @@ components:
           enum: [Active, Pending, Dropped, null]
         volunteerPause:
           $ref: '#/components/schemas/VolunteerPause'
+        donor:
+          # Omitted without donor:read; null for a person who is not a donor.
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [lglConstituentId, lastGiftDate]
+          properties:
+            lglConstituentId: { type: string, maxLength: 50 }
+            lastGiftDate: { type: string, format: date, nullable: true }
         circles:
           type: array
           items:
@@ -7142,6 +7210,7 @@ components:
           - member
           - volunteer
           - application
+          - donor
     RunSequenceQuery:
       name: after-seq
       in: query

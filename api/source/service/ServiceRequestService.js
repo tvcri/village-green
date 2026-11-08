@@ -306,6 +306,23 @@ async function assertNotPaused (connection, volunteerPersonId, serviceDate) {
   }
 }
 
+// A request is between a member and a volunteer: the member must hold a
+// member record and the volunteer a volunteer record (any status). The form
+// always offered only those; the API enforces it too, which also keeps
+// donor-only persons off requests (whose reads reach every sr:read holder).
+// Only ids that change are checked (`current` on patch): the edit form resends
+// both, and an old request must stay editable after a person loses the role.
+async function assertRequestPersons (connection, payload, current = null) {
+  for (const role of ['member', 'volunteer']) {
+    const id = payload[`${role}PersonId`]
+    if (id == null || id === '' || String(id) === String(current?.[`${role}PersonId`] ?? '')) continue
+    const [rows] = await connection.query(`SELECT 1 FROM ${role} WHERE personId = ? FOR SHARE`, [id])
+    if (!rows.length) {
+      throw new SmError.UnprocessableError(`The request's ${role} must be a person with a ${role} record.`)
+    }
+  }
+}
+
 module.exports.createServiceRequest = async function (payload, userId) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
@@ -342,6 +359,8 @@ module.exports.createServiceRequest = async function (payload, userId) {
         createdUserId: userId
       }
 
+      await assertRequestPersons(connection, insertFields)
+
       // A terminal write records the past; only in-flight rows are lined up.
       if (!isEndState(resolvedStatus)) {
         await assertNotPaused(connection, insertFields.volunteerPersonId, insertFields.serviceDate)
@@ -377,7 +396,7 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
       const { row: before } = await AuditService.readShape(connection, 'serviceRequest', serviceRequestId)
 
       const [currentRows] = await connection.query(
-        "SELECT volunteerPersonId, status, DATE_FORMAT(serviceDate, '%Y-%m-%d') AS serviceDate FROM service_request WHERE id = ?",
+        "SELECT memberPersonId, volunteerPersonId, status, DATE_FORMAT(serviceDate, '%Y-%m-%d') AS serviceDate FROM service_request WHERE id = ?",
         [serviceRequestId]
       )
       const current = currentRows[0]
@@ -397,6 +416,8 @@ module.exports.patchServiceRequest = async function (serviceRequestId, payload, 
           `Cannot change status from ${current.status} to ${payload.status}: a request never moves backward in its lifecycle.`
         )
       }
+
+      await assertRequestPersons(connection, payload, current)
 
       const updateFields = {}
       if (payload.memberPersonId !== undefined) updateFields.memberPersonId = payload.memberPersonId || null
