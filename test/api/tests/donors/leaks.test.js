@@ -56,3 +56,28 @@ test('patching a service request onto a donor-only volunteer is refused', async 
   assert.equal(res.status, 422)
   await vgCall('patchServiceRequest', { serviceRequestId }, { token: sc, body: { status: 'Hub cancelled' } })
 })
+
+// The member/volunteer PUTs looked the person up without the caller, so a
+// caller who can't see a donor-only person got 403 (exists) where a missing
+// id gets 404 — together with getPerson's 404, that marked donor-only ids.
+test('member and volunteer PUTs answer a donor-only id like a missing one', async () => {
+  for (const op of ['putPersonMember', 'putPersonVolunteer']) {
+    const hidden = await vgCall(op, { personId: donorOnly }, { token: board, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })
+    const missing = await vgCall(op, { personId: '999999' }, { token: board, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })
+    assert.equal(hidden.status, missing.status, `${op}: donor-only vs missing`)
+  }
+})
+
+// Only ids that change are checked: a full-form edit of an old request whose
+// member has since lost their member record must still save.
+test('editing a request whose member lost their member record still saves', async () => {
+  const personId = await makePerson()
+  assert.equal((await vgCall('putPersonMember', { personId }, { token: staff, body: { status: 'Active', memberLevel: 'Household', joinDate: '2026-01-15' } })).status, 200)
+  const created = await vgCall('createServiceRequest', {}, { token: sc, body: { villageId: quahog, memberPersonId: personId, serviceDate: '2026-07-11' } })
+  assert.equal(created.status, 201)
+  const { serviceRequestId } = created.json
+  assert.equal((await vgCall('deletePersonMember', { personId }, { token: staff })).status, 204)
+  const res = await vgCall('patchServiceRequest', { serviceRequestId }, { token: sc, body: { memberPersonId: personId, serviceDate: '2026-07-12' } })
+  assert.equal(res.status, 200)
+  await vgCall('patchServiceRequest', { serviceRequestId }, { token: sc, body: { status: 'Hub cancelled' } })
+})

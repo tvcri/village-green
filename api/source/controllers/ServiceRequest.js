@@ -43,9 +43,12 @@ module.exports.getServiceRequests = async function getServiceRequests (req, res,
 
 // Named persons must hold a member or volunteer record: request reads expose
 // them to every sr:read holder, so a donor-only person can never be named.
-async function assertRequestPersons (body) {
+// Only ids that change are checked (`existing` on patch): the edit form resends
+// both, and an old request must stay editable after its member loses the role.
+async function assertRequestPersons (body, existing = null) {
   for (const key of ['memberPersonId', 'volunteerPersonId']) {
-    if (body[key] != null && !(await PersonService.hasMemberOrVolunteer(body[key]))) {
+    if (body[key] == null || String(body[key]) === existing?.[key]) continue
+    if (!(await PersonService.hasMemberOrVolunteer(body[key]))) {
       throw new SmError.UnprocessableError(`${key} must be a person with a member or volunteer record.`)
     }
   }
@@ -100,7 +103,7 @@ module.exports.patchServiceRequest = async function patchServiceRequest (req, re
     if (!hasPermission(req.userObject, 'sr:write', { villageId: existing.villageId })) {
       throw new SmError.PrivilegeError()
     }
-    await assertRequestPersons(req.body)
+    await assertRequestPersons(req.body, existing)
 
     // The service commits in a transaction and returns the id; fetch the full
     // record afterward so the read sees committed data.

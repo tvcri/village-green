@@ -60,3 +60,8 @@ test('the constituent filter requires donor:read', async () => {
   assert.equal((await vgCall('getPersons', { lglConstituentId: 'x' }, { token: board })).status, 403)
   assert.equal((await vgCall('getPersons', { villageId: [quahog], lglConstituentId: 'x' }, { token: villageUser })).status, 403)
 })
+
+// An empty filter would be skipped and return everyone — reads as matches.
+test('an empty constituent filter is rejected', async () => {
+  assert.equal((await vgCall('getPersons', { lglConstituentId: '' }, { token: staff })).status, 400)
+})
