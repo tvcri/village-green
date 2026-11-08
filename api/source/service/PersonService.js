@@ -380,6 +380,10 @@ const DONOR_JSON = (alias) => `JSON_OBJECT(
       'lglConstituentId', ${alias}.lglConstituentId,
       'lastGiftDate', DATE_FORMAT(${alias}.lastGiftDate, '%Y-%m-%d')
     )`
+const SUMMARY_DONOR_COLUMN = `(SELECT JSON_OBJECT(
+      'lglConstituentId', d3.lglConstituentId,
+      'lastGiftDate', DATE_FORMAT(d3.lastGiftDate, '%Y-%m-%d')
+    ) FROM donor d3 WHERE d3.personId = p.id) AS donor`
 function donorColumn () {
   return `(SELECT ${DONOR_JSON('d2')} FROM donor d2 WHERE d2.personId = p.id) AS donor`
 }
@@ -427,6 +431,7 @@ function associationReadsFor (userObject, opts) {
 //                       (unrestricted), [] = no grants (empty result),
 //                       array = restrict to those villages
 //   firstName, lastName, phone, email - LIKE searches
+//   lglConstituentId  - exact match on the donor row (caller must hold donor:read)
 // inOptions:
 //   summary           - PersonSummary column set instead of full Person
 //   detail            - add the `detail` object to summary rows (getPersons projection)
@@ -434,6 +439,7 @@ function associationReadsFor (userObject, opts) {
 //   volunteer         - { inactive } projection gates
 //   application       - { member, volunteer } read_application gates (root object; base tables, never active_* views)
 //   donor             - include the donor projection (donor:read)
+//   summaryDonor      - summary rows carry `donor` { lglConstituentId, lastGiftDate } or null (donor:read)
 //   associationReads  - { member, volunteer, donor } read keys the caller
 //                       holds; applies the association visibility rule. null
 //                       (internal callers with no user) skips it.
@@ -447,7 +453,7 @@ function associationReadsFor (userObject, opts) {
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const {
     summary = false, detail = false, member = null, volunteer = null, application = null, donor = false,
-    associationReads = null,
+    associationReads = null, summaryDonor = false,
     birthDate = false, demographics = false, openRequestCount = false,
     memberNoncurrent = false, volunteerNoncurrent = false
   } = inOptions
@@ -462,6 +468,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       `${memberNoncurrent ? 'mb' : 'm'}.status AS memberStatus`,
       `${volunteerNoncurrent ? 'vb' : 'vol'}.status AS volunteerStatus`,
       `${pauseJsonSql(volunteerNoncurrent ? 'vb' : 'vol')} AS volunteerPause`,
+      ...(summaryDonor ? [SUMMARY_DONOR_COLUMN] : []),
       CIRCLES_COLUMN,
       ...(demographics ? ['p.isVeteran'] : []),
       `JSON_OBJECT('phone', p.phone, 'cell', p.cell) AS phone`,
@@ -553,6 +560,10 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
   if (inPredicates.phone) {
     predicates.statements.push('(p.phone LIKE ? OR p.cell LIKE ?)')
     predicates.binds.push(`%${inPredicates.phone}%`, `%${inPredicates.phone}%`)
+  }
+  if (inPredicates.lglConstituentId) {
+    predicates.statements.push('EXISTS (SELECT 1 FROM donor dx WHERE dx.personId = p.id AND dx.lglConstituentId = ?)')
+    predicates.binds.push(inPredicates.lglConstituentId)
   }
   if (inPredicates.email) {
     predicates.statements.push('p.email LIKE ?')
@@ -673,22 +684,27 @@ function keyForVillages (userObject, key, villageIds) {
   return villageIds.every(v => hasPermission(userObject, key, { villageId: v }))
 }
 
-module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, projection, userObject }) {
+module.exports.getPersons = async function ({ villageIdsGranted, villageId, firstName, lastName, phone, email, lglConstituentId, projection, userObject }) {
   // 'detail' adds a same-named object with the full person columns (exports).
   // Deliberately no member/volunteer options here: those projections carry
   // per-village-gated fields, and this endpoint can span villages (see
   // getPerson's gate logic). birthDate IS gated here, per-query, because the
   // detail object carries it.
+  const associationReads = Object.fromEntries(ASSOCIATIONS.map(a => [a, keyForVillages(userObject, `${a}:read`, villageId)]))
+  // Filtering on donor data without donor:read would reveal which visible
+  // persons are donors, so it is refused rather than ignored.
+  if (lglConstituentId && !associationReads.donor) throw new SmError.PrivilegeError()
   return queryPersons(
-    { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email },
+    { villageIdsGranted, villageIds: villageId, firstName, lastName, phone, email, lglConstituentId },
     {
       summary: true,
+      summaryDonor: associationReads.donor,
       detail: projection?.includes('detail'),
       birthDate: keyForVillages(userObject, 'person:read_birth_date', villageId),
       demographics: keyForVillages(userObject, 'person:read_demographics', villageId),
       memberNoncurrent: keyForVillages(userObject, 'member:read_inactive', villageId),
       volunteerNoncurrent: keyForVillages(userObject, 'volunteer:read_inactive', villageId),
-      associationReads: Object.fromEntries(ASSOCIATIONS.map(a => [a, keyForVillages(userObject, `${a}:read`, villageId)])),
+      associationReads,
     }
   )
 }

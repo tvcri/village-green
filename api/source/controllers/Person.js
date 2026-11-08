@@ -24,7 +24,7 @@ function stripHiddenFields (req, villageIds) {
 
 module.exports.getPersons = async function getPersons (req, res, next) {
   try {
-    const { villageId, firstName, lastName, phone, email, projection } = req.query
+    const { villageId, firstName, lastName, phone, email, lglConstituentId, projection } = req.query
     if (villageId?.length) {
       if (!villageId.every(vid => hasPermission(req.userObject, 'person:read', { villageId: vid }))) {
         throw new SmError.PrivilegeError()
@@ -40,7 +40,7 @@ module.exports.getPersons = async function getPersons (req, res, next) {
           vid => hasPermission(req.userObject, 'person:read', { villageId: vid })
         )
     const response = await PersonService.getPersons({
-      villageIdsGranted, villageId, firstName, lastName, phone, email, projection,
+      villageIdsGranted, villageId, firstName, lastName, phone, email, lglConstituentId, projection,
       userObject: req.userObject,
     })
     res.json(response)

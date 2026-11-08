@@ -1523,6 +1523,14 @@ paths:
           description: Filter by email (contains, case-insensitive)
           schema:
             type: string
+        - name: lglConstituentId
+          in: query
+          description: >-
+            Persons whose donor record carries this LGL constituent ID (exact
+            match; a couple shares one). Requires donor:read.
+          schema:
+            type: string
+            maxLength: 50
         - name: projection
           in: query
           description: >-
@@ -4425,6 +4433,15 @@ components:
           enum: [Active, Pending, Dropped, null]
         volunteerPause:
           $ref: '#/components/schemas/VolunteerPause'
+        donor:
+          # Omitted without donor:read; null for a person who is not a donor.
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [lglConstituentId, lastGiftDate]
+          properties:
+            lglConstituentId: { type: string, maxLength: 50 }
+            lastGiftDate: { type: string, format: date, nullable: true }
         circles:
           type: array
           items:
