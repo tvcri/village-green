@@ -809,6 +809,14 @@ module.exports.patchPerson = async function (personId, body, userId) {
   return personId
 }
 
+// Any member/volunteer/donor row blocks a person delete (their FKs to person
+// have no cascade). Whatever the row's status.
+module.exports.hasAssociations = async function (personId) {
+  const exists = ASSOCIATIONS.map(a => `EXISTS (SELECT 1 FROM ${a} WHERE personId = ?)`).join(' OR ')
+  const [[{ found }]] = await dbUtils.pool.query(`SELECT ${exists} AS found`, ASSOCIATIONS.map(() => personId))
+  return !!found
+}
+
 module.exports.deletePerson = async function (personId, userId) {
   return dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
