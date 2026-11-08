@@ -372,6 +372,18 @@ function volunteerColumn ({ inactive }) {
     ) FROM ${volunteerSource} vol3 WHERE vol3.personId = p.id) AS \`volunteer\``
 }
 
+// ?projection=donor (donor:read): the LGL-sourced donor row, or NULL when the
+// person is not a donor. No status, so no view: the base table is the source.
+const DONOR_JSON = (alias) => `JSON_OBJECT(
+      'donorId', CAST(${alias}.id AS CHAR),
+      'personId', CAST(${alias}.personId AS CHAR),
+      'lglConstituentId', ${alias}.lglConstituentId,
+      'lastGiftDate', DATE_FORMAT(${alias}.lastGiftDate, '%Y-%m-%d')
+    )`
+function donorColumn () {
+  return `(SELECT ${DONOR_JSON('d2')} FROM donor d2 WHERE d2.personId = p.id) AS donor`
+}
+
 // ?projection=application: a root object whose keys appear only with their
 // read_application gate. Base tables, never the active_* views — a dropped
 // member's application must stay readable to those allowed to read it.
@@ -402,6 +414,7 @@ function applicationColumn ({ member, volunteer }) {
 //   member            - { financial, scNote, inactive } projection gates
 //   volunteer         - { inactive } projection gates
 //   application       - { member, volunteer } read_application gates (root object; base tables, never active_* views)
+//   donor             - include the donor projection (donor:read)
 //   birthDate         - include p.birthDate (person:read_birth_date)
 //   demographics      - include gender/ethnicity/races/isVeteran (person:read_demographics)
 //   openRequestCount  - include openServiceRequestCount (full rows only; getPerson)
@@ -411,7 +424,7 @@ function applicationColumn ({ member, volunteer }) {
 //                       volunteer:read_inactive)
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const {
-    summary = false, detail = false, member = null, volunteer = null, application = null,
+    summary = false, detail = false, member = null, volunteer = null, application = null, donor = false,
     birthDate = false, demographics = false, openRequestCount = false,
     memberNoncurrent = false, volunteerNoncurrent = false
   } = inOptions
@@ -466,6 +479,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
   if (member) columns.push(memberColumn(member))
   if (volunteer) columns.push(volunteerColumn(volunteer))
   if (application) columns.push(applicationColumn(application))
+  if (donor) columns.push(donorColumn())
 
   const joins = new Set([
     'person p',
@@ -543,11 +557,13 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
   const wantsMember = projections.includes('member')
   const wantsVolunteer = projections.includes('volunteer')
   const wantsApplication = projections.includes('application')
+  const wantsDonor = projections.includes('donor')
   let financial = false
   let scNote = false
   let memberInactive = false
   let volunteerInactive = false
   let memberApplication = false, volunteerApplication = false
+  let donorRead = false
   let birthDate = hasPermission(userObject, 'person:read_birth_date')
   let demographics = hasPermission(userObject, 'person:read_demographics')
   if (wantsMember) {
@@ -562,11 +578,15 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
     memberApplication = hasPermission(userObject, 'member:read_application')
     volunteerApplication = hasPermission(userObject, 'volunteer:read_application')
   }
+  if (wantsDonor) {
+    donorRead = hasPermission(userObject, 'donor:read')
+  }
   const unresolved =
     !birthDate || !demographics ||
     (wantsMember && !(financial && scNote && memberInactive)) ||
     (wantsVolunteer && !volunteerInactive) ||
-    (wantsApplication && !(memberApplication && volunteerApplication))
+    (wantsApplication && !(memberApplication && volunteerApplication)) ||
+    (wantsDonor && !donorRead)
   // Without a userObject (internal Member/Volunteer controller calls) every
   // gate stays closed, so the village lookup cannot change anything — skip it.
   if (unresolved && userObject) {
@@ -586,6 +606,9 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       memberApplication ||= hasPermission(userObject, 'member:read_application', { villageId })
       volunteerApplication ||= hasPermission(userObject, 'volunteer:read_application', { villageId })
     }
+    if (wantsDonor) {
+      donorRead ||= hasPermission(userObject, 'donor:read', { villageId })
+    }
   }
   const rows = await queryPersons(
     { personId },
@@ -595,7 +618,8 @@ module.exports.getPerson = async function (personId, projections = [], userObjec
       openRequestCount,
       member: wantsMember ? { financial, scNote, inactive: memberInactive } : null,
       volunteer: wantsVolunteer ? { inactive: volunteerInactive } : null,
-      application: wantsApplication ? { member: memberApplication, volunteer: volunteerApplication } : null
+      application: wantsApplication ? { member: memberApplication, volunteer: volunteerApplication } : null,
+      donor: wantsDonor && donorRead
     }
   )
   return rows[0] ?? null

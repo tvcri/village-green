@@ -6,7 +6,7 @@ import { withDb } from '../../lib/db.js'
 import { villages, persons } from '../../setup/fixtures.js'
 
 // GET /metrics/persons: the active roster plus anyone inactive who had
-// Completed activity in range. Scenario rows are inserted here (ids 80-89,
+// Completed activity in range. Scenario rows are inserted here (ids 9080-9089,
 // April 2026) and removed in after(), so the shared fixtures and the June
 // metrics window stay untouched. Files run with concurrency 1.
 const RANGE = { start: '2026-04-01', end: '2026-04-30' }
@@ -14,16 +14,16 @@ const RANGE = { start: '2026-04-01', end: '2026-04-30' }
 const quahog = villages.quahog.id
 const innsmouth = villages.innsmouth.id
 
-const DROPPED_ACTIVE = 80 // Quahog member, Dropped, one Completed request in range
-const DROPPED_IDLE = 81 // Quahog member, Dropped, nothing in range
-const INACTIVE_DRIVER = 82 // Innsmouth volunteer, inactive, drove a Quahog ride in range
-const INACTIVE_IDLE = 83 // Quahog volunteer, inactive, nothing in range
+const DROPPED_ACTIVE = 9080 // Quahog member, Dropped, one Completed request in range
+const DROPPED_IDLE = 9081 // Quahog member, Dropped, nothing in range
+const INACTIVE_DRIVER = 9082 // Innsmouth volunteer, inactive, drove a Quahog ride in range
+const INACTIVE_IDLE = 9083 // Quahog volunteer, inactive, nothing in range
 
 async function cleanup (conn) {
-  await conn.query('DELETE FROM service_request WHERE id BETWEEN 80 AND 89')
-  await conn.query('DELETE FROM member WHERE id BETWEEN 80 AND 89')
-  await conn.query('DELETE FROM volunteer WHERE id BETWEEN 80 AND 89')
-  await conn.query('DELETE FROM person WHERE id BETWEEN 80 AND 89')
+  await conn.query('DELETE FROM service_request WHERE id BETWEEN 9080 AND 9089')
+  await conn.query('DELETE FROM member WHERE id BETWEEN 9080 AND 9089')
+  await conn.query('DELETE FROM volunteer WHERE id BETWEEN 9080 AND 9089')
+  await conn.query('DELETE FROM person WHERE id BETWEEN 9080 AND 9089')
 }
 
 before(() => withDb(async conn => {
@@ -36,8 +36,8 @@ before(() => withDb(async conn => {
   await person(INACTIVE_DRIVER, innsmouth, 'Zadok', 'Allen')
   await person(INACTIVE_IDLE, quahog, 'Cleveland', 'Brown')
   await conn.query(`INSERT INTO member (id, personId, memberNumber, status) VALUES
-    (80, ?, 'Q-8080', 'Dropped'), (81, ?, 'Q-8081', 'Dropped')`, [DROPPED_ACTIVE, DROPPED_IDLE])
-  await conn.query("INSERT INTO volunteer (id, personId, status) VALUES (82, ?, 'Dropped'), (83, ?, 'Dropped')",
+    (9080, ?, 'Q-8080', 'Dropped'), (9081, ?, 'Q-8081', 'Dropped')`, [DROPPED_ACTIVE, DROPPED_IDLE])
+  await conn.query("INSERT INTO volunteer (id, personId, status) VALUES (9082, ?, 'Dropped'), (9083, ?, 'Dropped')",
     [INACTIVE_DRIVER, INACTIVE_IDLE])
   const sr = (id, memberPersonId, volunteerPersonId, status, serviceName, transportationType, serviceDate, villageId = quahog) =>
     conn.query(`INSERT INTO service_request
@@ -46,17 +46,17 @@ before(() => withDb(async conn => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
     [id, 800 + id, villageId, memberPersonId, volunteerPersonId, status, serviceName, transportationType, serviceDate])
   // The dropped member's completed errand, driven by the active Quahog volunteer.
-  await sr(80, DROPPED_ACTIVE, persons.quahogVolunteer.id, 'Completed', 'Errand: Shopping', null, '2026-04-02')
+  await sr(9080, DROPPED_ACTIVE, persons.quahogVolunteer.id, 'Completed', 'Errand: Shopping', null, '2026-04-02')
   // A Quahog round-trip ride driven by the inactive INNSMOUTH volunteer: counts
   // toward that volunteer although the request belongs to Quahog.
-  await sr(81, persons.quahogMember.id, INACTIVE_DRIVER, 'Completed', 'Ride: Medical Appnt', 'Round Trip', '2026-04-03')
+  await sr(9081, persons.quahogMember.id, INACTIVE_DRIVER, 'Completed', 'Ride: Medical Appnt', 'Round Trip', '2026-04-03')
   // The active Innsmouth volunteer also drove for Quahog.
-  await sr(82, persons.quahogMember.id, persons.innsmouthVolunteer.id, 'Completed', 'Ride: Medical Appnt', 'One Way', '2026-04-04')
+  await sr(9082, persons.quahogMember.id, persons.innsmouthVolunteer.id, 'Completed', 'Ride: Medical Appnt', 'One Way', '2026-04-04')
   // ...and for Miskatonic, which the multi persona is not granted.
-  await sr(85, persons.miskatonicMember.id, persons.innsmouthVolunteer.id, 'Completed', 'Ride: Medical Appnt', 'One Way', '2026-04-07', villages.miskatonic.id)
+  await sr(9085, persons.miskatonicMember.id, persons.innsmouthVolunteer.id, 'Completed', 'Ride: Medical Appnt', 'One Way', '2026-04-07', villages.miskatonic.id)
   // Not Completed: never counted.
-  await sr(83, persons.quahogMember.id, persons.quahogVolunteer.id, 'Member cancelled', 'Ride: Medical Appnt', 'One Way', '2026-04-05')
-  await sr(84, persons.quahogMember.id, null, 'Hub cancelled', 'Tech Support', null, '2026-04-06')
+  await sr(9083, persons.quahogMember.id, persons.quahogVolunteer.id, 'Member cancelled', 'Ride: Medical Appnt', 'One Way', '2026-04-05')
+  await sr(9084, persons.quahogMember.id, null, 'Hub cancelled', 'Tech Support', null, '2026-04-06')
 }))
 
 after(() => withDb(cleanup))
