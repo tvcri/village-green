@@ -3222,12 +3222,30 @@ paths:
         description: >-
           Narrows the audience by who a person is. Must be member when
           audience is printed-newsletter or join-month (422 otherwise).
+          donor and all (member, volunteer or donor) require the donor:read
+          permission (403 otherwise) and are accepted only by the roster
+          audience (422 otherwise).
         schema:
           type: string
           enum:
           - member
           - volunteer
           - either
+          - donor
+          - all
+      - name: lastGiftWithinYears
+        in: query
+        required: false
+        description: >-
+          Keep donors whose last gift is within this many years. Applies only
+          to the donor side of role=donor or role=all, and drops donors with
+          no recorded gift. Omit for any time. Rejected for other roles (422).
+        schema:
+          type: integer
+          enum:
+          - 1
+          - 2
+          - 5
       - name: villageId
         in: query
         required: false
