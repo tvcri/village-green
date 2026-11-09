@@ -17,6 +17,33 @@ function parseAuthority(authority) {
   }
 }
 
+// Keycloak 26.6.3's default user profile validates firstName/lastName with
+// person-name-prohibited-characters (a fixed denylist) and length max 255
+// (UTF-16 units, after trim). One bad character rejects the whole account, and
+// these names are display-only, so clean them instead of passing them through.
+const NAME_MAX_LENGTH = 255
+const LINE_BREAKS_AND_TABS = /[\t\n\v\f\r\u0085\u2028\u2029]/g
+const PARENTHESIZED = /\([^)]*\)/g
+// Keycloak's set: < > & " $ % ! # ? § ; * ~ / \ | ^ = [ ] { } ( ), plus ASCII controls.
+const KEYCLOAK_PROHIBITED = /[<>&"$%!#?§;*~/\\|^=[\]{}()\u0000-\u001F\u007F]/g
+
+function cleanPersonName(name) {
+  if (typeof name !== 'string') return ''
+  let cleaned = name
+    .replace(LINE_BREAKS_AND_TABS, ' ')
+    .replace(PARENTHESIZED, ' ')
+    .replace(KEYCLOAK_PROHIBITED, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (cleaned.length > NAME_MAX_LENGTH) {
+    cleaned = cleaned.slice(0, NAME_MAX_LENGTH)
+    // Don't leave half of a surrogate pair at the cut.
+    if (/[\uD800-\uDBFF]$/.test(cleaned)) cleaned = cleaned.slice(0, -1)
+    cleaned = cleaned.trim()
+  }
+  return cleaned
+}
+
 function buildCreateUserPayload({ username, email, firstName, lastName }) {
   const payload = {
     username,
@@ -24,8 +51,10 @@ function buildCreateUserPayload({ username, email, firstName, lastName }) {
     enabled: true,
     emailVerified: true
   }
-  if (firstName) payload.firstName = firstName
-  if (lastName) payload.lastName = lastName
+  const first = cleanPersonName(firstName)
+  const last = cleanPersonName(lastName)
+  if (first) payload.firstName = first
+  if (last) payload.lastName = last
   return payload
 }
 

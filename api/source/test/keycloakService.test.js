@@ -73,3 +73,49 @@ test('buildResetPasswordPayload marks the password temporary', () => {
     temporary: true
   })
 })
+
+// Keycloak's default user profile runs person-name-prohibited-characters and
+// length max 255 on firstName/lastName (26.6.3 source). The names are display
+// only, so buildCreateUserPayload cleans them rather than letting Keycloak
+// reject the account (VG-202611-518: a parenthesized nickname blocked enrollment).
+const payloadFor = (firstName, lastName) =>
+  svc.buildCreateUserPayload({ username: 'v@example.com', email: 'v@example.com', firstName, lastName })
+
+test('buildCreateUserPayload drops a parenthesized nickname', () => {
+  assert.equal(payloadFor('Robert (Bob)', 'Example').firstName, 'Robert')
+})
+
+test('buildCreateUserPayload removes every Keycloak-prohibited character', () => {
+  const prohibited = '<>&"$%!#?§;*~/\\|^=[]{}'
+  assert.equal(payloadFor(`Jo${prohibited}an`).firstName, 'Joan')
+})
+
+test('buildCreateUserPayload removes control and line-break characters', () => {
+  assert.equal(payloadFor('Ann\tMarie\n\u0085\u2028\u2029\u007F').firstName, 'Ann Marie')
+})
+
+test('buildCreateUserPayload leaves allowed punctuation and accents alone', () => {
+  const p = payloadFor('José', "O'Brien-Smith Jr.")
+  assert.equal(p.firstName, 'José')
+  assert.equal(p.lastName, "O'Brien-Smith Jr.")
+})
+
+test('buildCreateUserPayload collapses and trims whitespace', () => {
+  assert.equal(payloadFor('  Jane   (Janie)   Ann ').firstName, 'Jane Ann')
+})
+
+test('buildCreateUserPayload truncates to 255 characters', () => {
+  assert.equal(payloadFor('A'.repeat(300)).firstName.length, 255)
+})
+
+test('buildCreateUserPayload does not split a surrogate pair when truncating', () => {
+  const name = 'A'.repeat(254) + '\u{1F600}'
+  const first = payloadFor(name).firstName
+  assert.equal(first, 'A'.repeat(254))
+})
+
+test('buildCreateUserPayload omits a name that cleans to nothing', () => {
+  const p = payloadFor('(Bob)', '   ')
+  assert.equal('firstName' in p, false)
+  assert.equal('lastName' in p, false)
+})

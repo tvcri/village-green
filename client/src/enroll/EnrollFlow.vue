@@ -24,6 +24,16 @@
       <Button label="Start over" link @click="startOver" />
     </template>
 
+    <template v-else-if="step === 'setup_failed'">
+      <Message severity="error" :closable="false">
+        Your PIN was correct, but we couldn't finish setting up your account.
+        This is a problem on our end, not something you did. Please email
+        <a :href="`mailto:${SUPPORT_EMAIL}`">{{ SUPPORT_EMAIL }}</a>
+        and we'll get you set up.
+      </Message>
+      <Button label="Start over" link @click="startOver" />
+    </template>
+
     <template v-else-if="step === 'choice'">
       <p>You already have a Village Green account for {{ email }}.</p>
       <div class="enroll-choices">
@@ -61,7 +71,11 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { requestPin, verifyPin, resetPassword } from './enrollApi.js'
 
-const step = ref('email')      // email | pin | choice | password
+// Where a volunteer goes when enrollment fails on our side: the Member &
+// Volunteer Coordinator's role mailbox.
+const SUPPORT_EMAIL = 'volunteer@villagecommonri.org'
+
+const step = ref('email')      // email | pin | setup_failed | choice | password
 const email = ref('')
 const pin = ref('')
 const busy = ref(false)
@@ -95,6 +109,10 @@ async function submitPin() {
   busy.value = true
   try {
     const res = await verifyPin(email.value, pin.value)
+    if (res.data?.status === 'setup_failed') {
+      step.value = 'setup_failed'
+      return
+    }
     if (!res.ok) {
       error.value = 'That PIN was not accepted. It may be wrong, expired, or already used. You can start over to request a new one.'
       return

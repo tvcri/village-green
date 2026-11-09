@@ -990,6 +990,23 @@ paths:
                     type: string
                     enum:
                     - invalid
+        '502':
+          description: >-
+            The PIN was correct but the login account could not be created.
+            The PIN is consumed and the request is recorded with outcome
+            account_failed; the caller should contact staff rather than
+            request a new PIN.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - setup_failed
   /enrollment/reset-password:
     post:
       tags:

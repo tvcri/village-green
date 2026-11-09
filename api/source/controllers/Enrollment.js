@@ -22,6 +22,12 @@ module.exports.verifyEnrollment = async function verifyEnrollment(req, res, next
       res.status(400).json({ status: 'invalid' })
       return
     }
+    if (result.status === 'setup_failed') {
+      // Correct PIN, but Keycloak would not create the account: an upstream
+      // failure, not the caller's mistake.
+      res.status(502).json({ status: 'setup_failed' })
+      return
+    }
     res.json(result)
   }
   catch (err) {
