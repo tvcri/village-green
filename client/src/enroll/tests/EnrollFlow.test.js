@@ -99,6 +99,20 @@ describe('EnrollFlow', () => {
     expect(screen.getByLabelText('PIN')).toBeTruthy()
   })
 
+  // A correct PIN whose account setup failed on our side must not read as a
+  // wrong PIN: the volunteer did nothing wrong and a new PIN cannot help.
+  it('tells the volunteer their PIN was correct when account setup fails', async () => {
+    renderFlow()
+    await submitEmailAndReachPinStep()
+    verifyPin.mockResolvedValue({ ok: false, status: 502, data: { status: 'setup_failed' } })
+    await fireEvent.update(screen.getByLabelText('PIN'), '123456')
+    await fireEvent.click(screen.getByRole('button', { name: 'Verify PIN' }))
+    await waitFor(() => expect(screen.getByText(/PIN was correct/i)).toBeTruthy())
+    expect(screen.queryByText(/not accepted/i)).toBeNull()
+    expect(screen.getByRole('link', { name: 'volunteer@villagecommonri.org' }).getAttribute('href'))
+      .toBe('mailto:volunteer@villagecommonri.org')
+  })
+
   it('writes the email to sessionStorage and navigates same-tab on sign in', async () => {
     const assignSpy = vi.fn()
     // jsdom: window.location.assign is not implemented; replace it

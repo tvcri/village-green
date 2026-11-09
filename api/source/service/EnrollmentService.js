@@ -253,10 +253,14 @@ exports.verifyEnrollment = async function (rawEmail, pin) {
     return { status: 'created', tempPassword, loginUrl: LOGIN_URL }
   }
   catch (err) {
-    // Do not leak raw Keycloak errors (status/body/stack) to the anonymous
-    // caller - log server-side and report as an invalid/expired PIN.
+    // The PIN was correct, so the caller has proven inbox control and is owed
+    // the truth: the account could not be set up. Never report this as an
+    // invalid PIN. Raw Keycloak errors (status/body/stack) stay server-side.
     logger.writeError('verifyEnrollment', 'enrollment', { message: err.message })
-    return null
+    await dbUtils.pool.query(
+      `UPDATE enrollment_request SET outcome = 'account_failed' WHERE id = ?`, [row.id]
+    )
+    return { status: 'setup_failed' }
   }
 }
 
