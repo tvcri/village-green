@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  shownStatus, circleShortName, rowTagKeys, matchesTags, tagLabel, selectionSentence, isEmailPaused
+  shownStatus, circleShortName, rowTagKeys, matchesTags, tagLabel, selectionSentence, isEmailPaused, DONOR_WINDOWS
 } from './personTags.js'
 
 describe('shownStatus', () => {
@@ -43,6 +43,55 @@ describe('rowTagKeys', () => {
   })
 })
 
+describe('rowTagKeys donor', () => {
+  it('emits donor after volunteer and before circles', () => {
+    expect(rowTagKeys({ memberStatus: 'Active', donor: { lastGiftDate: '2025-01-01' }, circles: [{ circleId: 1 }] }))
+      .toEqual(['member:active', 'donor', 'circle:1'])
+  })
+  it('emits nothing without a donor', () => {
+    expect(rowTagKeys({ memberStatus: 'Active', donor: null })).toEqual(['member:active'])
+  })
+})
+
+describe('DONOR_WINDOWS', () => {
+  it('lists the four window keys', () => {
+    expect(DONOR_WINDOWS.map(w => w.key)).toEqual(['donor:1y', 'donor:2y', 'donor:5y', 'donor:any'])
+  })
+})
+
+describe('matchesTags donor windows', () => {
+  const today = '2026-11-09'
+  const keys = ['member:active', 'donor']
+  const ctx = { lastGiftDate: '2018-01-01', today }
+  it('any', () => {
+    expect(matchesTags(keys, ['donor:5y', 'member:active'], 'any', ctx)).toBe(true)
+  })
+  it('all', () => {
+    expect(matchesTags(keys, ['donor:5y', 'member:active'], 'all', ctx)).toBe(false)
+  })
+  it('exact', () => {
+    expect(matchesTags(keys, ['member:active', 'donor:any'], 'exact', ctx)).toBe(true)
+    expect(matchesTags(keys, ['member:active', 'donor:5y'], 'exact', ctx)).toBe(false)
+    expect(matchesTags(keys, ['member:active'], 'exact', ctx)).toBe(false)
+  })
+  it('matches a gift inside the window, inclusive of the cutoff', () => {
+    expect(matchesTags(['donor'], ['donor:5y'], 'any', { lastGiftDate: '2021-11-09', today })).toBe(true)
+    expect(matchesTags(['donor'], ['donor:5y'], 'any', { lastGiftDate: '2021-11-08', today })).toBe(false)
+  })
+  it('a null gift is excluded by a year window and included by any time', () => {
+    const c = { lastGiftDate: null, today }
+    expect(matchesTags(['donor'], ['donor:1y'], 'any', c)).toBe(false)
+    expect(matchesTags(['donor'], ['donor:any'], 'any', c)).toBe(true)
+  })
+  it('a non-donor row never matches a window', () => {
+    expect(matchesTags(['member:active'], ['donor:any'], 'any', ctx)).toBe(false)
+  })
+  it('leap-day cutoff clamps to Feb 28', () => {
+    const c = { lastGiftDate: '2027-02-28', today: '2028-02-29' }
+    expect(matchesTags(['donor'], ['donor:1y'], 'any', c)).toBe(true)
+  })
+})
+
 describe('matchesTags', () => {
   const keys = ['member:dropped', 'volunteer:active']
   it('matches everything on an empty selection', () => {
@@ -75,6 +124,7 @@ describe('tagLabel', () => {
     expect(tagLabel('member:pending', names)).toBe('Member, pending')
     expect(tagLabel('volunteer:active', names)).toBe('Volunteer, active')
     expect(tagLabel('circle:1', names)).toBe('Circle of Pride')
+    expect(tagLabel('donor')).toBe('Donor')
   })
 })
 
@@ -96,6 +146,16 @@ describe('selectionSentence', () => {
   it('exact uses bare labels', () => {
     expect(selectionSentence(['member:active'], 'exact', names))
       .toBe('People whose tags are exactly: active member')
+  })
+  it('phrases donor windows', () => {
+    expect(selectionSentence(['donor:5y', 'member:active'], 'any', names))
+      .toBe('People who are a donor (last gift within 5 years) or an active member')
+    expect(selectionSentence(['donor:1y'], 'any', names)).toBe('People who are a donor (last gift within 1 year)')
+    expect(selectionSentence(['donor:any'], 'any', names)).toBe('People who are a donor')
+  })
+  it('exact uses bare donor labels', () => {
+    expect(selectionSentence(['donor:2y'], 'exact', names))
+      .toBe('People whose tags are exactly: donor (last gift within 2 years)')
   })
   it('joins three with commas and a final or', () => {
     expect(selectionSentence(['member:active', 'volunteer:pending', 'circle:1'], 'any', names))

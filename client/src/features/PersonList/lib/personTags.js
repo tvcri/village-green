@@ -1,7 +1,18 @@
 // Tag logic for the Hub persons list: one source for the row tags, the
 // filter match, and the sentence that describes a filter selection.
-// Tag keys: 'member:<shown>', 'volunteer:<shown>', 'circle:<circleId>'.
+// Tag keys: 'member:<shown>', 'volunteer:<shown>', 'donor', 'circle:<circleId>'.
+// 'donor' is the row's key; the picker offers it as the four selectable
+// window keys in DONOR_WINDOWS, which match on the row's last gift date.
 import { pauseTag } from '../../../shared/lib/volunteerPause.js'
+import { civilYearsAgo } from '../../../shared/lib/civilDate.js'
+
+export const DONOR_WINDOWS = [
+  { key: 'donor:1y', years: 1, caption: '1 yr' },
+  { key: 'donor:2y', years: 2, caption: '2 yr' },
+  { key: 'donor:5y', years: 5, caption: '5 yr' },
+  { key: 'donor:any', years: null, caption: 'any time' }
+]
+const windowByKey = new Map(DONOR_WINDOWS.map(w => [w.key, w]))
 
 // A deceased person is shown as dropped in every role they hold.
 export function shownStatus (status, deceased) {
@@ -25,16 +36,26 @@ export function rowTagKeys (row) {
   if (member) keys.push(`member:${member}`)
   const volunteer = shownStatus(row.volunteerStatus, row.deceased)
   if (volunteer) keys.push(`volunteer:${volunteer}`)
+  if (row.donor) keys.push('donor')
   for (const circle of row.circles ?? []) keys.push(`circle:${circle.circleId}`)
   return keys
 }
 
-// An empty selection matches every row.
-export function matchesTags (keys, selected, mode) {
+// An empty selection matches every row. A donor window key matches a donor
+// row whose last gift is inside the window; a null gift fails every year
+// window but passes 'any time'. Every other key matches by inclusion.
+export function matchesTags (keys, selected, mode, { lastGiftDate = null, today = null } = {}) {
   if (selected.length === 0) return true
-  if (mode === 'any') return selected.some(k => keys.includes(k))
-  if (mode === 'all') return selected.every(k => keys.includes(k))
-  return keys.length === selected.length && selected.every(k => keys.includes(k))
+  const hit = (k) => {
+    const w = windowByKey.get(k)
+    if (!w) return keys.includes(k)
+    if (!keys.includes('donor')) return false
+    if (w.years == null) return true
+    return lastGiftDate != null && lastGiftDate >= civilYearsAgo(today, w.years)
+  }
+  if (mode === 'any') return selected.some(hit)
+  if (mode === 'all') return selected.every(hit)
+  return keys.length === selected.length && selected.every(hit)
 }
 
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -42,11 +63,20 @@ const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 export function tagLabel (key, circleNameById) {
   const [kind, value] = key.split(':')
   if (kind === 'circle') return circleNameById.get(value) ?? `Circle ${value}`
+  if (kind === 'donor') return 'Donor'
   return `${capitalize(kind)}, ${value}`
+}
+
+// '' for any time, ' (last gift within 5 years)' otherwise.
+function donorWindowSuffix (key) {
+  const years = windowByKey.get(key)?.years
+  if (years == null) return ''
+  return ` (last gift within ${years} ${years === 1 ? 'year' : 'years'})`
 }
 
 function tagPhrase (key, circleNameById) {
   const [kind, value] = key.split(':')
+  if (kind === 'donor') return `a donor${donorWindowSuffix(key)}`
   if (kind === 'circle') return `in ${tagLabel(key, circleNameById)}`
   return `${value === 'active' ? 'an' : 'a'} ${value} ${kind}`
 }
@@ -54,6 +84,7 @@ function tagPhrase (key, circleNameById) {
 // 'active member' / full circle name, for the exact-mode sentence.
 function bareLabel (key, circleNameById) {
   const [kind, value] = key.split(':')
+  if (kind === 'donor') return `donor${donorWindowSuffix(key)}`
   return kind === 'circle' ? tagLabel(key, circleNameById) : `${value} ${kind}`
 }
 
