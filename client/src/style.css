@@ -7,6 +7,13 @@
 
   --breadcrumb-height: 35px;
 
+  /* Donor tag colours. Global, not scoped to .person-list, because the
+     person list and PersonDetailCard both render the donor tag. amber-950
+     is the text colour: Material's amber-700 is #FFA000, unreadable on
+     amber-100. */
+  --tag-donor-bg: var(--p-amber-100);
+  --tag-donor-fg: var(--p-amber-950);
+
   /* Brand Colors */
   --color-primary: #6366f1; /* Indigo-500 */
   --color-action-red: #ef4444;
@@ -197,6 +204,10 @@ textarea:focus {
 
   --color-bg-hover: rgba(255, 255, 255, 0.05);
   --color-bg-hover-light: #252525;
+
+  /* Donor tag colours, dark pair (see :root). */
+  --tag-donor-bg: color-mix(in srgb, var(--p-amber-500), transparent 84%);
+  --tag-donor-fg: var(--p-amber-200);
 }
 
 :root.app-dark body {

@@ -902,9 +902,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
    uses. Defined on the component root so the filter picker shares them. */
 .person-list {
   --tag-member-bg: var(--p-sky-100);
-  --tag-member-fg: var(--p-sky-700);
+  --tag-member-fg: var(--p-sky-900);
   --tag-volunteer-bg: var(--p-green-100);
-  --tag-volunteer-fg: var(--p-green-700);
+  --tag-volunteer-fg: var(--p-green-900);
   --tag-muted-bg: var(--p-surface-100);
   --tag-muted-fg: var(--p-surface-600);
   --circle-bg: var(--p-violet-50);
@@ -944,6 +944,11 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 .role-tag--volunteer {
   background: var(--tag-volunteer-bg);
   color: var(--tag-volunteer-fg);
+}
+
+.role-tag--donor {
+  background: var(--tag-donor-bg);
+  color: var(--tag-donor-fg);
 }
 
 .role-tag--dropped {
