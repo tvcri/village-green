@@ -75,6 +75,18 @@ test('all gives the member and donor A one envelope', async () => {
   assert.equal(l.filter(x => x.sortLastName === names.A).length, 1)
 })
 
+test('all never labels the deceased', async () => {
+  const l = await labels({ role: 'all' })
+  assert.ok(has(l, 'B'), 'precondition: a living donor is present')
+  assert.ok(!has(l, 'D'))
+})
+
+test('under all the window trims donors but not members', async () => {
+  const l = await labels({ role: 'all', lastGiftWithinYears: 1 })
+  assert.ok(has(l, 'A'), 'the member is kept whatever their giving')
+  assert.ok(!has(l, 'B'), 'the 2014 donor is dropped')
+})
+
 test('a dropped member who gives is labelled as a donor', async () => {
   assert.ok(has(await labels({ role: 'donor' }), 'E'))
 })
@@ -82,8 +94,9 @@ test('a dropped member who gives is labelled as a donor', async () => {
 test('donor-only person with no village appears only under All villages', async () => {
   const everyone = await labels({ role: 'donor' })
   const scoped = await labels({ role: 'donor', villageId: scratch })
-  // A's member shares the name, so look for the donor-only person by first name.
-  const donorA = (list) => list.some(l => l.sortLastName === names.A && JSON.stringify(l).includes('Donor'))
+  // A's member shares the name, so tell them apart by the label's name line:
+  // the donor-only envelope reads exactly "Donor <last>".
+  const donorA = (list) => list.some(l => l.name === `Donor ${names.A}`)
   assert.ok(donorA(everyone))
   assert.ok(!donorA(scoped))
 })
