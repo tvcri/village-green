@@ -21,9 +21,10 @@ import { personExportColumns, personExportValues } from '../../../shared/lib/per
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { usePersonListFilters } from '../composables/usePersonListFilters.js'
-import { rowTagKeys, tagLabel, circleShortName, isEmailPaused } from '../lib/personTags.js'
+import { rowTagKeys, tagLabel, circleShortName, isEmailPaused, DONOR_WINDOWS } from '../lib/personTags.js'
 import { parsePhoneObj } from '../lib/parsePhoneObj.js'
-import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
+import { todayCivilDateIn, formatCivilDate } from '../../../shared/lib/civilDate.js'
+import { lglConstituentUrl } from '../../../shared/lib/lgl.js'
 import { PAUSE_TIME_ZONE, pauseTag } from '../../../shared/lib/volunteerPause.js'
 
 defineOptions({ name: 'PersonList' })
@@ -66,6 +67,9 @@ const {
 const canSeeNoncurrentMember = computed(() => hasPermission('member:read_inactive'))
 const canSeeNoncurrentVolunteer = computed(() => hasPermission('volunteer:read_inactive'))
 const canFilterVeteran = computed(() => hasPermission('person:read_demographics'))
+// The API sends `donor` only to holders of donor:read; every donor element
+// here is gated on the same grant.
+const canReadDonor = computed(() => hasPermission('donor:read'))
 
 const filtersCollapsed = ref(false)
 const matchOptions = [
@@ -84,9 +88,15 @@ const circleChoices = computed(() =>
     .map(c => ({ key: `circle:${c.circleId}`, name: c.name, short: circleShortName(c.name) })))
 function isSelected (key) { return selectedTags.value.includes(key) }
 function toggleTag (key) {
-  selectedTags.value = isSelected(key)
-    ? selectedTags.value.filter(k => k !== key)
-    : [...selectedTags.value, key]
+  if (isSelected(key)) {
+    selectedTags.value = selectedTags.value.filter(k => k !== key)
+    return
+  }
+  // The donor windows are one choice, not a set: a newer window replaces the old.
+  const kept = key.startsWith('donor:')
+    ? selectedTags.value.filter(k => !k.startsWith('donor:'))
+    : selectedTags.value
+  selectedTags.value = [...kept, key]
 }
 
 // person:read_birth_date: the API omits birthDate for holders without it, so
@@ -103,7 +113,7 @@ const canReadDemographics = computed(() => hasPermission('person:read_demographi
 // the table header under the filter bar.
 const sortField = ref('fullName')
 const sortOrder = ref(1)
-const sortKey = { fullName: p => p.fullName ?? '', village: p => p.village?.name ?? '' }
+const sortKey = { fullName: p => p.fullName ?? '', village: p => p.village?.name ?? '', lastGift: p => p.donor?.lastGiftDate ?? '' }
 function toggleSort (field) {
   if (sortField.value === field) sortOrder.value = -sortOrder.value
   else { sortField.value = field; sortOrder.value = 1 }
@@ -127,14 +137,14 @@ const sortedPersons = computed(() => {
   return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
 })
 
-// Role tags for a row: member and volunteer only (circles have their own
+// Role tags for a row: member, volunteer and donor only (circles have their own
 // column). A deceased person reads as dropped in every role and says so.
 function roleTags (p, today) {
   return rowTagKeys(p)
     .filter(key => !key.startsWith('circle:'))
     .map(key => {
       const [kind, status] = key.split(':')
-      const role = kind === 'member' ? 'Member' : 'Volunteer'
+      const role = kind === 'member' ? 'Member' : kind === 'donor' ? 'Donor' : 'Volunteer'
       const label = p.deceased ? `${role} (deceased)` : tagLabel(key, circleNameById.value)
       const pause = kind === 'volunteer' && isEmailPaused(p, today)
         ? pauseTag(p.volunteerPause, today)
@@ -163,6 +173,9 @@ const columnsForCsv = computed(() => [
   { header: 'Village', key: 'villageName' },
   { header: 'Member Status', key: 'memberStatus' },
   { header: 'Volunteer Status', key: 'volunteerStatus' },
+  ...(canReadDonor.value
+    ? [{ header: 'Donor', key: 'donor' }, { header: 'Last Gift Date', key: 'lastGiftDate' }, { header: 'LGL', key: 'lgl' }]
+    : []),
   ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
 ])
 
@@ -175,6 +188,10 @@ function detailRowForCsv(p) {
     villageName: p.village?.name ?? '',
     memberStatus: p.memberStatus,
     volunteerStatus: p.volunteerStatus,
+    // Absent without donor:read, and the columns are then not in the export.
+    donor: p.donor ? 'Yes' : '',
+    lastGiftDate: p.donor?.lastGiftDate ?? '',
+    lgl: p.donor ? lglConstituentUrl(p.donor.lglConstituentId) : '',
     ...personExportValues({ ...(p.detail ?? {}), email: p.email, phone, cell }),
   }
 }
@@ -195,7 +212,7 @@ async function fetchRowsForExport() {
     const byId = new Map(detail.map(p => [p.personId, p]))
     return (sortedPersons.value ?? [])
       .filter(p => byId.has(p.personId))
-      .map(p => detailRowForCsv({ ...byId.get(p.personId), memberStatus: p.memberStatus, volunteerStatus: p.volunteerStatus }))
+      .map(p => detailRowForCsv({ ...byId.get(p.personId), memberStatus: p.memberStatus, volunteerStatus: p.volunteerStatus, donor: p.donor }))
   } finally {
     isFetchingExport.value = false
   }
@@ -481,6 +498,24 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           </div>
         </div>
 
+        <div v-if="canReadDonor" class="filter-group" role="group" aria-label="Donor">
+          <span class="filter-group-label">Donor</span>
+          <div class="picker-items">
+            <button
+              v-for="w in DONOR_WINDOWS"
+              :key="w.key"
+              type="button"
+              class="picker-item"
+              :class="{ selected: isSelected(w.key) }"
+              :aria-pressed="isSelected(w.key)"
+              @click="toggleTag(w.key)"
+            >
+              <span class="role-tag role-tag--donor">donor</span>
+              <span class="picker-caption">{{ w.caption }}</span>
+            </button>
+          </div>
+        </div>
+
         <div class="filter-group" role="group" aria-label="Circles">
           <span class="filter-group-label">Circles</span>
           <div class="picker-items">
@@ -549,6 +584,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
       <colgroup>
         <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10rem">
         <col style="width: 11%"><col style="width: 11%"><col style="width: 21%">
+        <col v-if="canReadDonor" style="width: 8rem">
       </colgroup>
       <thead>
         <tr>
@@ -563,6 +599,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           <th>Phone</th>
           <th>Cell</th>
           <th>Email</th>
+          <th v-if="canReadDonor" class="sortable" :class="{ sorted: sortField === 'lastGift' }" @click="toggleSort('lastGift')">
+            Last gift <i :class="sortIcon('lastGift')" />
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -580,7 +619,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
                 v-for="t in tagsByPerson.get(p.personId)"
                 :key="t.key"
                 class="role-tag"
-                :class="[`role-tag--${t.kind}`, `role-tag--${t.status}`]"
+                :class="t.status ? [`role-tag--${t.kind}`, `role-tag--${t.status}`] : `role-tag--${t.kind}`"
                 role="img"
                 :title="t.label"
                 :aria-label="t.pause ? `${t.label}, ${t.pause}` : t.label"
@@ -617,6 +656,18 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               </button>
             </div>
             <template v-else>—</template>
+          </td>
+          <td v-if="canReadDonor">
+            <template v-if="p.donor">
+              <span>{{ formatCivilDate(p.donor.lastGiftDate) }}</span>
+              <a
+                class="lgl-link"
+                :href="lglConstituentUrl(p.donor.lglConstituentId)"
+                target="_blank"
+                rel="noopener"
+                @click.stop
+              >LGL</a>
+            </template>
           </td>
         </tr>
       </tbody>
@@ -944,6 +995,11 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 .role-tag--volunteer {
   background: var(--tag-volunteer-bg);
   color: var(--tag-volunteer-fg);
+}
+
+.lgl-link {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
 }
 
 .role-tag--donor {

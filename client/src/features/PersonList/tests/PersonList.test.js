@@ -323,4 +323,86 @@ describe('PersonList grid', () => {
       expect(cellsOf(line)[head.split(',').indexOf('Member Status')]).toBe('Active')
     })
   })
+
+  describe('Donors', () => {
+    const donorRows = () => [
+      row({ personId: 1, fullName: 'Alpha, Ann', donor: { lglConstituentId: 'L1', lastGiftDate: '2025-06-01' } }),
+      row({ personId: 2, fullName: 'Beta, Bob', donor: null })
+    ]
+    const headersOf = (csvHead) => csvHead.split(',')
+
+    it('with donor:read: tag, picker group, Last gift column and link', async () => {
+      perms.all = true
+      setRows(donorRows())
+      await renderList()
+      const rows = screen.getAllByRole('row').slice(1)
+      expect(within(rows[0]).getByTitle('Donor')).toHaveClass('role-tag', 'role-tag--donor')
+      const group = screen.getByRole('group', { name: 'Donor' })
+      expect(within(group).getAllByRole('button').map(b => b.querySelector('.picker-caption').textContent.trim()))
+        .toEqual(['1 yr', '2 yr', '5 yr', 'any time'])
+      expect(screen.getAllByRole('columnheader').map(h => h.textContent.trim())).toContain('Last gift')
+      const link = within(rows[0]).getByRole('link', { name: /LGL/ })
+      expect(link).toHaveAttribute('href', 'https://pvri.littlegreenlight.com/constituents/L1')
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener')
+      expect(within(rows[0]).getByText('Jun 1, 2025')).toBeInTheDocument()
+      expect(within(rows[1]).queryByRole('link')).toBeNull()
+    })
+
+    it('picking a window replaces the previous one', async () => {
+      perms.all = true
+      setRows(donorRows())
+      await renderList()
+      const group = screen.getByRole('group', { name: 'Donor' })
+      await fireEvent.click(within(group).getByRole('button', { name: /2 yr/ }))
+      await fireEvent.click(within(group).getByRole('button', { name: /5 yr/ }))
+      const pressed = within(group).getAllByRole('button').filter(b => b.getAttribute('aria-pressed') === 'true')
+      expect(pressed).toHaveLength(1)
+      expect(pressed[0]).toHaveTextContent('5 yr')
+      expect(screen.getByRole('button', { name: /Filters/ })).toHaveTextContent('1')
+    })
+
+    it('a deceased donor reads Donor (deceased)', async () => {
+      perms.all = true
+      setRows([row({ personId: 1, fullName: 'Alpha, Ann', deceased: true, donor: { lglConstituentId: 'L1', lastGiftDate: null } })])
+      await renderList()
+      const tag = screen.getByTitle('Donor (deceased)')
+      expect(tag).toHaveClass('role-tag--donor')
+      expect(tag).not.toHaveClass('role-tag--dropped')
+    })
+
+    async function download (summary) {
+      getPersons.mockImplementation(async (params) =>
+        params?.projection?.includes('detail') ? summary.map(p => ({ ...p, donor: undefined, detail: {} })) : summary)
+      await renderList()
+      await fireEvent.click(screen.getByRole('button', { name: /Export|Download/ }))
+      await fireEvent.click(await screen.findByText('Download'))
+      await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
+      return downloadCsv.mock.calls[0][0].split('\n')
+    }
+    const cellsOf = (line) => line.match(/("([^"]|"")*"|[^,]*)(,|$)/g).slice(0, -1).map(c => c.replace(/,$/, ''))
+
+    it('with donor:read the CSV carries Donor, Last Gift Date and LGL from the on-screen row', async () => {
+      perms.all = true
+      const [head, l1] = await download(donorRows())
+      const headers = headersOf(head)
+      expect(headers.slice(headers.indexOf('Volunteer Status') + 1, headers.indexOf('Volunteer Status') + 4))
+        .toEqual(['Donor', 'Last Gift Date', 'LGL'])
+      const cells = cellsOf(l1)
+      expect(cells[headers.indexOf('Donor')]).toBe('Yes')
+      expect(cells[headers.indexOf('Last Gift Date')]).toBe('2025-06-01')
+      expect(cells[headers.indexOf('LGL')]).toBe('https://pvri.littlegreenlight.com/constituents/L1')
+    })
+
+    it('without donor:read nothing donor shows', async () => {
+      perms.all = true
+      perms.denied = new Set(['donor:read'])
+      // The API sends no `donor` key at all to a caller without the grant.
+      const noDonorKey = donorRows().map(r => { const o = { ...r }; delete o.donor; return o })
+      const [head] = await download(noDonorKey)
+      expect(screen.queryByRole('group', { name: 'Donor' })).toBeNull()
+      expect(screen.getAllByRole('columnheader').map(h => h.textContent.trim())).not.toContain('Last gift')
+      for (const h of ['Donor', 'Last Gift Date', 'LGL']) expect(headersOf(head)).not.toContain(h)
+    })
+  })
 })

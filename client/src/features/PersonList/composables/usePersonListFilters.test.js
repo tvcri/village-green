@@ -171,4 +171,13 @@ describe('usePersonListFilters', () => {
     expect(f.deceasedOnly.value).toBe(false)
     expect(f.matchMode.value).toBe('any')
   })
+
+  it('a donor window filters on the last gift date and passes today', () => {
+    const f = make([
+      row(1, { donor: { lglConstituentId: 'L1', lastGiftDate: '2025-06-01' } }),
+      row(2, { donor: { lglConstituentId: 'L2', lastGiftDate: '2015-01-01' } })
+    ])
+    f.selectedTags.value = ['donor:5y']
+    expect(ids(f)).toEqual([1])
+  })
 })
