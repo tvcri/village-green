@@ -1,6 +1,6 @@
 'use strict'
 const dbUtils = require('../utils')
-const { AUDIENCE_RULES } = require('./audienceRules')
+const { AUDIENCE_RULES, DONOR_ROLES } = require('./audienceRules')
 
 // Every mailing answers the same question — "who gets an envelope" — and so
 // returns the same nine columns from the same base table. Only the role
@@ -40,6 +40,16 @@ const EITHER_PREDICATE =
   '(EXISTS (SELECT 1 FROM active_member m WHERE m.personId = p.id)'
   + ' OR EXISTS (SELECT 1 FROM active_volunteer vol WHERE vol.personId = p.id))'
 
+// Donors are a person association (the donor table), not a status view, so
+// the deceased check is explicit here; the active views already exclude
+// them for members and volunteers. The last-gift window applies only to this
+// clause, and a NULL lastGiftDate fails `>=`, so any window excludes donors
+// with no recorded gift.
+function donorPredicate (hasCutoff) {
+  return '(p.deceased = 0 AND EXISTS (SELECT 1 FROM donor d WHERE d.personId = p.id'
+    + `${hasCutoff ? ' AND d.lastGiftDate >= ?' : ''}))`
+}
+
 // Pure: builds SQL and binds, touching no database. Kept separate from
 // execution so it is unit-testable — this project unit-tests pure functions
 // only and does not mock dbUtils.pool.
@@ -47,13 +57,27 @@ const EITHER_PREDICATE =
 // The controller 422s bad parameter combinations first (validateLabelParams,
 // driven by the same AUDIENCE_RULES table); the throws here are defense in
 // depth for future service-level callers that bypass the validator.
-function buildRecipientQuery ({ audience, role, villageId = null, month = null } = {}) {
+function buildRecipientQuery ({ audience, role, villageId = null, month = null, lastGiftSince = null } = {}) {
   const joins = []
   const where = []
   const binds = []
 
+  const hasCutoff = lastGiftSince !== null && lastGiftSince !== undefined
+  if (hasCutoff && !DONOR_ROLES.has(role)) {
+    throw new Error('lastGiftSince requires role donor or all')
+  }
+
   if (role === 'either') {
     where.push(EITHER_PREDICATE)
+  }
+  else if (role === 'donor') {
+    where.push(donorPredicate(hasCutoff))
+    if (hasCutoff) binds.push(lastGiftSince)
+  }
+  else if (role === 'all') {
+    // Reuse the EITHER pieces: strip its outer parens to splice in the donor branch.
+    where.push(`(${EITHER_PREDICATE.slice(1, -1)} OR ${donorPredicate(hasCutoff)})`)
+    if (hasCutoff) binds.push(lastGiftSince)
   }
   else {
     const roleJoin = ROLE_JOIN[role]
@@ -67,6 +91,9 @@ function buildRecipientQuery ({ audience, role, villageId = null, month = null }
   }
   if (rules.memberOnly && role !== 'member') {
     throw new Error(`audience ${audience} requires role member`)
+  }
+  if (DONOR_ROLES.has(role) && !rules.allowsDonors) {
+    throw new Error(`audience ${audience} does not accept role ${role}`)
   }
   const hasMonth = month !== null && month !== undefined
   if (rules.requiresMonth && !hasMonth) {

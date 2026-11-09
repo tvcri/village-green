@@ -41,3 +41,19 @@ test('valid combinations pass', () => {
     assert.doesNotThrow(() => validateLabelParams(params), JSON.stringify(params))
   }
 })
+
+test('donor roles are roster-only', () => {
+  throws422({ audience: 'birthday-month', role: 'all', month: 3 }, /does not accept role=all/i)
+  throws422({ audience: 'birthday-month', role: 'donor', month: 3 }, /does not accept role=donor/i)
+})
+
+test('lastGiftWithinYears requires a donor role', () => {
+  throws422({ audience: 'roster', role: 'either', lastGiftWithinYears: 5 }, /requires role=donor or role=all/i)
+})
+
+test('roster accepts donor and all, with or without lastGiftWithinYears', () => {
+  for (const role of ['donor', 'all']) {
+    assert.doesNotThrow(() => validateLabelParams({ audience: 'roster', role }))
+    assert.doesNotThrow(() => validateLabelParams({ audience: 'roster', role, lastGiftWithinYears: 5 }))
+  }
+})

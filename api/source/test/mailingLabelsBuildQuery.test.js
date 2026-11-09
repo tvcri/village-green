@@ -112,3 +112,42 @@ test('non-month audiences throw when month is supplied', () => {
   assert.throws(() => buildRecipientQuery({ audience: 'roster', role: 'member', month: 5 }), /does not accept month/i)
   assert.throws(() => buildRecipientQuery({ audience: 'printed-newsletter', role: 'member', month: 5 }), /does not accept month/i)
 })
+
+test('roster/donor uses EXISTS on donor and excludes the deceased', () => {
+  const { sql, binds } = buildRecipientQuery({ audience: 'roster', role: 'donor' })
+  assert.match(sql, /p\.deceased = 0/)
+  assert.match(sql, /EXISTS \(SELECT 1 FROM donor d WHERE d\.personId = p\.id\)/)
+  assert.ok(!/INNER JOIN/.test(sql), `donor SQL must not join:\n${sql}`)
+  assert.deepEqual(binds, [])
+})
+
+test('roster/donor with lastGiftSince binds the cutoff', () => {
+  const { sql, binds } = buildRecipientQuery({ audience: 'roster', role: 'donor', lastGiftSince: '2021-11-09' })
+  assert.match(sql, /d\.lastGiftDate >= \?/)
+  assert.deepEqual(binds, ['2021-11-09'])
+})
+
+test('roster/all ORs member, volunteer and donor', () => {
+  const { sql } = buildRecipientQuery({ audience: 'roster', role: 'all' })
+  assert.match(sql, /EXISTS \(SELECT 1 FROM active_member m WHERE m\.personId = p\.id\)/)
+  assert.match(sql, /EXISTS \(SELECT 1 FROM active_volunteer vol WHERE vol\.personId = p\.id\)/)
+  assert.match(sql, /EXISTS \(SELECT 1 FROM donor d WHERE d\.personId = p\.id\)/)
+  // The deceased check belongs to the donor branch only: the active views
+  // already cover members and volunteers.
+  assert.equal(sql.match(/p\.deceased = 0/g).length, 1)
+  assert.match(sql, /OR \(p\.deceased = 0 AND EXISTS \(SELECT 1 FROM donor d/)
+  assert.ok(!/INNER JOIN/.test(sql), `all SQL must not join:\n${sql}`)
+})
+
+test('lastGiftSince binds before villageId', () => {
+  const { binds } = buildRecipientQuery({ audience: 'roster', role: 'donor', lastGiftSince: '2021-11-09', villageId: 5 })
+  assert.deepEqual(binds, ['2021-11-09', 5])
+})
+
+test('donor roles throw for non-roster audiences', () => {
+  assert.throws(() => buildRecipientQuery({ audience: 'birthday-month', role: 'donor', month: 3 }), /does not accept role/)
+})
+
+test('lastGiftSince throws without a donor role', () => {
+  assert.throws(() => buildRecipientQuery({ audience: 'roster', role: 'member', lastGiftSince: '2021-11-09' }), /lastGiftSince requires/)
+})
