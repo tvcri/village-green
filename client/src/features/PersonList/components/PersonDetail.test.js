@@ -121,23 +121,26 @@ describe('PersonDetail — donor tag and section', () => {
 
   beforeEach(() => apiCall.mockReset())
 
-  it('asks for the donor projection and shows tag, last gift and the LGL link', async () => {
+  it('asks for the donor projection and shows tag, the last-gift badge and the LGL link', async () => {
     granted = [...ALL, 'donor:read']
     await mount(person({ donor: DONOR }))
     expect(projectionOf()).toContain('donor')
     expect(screen.getByText('Donor', { selector: '.donor-tag, .donor-tag *' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Donor' })).toBeInTheDocument()
-    expect(screen.getByText('Mar 2, 2024')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Donor Information' })).toBeInTheDocument()
+    expect(screen.getByTestId('last-gift-tag')).toHaveTextContent('Last gift Mar 2, 2024')
+    expect(screen.getByTestId('last-gift-tag')).toHaveClass('donor-tag')
     const link = screen.getByRole('link', { name: 'Open in LGL' })
     expect(link).toHaveAttribute('href', expect.stringMatching(/\/constituents\/L9$/))
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener')
   })
 
-  it('shows a dash when the donor has no gift date', async () => {
+  it('shows no last-gift badge when the donor has no gift date, but keeps the card and link', async () => {
     granted = [...ALL, 'donor:read']
     await mount(person({ donor: { ...DONOR, lastGiftDate: null } }))
-    expect(screen.getByText('Last gift').nextElementSibling).toHaveTextContent('—')
+    expect(screen.getByRole('heading', { name: 'Donor Information' })).toBeInTheDocument()
+    expect(screen.queryByTestId('last-gift-tag')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Open in LGL' })).toBeInTheDocument()
   })
 
   it('without donor:read the projection is exactly member, volunteer and no Donor text', async () => {

@@ -425,14 +425,19 @@ const copyEmail = async (email) => {
         </template>
       </div>
 
-      <!-- Donor Section: read-only, the record is edited in LGL. -->
+      <!-- Donor Section: read-only, the record is edited in LGL. Like Member and
+           Volunteer, its key fact rides in the header badge (@csmig, 2026-11-09):
+           there it is the last gift date, in the donor gold. No badge when LGL
+           gave no date. The body is the one action, Open in LGL. -->
       <div v-if="donor" class="section">
         <div class="section-header-row">
-          <h3 class="section-header">Donor</h3>
-        </div>
-        <div class="detail-field">
-          <span class="label">Last gift</span>
-          <span class="value">{{ donor.lastGiftDate ? formatCivilDate(donor.lastGiftDate) : '—' }}</span>
+          <h3 class="section-header">Donor Information</h3>
+          <Tag
+            v-if="donor.lastGiftDate"
+            :value="`Last gift ${formatCivilDate(donor.lastGiftDate)}`"
+            class="member-status-tag donor-tag"
+            data-testid="last-gift-tag"
+          />
         </div>
         <div class="detail-field">
           <a :href="lglConstituentUrl(donor.lglConstituentId)" target="_blank" rel="noopener">Open in LGL</a>
