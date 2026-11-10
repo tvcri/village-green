@@ -859,13 +859,13 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   color: var(--color-text-dim);
 }
 
-/* Two per column at most; a third option starts a new column. */
+/* One row, never wrapping (@csmig, 2026-11-09). The old two-row grid suited
+   Also sitting beside Match; since the Donor group, Also starts its own line,
+   and when space is short .filter-groups wraps the whole group instead. */
 .also-options {
-  display: grid;
-  grid-template-rows: repeat(2, auto);
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: 0.5rem 1.5rem;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1.5rem;
 }
 
 .also-option {
@@ -873,6 +873,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .role-tags {
