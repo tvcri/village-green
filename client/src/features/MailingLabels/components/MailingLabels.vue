@@ -193,6 +193,11 @@ function onAudienceSelected () {
   if (audience.value !== 'roster' && DONOR_ROLES.has(role.value)) {
     role.value = 'member'
   }
+  // Either is not offered to donor:read users on Full roster (All replaces it);
+  // the user's intent carries over rather than leaving a blank Role select.
+  if (audience.value === 'roster' && hasPermission('donor:read') && role.value === 'either') {
+    role.value = 'all'
+  }
 }
 
 // One watcher, one straight-line pass: every change either fires exactly one

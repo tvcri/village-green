@@ -134,7 +134,14 @@ onActivated(() => {
 const sortedPersons = computed(() => {
   if (!filteredPersons.value) return null
   const key = sortKey[sortField.value]
-  return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
+  // Blank last-gift keys stay at the bottom in both directions.
+  const blankLast = sortField.value === 'lastGift'
+  return [...filteredPersons.value].sort((a, b) => {
+    const ka = key(a)
+    const kb = key(b)
+    if (blankLast && (ka === '' || kb === '')) return ka === kb ? 0 : ka === '' ? 1 : -1
+    return sortOrder.value * ka.localeCompare(kb)
+  })
 })
 
 // Role tags for a row: member, volunteer and donor only (circles have their own
@@ -584,7 +591,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
       <colgroup>
         <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10rem">
         <col style="width: 11%"><col style="width: 11%"><col style="width: 21%">
-        <col v-if="canReadDonor" style="width: 8rem">
+        <col v-if="canReadDonor" style="width: 10rem">
       </colgroup>
       <thead>
         <tr>

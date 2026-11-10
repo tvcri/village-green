@@ -349,6 +349,24 @@ describe('PersonList grid', () => {
       expect(within(rows[1]).queryByRole('link')).toBeNull()
     })
 
+    it('sorting by Last gift keeps non-donors last in both directions', async () => {
+      perms.all = true
+      setRows([
+        row({ personId: 2, fullName: 'Beta, Bob', donor: null }),
+        row({ personId: 1, fullName: 'Alpha, Ann', donor: { lglConstituentId: 'L1', lastGiftDate: '2025-06-01' } }),
+        row({ personId: 3, fullName: 'Gamma, Gus', donor: { lglConstituentId: 'L3', lastGiftDate: '2024-01-15' } })
+      ])
+      await renderList()
+      const names = () => screen.getAllByRole('row').slice(1).map(r => r.textContent)
+      const header = screen.getByRole('columnheader', { name: /Last gift/ })
+      await fireEvent.click(header)
+      let t = names()
+      expect(t[0]).toContain('Gamma'); expect(t[1]).toContain('Alpha'); expect(t[2]).toContain('Beta')
+      await fireEvent.click(header)
+      t = names()
+      expect(t[0]).toContain('Alpha'); expect(t[1]).toContain('Gamma'); expect(t[2]).toContain('Beta')
+    })
+
     it('picking a window replaces the previous one', async () => {
       perms.all = true
       setRows(donorRows())

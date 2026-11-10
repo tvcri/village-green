@@ -114,6 +114,26 @@ describe('MailingLabels donor roles', () => {
     expect(comboOrNull('Last gift within')).toBeNull()
   })
 
+  it('Either carries over as All when switching to Full roster with donor:read', async () => {
+    await renderPage()
+    await pick('Audience', 'Birthday month')
+    await pick('Role', 'Either')
+    await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'birthday-month', role: 'either' }))
+    await pick('Audience', 'Full roster')
+    await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'roster', role: 'all', lastGiftWithinYears: 5 }))
+    expect(combo('Role')).toHaveTextContent('All')
+  })
+
+  it('without donor:read, Either survives switching to Full roster', async () => {
+    perms.denied = new Set(['donor:read'])
+    await renderPage()
+    await pick('Audience', 'Birthday month')
+    await pick('Role', 'Either')
+    await pick('Audience', 'Full roster')
+    await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'roster', role: 'either' }))
+    expect(combo('Role')).toHaveTextContent('Either')
+  })
+
   it('titles All with the window', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')
