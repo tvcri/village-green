@@ -5,6 +5,7 @@ import InputNumber from 'primevue/inputnumber'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import ExportButton from '../../../components/ExportButton.vue'
+import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { getMailingLabels } from '../api/mailingLabelApi.js'
 import { getVillages } from '../../VillageList/api/villageApi.js'
@@ -33,11 +34,33 @@ const ROLE_OPTIONS = [
   { label: 'Active volunteers', value: 'volunteer' },
   { label: 'Either', value: 'either' },
 ]
+// Donor roles are Full-roster-only (the API 422s any other audience) and need
+// donor:read (the API 403s without it). Donors and All replace Either in the
+// list: it is the narrower, older choice, and the picker stays four items long.
+const DONOR_ROLE_OPTIONS = [
+  { label: 'Active members', value: 'member' },
+  { label: 'Active volunteers', value: 'volunteer' },
+  { label: 'Donors', value: 'donor' },
+  { label: 'All', value: 'all' },
+]
+const DONOR_ROLES = new Set(['donor', 'all'])
+// "Any time" is a string sentinel: PrimeVue Select renders a null model as
+// empty, so a null-valued option could never display as chosen (same trap as
+// the village sentinel below). It maps to a null window in the request.
+const ANY_TIME = 'any'
+const GIFT_WINDOW_OPTIONS = [
+  { label: '1 year', value: 1 },
+  { label: '2 years', value: 2 },
+  { label: '5 years', value: 5 },
+  { label: 'Any time', value: ANY_TIME },
+]
 // In headings, 'either' reads as the pair; the Select option stays "Either".
 const ROLE_TITLE = {
   member: 'Active members',
   volunteer: 'Active volunteers',
   either: 'Active members & volunteers',
+  donor: 'Donors',
+  all: 'Active members, volunteers & donors',
 }
 
 const MONTH_OPTIONS = [
@@ -53,6 +76,7 @@ const audience = ref(null)
 const role = ref('member')
 const villageId = ref(null)
 const month = ref(null)
+const giftWindow = ref(5)
 
 const startPosition = ref(1)
 const nudgeX = ref(0)
@@ -81,6 +105,14 @@ const isMonthAudience = computed(() => MONTH_AUDIENCES.has(audience.value))
 // "Volunteers" or month is still there.
 const effectiveRole = computed(() => (isMemberOnly.value ? 'member' : role.value))
 const effectiveMonth = computed(() => (isMonthAudience.value ? month.value : null))
+// The window only means something to a donor role; elsewhere it is unsendable
+// (the API 422s it), and the user's choice survives a detour.
+const effectiveGiftWindow = computed(() =>
+  DONOR_ROLES.has(effectiveRole.value) && giftWindow.value !== ANY_TIME ? giftWindow.value : null)
+
+const { hasPermission } = useCurrentUser()
+const roleOptions = computed(() =>
+  hasPermission('donor:read') && audience.value === 'roster' ? DONOR_ROLE_OPTIONS : ROLE_OPTIONS)
 // No audience, or a month audience with no month chosen, is an incomplete
 // configuration: no request fires and the stale preview is cleared rather
 // than left misleading.
@@ -115,6 +147,7 @@ const { state: labelData, isLoading, error: labelsError, execute: loadLabels } =
     role: effectiveRole.value,
     villageId: villageId.value,
     month: effectiveMonth.value,
+    lastGiftWithinYears: effectiveGiftWindow.value,
   }),
   { immediate: false }
 )
@@ -135,7 +168,11 @@ const composedTitle = computed(() => {
     head += `: ${MONTH_OPTIONS.find(m => m.value === effectiveMonth.value).label}`
   }
   const parts = [head]
-  if (!isMemberOnly.value) parts.push(ROLE_TITLE[effectiveRole.value])
+  if (!isMemberOnly.value) {
+    const years = effectiveGiftWindow.value
+    parts.push(ROLE_TITLE[effectiveRole.value]
+      + (years === null ? '' : ` (gift within ${years} ${years === 1 ? 'year' : 'years'})`))
+  }
   if (villageId.value !== null && selectedVillageName.value) parts.push(selectedVillageName.value)
   return parts.join(' - ')
 })
@@ -150,6 +187,12 @@ function onAudienceSelected () {
   if (isMonthAudience.value && month.value === null) {
     month.value = (new Date().getMonth() + 1) % 12 + 1
   }
+  // Donors/All exist only under Full roster; leaving it must not strand the
+  // Role select on an option that is no longer in its list (and would 422).
+  // Done here, on the user action, so nothing silently rewrites a visible value.
+  if (audience.value !== 'roster' && DONOR_ROLES.has(role.value)) {
+    role.value = 'member'
+  }
 }
 
 // One watcher, one straight-line pass: every change either fires exactly one
@@ -157,7 +200,7 @@ function onAudienceSelected () {
 // state unsendable, so no 422 combination can be requested. Clearing
 // labelData is sufficient cleanup — it empties sortedLabels, and the
 // regenerate watcher owns revoking the preview URL.
-watch([audience, effectiveRole, villageId, effectiveMonth], async () => {
+watch([audience, effectiveRole, villageId, effectiveMonth, effectiveGiftWindow], async () => {
   truncated.value = []
   if (!configComplete.value) {
     labelData.value = null
@@ -276,7 +319,18 @@ onMounted(() => {
           <Select
             id="role"
             v-model="role"
-            :options="ROLE_OPTIONS"
+            :options="roleOptions"
+            option-label="label"
+            option-value="value"
+          />
+        </div>
+
+        <div v-if="DONOR_ROLES.has(effectiveRole)" class="field">
+          <label for="giftWindow">Last gift within</label>
+          <Select
+            id="giftWindow"
+            v-model="giftWindow"
+            :options="GIFT_WINDOW_OPTIONS"
             option-label="label"
             option-value="value"
           />
