@@ -111,8 +111,15 @@ const effectiveGiftWindow = computed(() =>
   DONOR_ROLES.has(effectiveRole.value) && giftWindow.value !== ANY_TIME ? giftWindow.value : null)
 
 const { hasPermission } = useCurrentUser()
-const roleOptions = computed(() =>
-  hasPermission('donor:read') && audience.value === 'roster' ? DONOR_ROLE_OPTIONS : ROLE_OPTIONS)
+// Donors and All are offered only on Full roster across all villages
+// (@csmig, 2026-11-09). Choosing a village takes donors out in plain sight:
+// the role list falls back to Members / Volunteers / Either and a note says why,
+// rather than leaving an "All" that quietly drops every donor without a village.
+const donorRolesOffered = computed(() =>
+  hasPermission('donor:read') && audience.value === 'roster' && villageId.value === null)
+const roleOptions = computed(() => (donorRolesOffered.value ? DONOR_ROLE_OPTIONS : ROLE_OPTIONS))
+const showDonorVillageNote = computed(() =>
+  hasPermission('donor:read') && audience.value === 'roster' && villageId.value !== null)
 // No audience, or a month audience with no month chosen, is an incomplete
 // configuration: no request fires and the stale preview is cleared rather
 // than left misleading.
@@ -136,7 +143,14 @@ const villageOptions = computed(() => [
 ])
 const villageSelection = computed({
   get: () => villageId.value ?? ALL_VILLAGES,
-  set: (value) => { villageId.value = value === ALL_VILLAGES ? null : value },
+  set: (value) => {
+    villageId.value = value === ALL_VILLAGES ? null : value
+    // A user action, like onAudienceSelected: keep Role on an offered option.
+    // A village rules out All, so it becomes Either; back to All villages,
+    // Either is not offered and becomes All again ("Either becomes All").
+    if (villageId.value !== null && role.value === 'all') role.value = 'either'
+    else if (donorRolesOffered.value && role.value === 'either') role.value = 'all'
+  },
 })
 // Donors have no village filter (@csmig, 2026-11-09): most donors the LGL import
 // created have no village at all, so a per-village donor run silently drops them.
@@ -202,7 +216,7 @@ function onAudienceSelected () {
   }
   // Either is not offered to donor:read users on Full roster (All replaces it);
   // the user's intent carries over rather than leaving a blank Role select.
-  if (audience.value === 'roster' && hasPermission('donor:read') && role.value === 'either') {
+  if (donorRolesOffered.value && role.value === 'either') {
     role.value = 'all'
   }
 }
@@ -357,6 +371,9 @@ onMounted(() => {
             option-label="label"
             option-value="value"
           />
+          <small v-if="showDonorVillageNote" class="note" data-testid="village-donor-note">
+            Donors are left out when a village is chosen. Choose All villages to include them.
+          </small>
         </div>
 
         <p v-if="!configComplete" class="note">

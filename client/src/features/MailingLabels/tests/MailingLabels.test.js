@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, cleanup, within, fireEvent, waitFor } from '@testing-library/vue'
+import { render, cleanup, within, fireEvent, waitFor, screen } from '@testing-library/vue'
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PrimeVue from 'primevue/config'
@@ -134,17 +134,48 @@ describe('MailingLabels donor roles', () => {
     expect(combo('Role')).toHaveTextContent('Either')
   })
 
-  it('Donors hides Village and sends no village; the choice returns for All', async () => {
+  it('Donors hides Village and sends no village', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')
-    await pick('Village', 'Testville')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'member', villageId: 1 }))
     await pick('Role', 'Donors')
     await waitFor(() => expect(lastCall()).toMatchObject({ role: 'donor', villageId: null }))
     expect(comboOrNull('Village')).toBeNull()
+  })
+
+  it('choosing a village takes donors out: All becomes Either, the window goes, a note says why', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
     await pick('Role', 'All')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'all', villageId: 1 }))
-    expect(combo('Village')).toHaveTextContent('Testville')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'all', lastGiftWithinYears: 5 }))
+    await pick('Village', 'Testville')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'either', villageId: 1, lastGiftWithinYears: null }))
+    expect(combo('Role')).toHaveTextContent('Either')
+    expect(comboOrNull('Last gift within')).toBeNull()
+    expect(screen.getByTestId('village-donor-note')).toHaveTextContent('Donors are left out when a village is chosen')
+    await openSelect('Role')
+    expect(optionNames('Role')).toEqual(['Active members', 'Active volunteers', 'Either'])
+  })
+
+  it('back to All villages, Donors and All return and Either becomes All', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await pick('Village', 'Testville')
+    await pick('Role', 'Either')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'either', villageId: 1 }))
+    await pick('Village', 'All villages')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'all', villageId: null, lastGiftWithinYears: 5 }))
+    expect(combo('Role')).toHaveTextContent('All')
+    expect(screen.queryByTestId('village-donor-note')).toBeNull()
+  })
+
+  it('without donor:read a village changes nothing about Role and shows no note', async () => {
+    perms.denied = new Set(['donor:read'])
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await pick('Role', 'Either')
+    await pick('Village', 'Testville')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'either', villageId: 1 }))
+    expect(screen.queryByTestId('village-donor-note')).toBeNull()
   })
 
   it('titles All with the window', async () => {
