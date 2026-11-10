@@ -268,6 +268,20 @@ describe('PersonList grid', () => {
       expect(screen.getByRole('button', { name: /Filters/ })).not.toHaveTextContent('1')
     })
 
+    it('the role pickers use the table\'s letter badges, named by caption', async () => {
+      perms.all = true
+      setRows(people())
+      await renderList()
+      for (const [group, letter] of [['Member', 'M'], ['Volunteer', 'V'], ['Donor', 'D']]) {
+        for (const btn of within(screen.getByRole('group', { name: group })).getAllByRole('button')) {
+          const badge = btn.querySelector('.role-badge')
+          expect(badge).toHaveTextContent(new RegExp(`^${letter}$`))
+          expect(badge).toHaveAttribute('aria-hidden', 'true')
+        }
+      }
+      expect(within(screen.getByRole('group', { name: 'Member' })).getByRole('button', { name: 'pending' })).toBeInTheDocument()
+    })
+
     it('without read_inactive the Member group offers only active; no demographics, no Veteran', async () => {
       perms.denied = new Set(['member:read_inactive', 'person:read_demographics'])
       setRows(people())

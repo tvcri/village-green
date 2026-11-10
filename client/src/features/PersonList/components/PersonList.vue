@@ -486,7 +486,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               :aria-pressed="isSelected(`member:${s}`)"
               @click="toggleTag(`member:${s}`)"
             >
-              <span class="role-tag role-tag--member" :class="`role-tag--${s}`">member</span>
+              <!-- The table's own badge (@csmig, 2026-11-09): the picker doubles as
+                   the legend for M / V / D. The group label names the role. -->
+              <span class="role-tag role-badge role-tag--member" :class="`role-tag--${s}`" aria-hidden="true">M</span>
               <span class="picker-caption">{{ s }}</span>
             </button>
           </div>
@@ -504,7 +506,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               :aria-pressed="isSelected(`volunteer:${s}`)"
               @click="toggleTag(`volunteer:${s}`)"
             >
-              <span class="role-tag role-tag--volunteer" :class="`role-tag--${s}`">volunteer</span>
+              <span class="role-tag role-badge role-tag--volunteer" :class="`role-tag--${s}`" aria-hidden="true">V</span>
               <span class="picker-caption">{{ s }}</span>
             </button>
           </div>
@@ -522,7 +524,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               :aria-pressed="isSelected(w.key)"
               @click="toggleTag(w.key)"
             >
-              <span class="role-tag role-tag--donor">donor</span>
+              <span class="role-tag role-badge role-tag--donor" aria-hidden="true">D</span>
               <span class="picker-caption">{{ w.caption }}</span>
             </button>
           </div>
