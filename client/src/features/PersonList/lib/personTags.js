@@ -88,17 +88,23 @@ function bareLabel (key, circleNameById) {
   return kind === 'circle' ? tagLabel(key, circleNameById) : `${value} ${kind}`
 }
 
-export function selectionSentence (selected, mode, circleNameById) {
-  if (selected.length === 0) return ''
+const joinList = (items, joiner) => items.length === 1
+  ? items[0]
+  : `${items.slice(0, -1).join(', ')} ${joiner} ${items[items.length - 1]}`
+
+// `also` holds the ticked Also boxes as predicates ('are veterans'). They
+// narrow every match mode (an AND outside Any/All/Exactly), so the clause
+// follows a comma: "…an active member or a donor, and who are veterans".
+// Staff are trained to read this sentence, so it names every tag and box.
+export function selectionSentence (selected, mode, circleNameById, also = []) {
+  const alsoClause = also.length ? joinList(also, 'and') : ''
+  if (selected.length === 0) return alsoClause ? `People who ${alsoClause}` : ''
+  const tail = alsoClause ? `, and who ${alsoClause}` : ''
   if (mode === 'exact') {
-    return `People whose tags are exactly: ${selected.map(k => bareLabel(k, circleNameById)).join(', ')}`
+    return `People whose tags are exactly: ${selected.map(k => bareLabel(k, circleNameById)).join(', ')}${tail}`
   }
-  const joiner = mode === 'all' ? 'and' : 'or'
   const phrases = selected.map(k => tagPhrase(k, circleNameById))
-  const body = phrases.length === 1
-    ? phrases[0]
-    : `${phrases.slice(0, -1).join(', ')} ${joiner} ${phrases[phrases.length - 1]}`
-  return `People who are ${body}`
+  return `People who are ${joinList(phrases, mode === 'all' ? 'and' : 'or')}${tail}`
 }
 
 export function isEmailPaused (row, today) {

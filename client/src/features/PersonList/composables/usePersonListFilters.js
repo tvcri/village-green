@@ -90,8 +90,14 @@ export function usePersonListFilters (persons, villages, circles) {
     (deceasedOnly.value ? 1 : 0))
   const hasFilter = computed(() => activeFilterCount.value > 0)
 
+  // In the Also boxes' on-screen order.
+  const alsoPhrases = computed(() => [
+    ...(emailPausedOnly.value ? ['have email paused'] : []),
+    ...(veteranOnly.value ? ['are veterans'] : []),
+    ...(deceasedOnly.value ? ['are deceased'] : []),
+  ])
   const sentence = computed(() =>
-    selectionSentence(selectedTags.value, matchMode.value, circleNameById.value))
+    selectionSentence(selectedTags.value, matchMode.value, circleNameById.value, alsoPhrases.value))
 
   function clearAll () {
     name.value = ''

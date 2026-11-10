@@ -153,6 +153,18 @@ describe('selectionSentence', () => {
     expect(selectionSentence(['donor:1y'], 'any', names)).toBe('People who are a donor (last gift within 1 year)')
     expect(selectionSentence(['donor:any'], 'any', names)).toBe('People who are a donor')
   })
+  it('adds the Also boxes after a comma, in every mode', () => {
+    expect(selectionSentence(['member:dropped', 'donor:1y'], 'all', names, ['are veterans']))
+      .toBe('People who are a dropped member and a donor (last gift within 1 year), and who are veterans')
+    expect(selectionSentence(['member:active'], 'any', names, ['have email paused', 'are veterans', 'are deceased']))
+      .toBe('People who are an active member, and who have email paused, are veterans and are deceased')
+    expect(selectionSentence(['member:active'], 'exact', names, ['are deceased']))
+      .toBe('People whose tags are exactly: active member, and who are deceased')
+  })
+  it('speaks for the Also boxes alone when no tag is picked', () => {
+    expect(selectionSentence([], 'any', names, ['are veterans'])).toBe('People who are veterans')
+    expect(selectionSentence([], 'any', names, [])).toBe('')
+  })
   it('exact uses bare donor labels', () => {
     expect(selectionSentence(['donor:2y'], 'exact', names))
       .toBe('People whose tags are exactly: donor (last gift within 2 years)')

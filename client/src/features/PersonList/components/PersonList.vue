@@ -546,20 +546,6 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           </div>
         </div>
 
-        <div class="filter-group" role="group" aria-label="Match">
-          <span class="filter-group-label">Match</span>
-          <div class="match-row">
-            <SelectButton
-              v-model="matchMode"
-              :options="matchOptions"
-              option-label="label"
-              option-value="value"
-              :allow-empty="false"
-            />
-            <span v-if="sentence" class="selection-sentence">{{ sentence }}</span>
-          </div>
-        </div>
-
         <div class="filter-group" role="group" aria-label="Also">
           <span class="filter-group-label">Also</span>
           <div class="also-options">
@@ -575,6 +561,22 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               <Checkbox v-model="deceasedOnly" binary />
               <span>Deceased</span>
             </label>
+          </div>
+        </div>
+
+        <!-- Match closes the panel on a row of its own (@csmig, 2026-11-09): every
+             selection sits above it, and its sentence reads them all back. -->
+        <div class="filter-group filter-group--match" role="group" aria-label="Match">
+          <span class="filter-group-label">Match</span>
+          <div class="match-row">
+            <SelectButton
+              v-model="matchMode"
+              :options="matchOptions"
+              option-label="label"
+              option-value="value"
+              :allow-empty="false"
+            />
+            <span v-if="sentence" class="selection-sentence">{{ sentence }}</span>
           </div>
         </div>
       </div>
@@ -801,6 +803,13 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 }
 
 .filter-group:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+/* A full-width last row; it always starts a line, so no divider. */
+.filter-group--match {
+  flex-basis: 100%;
   padding-left: 0;
   border-left: 0;
 }
