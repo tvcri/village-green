@@ -137,6 +137,12 @@ const sortedPersons = computed(() => {
   return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
 })
 
+// The Phone cell: the cell number, else the home phone. Parsed once per row.
+function phoneCell (raw) {
+  const { phone, cell } = parsePhoneObj(raw)
+  return cell || phone || '—'
+}
+
 // Role badges for a row: member, volunteer and donor (circles have their own
 // column), as one-letter badges in three FIXED slots, M then V then D, with an
 // empty slot where a role is absent (@csmig, 2026-11-09). Full-word tags made
@@ -659,7 +665,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           </td>
           <!-- One Phone column (@csmig, 2026-11-09): the cell, else the home
                phone. The CSV keeps both. -->
-          <td>{{ parsePhoneObj(p.phone).cell || parsePhoneObj(p.phone).phone || '—' }}</td>
+          <td>{{ phoneCell(p.phone) }}</td>
           <td>
             <div v-if="p.email" class="email-cell">
               <span class="email-text">{{ p.email }}</span>

@@ -75,8 +75,8 @@ function buildRecipientQuery ({ audience, role, villageId = null, month = null, 
     if (hasCutoff) binds.push(lastGiftSince)
   }
   else if (role === 'all') {
-    // Reuse the EITHER pieces: strip its outer parens to splice in the donor branch.
-    where.push(`(${EITHER_PREDICATE.slice(1, -1)} OR ${donorPredicate(hasCutoff)})`)
+    // EITHER_PREDICATE is already parenthesised, so it nests as one operand.
+    where.push(`(${EITHER_PREDICATE} OR ${donorPredicate(hasCutoff)})`)
     if (hasCutoff) binds.push(lastGiftSince)
   }
   else {
