@@ -9,7 +9,7 @@
 // memberOnly: the audience reads member columns through the m alias, so it
 // exists only for role=member. requiresMonth: the audience filters on a
 // month and is meaningless without one (and month is rejected without it).
-// allowsDonors: the audience accepts role=donor and role=all. Only the full
+// allowsDonors: the audience accepts donor in its role list. Only the full
 // roster does; the other audiences filter on member or person columns that a
 // donor-only recipient may not have a meaningful value for.
 const AUDIENCE_RULES = {
@@ -19,8 +19,12 @@ const AUDIENCE_RULES = {
   'join-month': { memberOnly: true, requiresMonth: true, allowsDonors: false },
 }
 
-// Roles that bring donors into the recipient set (and so accept a last-gift
-// window).
-const DONOR_ROLES = new Set(['donor', 'all'])
+// The role values, in the fixed order the query ORs them and the client
+// titles them. A request names any non-empty subset, in any order.
+const ROLE_ORDER = ['member', 'volunteer', 'donor']
 
-module.exports = { AUDIENCE_RULES, DONOR_ROLES }
+// Donor in the list brings donors into the recipient set (and so accepts a
+// last-gift window and needs donor:read).
+const includesDonor = (roles) => Array.isArray(roles) && roles.includes('donor')
+
+module.exports = { AUDIENCE_RULES, ROLE_ORDER, includesDonor }
