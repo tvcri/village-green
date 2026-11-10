@@ -165,6 +165,24 @@ describe('MailingLabels roles', () => {
     expect(screen.queryByText(/labels \(/)).toBeNull()
   })
 
+  it('unchecking the last role while a request is in flight shows no stale labels', async () => {
+    let resolvePending
+    await renderPage()
+    getMailingLabels.mockImplementationOnce(() => new Promise(r => { resolvePending = r }))
+    await pick('Audience', 'Full roster')
+    await waitFor(() => expect(resolvePending).toBeTypeOf('function'))
+    await toggle('Members')
+    expect(await screen.findByText('Choose at least one role to generate labels.')).toBeInTheDocument()
+    resolvePending(structuredClone(response))
+    await new Promise(r => setTimeout(r, 50))
+    expect(screen.queryByText(/labels \(/)).toBeNull()
+    expect(screen.queryByText('Loading…')).toBeNull()
+    // The late response can start a PDF build, but the page's generation
+    // counter discards it once the labels clear: no preview is left showing.
+    expect(document.querySelector('iframe.preview')).toBeNull()
+    expect(screen.getByText('The PDF preview appears here.')).toBeInTheDocument()
+  })
+
   it('Donors alone, then Birthday month, prompts for a role rather than sending members', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')

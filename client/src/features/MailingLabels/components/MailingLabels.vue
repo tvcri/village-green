@@ -229,7 +229,10 @@ watch([audience, () => effectiveRoles.value.join(','), effectiveVillageId, effec
   // not leave the prior run's PDF under the new control values — the user
   // would print the wrong labels. (Aborts and lost races also resolve null,
   // but they leave labelsError unset and a newer pass owns the state.)
-  if (await loadLabels() === null && labelsError.value) {
+  const result = await loadLabels()
+  // Unchecking the last role starts no newer request, so useAsyncState still
+  // lands this one. Labels under a "Choose…" prompt would be the wrong labels.
+  if (!configComplete.value || (result === null && labelsError.value)) {
     labelData.value = null
   }
 })
@@ -372,7 +375,7 @@ onMounted(() => {
           {{ incompletePrompt }}
         </p>
 
-        <div v-if="isLoading">Loading…</div>
+        <div v-if="isLoading && configComplete">Loading…</div>
 
         <template v-else-if="summary">
           <p>
