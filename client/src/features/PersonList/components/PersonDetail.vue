@@ -26,10 +26,15 @@ const { hasPermission } = useCurrentUser()
 const canWritePerson = computed(() => hasPermission('person:write'))
 const canWriteMember = computed(() => hasPermission('member:write'))
 const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
+const canReadDonor = computed(() => hasPermission('donor:read'))
 const personId = computed(() => route.params.personId)
 
 const { state: person, execute: refresh } = useAsyncState(
-  () => apiCall('getPerson', { personId: personId.value, projection: ['member', 'volunteer'] })
+  // The API rejects projection=donor without donor:read, so only ask when held.
+  () => apiCall('getPerson', {
+    personId: personId.value,
+    projection: canReadDonor.value ? ['member', 'volunteer', 'donor'] : ['member', 'volunteer']
+  })
     .then(p => { setCrumbPerson(p); return p }),
   { immediate: true }
 )
@@ -141,6 +146,7 @@ function removePerson () {
       :person-type="personType"
       :has-member-detail="hasMemberDetail"
       :has-volunteer-detail="hasVolunteerDetail"
+      :donor="canReadDonor ? (person?.donor ?? null) : null"
     >
       <!-- Pencil shortcuts to the same editors as the top buttons. Each
            section renders only when its role record exists, so these are

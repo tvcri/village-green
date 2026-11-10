@@ -114,3 +114,44 @@ describe('PersonDetail — delete guard', () => {
     expect(await screen.findByText(/^Untick Deceased/)).toBeInTheDocument()
   })
 })
+
+describe('PersonDetail — donor tag and section', () => {
+  const projectionOf = () => apiCall.mock.calls.at(-1)[1].projection
+  const DONOR = { donorId: '3', personId: '5', lglConstituentId: 'L9', lastGiftDate: '2024-03-02' }
+
+  beforeEach(() => apiCall.mockReset())
+
+  it('asks for the donor projection and shows tag, last gift and the LGL link', async () => {
+    granted = [...ALL, 'donor:read']
+    await mount(person({ donor: DONOR }))
+    expect(projectionOf()).toContain('donor')
+    expect(screen.getByText('Donor', { selector: '.donor-tag, .donor-tag *' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Donor' })).toBeInTheDocument()
+    expect(screen.getByText('Mar 2, 2024')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Open in LGL' })
+    expect(link).toHaveAttribute('href', expect.stringMatching(/\/constituents\/L9$/))
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener')
+  })
+
+  it('shows a dash when the donor has no gift date', async () => {
+    granted = [...ALL, 'donor:read']
+    await mount(person({ donor: { ...DONOR, lastGiftDate: null } }))
+    expect(screen.getByText('Last gift').nextElementSibling).toHaveTextContent('—')
+  })
+
+  it('without donor:read the projection is exactly member, volunteer and no Donor text', async () => {
+    granted = ALL
+    await mount(person({ donor: DONOR }))
+    expect(projectionOf()).toEqual(['member', 'volunteer'])
+    expect(screen.queryByText(/Donor/)).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Open in LGL' })).toBeNull()
+  })
+
+  it('shows neither tag nor section for a person who is not a donor', async () => {
+    granted = [...ALL, 'donor:read']
+    await mount(person({ donor: null }))
+    expect(projectionOf()).toContain('donor')
+    expect(screen.queryByText(/Donor/)).toBeNull()
+  })
+})

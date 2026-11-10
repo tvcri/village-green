@@ -7,6 +7,7 @@ import PersonMap from '../../components/PersonMap.vue'
 import { formatCivilDate, todayCivilDateIn } from '../lib/civilDate.js'
 import { PAUSE_TIME_ZONE, pauseTag } from '../lib/volunteerPause.js'
 import { positionPlace } from '../lib/positionRules.js'
+import { lglConstituentUrl } from '../lib/lgl.js'
 
 const props = defineProps({
   person: {
@@ -32,6 +33,12 @@ const props = defineProps({
   },
   hasVolunteerDetail: {
     type: Boolean,
+    default: null
+  },
+  // Donor record ({ lglConstituentId, lastGiftDate }) for the Hub person page
+  // only; other callers leave it null and render exactly as before.
+  donor: {
+    type: Object,
     default: null
   }
 })
@@ -133,6 +140,7 @@ const copyEmail = async (email) => {
         <div class="title-tags">
           <Tag v-if="person.village?.name" :value="person.village.name" class="village-tag" />
           <Tag v-for="circle in person.circles ?? []" :key="circle.circleId" :value="circle.name" severity="secondary" class="village-tag" />
+          <Tag v-if="donor" value="Donor" class="village-tag donor-tag" />
           <Tag v-if="person.deceased" value="Deceased" severity="contrast" class="village-tag" />
         </div>
       </div>
@@ -417,6 +425,19 @@ const copyEmail = async (email) => {
         </template>
       </div>
 
+      <!-- Donor Section: read-only, the record is edited in LGL. -->
+      <div v-if="donor" class="section">
+        <div class="section-header-row">
+          <h3 class="section-header">Donor</h3>
+        </div>
+        <div class="detail-field">
+          <span class="label">Last gift</span>
+          <span class="value">{{ donor.lastGiftDate ? formatCivilDate(donor.lastGiftDate) : '—' }}</span>
+        </div>
+        <div class="detail-field">
+          <a :href="lglConstituentUrl(donor.lglConstituentId)" target="_blank" rel="noopener">Open in LGL</a>
+        </div>
+      </div>
 
       <!-- Emergency Contact Section -->
       <div v-if="person.emergencyContactName || person.emergencyContactRelationship || person.emergencyContactPhone || person.emergencyContactEmail" class="section">
@@ -506,6 +527,11 @@ const copyEmail = async (email) => {
 .village-tag {
   font-size: 0.9rem;
   flex-shrink: 0;
+}
+
+.donor-tag {
+  background: var(--tag-donor-bg);
+  color: var(--tag-donor-fg);
 }
 
 :deep(.p-card-content) {
