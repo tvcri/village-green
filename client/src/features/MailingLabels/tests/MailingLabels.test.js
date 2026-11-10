@@ -32,7 +32,7 @@ const response = {
 // mousedown, not click.
 // The page puts each label's id on the Select root, not the focusable
 // combobox, so look the combobox up by that id.
-const ids = { Audience: 'audience', Role: 'role', 'Last gift within': 'giftWindow' }
+const ids = { Audience: 'audience', Role: 'role', 'Last gift within': 'giftWindow', Village: 'village' }
 const comboOrNull = (label) => document.querySelector(`#${ids[label]} [role="combobox"]`)
 const combo = (label) => {
   const el = comboOrNull(label)
@@ -132,6 +132,19 @@ describe('MailingLabels donor roles', () => {
     await pick('Audience', 'Full roster')
     await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'roster', role: 'either' }))
     expect(combo('Role')).toHaveTextContent('Either')
+  })
+
+  it('Donors hides Village and sends no village; the choice returns for All', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await pick('Village', 'Testville')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'member', villageId: 1 }))
+    await pick('Role', 'Donors')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'donor', villageId: null }))
+    expect(comboOrNull('Village')).toBeNull()
+    await pick('Role', 'All')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'all', villageId: 1 }))
+    expect(combo('Village')).toHaveTextContent('Testville')
   })
 
   it('titles All with the window', async () => {

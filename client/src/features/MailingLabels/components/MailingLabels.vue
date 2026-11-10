@@ -138,14 +138,21 @@ const villageSelection = computed({
   get: () => villageId.value ?? ALL_VILLAGES,
   set: (value) => { villageId.value = value === ALL_VILLAGES ? null : value },
 })
+// Donors have no village filter (@csmig, 2026-11-09): most donors the LGL import
+// created have no village at all, so a per-village donor run silently drops them.
+// The Village select hides for Donors and, like Role and Month, a hidden
+// selection is never sent; the user's village survives a detour through Donors.
+// All keeps the filter: its members and volunteers do have villages.
+const showVillage = computed(() => audience.value !== null && effectiveRole.value !== 'donor')
+const effectiveVillageId = computed(() => (showVillage.value ? villageId.value : null))
 const selectedVillageName = computed(() =>
-  villages.value.find(v => v.villageId === villageId.value)?.name ?? null)
+  villages.value.find(v => v.villageId === effectiveVillageId.value)?.name ?? null)
 
 const { state: labelData, isLoading, error: labelsError, execute: loadLabels } = useAsyncState(
   () => getMailingLabels({
     audience: audience.value,
     role: effectiveRole.value,
-    villageId: villageId.value,
+    villageId: effectiveVillageId.value,
     month: effectiveMonth.value,
     lastGiftWithinYears: effectiveGiftWindow.value,
   }),
@@ -173,7 +180,7 @@ const composedTitle = computed(() => {
     parts.push(ROLE_TITLE[effectiveRole.value]
       + (years === null ? '' : ` (gift within ${years} ${years === 1 ? 'year' : 'years'})`))
   }
-  if (villageId.value !== null && selectedVillageName.value) parts.push(selectedVillageName.value)
+  if (effectiveVillageId.value !== null && selectedVillageName.value) parts.push(selectedVillageName.value)
   return parts.join(' - ')
 })
 
@@ -205,7 +212,7 @@ function onAudienceSelected () {
 // state unsendable, so no 422 combination can be requested. Clearing
 // labelData is sufficient cleanup — it empties sortedLabels, and the
 // regenerate watcher owns revoking the preview URL.
-watch([audience, effectiveRole, villageId, effectiveMonth, effectiveGiftWindow], async () => {
+watch([audience, effectiveRole, effectiveVillageId, effectiveMonth, effectiveGiftWindow], async () => {
   truncated.value = []
   if (!configComplete.value) {
     labelData.value = null
@@ -341,7 +348,7 @@ onMounted(() => {
           />
         </div>
 
-        <div v-if="audience !== null" class="field">
+        <div v-if="showVillage" class="field">
           <label for="village">Village</label>
           <Select
             id="village"
