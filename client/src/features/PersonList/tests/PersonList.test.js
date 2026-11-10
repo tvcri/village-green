@@ -70,15 +70,35 @@ describe('PersonList grid', () => {
     setRows([row({ personId: 1, fullName: 'Alpha, Ann' })])
     await renderList()
     const headers = screen.getAllByRole('columnheader').map(h => h.textContent.trim())
-    expect(headers).toEqual(['Name', 'Village', 'Roles', 'Circles', 'Phone', 'Cell', 'Email'])
+    expect(headers).toEqual(['Name', 'Village', 'Roles', 'Circles', 'Phone', 'Email'])
   })
 
-  it('renders a pending member tag', async () => {
+  it('renders a pending member as an M badge', async () => {
     setRows([row({ personId: 1, fullName: 'Alpha, Ann', memberStatus: 'Pending' })])
     await renderList()
     const tag = screen.getByLabelText('Member, pending')
-    expect(tag).toHaveClass('role-tag', 'role-tag--member', 'role-tag--pending')
-    expect(tag).toHaveTextContent(/^member$/)
+    expect(tag).toHaveClass('role-tag', 'role-badge', 'role-tag--member', 'role-tag--pending')
+    expect(tag).toHaveTextContent(/^M$/)
+  })
+
+  it('keeps M, V and D in fixed slots, leaving an empty slot for an absent role', async () => {
+    perms.all = true
+    setRows([row({ personId: 1, fullName: 'Alpha, Ann', volunteerStatus: 'Active', donor: { lglConstituentId: 'L1', lastGiftDate: '2025-06-01' } })])
+    await renderList()
+    const slots = [...screen.getAllByRole('row')[1].querySelector('.role-tags').children]
+    expect(slots.map(s => s.classList.contains('role-slot') ? '_' : s.textContent.trim())).toEqual(['_', 'V', 'D'])
+  })
+
+  it('shows the cell in the one Phone column, falling back to the home phone', async () => {
+    setRows([
+      row({ personId: 1, fullName: 'Alpha, Ann', phone: { phone: '401-555-0100', cell: '401-555-0199' } }),
+      row({ personId: 2, fullName: 'Beta, Bob', phone: { phone: '401-555-0111' } })
+    ])
+    await renderList()
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('401-555-0199')
+    expect(rows[0]).not.toHaveTextContent('401-555-0100')
+    expect(rows[1]).toHaveTextContent('401-555-0111')
   })
 
   it('masks a deceased row and shows its tags as dropped', async () => {
@@ -122,7 +142,7 @@ describe('PersonList grid', () => {
     expect(screen.queryByRole('button', { name: /^Copy email/ })).toBeNull()
   })
 
-  it('marks an in-effect pause inside the volunteer tag and ignores an expired one', async () => {
+  it('marks an in-effect pause after the badges and ignores an expired one', async () => {
     setRows([
       row({
         personId: 1, fullName: 'Alpha, Ann', volunteerStatus: 'Active',
@@ -135,8 +155,10 @@ describe('PersonList grid', () => {
     ])
     await renderList()
     const rows = screen.getAllByRole('row').slice(1)
-    const mark = within(rows[0]).getByTitle('Email paused until Nov 10')
-    expect(mark.closest('.role-tag')).toHaveClass('role-tag--volunteer')
+    const mark = within(rows[0]).getByTitle('Volunteer: Email paused until Nov 10')
+    expect(mark).toHaveClass('pause-mark')
+    // The V badge says so too, so the tooltip on either reads the pause.
+    expect(within(rows[0]).getByLabelText(/^Volunteer, active, Email paused until Nov 10$/)).toHaveClass('role-tag--volunteer')
     expect(rows[1].querySelector('.pause-mark')).toBeNull()
   })
 
@@ -149,7 +171,7 @@ describe('PersonList grid', () => {
       row({ personId: 2, fullName: 'Beta, Bob', volunteerStatus: 'Active' })
     ])
     await renderList()
-    expect(screen.getByTitle('Email paused until Nov 1')).toBeInTheDocument()
+    expect(screen.getByTitle('Volunteer: Email paused until Nov 1')).toBeInTheDocument()
     vi.setSystemTime(new Date('2026-11-02T15:00:00Z'))
     await fireEvent.update(screen.getByPlaceholderText('Name'), 'a')
     await waitFor(() => expect(screen.queryByTitle(/Email paused/)).toBeNull())
@@ -331,40 +353,19 @@ describe('PersonList grid', () => {
     ]
     const headersOf = (csvHead) => csvHead.split(',')
 
-    it('with donor:read: tag, picker group, Last gift column and link', async () => {
+    it('with donor:read: a D badge carrying the last gift, the picker group, and no Last gift column', async () => {
       perms.all = true
       setRows(donorRows())
       await renderList()
       const rows = screen.getAllByRole('row').slice(1)
-      expect(within(rows[0]).getByTitle('Donor')).toHaveClass('role-tag', 'role-tag--donor')
+      const badge = within(rows[0]).getByTitle('Donor, last gift Jun 1, 2025')
+      expect(badge).toHaveClass('role-tag', 'role-badge', 'role-tag--donor')
+      expect(badge).toHaveTextContent(/^D$/)
       const group = screen.getByRole('group', { name: 'Donor' })
       expect(within(group).getAllByRole('button').map(b => b.querySelector('.picker-caption').textContent.trim()))
         .toEqual(['1 yr', '2 yr', '5 yr', 'any time'])
-      expect(screen.getAllByRole('columnheader').map(h => h.textContent.trim())).toContain('Last gift')
-      const link = within(rows[0]).getByRole('link', { name: /LGL/ })
-      expect(link).toHaveAttribute('href', 'https://pvri.littlegreenlight.com/constituents/L1')
-      expect(link).toHaveAttribute('target', '_blank')
-      expect(link).toHaveAttribute('rel', 'noopener')
-      expect(within(rows[0]).getByText('Jun 1, 2025')).toBeInTheDocument()
-      expect(within(rows[1]).queryByRole('link')).toBeNull()
-    })
-
-    it('sorting by Last gift keeps non-donors last in both directions', async () => {
-      perms.all = true
-      setRows([
-        row({ personId: 2, fullName: 'Beta, Bob', donor: null }),
-        row({ personId: 1, fullName: 'Alpha, Ann', donor: { lglConstituentId: 'L1', lastGiftDate: '2025-06-01' } }),
-        row({ personId: 3, fullName: 'Gamma, Gus', donor: { lglConstituentId: 'L3', lastGiftDate: '2024-01-15' } })
-      ])
-      await renderList()
-      const names = () => screen.getAllByRole('row').slice(1).map(r => r.textContent)
-      const header = screen.getByRole('columnheader', { name: /Last gift/ })
-      await fireEvent.click(header)
-      let t = names()
-      expect(t[0]).toContain('Gamma'); expect(t[1]).toContain('Alpha'); expect(t[2]).toContain('Beta')
-      await fireEvent.click(header)
-      t = names()
-      expect(t[0]).toContain('Alpha'); expect(t[1]).toContain('Gamma'); expect(t[2]).toContain('Beta')
+      expect(screen.getAllByRole('columnheader').map(h => h.textContent.trim())).not.toContain('Last gift')
+      expect(within(rows[1]).queryByTitle(/^Donor/)).toBeNull()
     })
 
     it('picking a window replaces the previous one', async () => {
@@ -419,7 +420,7 @@ describe('PersonList grid', () => {
       const noDonorKey = donorRows().map(r => { const o = { ...r }; delete o.donor; return o })
       const [head] = await download(noDonorKey)
       expect(screen.queryByRole('group', { name: 'Donor' })).toBeNull()
-      expect(screen.getAllByRole('columnheader').map(h => h.textContent.trim())).not.toContain('Last gift')
+      expect(screen.queryByTitle(/^Donor/)).toBeNull()
       for (const h of ['Donor', 'Last Gift Date', 'LGL']) expect(headersOf(head)).not.toContain(h)
     })
   })

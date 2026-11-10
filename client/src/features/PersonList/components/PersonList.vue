@@ -113,7 +113,7 @@ const canReadDemographics = computed(() => hasPermission('person:read_demographi
 // the table header under the filter bar.
 const sortField = ref('fullName')
 const sortOrder = ref(1)
-const sortKey = { fullName: p => p.fullName ?? '', village: p => p.village?.name ?? '', lastGift: p => p.donor?.lastGiftDate ?? '' }
+const sortKey = { fullName: p => p.fullName ?? '', village: p => p.village?.name ?? '' }
 function toggleSort (field) {
   if (sortField.value === field) sortOrder.value = -sortOrder.value
   else { sortField.value = field; sortOrder.value = 1 }
@@ -134,30 +134,35 @@ onActivated(() => {
 const sortedPersons = computed(() => {
   if (!filteredPersons.value) return null
   const key = sortKey[sortField.value]
-  // Blank last-gift keys stay at the bottom in both directions.
-  const blankLast = sortField.value === 'lastGift'
-  return [...filteredPersons.value].sort((a, b) => {
-    const ka = key(a)
-    const kb = key(b)
-    if (blankLast && (ka === '' || kb === '')) return ka === kb ? 0 : ka === '' ? 1 : -1
-    return sortOrder.value * ka.localeCompare(kb)
-  })
+  return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
 })
 
-// Role tags for a row: member, volunteer and donor only (circles have their own
-// column). A deceased person reads as dropped in every role and says so.
+// Role badges for a row: member, volunteer and donor (circles have their own
+// column), as one-letter badges in three FIXED slots, M then V then D, with an
+// empty slot where a role is absent (@csmig, 2026-11-09). Full-word tags made
+// the Roles column wrap or clip once donors arrived; fixed slots give the
+// column a known width and keep each role lined up down the page. The full
+// words live in the tooltip, and the filter picker pairs each colour with its
+// word. A deceased person reads as dropped in every role and says so.
+const ROLE_SLOTS = [
+  { kind: 'member', role: 'Member', letter: 'M' },
+  { kind: 'volunteer', role: 'Volunteer', letter: 'V' },
+  { kind: 'donor', role: 'Donor', letter: 'D' },
+]
 function roleTags (p, today) {
-  return rowTagKeys(p)
-    .filter(key => !key.startsWith('circle:'))
-    .map(key => {
-      const [kind, status] = key.split(':')
-      const role = kind === 'member' ? 'Member' : kind === 'donor' ? 'Donor' : 'Volunteer'
-      const label = p.deceased ? `${role} (deceased)` : tagLabel(key, circleNameById.value)
-      const pause = kind === 'volunteer' && isEmailPaused(p, today)
-        ? pauseTag(p.volunteerPause, today)
-        : null
-      return { key, kind, status, role, label, pause }
-    })
+  const keys = rowTagKeys(p)
+  return ROLE_SLOTS.map(({ kind, role, letter }) => {
+    const key = keys.find(k => k === kind || k.startsWith(`${kind}:`))
+    if (!key) return { kind, empty: true }
+    const status = key.split(':')[1]
+    let label = p.deceased ? `${role} (deceased)` : tagLabel(key, circleNameById.value)
+    // Last gift has no column of its own; it rides on the donor badge's tooltip.
+    if (kind === 'donor' && p.donor?.lastGiftDate) label += `, last gift ${formatCivilDate(p.donor.lastGiftDate)}`
+    const pause = kind === 'volunteer' && isEmailPaused(p, today)
+      ? pauseTag(p.volunteerPause, today)
+      : null
+    return { key, kind, status, role, letter, label, pause }
+  })
 }
 
 // Tags per row, rebuilt whenever the displayed rows change. Today's civil date
@@ -589,10 +594,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
     <table v-else class="person-table">
       <colgroup>
-        <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10rem">
-        <col style="width: 11%"><col style="width: 11%"><col style="width: 21%">
-        <!-- Last gift: widest "May dd, yyyy" + LGL link measured 115.4px, plus 28px cell padding -->
-        <col v-if="canReadDonor" style="width: 11rem">
+        <!-- Roles: three 1.6rem badge slots, two gaps, a pause mark and the cell padding. -->
+        <col style="width: 22%"><col style="width: 14%"><col style="width: 8.5rem"><col style="width: 10rem">
+        <col style="width: 9.5rem"><col>
       </colgroup>
       <thead>
         <tr>
@@ -605,11 +609,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           <th>Roles</th>
           <th>Circles</th>
           <th>Phone</th>
-          <th>Cell</th>
           <th>Email</th>
-          <th v-if="canReadDonor" class="sortable" :class="{ sorted: sortField === 'lastGift' }" @click="toggleSort('lastGift')">
-            Last gift <i :class="sortIcon('lastGift')" />
-          </th>
         </tr>
       </thead>
       <tbody>
@@ -623,18 +623,24 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           <td>{{ p.village?.name }}</td>
           <td>
             <div class="role-tags">
-              <span
-                v-for="t in tagsByPerson.get(p.personId)"
-                :key="t.key"
-                class="role-tag"
-                :class="t.status ? [`role-tag--${t.kind}`, `role-tag--${t.status}`] : `role-tag--${t.kind}`"
-                role="img"
-                :title="t.label"
-                :aria-label="t.pause ? `${t.label}, ${t.pause}` : t.label"
-              >
-                {{ t.kind }}
-                <i v-if="t.pause" class="pi pi-pause-circle pause-mark" :title="t.pause" />
-              </span>
+              <template v-for="t in tagsByPerson.get(p.personId)" :key="t.kind">
+                <span v-if="t.empty" class="role-slot" />
+                <span
+                  v-else
+                  class="role-tag role-badge"
+                  :class="t.status ? [`role-tag--${t.kind}`, `role-tag--${t.status}`] : `role-tag--${t.kind}`"
+                  role="img"
+                  :title="t.pause ? `${t.label}, ${t.pause}` : t.label"
+                  :aria-label="t.pause ? `${t.label}, ${t.pause}` : t.label"
+                >{{ t.letter }}</span>
+              </template>
+              <!-- The pause mark trails the slots so it never shifts M/V/D. -->
+              <i
+                v-for="t in (tagsByPerson.get(p.personId) ?? []).filter(x => x.pause)"
+                :key="`pause-${t.kind}`"
+                class="pi pi-pause-circle pause-mark"
+                :title="`Volunteer: ${t.pause}`"
+              />
             </div>
           </td>
           <td>
@@ -647,8 +653,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               >{{ circleShortName(c.name) }}</span>
             </div>
           </td>
-          <td>{{ parsePhoneObj(p.phone).phone || '—' }}</td>
-          <td>{{ parsePhoneObj(p.phone).cell || '—' }}</td>
+          <!-- One Phone column (@csmig, 2026-11-09): the cell, else the home
+               phone. The CSV keeps both. -->
+          <td>{{ parsePhoneObj(p.phone).cell || parsePhoneObj(p.phone).phone || '—' }}</td>
           <td>
             <div v-if="p.email" class="email-cell">
               <span class="email-text">{{ p.email }}</span>
@@ -664,18 +671,6 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               </button>
             </div>
             <template v-else>—</template>
-          </td>
-          <td v-if="canReadDonor">
-            <template v-if="p.donor">
-              <span>{{ formatCivilDate(p.donor.lastGiftDate) }}</span>
-              <a
-                class="lgl-link"
-                :href="lglConstituentUrl(p.donor.lglConstituentId)"
-                target="_blank"
-                rel="noopener"
-                @click.stop
-              >LGL</a>
-            </template>
           </td>
         </tr>
       </tbody>
@@ -1005,9 +1000,16 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   color: var(--tag-volunteer-fg);
 }
 
-.lgl-link {
-  margin-left: 0.5rem;
-  font-size: 0.75rem;
+/* Row badges: one letter in a fixed-width slot (the picker keeps full words). */
+.role-badge,
+.role-slot {
+  flex: none;
+  width: 1.6rem;
+}
+
+.role-badge {
+  justify-content: center;
+  padding: 0.125rem 0;
 }
 
 .role-tag--donor {
