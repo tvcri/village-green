@@ -96,15 +96,19 @@ const joinList = (items, joiner) => items.length === 1
 // narrow every match mode (an AND outside Any/All/Exactly), so the clause
 // follows a comma: "…an active member or a donor, and who are veterans".
 // Staff are trained to read this sentence, so it names every tag and box.
+// The words Match controls are capitalised (AND / OR / EXACTLY, @csmig
+// 2026-11-09): the only difference between Any and All is that one word, so
+// it must not be buried. The Also clause's "and" stays lowercase because
+// Match does not change it.
 export function selectionSentence (selected, mode, circleNameById, also = []) {
   const alsoClause = also.length ? joinList(also, 'and') : ''
   if (selected.length === 0) return alsoClause ? `People who ${alsoClause}` : ''
   const tail = alsoClause ? `, and who ${alsoClause}` : ''
   if (mode === 'exact') {
-    return `People whose tags are exactly: ${selected.map(k => bareLabel(k, circleNameById)).join(', ')}${tail}`
+    return `People whose tags are EXACTLY: ${selected.map(k => bareLabel(k, circleNameById)).join(', ')}${tail}`
   }
   const phrases = selected.map(k => tagPhrase(k, circleNameById))
-  return `People who are ${joinList(phrases, mode === 'all' ? 'and' : 'or')}${tail}`
+  return `People who are ${joinList(phrases, mode === 'all' ? 'AND' : 'OR')}${tail}`
 }
 
 export function isEmailPaused (row, today) {

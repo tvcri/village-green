@@ -819,7 +819,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 }
 
 .filter-group-label {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-text-primary);
   font-size: 0.9rem;
 }
@@ -871,6 +871,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
 .selection-sentence {
   font-size: 0.85rem;
+  font-weight: 600;
   color: var(--color-text-dim);
 }
 

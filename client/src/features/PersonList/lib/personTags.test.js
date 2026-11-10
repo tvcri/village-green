@@ -135,31 +135,31 @@ describe('selectionSentence', () => {
   })
   it('joins two with or / and', () => {
     expect(selectionSentence(['member:pending', 'volunteer:pending'], 'any', names))
-      .toBe('People who are a pending member or a pending volunteer')
+      .toBe('People who are a pending member OR a pending volunteer')
     expect(selectionSentence(['member:pending', 'volunteer:pending'], 'all', names))
-      .toBe('People who are a pending member and a pending volunteer')
+      .toBe('People who are a pending member AND a pending volunteer')
   })
   it('phrases circles', () => {
     expect(selectionSentence(['member:active', 'circle:1'], 'any', names))
-      .toBe('People who are an active member or in Circle of Pride')
+      .toBe('People who are an active member OR in Circle of Pride')
   })
   it('exact uses bare labels', () => {
     expect(selectionSentence(['member:active'], 'exact', names))
-      .toBe('People whose tags are exactly: active member')
+      .toBe('People whose tags are EXACTLY: active member')
   })
   it('phrases donor windows', () => {
     expect(selectionSentence(['donor:5y', 'member:active'], 'any', names))
-      .toBe('People who are a donor (last gift within 5 years) or an active member')
+      .toBe('People who are a donor (last gift within 5 years) OR an active member')
     expect(selectionSentence(['donor:1y'], 'any', names)).toBe('People who are a donor (last gift within 1 year)')
     expect(selectionSentence(['donor:any'], 'any', names)).toBe('People who are a donor')
   })
   it('adds the Also boxes after a comma, in every mode', () => {
     expect(selectionSentence(['member:dropped', 'donor:1y'], 'all', names, ['are veterans']))
-      .toBe('People who are a dropped member and a donor (last gift within 1 year), and who are veterans')
+      .toBe('People who are a dropped member AND a donor (last gift within 1 year), and who are veterans')
     expect(selectionSentence(['member:active'], 'any', names, ['have email paused', 'are veterans', 'are deceased']))
       .toBe('People who are an active member, and who have email paused, are veterans and are deceased')
     expect(selectionSentence(['member:active'], 'exact', names, ['are deceased']))
-      .toBe('People whose tags are exactly: active member, and who are deceased')
+      .toBe('People whose tags are EXACTLY: active member, and who are deceased')
   })
   it('speaks for the Also boxes alone when no tag is picked', () => {
     expect(selectionSentence([], 'any', names, ['are veterans'])).toBe('People who are veterans')
@@ -167,11 +167,11 @@ describe('selectionSentence', () => {
   })
   it('exact uses bare donor labels', () => {
     expect(selectionSentence(['donor:2y'], 'exact', names))
-      .toBe('People whose tags are exactly: donor (last gift within 2 years)')
+      .toBe('People whose tags are EXACTLY: donor (last gift within 2 years)')
   })
   it('joins three with commas and a final or', () => {
     expect(selectionSentence(['member:active', 'volunteer:pending', 'circle:1'], 'any', names))
-      .toBe('People who are an active member, a pending volunteer or in Circle of Pride')
+      .toBe('People who are an active member, a pending volunteer OR in Circle of Pride')
   })
 })
 
