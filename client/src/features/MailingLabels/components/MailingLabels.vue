@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import InputNumber from 'primevue/inputnumber'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
@@ -17,33 +18,29 @@ import { useExportActions } from '../../../shared/composables/useExportActions.j
 // The audience is the population definition — the kind of mailing. Values are
 // the API enum. Monthly runs are the common case, so the full-roster sweep
 // sits last; "Full roster" is its display word (the API value stays roster).
+// The members-only audiences say so in their names (@csmig, 2026-11-10), since
+// they show no Role checkboxes.
 const AUDIENCE_OPTIONS = [
-  { label: 'Printed newsletter', value: 'printed-newsletter' },
+  { label: 'Printed newsletter (members)', value: 'printed-newsletter' },
   { label: 'Birthday month', value: 'birthday-month' },
-  { label: 'Join month', value: 'join-month' },
+  { label: 'Join month (members)', value: 'join-month' },
   { label: 'Full roster', value: 'roster' },
 ]
 // printed-newsletter and join-month are member-table-backed: the role locks
-// to member and the Role select is hidden (no choice to make). birthday-month
-// is person-level and open to every role.
+// to member and the Role checkboxes are hidden (no choice to make).
+// birthday-month is person-level and open to members and volunteers.
 const MEMBER_ONLY_AUDIENCES = new Set(['printed-newsletter', 'join-month'])
 const MONTH_AUDIENCES = new Set(['birthday-month', 'join-month'])
 
-const ROLE_OPTIONS = [
-  { label: 'Active members', value: 'member' },
-  { label: 'Active volunteers', value: 'volunteer' },
-  { label: 'Either', value: 'either' },
-]
-// Donor roles are Full-roster-only (the API 422s any other audience) and need
-// donor:read (the API 403s without it). Donors and All replace Either in the
-// list: it is the narrower, older choice, and the picker stays four items long.
-const DONOR_ROLE_OPTIONS = [
-  { label: 'Active members', value: 'member' },
-  { label: 'Active volunteers', value: 'volunteer' },
+// Role is three independent checkboxes (@csmig, 2026-11-10): any non-empty
+// combination is one mailing, one envelope per address. Values are the API's
+// role values; ROLE_ORDER is the fixed order for the request and the title.
+const ROLE_ORDER = ['member', 'volunteer', 'donor']
+const ROLE_CHECKBOXES = [
+  { label: 'Members', value: 'member' },
+  { label: 'Volunteers', value: 'volunteer' },
   { label: 'Donors', value: 'donor' },
-  { label: 'All', value: 'all' },
 ]
-const DONOR_ROLES = new Set(['donor', 'all'])
 // "Any time" is a string sentinel: PrimeVue Select renders a null model as
 // empty, so a null-valued option could never display as chosen (same trap as
 // the village sentinel below). It maps to a null window in the request.
@@ -54,13 +51,15 @@ const GIFT_WINDOW_OPTIONS = [
   { label: '5 years', value: 5 },
   { label: 'Any time', value: ANY_TIME },
 ]
-// In headings, 'either' reads as the pair; the Select option stays "Either".
+// The heading's role part, keyed by the effective roles in ROLE_ORDER.
 const ROLE_TITLE = {
-  member: 'Active members',
-  volunteer: 'Active volunteers',
-  either: 'Active members & volunteers',
-  donor: 'Donors',
-  all: 'Active members, volunteers & donors',
+  'member': 'Active members',
+  'volunteer': 'Active volunteers',
+  'donor': 'Donors',
+  'member,volunteer': 'Active members & volunteers',
+  'member,donor': 'Active members & donors',
+  'volunteer,donor': 'Active volunteers & donors',
+  'member,volunteer,donor': 'Active members, volunteers & donors',
 }
 
 const MONTH_OPTIONS = [
@@ -73,7 +72,8 @@ const MONTH_OPTIONS = [
 // (full roster + PDF build) on every visit, when the common use is a small
 // monthly run.
 const audience = ref(null)
-const role = ref('member')
+// Members is checked on arrival, as the old Role select defaulted to members.
+const checked = reactive({ member: true, volunteer: false, donor: false })
 const villageId = ref(null)
 const month = ref(null)
 const giftWindow = ref(5)
@@ -99,32 +99,44 @@ const sortOptions = [
 
 const isMemberOnly = computed(() => MEMBER_ONLY_AUDIENCES.has(audience.value))
 const isMonthAudience = computed(() => MONTH_AUDIENCES.has(audience.value))
-// What the request may send, derived from what the user selected: a hidden
-// Role/Month select never contributes its value, and the user's selection is
-// never overwritten — detour through join-month and back, and a chosen
-// "Volunteers" or month is still there.
-const effectiveRole = computed(() => (isMemberOnly.value ? 'member' : role.value))
-const effectiveMonth = computed(() => (isMonthAudience.value ? month.value : null))
-// The window only means something to a donor role; elsewhere it is unsendable
-// (the API 422s it), and the user's choice survives a detour.
-const effectiveGiftWindow = computed(() =>
-  DONOR_ROLES.has(effectiveRole.value) && giftWindow.value !== ANY_TIME ? giftWindow.value : null)
 
 const { hasPermission } = useCurrentUser()
-// Donors and All are offered only on Full roster across all villages
-// (@csmig, 2026-11-09). Choosing a village takes donors out in plain sight:
-// the role list falls back to Members / Volunteers / Either and a note says why,
-// rather than leaving an "All" that quietly drops every donor without a village.
-const donorRolesOffered = computed(() =>
-  hasPermission('donor:read') && audience.value === 'roster' && villageId.value === null)
-const roleOptions = computed(() => (donorRolesOffered.value ? DONOR_ROLE_OPTIONS : ROLE_OPTIONS))
-const showDonorVillageNote = computed(() =>
-  hasPermission('donor:read') && audience.value === 'roster' && villageId.value !== null)
-// No audience, or a month audience with no month chosen, is an incomplete
-// configuration: no request fires and the stale preview is cleared rather
-// than left misleading.
+// Which checkboxes show. Donors needs donor:read (the API 403s without it)
+// and exists only on Full roster (the API 422s other audiences). A village
+// does not take donors out: with a village, donors means that village's donors.
+const offeredRoles = computed(() => {
+  if (audience.value === null || isMemberOnly.value) return []
+  const roles = ['member', 'volunteer']
+  if (audience.value === 'roster' && hasPermission('donor:read')) roles.push('donor')
+  return roles
+})
+const roleCheckboxes = computed(() => ROLE_CHECKBOXES.filter(r => offeredRoles.value.includes(r.value)))
+// What the request may send, derived from what the user selected: a hidden
+// checkbox or Month select never contributes its value, and the user's
+// selection is never overwritten. Detour through Birthday month and back, and
+// a checked Donors box (or a chosen month) is still there.
+const effectiveRoles = computed(() => (isMemberOnly.value
+  ? ['member']
+  : ROLE_ORDER.filter(r => offeredRoles.value.includes(r) && checked[r])))
+const includesDonor = computed(() => effectiveRoles.value.includes('donor'))
+const effectiveMonth = computed(() => (isMonthAudience.value ? month.value : null))
+// The window only means something with donors; elsewhere it is unsendable
+// (the API 422s it), and the user's choice survives a detour.
+const effectiveGiftWindow = computed(() =>
+  includesDonor.value && giftWindow.value !== ANY_TIME ? giftWindow.value : null)
+
+// No audience, a month audience with no month, or no role checked is an
+// incomplete configuration: no request fires and the stale preview is cleared
+// rather than left misleading.
 const configComplete = computed(() =>
-  audience.value !== null && (!isMonthAudience.value || month.value !== null))
+  audience.value !== null
+  && (!isMonthAudience.value || month.value !== null)
+  && effectiveRoles.value.length > 0)
+const incompletePrompt = computed(() => {
+  if (audience.value === null) return 'Choose an audience to generate labels.'
+  if (isMonthAudience.value && month.value === null) return 'Choose a month to generate labels.'
+  return 'Choose at least one role to generate labels.'
+})
 
 const { state: villages, execute: loadVillages } = useAsyncState(
   () => getVillages(),
@@ -143,29 +155,19 @@ const villageOptions = computed(() => [
 ])
 const villageSelection = computed({
   get: () => villageId.value ?? ALL_VILLAGES,
-  set: (value) => {
-    villageId.value = value === ALL_VILLAGES ? null : value
-    // A user action, like onAudienceSelected: keep Role on an offered option.
-    // A village rules out All, so it becomes Either; back to All villages,
-    // Either is not offered and becomes All again ("Either becomes All").
-    if (villageId.value !== null && role.value === 'all') role.value = 'either'
-    else if (donorRolesOffered.value && role.value === 'either') role.value = 'all'
-  },
+  set: (value) => { villageId.value = value === ALL_VILLAGES ? null : value },
 })
-// Donors have no village filter (@csmig, 2026-11-09): most donors the LGL import
-// created have no village at all, so a per-village donor run silently drops them.
-// The Village select hides for Donors and, like Role and Month, a hidden
-// selection is never sent; the user's village survives a detour through Donors.
-// All keeps the filter: its members and volunteers do have villages.
-const showVillage = computed(() => audience.value !== null && effectiveRole.value !== 'donor')
-const effectiveVillageId = computed(() => (showVillage.value ? villageId.value : null))
+// Most donors the LGL import created have no village, so a village run leaves
+// them out. Say so in plain sight rather than block the combination.
+const showDonorVillageNote = computed(() => includesDonor.value && villageId.value !== null)
+const effectiveVillageId = computed(() => (audience.value !== null ? villageId.value : null))
 const selectedVillageName = computed(() =>
   villages.value.find(v => v.villageId === effectiveVillageId.value)?.name ?? null)
 
 const { state: labelData, isLoading, error: labelsError, execute: loadLabels } = useAsyncState(
   () => getMailingLabels({
     audience: audience.value,
-    role: effectiveRole.value,
+    role: effectiveRoles.value,
     villageId: effectiveVillageId.value,
     month: effectiveMonth.value,
     lastGiftWithinYears: effectiveGiftWindow.value,
@@ -191,7 +193,7 @@ const composedTitle = computed(() => {
   const parts = [head]
   if (!isMemberOnly.value) {
     const years = effectiveGiftWindow.value
-    parts.push(ROLE_TITLE[effectiveRole.value]
+    parts.push(ROLE_TITLE[effectiveRoles.value.join(',')]
       + (years === null ? '' : ` (gift within ${years} ${years === 1 ? 'year' : 'years'})`))
   }
   if (effectiveVillageId.value !== null && selectedVillageName.value) parts.push(selectedVillageName.value)
@@ -208,25 +210,16 @@ function onAudienceSelected () {
   if (isMonthAudience.value && month.value === null) {
     month.value = (new Date().getMonth() + 1) % 12 + 1
   }
-  // Donors/All exist only under Full roster; leaving it must not strand the
-  // Role select on an option that is no longer in its list (and would 422).
-  // Done here, on the user action, so nothing silently rewrites a visible value.
-  if (audience.value !== 'roster' && DONOR_ROLES.has(role.value)) {
-    role.value = 'member'
-  }
-  // Either is not offered to donor:read users on Full roster (All replaces it);
-  // the user's intent carries over rather than leaving a blank Role select.
-  if (donorRolesOffered.value && role.value === 'either') {
-    role.value = 'all'
-  }
 }
 
 // One watcher, one straight-line pass: every change either fires exactly one
 // request or clears the result. The effective* computeds make hidden-but-set
-// state unsendable, so no 422 combination can be requested. Clearing
+// state unsendable, so no 422 combination can be requested. The roles are
+// watched as a joined string: effectiveRoles yields a fresh array on every
+// recompute, and an equal-but-new array must not refire the request. Clearing
 // labelData is sufficient cleanup — it empties sortedLabels, and the
 // regenerate watcher owns revoking the preview URL.
-watch([audience, effectiveRole, effectiveVillageId, effectiveMonth, effectiveGiftWindow], async () => {
+watch([audience, () => effectiveRoles.value.join(','), effectiveVillageId, effectiveMonth, effectiveGiftWindow], async () => {
   truncated.value = []
   if (!configComplete.value) {
     labelData.value = null
@@ -340,18 +333,31 @@ onMounted(() => {
           />
         </div>
 
-        <div v-if="audience !== null && !isMemberOnly" class="field">
-          <label for="role">Role</label>
+        <div v-if="audience !== null" class="field">
+          <label for="village">Village</label>
           <Select
-            id="role"
-            v-model="role"
-            :options="roleOptions"
+            id="village"
+            v-model="villageSelection"
+            :options="villageOptions"
             option-label="label"
             option-value="value"
           />
+          <small v-if="showDonorVillageNote" class="note" data-testid="village-donor-note">
+            Donors with no village aren't included when a village is chosen.
+          </small>
         </div>
 
-        <div v-if="DONOR_ROLES.has(effectiveRole)" class="field">
+        <div v-if="roleCheckboxes.length" class="field" role="group" aria-label="Role">
+          <span class="field-label">Role</span>
+          <div class="role-options">
+            <label v-for="r in roleCheckboxes" :key="r.value" class="role-option">
+              <Checkbox v-model="checked[r.value]" binary />
+              <span>{{ r.label }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div v-if="includesDonor" class="field">
           <label for="giftWindow">Last gift within</label>
           <Select
             id="giftWindow"
@@ -362,22 +368,8 @@ onMounted(() => {
           />
         </div>
 
-        <div v-if="showVillage" class="field">
-          <label for="village">Village</label>
-          <Select
-            id="village"
-            v-model="villageSelection"
-            :options="villageOptions"
-            option-label="label"
-            option-value="value"
-          />
-          <small v-if="showDonorVillageNote" class="note" data-testid="village-donor-note">
-            Donors are left out when a village is chosen. Choose All villages to include them.
-          </small>
-        </div>
-
         <p v-if="!configComplete" class="note">
-          {{ audience === null ? 'Choose an audience to generate labels.' : 'Choose a month to generate labels.' }}
+          {{ incompletePrompt }}
         </p>
 
         <div v-if="isLoading">Loading…</div>
@@ -536,6 +528,21 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+/* Same pattern as the person list's Also group: a column of checkbox rows. */
+.role-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.role-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .preview-pane {

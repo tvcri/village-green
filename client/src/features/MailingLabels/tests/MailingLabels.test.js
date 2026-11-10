@@ -32,7 +32,7 @@ const response = {
 // mousedown, not click.
 // The page puts each label's id on the Select root, not the focusable
 // combobox, so look the combobox up by that id.
-const ids = { Audience: 'audience', Role: 'role', 'Last gift within': 'giftWindow', Village: 'village' }
+const ids = { Audience: 'audience', 'Last gift within': 'giftWindow', Village: 'village', Month: 'month' }
 const comboOrNull = (label) => document.querySelector(`#${ids[label]} [role="combobox"]`)
 const combo = (label) => {
   const el = comboOrNull(label)
@@ -47,13 +47,27 @@ async function pick (label, option) {
   await openSelect(label)
   await fireEvent.mouseDown(within(listOf(label)).getByRole('option', { name: option }))
 }
+const roleGroup = () => document.querySelector('[role="group"][aria-label="Role"]')
+const box = (name) => {
+  const group = roleGroup()
+  const label = group && [...group.querySelectorAll('label')].find(l => l.textContent.trim() === name)
+  return label ? label.querySelector('input[type="checkbox"]') : null
+}
+async function toggle (name) {
+  const el = box(name)
+  if (!el) throw new Error(`No ${name} checkbox`)
+  await fireEvent.click(el)
+}
+// The visible control labels, top to bottom.
+const fieldOrder = () => [...document.querySelectorAll('.controls .field > label, .controls .field > .field-label')]
+  .map(e => e.textContent.trim())
 const lastCall = () => getMailingLabels.mock.calls.at(-1)[0]
 
 async function renderPage () {
   render(MailingLabels, { global: { plugins: [PrimeVue] } })
 }
 
-describe('MailingLabels donor roles', () => {
+describe('MailingLabels roles', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     perms.denied = new Set()
@@ -66,125 +80,166 @@ describe('MailingLabels donor roles', () => {
   })
   afterEach(cleanup)
 
-  it('offers Donors and All on Full roster with donor:read', async () => {
+  const lastTitle = () => generateLabelPdf.mock.calls.at(-1)[1].title
+
+  it('orders Full roster controls Audience, Village, Role, Last gift within', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')
-    await openSelect('Role')
-    expect(optionNames('Role')).toEqual(['Active members', 'Active volunteers', 'Donors', 'All'])
+    await toggle('Donors')
+    expect(fieldOrder()).toEqual(['Audience', 'Village', 'Role', 'Last gift within'])
   })
 
-  it('Donors shows a window select defaulting to 5 years and sends it', async () => {
+  it('orders Birthday month controls Audience, Month, Village, Role', async () => {
+    await renderPage()
+    await pick('Audience', 'Birthday month')
+    expect(fieldOrder()).toEqual(['Audience', 'Month', 'Village', 'Role'])
+  })
+
+  it('names the members-only audiences', async () => {
+    await renderPage()
+    await openSelect('Audience')
+    expect(optionNames('Audience')).toEqual(['Printed newsletter (members)', 'Birthday month', 'Join month (members)', 'Full roster'])
+  })
+
+  it('opens with Members checked and sends it alone', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')
-    await pick('Role', 'Donors')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'donor', lastGiftWithinYears: 5 }))
+    expect(box('Members')).toBeChecked()
+    expect(box('Volunteers')).not.toBeChecked()
+    expect(box('Donors')).not.toBeChecked()
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['member'], lastGiftWithinYears: null }))
+  })
+
+  it('Members + Volunteers across all villages, with no donors and no window', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await toggle('Volunteers')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['member', 'volunteer'], villageId: null, lastGiftWithinYears: null }))
+    expect(combo('Village')).toHaveTextContent('All villages')
+    expect(comboOrNull('Last gift within')).toBeNull()
+  })
+
+  it('Donors shows the window, defaulting to 5 years, and sends it', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await toggle('Donors')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['member', 'donor'], lastGiftWithinYears: 5 }))
     expect(combo('Last gift within')).toHaveTextContent('5 years')
   })
 
-  it('Any time sends no lastGiftWithinYears', async () => {
+  it('Any time sends no window and keeps donors', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')
-    await pick('Role', 'Donors')
+    await toggle('Donors')
     await pick('Last gift within', 'Any time')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'donor', lastGiftWithinYears: null }))
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['member', 'donor'], lastGiftWithinYears: null }))
   })
 
-  it('leaving Full roster resets a donor role to member and sends no window', async () => {
+  it('a village with Donors keeps donors and shows the note', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')
-    await pick('Role', 'Donors')
-    await waitFor(() => expect(lastCall().role).toBe('donor'))
+    await toggle('Donors')
+    await pick('Village', 'Testville')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['member', 'donor'], villageId: 1, lastGiftWithinYears: 5 }))
+    expect(screen.getByTestId('village-donor-note')).toHaveTextContent("Donors with no village aren't included when a village is chosen.")
+  })
+
+  it('a village without Donors shows no note', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await pick('Village', 'Testville')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['member'], villageId: 1 }))
+    expect(screen.queryByTestId('village-donor-note')).toBeNull()
+  })
+
+  it('nothing checked prompts for a role and makes no request', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await waitFor(() => expect(generateLabelPdf).toHaveBeenCalled())
+    const calls = getMailingLabels.mock.calls.length
+    const pdfs = generateLabelPdf.mock.calls.length
+    await toggle('Members')
+    expect(await screen.findByText('Choose at least one role to generate labels.')).toBeInTheDocument()
+    expect(getMailingLabels.mock.calls.length).toBe(calls)
+    expect(generateLabelPdf.mock.calls.length).toBe(pdfs)
+    expect(screen.queryByText(/labels \(/)).toBeNull()
+  })
+
+  it('Donors alone, then Birthday month, prompts for a role rather than sending members', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await toggle('Donors')
+    await toggle('Members')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['donor'] }))
+    await pick('Audience', 'Birthday month')
+    expect(box('Donors')).toBeNull()
+    expect(await screen.findByText('Choose at least one role to generate labels.')).toBeInTheDocument()
+    expect(getMailingLabels.mock.calls.some(([a]) => a.audience === 'birthday-month')).toBe(false)
+  })
+
+  it('remembers a hidden Donors box across an audience detour', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await toggle('Donors')
+    await pick('Audience', 'Birthday month')
+    await waitFor(() => expect(lastCall().audience).toBe('birthday-month'))
+    await pick('Audience', 'Full roster')
+    expect(box('Donors')).toBeChecked()
+    await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'roster', role: ['member', 'donor'], lastGiftWithinYears: 5 }))
+  })
+
+  it('Birthday month never sends donor or a window', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await toggle('Donors')
     await pick('Audience', 'Birthday month')
     await waitFor(() => expect(lastCall().audience).toBe('birthday-month'))
     for (const [args] of getMailingLabels.mock.calls.filter(([a]) => a.audience === 'birthday-month')) {
-      expect(args.role).toBe('member')
+      expect(args.role).toEqual(['member'])
       expect(args.lastGiftWithinYears ?? null).toBeNull()
     }
-    expect(lastCall().month).not.toBeNull()
-    expect(combo('Role')).toHaveTextContent('Active members')
+    expect(box('Volunteers')).not.toBeNull()
     expect(comboOrNull('Last gift within')).toBeNull()
   })
 
-  it('without donor:read keeps today\'s options and no window select', async () => {
+  it('a members-only audience sends member even when Members was unchecked', async () => {
+    await renderPage()
+    await pick('Audience', 'Full roster')
+    await toggle('Volunteers')
+    await toggle('Members')
+    await pick('Audience', 'Printed newsletter (members)')
+    expect(roleGroup()).toBeNull()
+    await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'printed-newsletter', role: ['member'] }))
+  })
+
+  it('without donor:read there is no Donors box, no window, and donor is never sent', async () => {
     perms.denied = new Set(['donor:read'])
     await renderPage()
     await pick('Audience', 'Full roster')
-    await openSelect('Role')
-    expect(optionNames('Role')).toEqual(['Active members', 'Active volunteers', 'Either'])
+    await toggle('Volunteers')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['member', 'volunteer'] }))
+    expect(box('Donors')).toBeNull()
     expect(comboOrNull('Last gift within')).toBeNull()
+    for (const [args] of getMailingLabels.mock.calls) expect(args.role).not.toContain('donor')
   })
 
-  it('Either carries over as All when switching to Full roster with donor:read', async () => {
-    await renderPage()
-    await pick('Audience', 'Birthday month')
-    await pick('Role', 'Either')
-    await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'birthday-month', role: 'either' }))
-    await pick('Audience', 'Full roster')
-    await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'roster', role: 'all', lastGiftWithinYears: 5 }))
-    expect(combo('Role')).toHaveTextContent('All')
-  })
-
-  it('without donor:read, Either survives switching to Full roster', async () => {
-    perms.denied = new Set(['donor:read'])
-    await renderPage()
-    await pick('Audience', 'Birthday month')
-    await pick('Role', 'Either')
-    await pick('Audience', 'Full roster')
-    await waitFor(() => expect(lastCall()).toMatchObject({ audience: 'roster', role: 'either' }))
-    expect(combo('Role')).toHaveTextContent('Either')
-  })
-
-  it('Donors hides Village and sends no village', async () => {
+  it('titles all three with the window and the village', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')
-    await pick('Role', 'Donors')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'donor', villageId: null }))
-    expect(comboOrNull('Village')).toBeNull()
-  })
-
-  it('choosing a village takes donors out: All becomes Either, the window goes, a note says why', async () => {
-    await renderPage()
-    await pick('Audience', 'Full roster')
-    await pick('Role', 'All')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'all', lastGiftWithinYears: 5 }))
+    await toggle('Volunteers')
+    await toggle('Donors')
     await pick('Village', 'Testville')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'either', villageId: 1, lastGiftWithinYears: null }))
-    expect(combo('Role')).toHaveTextContent('Either')
-    expect(comboOrNull('Last gift within')).toBeNull()
-    expect(screen.getByTestId('village-donor-note')).toHaveTextContent('Donors are left out when a village is chosen')
-    await openSelect('Role')
-    expect(optionNames('Role')).toEqual(['Active members', 'Active volunteers', 'Either'])
+    await waitFor(() => expect(lastCall()).toMatchObject({ villageId: 1 }))
+    await waitFor(() => expect(lastTitle()).toBe('Full roster - Active members, volunteers & donors (gift within 5 years) - Testville'))
   })
 
-  it('back to All villages, Donors and All return and Either becomes All', async () => {
+  it('titles volunteers and donors', async () => {
     await renderPage()
     await pick('Audience', 'Full roster')
-    await pick('Village', 'Testville')
-    await pick('Role', 'Either')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'either', villageId: 1 }))
-    await pick('Village', 'All villages')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'all', villageId: null, lastGiftWithinYears: 5 }))
-    expect(combo('Role')).toHaveTextContent('All')
-    expect(screen.queryByTestId('village-donor-note')).toBeNull()
-  })
-
-  it('without donor:read a village changes nothing about Role and shows no note', async () => {
-    perms.denied = new Set(['donor:read'])
-    await renderPage()
-    await pick('Audience', 'Full roster')
-    await pick('Role', 'Either')
-    await pick('Village', 'Testville')
-    await waitFor(() => expect(lastCall()).toMatchObject({ role: 'either', villageId: 1 }))
-    expect(screen.queryByTestId('village-donor-note')).toBeNull()
-  })
-
-  it('titles All with the window', async () => {
-    await renderPage()
-    await pick('Audience', 'Full roster')
-    await pick('Role', 'All')
-    await waitFor(() => expect(generateLabelPdf).toHaveBeenCalled())
-    const { title } = generateLabelPdf.mock.calls.at(-1)[1]
-    expect(title).toContain('Active members, volunteers & donors')
-    expect(title).toContain('gift within 5 years')
+    await toggle('Members')
+    await toggle('Volunteers')
+    await toggle('Donors')
+    await waitFor(() => expect(lastCall()).toMatchObject({ role: ['volunteer', 'donor'] }))
+    await waitFor(() => expect(lastTitle()).toContain('Active volunteers & donors'))
   })
 })
