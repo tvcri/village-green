@@ -25,14 +25,14 @@ before(async () => {
   const add = await vgCall('patchPositionHolders', { positionId }, { token: staff, body: { add: [{ personId, villageId: scratch }] } })
   assert.equal(add.status, 200)
   holderId = add.json[0].volunteerPositionId
-  const labels = await vgCall('getMailingLabels', { audience: 'roster', role: 'either' }, { token: staff })
+  const labels = await vgCall('getMailingLabels', { audience: 'roster', role: ['member', 'volunteer'] }, { token: staff })
   assert.ok(labels.json.labels.some(l => l.sortLastName === lastName), 'precondition: labelled while Active')
   const patch = await vgCall('patchPersonVolunteer', { personId }, { token: staff, body: { status: 'Pending' } })
   assert.equal(patch.status, 200)
 })
 
 test('mailing labels skip a Pending volunteer', async () => {
-  const res = await vgCall('getMailingLabels', { audience: 'roster', role: 'either' }, { token: staff })
+  const res = await vgCall('getMailingLabels', { audience: 'roster', role: ['member', 'volunteer'] }, { token: staff })
   assert.equal(res.status, 200)
   assert.ok(!res.json.labels.some(l => l.sortLastName === lastName))
 })

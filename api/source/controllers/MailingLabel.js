@@ -6,7 +6,7 @@ const { queryRecipients } = require('../service/mailingLabels/buildQuery')
 const config = require('../utils/config')
 const { todayCivil } = require('../utils/metricsRange')
 const { civilYearsAgo } = require('../utils/civilDate')
-const { DONOR_ROLES } = require('../service/mailingLabels/audienceRules')
+const { includesDonor } = require('../service/mailingLabels/audienceRules')
 const { validateLabelParams } = require('../service/mailingLabels/validateLabelParams')
 const { groupByAddress } = require('../service/mailingLabels/groupByAddress')
 
@@ -20,15 +20,17 @@ module.exports.getMailingLabels = async function getMailingLabels (req, res, nex
 
     // OAS has already enum-checked and coerced these (typed query params are
     // always coerced by express-openapi-validator — never string-compare).
-    const { audience, role, villageId, month, lastGiftWithinYears } = req.query
+    // role is an exploded array param, so a lone ?role=member arrives as
+    // ['member'].
+    const { audience, role: roles, villageId, month, lastGiftWithinYears } = req.query
 
     // Donor data is gated separately from person:read. Checked before
     // validation so a caller without donor:read gets 403, not a 422 that
     // would confirm the role exists for their audience.
-    if (DONOR_ROLES.has(role) && !hasPermission(req.userObject, 'donor:read')) {
+    if (includesDonor(roles) && !hasPermission(req.userObject, 'donor:read')) {
       throw new SmError.PrivilegeError()
     }
-    validateLabelParams({ audience, role, month, lastGiftWithinYears })
+    validateLabelParams({ audience, roles, month, lastGiftWithinYears })
 
     // The birthday-month audience reveals each recipient's birth month, so it
     // additionally requires the birth-date key (federation form: this
@@ -43,7 +45,7 @@ module.exports.getMailingLabels = async function getMailingLabels (req, res, nex
     const lastGiftSince = lastGiftWithinYears
       ? civilYearsAgo(todayCivil(config.settings.civilTimeZone), lastGiftWithinYears)
       : null
-    const rows = await queryRecipients({ audience, role, villageId, month, lastGiftSince })
+    const rows = await queryRecipients({ audience, roles, villageId, month, lastGiftSince })
     const { labels, summary, unmailable } = groupByAddress(rows)
     res.json({ audience, labels, summary, warnings: { unmailable } })
   }

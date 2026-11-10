@@ -4,10 +4,10 @@ import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { villages } from '../../setup/fixtures.js'
 
-// Mailing labels gain role=donor|all and a last-gift window. Donor roles
-// need donor:read (board has person:read but not donor:read), the window
-// applies only to the donor clause, and a donor with no village appears only
-// under All villages. Labels are found by sortLastName; every name is invented.
+// Mailing labels take a role list (member, volunteer, donor) and a last-gift
+// window. donor in the list needs donor:read (board has person:read but not
+// donor:read), the window applies only to the donor clause, and with a
+// village chosen only donors of that village appear. Labels are found by sortLastName; every name is invented.
 const scratch = String(villages.scratch.id)
 const { staff, admin, board } = tokens.users
 const uniq = (s) => `${s}${Date.now()}${Math.round(Math.random() * 1e6)}`
@@ -59,58 +59,74 @@ before(async () => {
 })
 
 test('donor role labels donors, not the deceased', async () => {
-  const l = await labels({ role: 'donor' })
+  const l = await labels({ role: ['donor'] })
   for (const k of ['A', 'B', 'C', 'E']) assert.ok(has(l, k), `${k} present`)
   assert.ok(!has(l, 'D'), 'deceased donor absent')
 })
 
 test('5-year window drops the old gift and the null gift', async () => {
-  const l = await labels({ role: 'donor', lastGiftWithinYears: 5 })
+  const l = await labels({ role: ['donor'], lastGiftWithinYears: 5 })
   assert.ok(has(l, 'A') && has(l, 'E'))
   assert.ok(!has(l, 'B') && !has(l, 'C'))
 })
 
-test('all gives the member and donor A one envelope', async () => {
-  const l = await labels({ role: 'all' })
+test('all three give the member and donor A one envelope', async () => {
+  const l = await labels({ role: ['member', 'volunteer', 'donor'] })
   assert.equal(l.filter(x => x.sortLastName === names.A).length, 1)
 })
 
-test('all never labels the deceased', async () => {
-  const l = await labels({ role: 'all' })
+test('all three never labels the deceased', async () => {
+  const l = await labels({ role: ['member', 'volunteer', 'donor'] })
   assert.ok(has(l, 'B'), 'precondition: a living donor is present')
   assert.ok(!has(l, 'D'))
 })
 
-test('under all the window trims donors but not members', async () => {
-  const l = await labels({ role: 'all', lastGiftWithinYears: 1 })
+test('under all three the window trims donors but not members', async () => {
+  const l = await labels({ role: ['member', 'volunteer', 'donor'], lastGiftWithinYears: 1 })
   assert.ok(has(l, 'A'), 'the member is kept whatever their giving')
   assert.ok(!has(l, 'B'), 'the 2014 donor is dropped')
 })
 
 test('a dropped member who gives is labelled as a donor', async () => {
-  assert.ok(has(await labels({ role: 'donor' }), 'E'))
+  assert.ok(has(await labels({ role: ['donor'] }), 'E'))
 })
 
-test('donor-only person with no village appears only under All villages', async () => {
-  const everyone = await labels({ role: 'donor' })
-  const scoped = await labels({ role: 'donor', villageId: scratch })
+test('with a village, donors are that village\'s donors only', async () => {
+  const everyone = await labels({ role: ['donor'] })
+  const scoped = await labels({ role: ['donor'], villageId: scratch })
   // A's member shares the name, so tell them apart by the label's name line:
   // the donor-only envelope reads exactly "Donor <last>".
   const donorA = (list) => list.some(l => l.name === `Donor ${names.A}`)
   assert.ok(donorA(everyone))
-  assert.ok(!donorA(scoped))
+  assert.ok(!donorA(scoped), 'a donor with no village is not in a village run')
+  assert.ok(has(scoped, 'B'), 'a donor of the village is')
 })
 
-test('board gets 403 for donor and all', async () => {
-  for (const role of ['donor', 'all']) {
+test('board gets 403 whenever donor is in the list', async () => {
+  for (const role of [['donor'], ['member', 'donor'], ['member', 'volunteer', 'donor']]) {
     assert.equal((await vgCall('getMailingLabels', { audience: 'roster', role }, { token: board })).status, 403)
   }
 })
 
-test('422 for a window with role either', async () => {
-  assert.equal((await vgCall('getMailingLabels', { audience: 'roster', role: 'either', lastGiftWithinYears: 5 }, { token: staff })).status, 422)
+test('422 for a window without donor in the list', async () => {
+  assert.equal((await vgCall('getMailingLabels', { audience: 'roster', role: ['member', 'volunteer'], lastGiftWithinYears: 5 }, { token: staff })).status, 422)
 })
 
-test('422 for donor role on birthday-month', async () => {
-  assert.equal((await vgCall('getMailingLabels', { audience: 'birthday-month', role: 'donor', month: 6 }, { token: staff })).status, 422)
+test('422 for donor in the list on birthday-month', async () => {
+  assert.equal((await vgCall('getMailingLabels', { audience: 'birthday-month', role: ['member', 'donor'], month: 6 }, { token: staff })).status, 422)
+})
+
+test('volunteer+donor labels donors without requiring a volunteer', async () => {
+  const l = await labels({ role: ['volunteer', 'donor'] })
+  assert.ok(has(l, 'B') && has(l, 'E'))
+  assert.ok(!has(l, 'D'), 'deceased donor absent')
+})
+
+test('400 for an empty or duplicated role list', async () => {
+  // OAS minItems/uniqueItems reject these before the controller runs. An
+  // empty array leaves role off the URL entirely, so that case is the
+  // missing-required-param 400.
+  for (const role of [[], ['member', 'member']]) {
+    assert.equal((await vgCall('getMailingLabels', { audience: 'roster', role }, { token: staff })).status, 400, JSON.stringify(role))
+  }
 })
