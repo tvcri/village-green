@@ -111,10 +111,44 @@ describe('matchesTags', () => {
   it('exact is order-insensitive and rejects extra tags', () => {
     expect(matchesTags(keys, ['member:dropped'], 'exact')).toBe(false)
     expect(matchesTags(keys, ['volunteer:active', 'member:dropped'], 'exact')).toBe(true)
-    expect(matchesTags(['member:active', 'circle:1'], ['member:active'], 'exact')).toBe(false)
   })
   it('a row with no tags matches no non-empty selection', () => {
     for (const mode of ['any', 'all', 'exact']) expect(matchesTags([], ['member:active'], mode)).toBe(false)
+  })
+})
+
+describe('matchesTags groups (VG-202611-520)', () => {
+  const both = ['member:active', 'member:pending']
+  it('statuses of one role OR in every mode', () => {
+    for (const mode of ['any', 'all', 'exact']) {
+      expect(matchesTags(['member:active'], both, mode)).toBe(true)
+      expect(matchesTags(['member:pending'], both, mode)).toBe(true)
+      expect(matchesTags(['member:dropped'], both, mode)).toBe(false)
+    }
+  })
+  it('all ANDs the groups', () => {
+    const sel = [...both, 'volunteer:active']
+    expect(matchesTags(['member:pending', 'volunteer:active'], sel, 'all')).toBe(true)
+    expect(matchesTags(['member:pending'], sel, 'all')).toBe(false)
+    expect(matchesTags(['volunteer:active'], sel, 'any')).toBe(true)
+  })
+  it('each circle is its own group', () => {
+    const sel = ['circle:1', 'circle:2']
+    expect(matchesTags(['circle:1'], sel, 'any')).toBe(true)
+    expect(matchesTags(['circle:1'], sel, 'all')).toBe(false)
+    expect(matchesTags(['circle:1', 'circle:2'], sel, 'all')).toBe(true)
+  })
+  it('exact rejects an unpicked role', () => {
+    expect(matchesTags(['member:active', 'volunteer:active'], both, 'exact')).toBe(false)
+  })
+  it('exact ignores circles when none is picked', () => {
+    expect(matchesTags(['member:active', 'circle:1'], ['member:active'], 'exact')).toBe(true)
+  })
+  it('exact wants exactly the picked circles once one is picked', () => {
+    expect(matchesTags(['member:active', 'circle:1'], ['member:active', 'circle:1'], 'exact')).toBe(true)
+    expect(matchesTags(['member:active', 'circle:1', 'circle:2'], ['member:active', 'circle:1'], 'exact')).toBe(false)
+    expect(matchesTags(['circle:1'], ['circle:1'], 'exact')).toBe(true)
+    expect(matchesTags(['circle:1', 'member:active'], ['circle:1'], 'exact')).toBe(false)
   })
 })
 
@@ -168,6 +202,14 @@ describe('selectionSentence', () => {
   it('exact uses bare donor labels', () => {
     expect(selectionSentence(['donor:2y'], 'exact', names))
       .toBe('People whose tags are EXACTLY: donor (last gift within 2 years)')
+  })
+  it('one role\'s statuses share a noun with a lowercase or, in status order', () => {
+    expect(selectionSentence(['member:pending', 'member:active', 'volunteer:active'], 'all', names))
+      .toBe('People who are an active or pending member AND an active volunteer')
+    expect(selectionSentence(['member:dropped', 'member:pending', 'member:active'], 'any', names))
+      .toBe('People who are an active, pending or dropped member')
+    expect(selectionSentence(['member:pending', 'member:active', 'circle:1'], 'exact', names))
+      .toBe('People whose tags are EXACTLY: active or pending member, Circle of Pride')
   })
   it('joins three with commas and a final or', () => {
     expect(selectionSentence(['member:active', 'volunteer:pending', 'circle:1'], 'any', names))

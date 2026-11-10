@@ -242,17 +242,17 @@ describe('PersonList grid', () => {
       expect(screen.getByText('People who are a pending member')).toBeInTheDocument()
     })
 
-    it('Match offers Any, All and Exactly these; Exactly these drops the circle member', async () => {
-      setRows(people())
+    it('Match offers Any, All and Exactly these; Exactly these drops the volunteer, not the circle', async () => {
+      setRows([...people(), row({ personId: 4, fullName: 'Delta, Dee', memberStatus: 'Active', volunteerStatus: 'Active' })])
       await renderList()
       const match = screen.getByRole('group', { name: 'Match' })
       expect(within(match).getAllByRole('button').map(b => b.textContent.trim()))
         .toEqual(['Any', 'All', 'Exactly these'])
       await fireEvent.click(within(screen.getByRole('group', { name: 'Member' })).getByRole('button', { name: /active/i }))
-      expect(bodyRows()).toHaveLength(2)
+      expect(bodyRows()).toHaveLength(3)
       await fireEvent.click(within(match).getByRole('button', { name: 'Exactly these' }))
-      expect(bodyRows()).toHaveLength(1)
-      expect(bodyRows()[0]).toHaveTextContent('Beta, Bob')
+      expect(bodyRows()).toHaveLength(2)
+      expect(bodyRows().map(r => r.textContent)).not.toContain(expect.stringContaining('Delta, Dee'))
     })
 
     it('counts N of M and the inline clear appears only with a filter', async () => {

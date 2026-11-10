@@ -41,9 +41,34 @@ export function rowTagKeys (row) {
   return keys
 }
 
+// A filter group: one per role ('member', 'volunteer', 'donor') and one per
+// picked circle ('circle:3'). Picks inside a role group always OR, since a
+// person holds one status per role; Match decides only how groups combine
+// (VG-202611-520). Each circle is its own group so "in Pride AND in Veteran"
+// stays expressible under All.
+function groupOf (key) {
+  const kind = key.split(':')[0]
+  return kind === 'circle' ? key : kind
+}
+const isCircle = (k) => k.startsWith('circle:')
+
+// Selected keys bucketed by group, groups in the order first picked.
+function groupSelection (selected) {
+  const groups = new Map()
+  for (const k of selected) {
+    const g = groupOf(k)
+    if (!groups.has(g)) groups.set(g, [])
+    groups.get(g).push(k)
+  }
+  return groups
+}
+
 // An empty selection matches every row. A donor window key matches a donor
 // row whose last gift is inside the window; a null gift fails every year
 // window but passes 'any time'. Every other key matches by inclusion.
+// Exact: the row holds exactly the picked roles, each in a picked status.
+// Circles count only when one is picked, and then the row must be in exactly
+// the picked circles; with none picked a row's circles are ignored.
 export function matchesTags (keys, selected, mode, { lastGiftDate = null, today = null } = {}) {
   if (selected.length === 0) return true
   const hit = (k) => {
@@ -53,9 +78,16 @@ export function matchesTags (keys, selected, mode, { lastGiftDate = null, today 
     if (w.years == null) return true
     return lastGiftDate != null && lastGiftDate >= civilYearsAgo(today, w.years)
   }
-  if (mode === 'any') return selected.some(hit)
-  if (mode === 'all') return selected.every(hit)
-  return keys.length === selected.length && selected.every(hit)
+  const groups = [...groupSelection(selected).values()]
+  const groupHit = (picks) => picks.some(hit)
+  if (mode === 'any') return groups.some(groupHit)
+  if (!groups.every(groupHit)) return false
+  if (mode === 'all') return true
+  const rowRoles = keys.filter(k => !isCircle(k)).map(groupOf)
+  const pickedRoles = new Set(selected.filter(k => !isCircle(k)).map(groupOf))
+  if (rowRoles.length !== pickedRoles.size) return false
+  const pickedCircles = selected.filter(isCircle)
+  return pickedCircles.length === 0 || keys.filter(isCircle).length === pickedCircles.length
 }
 
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -74,18 +106,19 @@ function donorWindowSuffix (key) {
   return ` (last gift within ${years} ${years === 1 ? 'year' : 'years'})`
 }
 
-function tagPhrase (key, circleNameById) {
-  const [kind, value] = key.split(':')
-  if (kind === 'donor') return `a donor${donorWindowSuffix(key)}`
-  if (kind === 'circle') return `in ${tagLabel(key, circleNameById)}`
-  return `${value === 'active' ? 'an' : 'a'} ${value} ${kind}`
-}
+const STATUS_ORDER = ['active', 'pending', 'dropped']
 
-// 'active member' / full circle name, for the exact-mode sentence.
-function bareLabel (key, circleNameById) {
-  const [kind, value] = key.split(':')
-  if (kind === 'donor') return `donor${donorWindowSuffix(key)}`
-  return kind === 'circle' ? tagLabel(key, circleNameById) : `${value} ${kind}`
+// One group's phrase. A role's statuses share one noun in a fixed order:
+// "an active or pending member". The "or" is lowercase because Match does
+// not control it.
+function groupPhrase (picks, circleNameById, bare) {
+  const [kind] = picks[0].split(':')
+  if (kind === 'donor') return `${bare ? '' : 'a '}donor${donorWindowSuffix(picks[0])}`
+  if (kind === 'circle') return bare ? tagLabel(picks[0], circleNameById) : `in ${tagLabel(picks[0], circleNameById)}`
+  const statuses = picks.map(k => k.split(':')[1])
+    .sort((a, b) => STATUS_ORDER.indexOf(a) - STATUS_ORDER.indexOf(b))
+  const article = bare ? '' : (statuses[0] === 'active' ? 'an ' : 'a ')
+  return `${article}${joinList(statuses, 'or')} ${kind}`
 }
 
 const joinList = (items, joiner) => items.length === 1
@@ -98,16 +131,17 @@ const joinList = (items, joiner) => items.length === 1
 // Staff are trained to read this sentence, so it names every tag and box.
 // The words Match controls are capitalised (AND / OR / EXACTLY, @csmig
 // 2026-11-09): the only difference between Any and All is that one word, so
-// it must not be buried. The Also clause's "and" stays lowercase because
-// Match does not change it.
+// it must not be buried. The "or" inside a role group and the Also clause's
+// "and" stay lowercase because Match does not change them.
 export function selectionSentence (selected, mode, circleNameById, also = []) {
   const alsoClause = also.length ? joinList(also, 'and') : ''
   if (selected.length === 0) return alsoClause ? `People who ${alsoClause}` : ''
   const tail = alsoClause ? `, and who ${alsoClause}` : ''
+  const groups = [...groupSelection(selected).values()]
   if (mode === 'exact') {
-    return `People whose tags are EXACTLY: ${selected.map(k => bareLabel(k, circleNameById)).join(', ')}${tail}`
+    return `People whose tags are EXACTLY: ${groups.map(g => groupPhrase(g, circleNameById, true)).join(', ')}${tail}`
   }
-  const phrases = selected.map(k => tagPhrase(k, circleNameById))
+  const phrases = groups.map(g => groupPhrase(g, circleNameById, false))
   return `People who are ${joinList(phrases, mode === 'all' ? 'AND' : 'OR')}${tail}`
 }
 
