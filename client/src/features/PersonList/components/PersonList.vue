@@ -564,8 +564,8 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           </div>
         </div>
 
-        <!-- Match closes the panel on a row of its own (@csmig, 2026-11-09): every
-             selection sits above it, and its sentence reads them all back. -->
+        <!-- Match is the last column (@csmig, 2026-11-09): every selection sits
+             before it, and its sentence reads them all back. -->
         <div class="filter-group filter-group--match" role="group" aria-label="Match">
           <span class="filter-group-label">Match</span>
           <div class="match-row">
@@ -807,11 +807,13 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   border-left: 0;
 }
 
-/* A full-width last row; it always starts a line, so no divider. */
+/* Columns, not rows (@csmig, 2026-11-09): each group stacks its choices
+   top to bottom, so the eye reads one column per group and the panel spends
+   width rather than height. Match takes the remaining width, last, with its
+   sentence under the buttons; on a narrow screen it wraps to a new line. */
 .filter-group--match {
-  flex-basis: 100%;
-  padding-left: 0;
-  border-left: 0;
+  flex: 1 1 18rem;
+  min-width: 0;
 }
 
 .filter-group-label {
@@ -822,17 +824,19 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
 .picker-items {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
 }
 
 /* The picker reuses the grid's tag and pill visuals; unselected dimmed,
    selected ringed. */
+/* Tag then caption on one line ("member  active"), so a stacked column stays short. */
 .picker-item {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.4rem;
   padding: 0.2rem 0.4rem;
   background: transparent;
   border: 1px solid transparent;
@@ -858,9 +862,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
 .match-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 .selection-sentence {
@@ -868,13 +872,11 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   color: var(--color-text-dim);
 }
 
-/* One row, never wrapping (@csmig, 2026-11-09). The old two-row grid suited
-   Also sitting beside Match; since the Donor group, Also starts its own line,
-   and when space is short .filter-groups wraps the whole group instead. */
+/* Stacked like the other columns. */
 .also-options {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 1.5rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .also-option {
