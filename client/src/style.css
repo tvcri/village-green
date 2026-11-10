@@ -8,10 +8,12 @@
   --breadcrumb-height: 35px;
 
   /* Donor tag colours. Global, not scoped to .person-list, because the
-     person list and PersonDetailCard both render the donor tag. amber-950
-     is the text colour: Material's amber-700 is #FFA000, unreadable on
-     amber-100. */
-  --tag-donor-bg: var(--p-amber-100);
+     person list and PersonDetailCard both render the donor tag. amber-300,
+     not amber-100: pale gold all but vanishes on the list's grey striped rows
+     (1.07:1 against #f1f5f9; amber-300 gives 1.29, the member and volunteer
+     tags 1.23). amber-950 is the text colour (5.99:1): Material's amber-700
+     is #FFA000, unreadable on any amber. */
+  --tag-donor-bg: var(--p-amber-300);
   --tag-donor-fg: var(--p-amber-950);
 
   /* Brand Colors */
