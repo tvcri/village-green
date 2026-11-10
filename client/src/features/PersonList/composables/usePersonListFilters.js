@@ -68,7 +68,10 @@ export function usePersonListFilters (persons, villages, circles) {
     const today = todayCivilDateIn(PAUSE_TIME_ZONE)
     return persons.value.filter(p =>
       matchesText(p) &&
-      matchesTags(rowTagKeys(p), selectedTags.value, matchMode.value) &&
+      // The donor windows cut on the last gift date; today is always passed
+      // because matchesTags throws for a window without it.
+      matchesTags(rowTagKeys(p), selectedTags.value, matchMode.value,
+        { lastGiftDate: p.donor?.lastGiftDate ?? null, today }) &&
       (!emailPausedOnly.value || isEmailPaused(p, today)) &&
       (!veteranOnly.value || p.isVeteran === true) &&
       (!deceasedOnly.value || p.deceased === true))
@@ -87,8 +90,14 @@ export function usePersonListFilters (persons, villages, circles) {
     (deceasedOnly.value ? 1 : 0))
   const hasFilter = computed(() => activeFilterCount.value > 0)
 
+  // In the Also boxes' on-screen order.
+  const alsoPhrases = computed(() => [
+    ...(emailPausedOnly.value ? ['have email paused'] : []),
+    ...(veteranOnly.value ? ['are veterans'] : []),
+    ...(deceasedOnly.value ? ['are deceased'] : []),
+  ])
   const sentence = computed(() =>
-    selectionSentence(selectedTags.value, matchMode.value, circleNameById.value))
+    selectionSentence(selectedTags.value, matchMode.value, circleNameById.value, alsoPhrases.value))
 
   function clearAll () {
     name.value = ''

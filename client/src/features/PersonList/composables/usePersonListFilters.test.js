@@ -92,7 +92,18 @@ describe('usePersonListFilters', () => {
     const f = make()
     f.selectedTags.value = ['member:active']
     f.matchMode.value = 'exact'
-    expect(ids(f)).toEqual([1])
+    // 6 is in a circle too; no circle is picked, so circles are ignored.
+    expect(ids(f)).toEqual([1, 6])
+    f.selectedTags.value = ['member:active', 'circle:1']
+    expect(ids(f)).toEqual([6])
+  })
+
+  it('two statuses of one role OR under All (VG-202611-520)', () => {
+    const f = make()
+    f.selectedTags.value = ['member:active', 'member:dropped']
+    f.matchMode.value = 'all'
+    // 4 is deceased, so their Active membership shows as dropped.
+    expect(ids(f)).toEqual([1, 3, 4, 6])
   })
 
   it('emailPausedOnly and veteranOnly, ANDed with tags', () => {
@@ -170,5 +181,14 @@ describe('usePersonListFilters', () => {
     expect(f.veteranOnly.value).toBe(false)
     expect(f.deceasedOnly.value).toBe(false)
     expect(f.matchMode.value).toBe('any')
+  })
+
+  it('a donor window filters on the last gift date and passes today', () => {
+    const f = make([
+      row(1, { donor: { lglConstituentId: 'L1', lastGiftDate: '2025-06-01' } }),
+      row(2, { donor: { lglConstituentId: 'L2', lastGiftDate: '2015-01-01' } })
+    ])
+    f.selectedTags.value = ['donor:5y']
+    expect(ids(f)).toEqual([1])
   })
 })

@@ -1703,8 +1703,8 @@ const openPersonDialog = (personId) => {
 }
 
 /* Service Coordinator Notes panel. Amber rather than red: the notes are operational
-   heads-ups for the coordinator, not hazard warnings. The palette in style.css
-   has no amber token, so the two shades are defined locally with an app-dark
+   heads-ups for the coordinator, not hazard warnings. style.css has amber only as
+   --tag-donor-* (tag-specific), so the two shades are defined locally with an app-dark
    override. Rendered only when the member actually has notes. */
 .sc-notes {
   --sc-notes-bg: #fffbeb;

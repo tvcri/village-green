@@ -21,9 +21,10 @@ import { personExportColumns, personExportValues } from '../../../shared/lib/per
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { usePersonListFilters } from '../composables/usePersonListFilters.js'
-import { rowTagKeys, tagLabel, circleShortName, isEmailPaused } from '../lib/personTags.js'
+import { rowTagKeys, tagLabel, circleShortName, isEmailPaused, DONOR_WINDOWS } from '../lib/personTags.js'
 import { parsePhoneObj } from '../lib/parsePhoneObj.js'
-import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
+import { todayCivilDateIn, formatCivilDate } from '../../../shared/lib/civilDate.js'
+import { lglConstituentUrl } from '../../../shared/lib/lgl.js'
 import { PAUSE_TIME_ZONE, pauseTag } from '../../../shared/lib/volunteerPause.js'
 
 defineOptions({ name: 'PersonList' })
@@ -66,6 +67,9 @@ const {
 const canSeeNoncurrentMember = computed(() => hasPermission('member:read_inactive'))
 const canSeeNoncurrentVolunteer = computed(() => hasPermission('volunteer:read_inactive'))
 const canFilterVeteran = computed(() => hasPermission('person:read_demographics'))
+// The API sends `donor` only to holders of donor:read; every donor element
+// here is gated on the same grant.
+const canReadDonor = computed(() => hasPermission('donor:read'))
 
 const filtersCollapsed = ref(false)
 const matchOptions = [
@@ -84,9 +88,15 @@ const circleChoices = computed(() =>
     .map(c => ({ key: `circle:${c.circleId}`, name: c.name, short: circleShortName(c.name) })))
 function isSelected (key) { return selectedTags.value.includes(key) }
 function toggleTag (key) {
-  selectedTags.value = isSelected(key)
-    ? selectedTags.value.filter(k => k !== key)
-    : [...selectedTags.value, key]
+  if (isSelected(key)) {
+    selectedTags.value = selectedTags.value.filter(k => k !== key)
+    return
+  }
+  // The donor windows are one choice, not a set: a newer window replaces the old.
+  const kept = key.startsWith('donor:')
+    ? selectedTags.value.filter(k => !k.startsWith('donor:'))
+    : selectedTags.value
+  selectedTags.value = [...kept, key]
 }
 
 // person:read_birth_date: the API omits birthDate for holders without it, so
@@ -127,20 +137,38 @@ const sortedPersons = computed(() => {
   return [...filteredPersons.value].sort((a, b) => sortOrder.value * key(a).localeCompare(key(b)))
 })
 
-// Role tags for a row: member and volunteer only (circles have their own
-// column). A deceased person reads as dropped in every role and says so.
+// The Phone cell: the cell number, else the home phone. Parsed once per row.
+function phoneCell (raw) {
+  const { phone, cell } = parsePhoneObj(raw)
+  return cell || phone || '—'
+}
+
+// Role badges for a row: member, volunteer and donor (circles have their own
+// column), as one-letter badges in three FIXED slots, M then V then D, with an
+// empty slot where a role is absent (@csmig, 2026-11-09). Full-word tags made
+// the Roles column wrap or clip once donors arrived; fixed slots give the
+// column a known width and keep each role lined up down the page. The full
+// words live in the tooltip, and the filter picker pairs each colour with its
+// word. A deceased person reads as dropped in every role and says so.
+const ROLE_SLOTS = [
+  { kind: 'member', role: 'Member', letter: 'M' },
+  { kind: 'volunteer', role: 'Volunteer', letter: 'V' },
+  { kind: 'donor', role: 'Donor', letter: 'D' },
+]
 function roleTags (p, today) {
-  return rowTagKeys(p)
-    .filter(key => !key.startsWith('circle:'))
-    .map(key => {
-      const [kind, status] = key.split(':')
-      const role = kind === 'member' ? 'Member' : 'Volunteer'
-      const label = p.deceased ? `${role} (deceased)` : tagLabel(key, circleNameById.value)
-      const pause = kind === 'volunteer' && isEmailPaused(p, today)
-        ? pauseTag(p.volunteerPause, today)
-        : null
-      return { key, kind, status, role, label, pause }
-    })
+  const keys = rowTagKeys(p)
+  return ROLE_SLOTS.map(({ kind, role, letter }) => {
+    const key = keys.find(k => k === kind || k.startsWith(`${kind}:`))
+    if (!key) return { kind, empty: true }
+    const status = key.split(':')[1]
+    let label = p.deceased ? `${role} (deceased)` : tagLabel(key, circleNameById.value)
+    // Last gift has no column of its own; it rides on the donor badge's tooltip.
+    if (kind === 'donor' && p.donor?.lastGiftDate) label += `, last gift ${formatCivilDate(p.donor.lastGiftDate)}`
+    const pause = kind === 'volunteer' && isEmailPaused(p, today)
+      ? pauseTag(p.volunteerPause, today)
+      : null
+    return { key, kind, status, role, letter, label, pause }
+  })
 }
 
 // Tags per row, rebuilt whenever the displayed rows change. Today's civil date
@@ -163,6 +191,9 @@ const columnsForCsv = computed(() => [
   { header: 'Village', key: 'villageName' },
   { header: 'Member Status', key: 'memberStatus' },
   { header: 'Volunteer Status', key: 'volunteerStatus' },
+  ...(canReadDonor.value
+    ? [{ header: 'Donor', key: 'donor' }, { header: 'Last Gift Date', key: 'lastGiftDate' }, { header: 'LGL', key: 'lgl' }]
+    : []),
   ...personExportColumns({ birthDate: canReadBirthDate.value, demographics: canReadDemographics.value }),
 ])
 
@@ -175,6 +206,10 @@ function detailRowForCsv(p) {
     villageName: p.village?.name ?? '',
     memberStatus: p.memberStatus,
     volunteerStatus: p.volunteerStatus,
+    // Absent without donor:read, and the columns are then not in the export.
+    donor: p.donor ? 'Yes' : '',
+    lastGiftDate: p.donor?.lastGiftDate ?? '',
+    lgl: p.donor ? lglConstituentUrl(p.donor.lglConstituentId) : '',
     ...personExportValues({ ...(p.detail ?? {}), email: p.email, phone, cell }),
   }
 }
@@ -195,7 +230,7 @@ async function fetchRowsForExport() {
     const byId = new Map(detail.map(p => [p.personId, p]))
     return (sortedPersons.value ?? [])
       .filter(p => byId.has(p.personId))
-      .map(p => detailRowForCsv({ ...byId.get(p.personId), memberStatus: p.memberStatus, volunteerStatus: p.volunteerStatus }))
+      .map(p => detailRowForCsv({ ...byId.get(p.personId), memberStatus: p.memberStatus, volunteerStatus: p.volunteerStatus, donor: p.donor }))
   } finally {
     isFetchingExport.value = false
   }
@@ -457,7 +492,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               :aria-pressed="isSelected(`member:${s}`)"
               @click="toggleTag(`member:${s}`)"
             >
-              <span class="role-tag role-tag--member" :class="`role-tag--${s}`">member</span>
+              <!-- The table's own badge (@csmig, 2026-11-09): the picker doubles as
+                   the legend for M / V / D. The group label names the role. -->
+              <span class="role-tag role-badge role-tag--member" :class="`role-tag--${s}`" aria-hidden="true">M</span>
               <span class="picker-caption">{{ s }}</span>
             </button>
           </div>
@@ -475,8 +512,26 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               :aria-pressed="isSelected(`volunteer:${s}`)"
               @click="toggleTag(`volunteer:${s}`)"
             >
-              <span class="role-tag role-tag--volunteer" :class="`role-tag--${s}`">volunteer</span>
+              <span class="role-tag role-badge role-tag--volunteer" :class="`role-tag--${s}`" aria-hidden="true">V</span>
               <span class="picker-caption">{{ s }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="canReadDonor" class="filter-group" role="group" aria-label="Donor">
+          <span class="filter-group-label">Donor</span>
+          <div class="picker-items">
+            <button
+              v-for="w in DONOR_WINDOWS"
+              :key="w.key"
+              type="button"
+              class="picker-item"
+              :class="{ selected: isSelected(w.key) }"
+              :aria-pressed="isSelected(w.key)"
+              @click="toggleTag(w.key)"
+            >
+              <span class="role-tag role-badge role-tag--donor" aria-hidden="true">D</span>
+              <span class="picker-caption">{{ w.caption }}</span>
             </button>
           </div>
         </div>
@@ -499,20 +554,6 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           </div>
         </div>
 
-        <div class="filter-group" role="group" aria-label="Match">
-          <span class="filter-group-label">Match</span>
-          <div class="match-row">
-            <SelectButton
-              v-model="matchMode"
-              :options="matchOptions"
-              option-label="label"
-              option-value="value"
-              :allow-empty="false"
-            />
-            <span v-if="sentence" class="selection-sentence">{{ sentence }}</span>
-          </div>
-        </div>
-
         <div class="filter-group" role="group" aria-label="Also">
           <span class="filter-group-label">Also</span>
           <div class="also-options">
@@ -528,6 +569,22 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               <Checkbox v-model="deceasedOnly" binary />
               <span>Deceased</span>
             </label>
+          </div>
+        </div>
+
+        <!-- Match is the last column (@csmig, 2026-11-09): every selection sits
+             before it, and its sentence reads them all back. -->
+        <div class="filter-group filter-group--match" role="group" aria-label="Match">
+          <span class="filter-group-label">Match</span>
+          <div class="match-row">
+            <SelectButton
+              v-model="matchMode"
+              :options="matchOptions"
+              option-label="label"
+              option-value="value"
+              :allow-empty="false"
+            />
+            <span v-if="sentence" class="selection-sentence">{{ sentence }}</span>
           </div>
         </div>
       </div>
@@ -547,8 +604,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
     <table v-else class="person-table">
       <colgroup>
-        <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10rem">
-        <col style="width: 11%"><col style="width: 11%"><col style="width: 21%">
+        <!-- Roles: three 1.6rem badge slots, two gaps, a pause mark and the cell padding. -->
+        <col style="width: 22%"><col style="width: 14%"><col style="width: 8.5rem"><col style="width: 10rem">
+        <col style="width: 9.5rem"><col>
       </colgroup>
       <thead>
         <tr>
@@ -561,7 +619,6 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           <th>Roles</th>
           <th>Circles</th>
           <th>Phone</th>
-          <th>Cell</th>
           <th>Email</th>
         </tr>
       </thead>
@@ -576,18 +633,24 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
           <td>{{ p.village?.name }}</td>
           <td>
             <div class="role-tags">
-              <span
-                v-for="t in tagsByPerson.get(p.personId)"
-                :key="t.key"
-                class="role-tag"
-                :class="[`role-tag--${t.kind}`, `role-tag--${t.status}`]"
-                role="img"
-                :title="t.label"
-                :aria-label="t.pause ? `${t.label}, ${t.pause}` : t.label"
-              >
-                {{ t.kind }}
-                <i v-if="t.pause" class="pi pi-pause-circle pause-mark" :title="t.pause" />
-              </span>
+              <template v-for="t in tagsByPerson.get(p.personId)" :key="t.kind">
+                <span v-if="t.empty" class="role-slot" />
+                <span
+                  v-else
+                  class="role-tag role-badge"
+                  :class="t.status ? [`role-tag--${t.kind}`, `role-tag--${t.status}`] : `role-tag--${t.kind}`"
+                  role="img"
+                  :title="t.pause ? `${t.label}, ${t.pause}` : t.label"
+                  :aria-label="t.pause ? `${t.label}, ${t.pause}` : t.label"
+                >{{ t.letter }}</span>
+              </template>
+              <!-- The pause mark trails the slots so it never shifts M/V/D. -->
+              <i
+                v-for="t in (tagsByPerson.get(p.personId) ?? []).filter(x => x.pause)"
+                :key="`pause-${t.kind}`"
+                class="pi pi-pause-circle pause-mark"
+                :title="`Volunteer: ${t.pause}`"
+              />
             </div>
           </td>
           <td>
@@ -600,8 +663,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
               >{{ circleShortName(c.name) }}</span>
             </div>
           </td>
-          <td>{{ parsePhoneObj(p.phone).phone || '—' }}</td>
-          <td>{{ parsePhoneObj(p.phone).cell || '—' }}</td>
+          <!-- One Phone column (@csmig, 2026-11-09): the cell, else the home
+               phone. The CSV keeps both. -->
+          <td>{{ phoneCell(p.phone) }}</td>
           <td>
             <div v-if="p.email" class="email-cell">
               <span class="email-text">{{ p.email }}</span>
@@ -751,25 +815,36 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   border-left: 0;
 }
 
+/* Columns, not rows (@csmig, 2026-11-09): each group stacks its choices
+   top to bottom, so the eye reads one column per group and the panel spends
+   width rather than height. Match takes the remaining width, last, with its
+   sentence under the buttons; on a narrow screen it wraps to a new line. */
+.filter-group--match {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
 .filter-group-label {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-text-primary);
   font-size: 0.9rem;
 }
 
 .picker-items {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
 }
 
 /* The picker reuses the grid's tag and pill visuals; unselected dimmed,
    selected ringed. */
+/* Tag then caption on one line ("member  active"), so a stacked column stays short. */
 .picker-item {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.4rem;
   padding: 0.2rem 0.4rem;
   background: transparent;
   border: 1px solid transparent;
@@ -795,23 +870,22 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 
 .match-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 .selection-sentence {
   font-size: 0.85rem;
+  font-weight: 600;
   color: var(--color-text-dim);
 }
 
-/* Two per column at most; a third option starts a new column. */
+/* Stacked like the other columns. */
 .also-options {
-  display: grid;
-  grid-template-rows: repeat(2, auto);
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: 0.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .also-option {
@@ -819,6 +893,7 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .role-tags {
@@ -902,9 +977,9 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
    uses. Defined on the component root so the filter picker shares them. */
 .person-list {
   --tag-member-bg: var(--p-sky-100);
-  --tag-member-fg: var(--p-sky-700);
+  --tag-member-fg: var(--p-sky-900);
   --tag-volunteer-bg: var(--p-green-100);
-  --tag-volunteer-fg: var(--p-green-700);
+  --tag-volunteer-fg: var(--p-green-900);
   --tag-muted-bg: var(--p-surface-100);
   --tag-muted-fg: var(--p-surface-600);
   --circle-bg: var(--p-violet-50);
@@ -944,6 +1019,23 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
 .role-tag--volunteer {
   background: var(--tag-volunteer-bg);
   color: var(--tag-volunteer-fg);
+}
+
+/* Row badges: one letter in a fixed-width slot (the picker keeps full words). */
+.role-badge,
+.role-slot {
+  flex: none;
+  width: 1.6rem;
+}
+
+.role-badge {
+  justify-content: center;
+  padding: 0.125rem 0;
+}
+
+.role-tag--donor {
+  background: var(--tag-donor-bg);
+  color: var(--tag-donor-fg);
 }
 
 .role-tag--dropped {

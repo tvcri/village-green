@@ -70,15 +70,35 @@ describe('PersonList grid', () => {
     setRows([row({ personId: 1, fullName: 'Alpha, Ann' })])
     await renderList()
     const headers = screen.getAllByRole('columnheader').map(h => h.textContent.trim())
-    expect(headers).toEqual(['Name', 'Village', 'Roles', 'Circles', 'Phone', 'Cell', 'Email'])
+    expect(headers).toEqual(['Name', 'Village', 'Roles', 'Circles', 'Phone', 'Email'])
   })
 
-  it('renders a pending member tag', async () => {
+  it('renders a pending member as an M badge', async () => {
     setRows([row({ personId: 1, fullName: 'Alpha, Ann', memberStatus: 'Pending' })])
     await renderList()
     const tag = screen.getByLabelText('Member, pending')
-    expect(tag).toHaveClass('role-tag', 'role-tag--member', 'role-tag--pending')
-    expect(tag).toHaveTextContent(/^member$/)
+    expect(tag).toHaveClass('role-tag', 'role-badge', 'role-tag--member', 'role-tag--pending')
+    expect(tag).toHaveTextContent(/^M$/)
+  })
+
+  it('keeps M, V and D in fixed slots, leaving an empty slot for an absent role', async () => {
+    perms.all = true
+    setRows([row({ personId: 1, fullName: 'Alpha, Ann', volunteerStatus: 'Active', donor: { lglConstituentId: 'L1', lastGiftDate: '2025-06-01' } })])
+    await renderList()
+    const slots = [...screen.getAllByRole('row')[1].querySelector('.role-tags').children]
+    expect(slots.map(s => s.classList.contains('role-slot') ? '_' : s.textContent.trim())).toEqual(['_', 'V', 'D'])
+  })
+
+  it('shows the cell in the one Phone column, falling back to the home phone', async () => {
+    setRows([
+      row({ personId: 1, fullName: 'Alpha, Ann', phone: { phone: '401-555-0100', cell: '401-555-0199' } }),
+      row({ personId: 2, fullName: 'Beta, Bob', phone: { phone: '401-555-0111' } })
+    ])
+    await renderList()
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('401-555-0199')
+    expect(rows[0]).not.toHaveTextContent('401-555-0100')
+    expect(rows[1]).toHaveTextContent('401-555-0111')
   })
 
   it('masks a deceased row and shows its tags as dropped', async () => {
@@ -122,7 +142,7 @@ describe('PersonList grid', () => {
     expect(screen.queryByRole('button', { name: /^Copy email/ })).toBeNull()
   })
 
-  it('marks an in-effect pause inside the volunteer tag and ignores an expired one', async () => {
+  it('marks an in-effect pause after the badges and ignores an expired one', async () => {
     setRows([
       row({
         personId: 1, fullName: 'Alpha, Ann', volunteerStatus: 'Active',
@@ -135,8 +155,10 @@ describe('PersonList grid', () => {
     ])
     await renderList()
     const rows = screen.getAllByRole('row').slice(1)
-    const mark = within(rows[0]).getByTitle('Email paused until Nov 10')
-    expect(mark.closest('.role-tag')).toHaveClass('role-tag--volunteer')
+    const mark = within(rows[0]).getByTitle('Volunteer: Email paused until Nov 10')
+    expect(mark).toHaveClass('pause-mark')
+    // The V badge says so too, so the tooltip on either reads the pause.
+    expect(within(rows[0]).getByLabelText(/^Volunteer, active, Email paused until Nov 10$/)).toHaveClass('role-tag--volunteer')
     expect(rows[1].querySelector('.pause-mark')).toBeNull()
   })
 
@@ -149,7 +171,7 @@ describe('PersonList grid', () => {
       row({ personId: 2, fullName: 'Beta, Bob', volunteerStatus: 'Active' })
     ])
     await renderList()
-    expect(screen.getByTitle('Email paused until Nov 1')).toBeInTheDocument()
+    expect(screen.getByTitle('Volunteer: Email paused until Nov 1')).toBeInTheDocument()
     vi.setSystemTime(new Date('2026-11-02T15:00:00Z'))
     await fireEvent.update(screen.getByPlaceholderText('Name'), 'a')
     await waitFor(() => expect(screen.queryByTitle(/Email paused/)).toBeNull())
@@ -220,17 +242,17 @@ describe('PersonList grid', () => {
       expect(screen.getByText('People who are a pending member')).toBeInTheDocument()
     })
 
-    it('Match offers Any, All and Exactly these; Exactly these drops the circle member', async () => {
-      setRows(people())
+    it('Match offers Any, All and Exactly these; Exactly these drops the volunteer, not the circle', async () => {
+      setRows([...people(), row({ personId: 4, fullName: 'Delta, Dee', memberStatus: 'Active', volunteerStatus: 'Active' })])
       await renderList()
       const match = screen.getByRole('group', { name: 'Match' })
       expect(within(match).getAllByRole('button').map(b => b.textContent.trim()))
         .toEqual(['Any', 'All', 'Exactly these'])
       await fireEvent.click(within(screen.getByRole('group', { name: 'Member' })).getByRole('button', { name: /active/i }))
-      expect(bodyRows()).toHaveLength(2)
+      expect(bodyRows()).toHaveLength(3)
       await fireEvent.click(within(match).getByRole('button', { name: 'Exactly these' }))
-      expect(bodyRows()).toHaveLength(1)
-      expect(bodyRows()[0]).toHaveTextContent('Beta, Bob')
+      expect(bodyRows()).toHaveLength(2)
+      expect(bodyRows().map(r => r.textContent)).not.toContain(expect.stringContaining('Delta, Dee'))
     })
 
     it('counts N of M and the inline clear appears only with a filter', async () => {
@@ -244,6 +266,20 @@ describe('PersonList grid', () => {
       expect(bodyRows()).toHaveLength(3)
       expect(screen.queryByTitle('Clear all filters')).toBeNull()
       expect(screen.getByRole('button', { name: /Filters/ })).not.toHaveTextContent('1')
+    })
+
+    it('the role pickers use the table\'s letter badges, named by caption', async () => {
+      perms.all = true
+      setRows(people())
+      await renderList()
+      for (const [group, letter] of [['Member', 'M'], ['Volunteer', 'V'], ['Donor', 'D']]) {
+        for (const btn of within(screen.getByRole('group', { name: group })).getAllByRole('button')) {
+          const badge = btn.querySelector('.role-badge')
+          expect(badge).toHaveTextContent(new RegExp(`^${letter}$`))
+          expect(badge).toHaveAttribute('aria-hidden', 'true')
+        }
+      }
+      expect(within(screen.getByRole('group', { name: 'Member' })).getByRole('button', { name: 'pending' })).toBeInTheDocument()
     })
 
     it('without read_inactive the Member group offers only active; no demographics, no Veteran', async () => {
@@ -321,6 +357,85 @@ describe('PersonList grid', () => {
       await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
       const [head, line] = downloadCsv.mock.calls[0][0].split('\n')
       expect(cellsOf(line)[head.split(',').indexOf('Member Status')]).toBe('Active')
+    })
+  })
+
+  describe('Donors', () => {
+    const donorRows = () => [
+      row({ personId: 1, fullName: 'Alpha, Ann', donor: { lglConstituentId: 'L1', lastGiftDate: '2025-06-01' } }),
+      row({ personId: 2, fullName: 'Beta, Bob', donor: null })
+    ]
+    const headersOf = (csvHead) => csvHead.split(',')
+
+    it('with donor:read: a D badge carrying the last gift, the picker group, and no Last gift column', async () => {
+      perms.all = true
+      setRows(donorRows())
+      await renderList()
+      const rows = screen.getAllByRole('row').slice(1)
+      const badge = within(rows[0]).getByTitle('Donor, last gift Jun 1, 2025')
+      expect(badge).toHaveClass('role-tag', 'role-badge', 'role-tag--donor')
+      expect(badge).toHaveTextContent(/^D$/)
+      const group = screen.getByRole('group', { name: 'Donor' })
+      expect(within(group).getAllByRole('button').map(b => b.querySelector('.picker-caption').textContent.trim()))
+        .toEqual(['1 yr', '2 yr', '5 yr', 'any time'])
+      expect(screen.getAllByRole('columnheader').map(h => h.textContent.trim())).not.toContain('Last gift')
+      expect(within(rows[1]).queryByTitle(/^Donor/)).toBeNull()
+    })
+
+    it('picking a window replaces the previous one', async () => {
+      perms.all = true
+      setRows(donorRows())
+      await renderList()
+      const group = screen.getByRole('group', { name: 'Donor' })
+      await fireEvent.click(within(group).getByRole('button', { name: /2 yr/ }))
+      await fireEvent.click(within(group).getByRole('button', { name: /5 yr/ }))
+      const pressed = within(group).getAllByRole('button').filter(b => b.getAttribute('aria-pressed') === 'true')
+      expect(pressed).toHaveLength(1)
+      expect(pressed[0]).toHaveTextContent('5 yr')
+      expect(screen.getByRole('button', { name: /Filters/ })).toHaveTextContent('1')
+    })
+
+    it('a deceased donor reads Donor (deceased)', async () => {
+      perms.all = true
+      setRows([row({ personId: 1, fullName: 'Alpha, Ann', deceased: true, donor: { lglConstituentId: 'L1', lastGiftDate: null } })])
+      await renderList()
+      const tag = screen.getByTitle('Donor (deceased)')
+      expect(tag).toHaveClass('role-tag--donor')
+      expect(tag).not.toHaveClass('role-tag--dropped')
+    })
+
+    async function download (summary) {
+      getPersons.mockImplementation(async (params) =>
+        params?.projection?.includes('detail') ? summary.map(p => ({ ...p, donor: undefined, detail: {} })) : summary)
+      await renderList()
+      await fireEvent.click(screen.getByRole('button', { name: /Export|Download/ }))
+      await fireEvent.click(await screen.findByText('Download'))
+      await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
+      return downloadCsv.mock.calls[0][0].split('\n')
+    }
+    const cellsOf = (line) => line.match(/("([^"]|"")*"|[^,]*)(,|$)/g).slice(0, -1).map(c => c.replace(/,$/, ''))
+
+    it('with donor:read the CSV carries Donor, Last Gift Date and LGL from the on-screen row', async () => {
+      perms.all = true
+      const [head, l1] = await download(donorRows())
+      const headers = headersOf(head)
+      expect(headers.slice(headers.indexOf('Volunteer Status') + 1, headers.indexOf('Volunteer Status') + 4))
+        .toEqual(['Donor', 'Last Gift Date', 'LGL'])
+      const cells = cellsOf(l1)
+      expect(cells[headers.indexOf('Donor')]).toBe('Yes')
+      expect(cells[headers.indexOf('Last Gift Date')]).toBe('2025-06-01')
+      expect(cells[headers.indexOf('LGL')]).toBe('https://pvri.littlegreenlight.com/constituents/L1')
+    })
+
+    it('without donor:read nothing donor shows', async () => {
+      perms.all = true
+      perms.denied = new Set(['donor:read'])
+      // The API sends no `donor` key at all to a caller without the grant.
+      const noDonorKey = donorRows().map(r => { const o = { ...r }; delete o.donor; return o })
+      const [head] = await download(noDonorKey)
+      expect(screen.queryByRole('group', { name: 'Donor' })).toBeNull()
+      expect(screen.queryByTitle(/^Donor/)).toBeNull()
+      for (const h of ['Donor', 'Last Gift Date', 'LGL']) expect(headersOf(head)).not.toContain(h)
     })
   })
 })

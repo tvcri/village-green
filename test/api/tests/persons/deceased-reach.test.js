@@ -30,7 +30,7 @@ before(async () => {
 })
 
 const labelsHave = async () => {
-  const res = await vgCall('getMailingLabels', { audience: 'roster', role: 'either' }, { token: staff })
+  const res = await vgCall('getMailingLabels', { audience: 'roster', role: ['member', 'volunteer'] }, { token: staff })
   assert.equal(res.status, 200)
   return res.json.labels.some(l => l.sortLastName === lastName)
 }
