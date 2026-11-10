@@ -591,7 +591,8 @@ watch([name, phone, email, selectedVillage, selectedTags, matchMode, emailPaused
       <colgroup>
         <col style="width: 20%"><col style="width: 12%"><col style="width: 15%"><col style="width: 10rem">
         <col style="width: 11%"><col style="width: 11%"><col style="width: 21%">
-        <col v-if="canReadDonor" style="width: 10rem">
+        <!-- Last gift: widest "May dd, yyyy" + LGL link measured 115.4px, plus 28px cell padding -->
+        <col v-if="canReadDonor" style="width: 11rem">
       </colgroup>
       <thead>
         <tr>
