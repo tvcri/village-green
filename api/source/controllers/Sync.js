@@ -36,3 +36,36 @@ module.exports.putSyncFields = async function putSyncFields (req, res, next) {
   }
   catch (err) { next(err) }
 }
+
+module.exports.getSyncHolds = async function getSyncHolds (req, res, next) {
+  try {
+    assertSync(req.userObject, 'read')
+    const { state, personId, lglConstituentId } = req.query
+    res.json(await SyncService.getHolds({ states: state, personId, lglConstituentId }))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.createSyncHolds = async function createSyncHolds (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.createHolds(req.body, req.userObject.userId))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.patchSyncHolds = async function patchSyncHolds (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.patchHolds(req.body))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.createSyncHoldDismissal = async function createSyncHoldDismissal (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.dismissHold(req.params.holdId, req.body, req.userObject.userId))
+  }
+  catch (err) { next(err) }
+}

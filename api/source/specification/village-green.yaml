@@ -3418,8 +3418,139 @@ paths:
               schema: { type: object, additionalProperties: false, required: [upserted], properties: { upserted: { type: integer } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:sync ] } ]
+  /sync/holds:
+    get:
+      summary: Read the things the sync is leaving alone
+      tags: [Sync]
+      operationId: getSyncHolds
+      parameters:
+        - name: state
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string, enum: [open, closed, dismissed] }, default: [open] }
+        - { name: personId, in: query, required: false, schema: { type: integer } }
+        - { name: lglConstituentId, in: query, required: false, schema: { type: string, maxLength: 50 } }
+      responses:
+        '200': { description: Holds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncHold' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync:read ] } ]
+    post:
+      summary: Open a batch of holds
+      description: >-
+        Opens each item, or records it already dismissed (state dismissed, with
+        dismissalKind) for the one-time load of the import's decisions. All or
+        nothing. A second OPEN hold for the same constituent, person, field and
+        reason is a 409 naming the item. Returns the rows in input order.
+      tags: [Sync]
+      operationId: createSyncHolds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/SyncHoldNew' } }
+      responses:
+        '200': { description: The created holds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncHold' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
+    patch:
+      summary: Update a batch of holds
+      description: >-
+        seen moves lastSeenAt to now. state closed (from open) sets closedAt;
+        state open (from dismissed) clears the dismissal. Other transitions are
+        422; reopening onto an existing open hold is 409; an unknown holdId is
+        404. All or nothing. Dismissal has its own endpoint.
+      tags: [Sync]
+      operationId: patchSyncHolds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/SyncHoldPatch' } }
+      responses:
+        '200':
+          description: Count of holds updated
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: false, required: [updated], properties: { updated: { type: integer } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
+  /sync/holds/{holdId}/dismissal:
+    post:
+      summary: Dismiss one open hold
+      description: >-
+        Records who dismissed it and how. A staff dismissal is permanent; a rule
+        dismissal is reconsidered by the sync when its facts change.
+      tags: [Sync]
+      operationId: createSyncHoldDismissal
+      parameters:
+        - { name: holdId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [dismissalKind]
+              properties:
+                dismissalKind: { type: string, enum: [staff, rule] }
+                note: { type: string, maxLength: 500, nullable: true }
+      responses:
+        '200': { description: The dismissed hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
 components:
   schemas:
+    SyncHoldNew:
+      type: object
+      additionalProperties: false
+      required: [lglConstituentId, reason, fingerprint]
+      properties:
+        lglConstituentId: { type: string, minLength: 1, maxLength: 50 }
+        personId: { type: integer, nullable: true }
+        field: { type: string, maxLength: 32, nullable: true }
+        reason: { type: string, minLength: 1, maxLength: 64 }
+        fingerprint: { type: string, minLength: 1, maxLength: 64 }
+        detail:
+          description: Anything a person reviewing the hold should see, any JSON.
+        state: { type: string, enum: [open, dismissed], default: open }
+        dismissalKind: { type: string, enum: [staff, rule, null], nullable: true }
+        note: { type: string, maxLength: 500, nullable: true }
+    SyncHoldPatch:
+      type: object
+      additionalProperties: false
+      required: [holdId]
+      properties:
+        holdId: { type: integer }
+        seen: { type: boolean }
+        fingerprint: { type: string, minLength: 1, maxLength: 64 }
+        detail:
+          description: Replaces the hold's detail, any JSON.
+        state: { type: string, enum: [open, closed] }
+    SyncHold:
+      type: object
+      additionalProperties: false
+      required: [holdId, lglConstituentId, personId, field, reason, detail, fingerprint, state, dismissalKind,
+        firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note]
+      properties:
+        holdId: { type: integer }
+        lglConstituentId: { type: string }
+        personId: { type: integer, nullable: true }
+        field: { type: string, nullable: true }
+        reason: { type: string }
+        detail:
+          description: Any JSON, or null.
+        fingerprint: { type: string }
+        state: { type: string, enum: [open, closed, dismissed] }
+        dismissalKind: { type: string, enum: [staff, rule, null], nullable: true }
+        firstSeenAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        closedAt: { type: string, format: date-time, nullable: true }
+        dismissedAt: { type: string, format: date-time, nullable: true }
+        dismissedUserId: { type: integer, nullable: true }
+        note: { type: string, nullable: true }
     SyncFieldPut:
       type: object
       additionalProperties: false

@@ -114,3 +114,130 @@ module.exports.putFields = async function (items) {
   })
   return { upserted: items.length }
 }
+
+// ---- holds (sync_hold) ----
+
+const SmError = require('../utils/error')
+const HOLD_COLUMNS = `holdId, lglConstituentId, personId, field, reason, detail, fingerprint, state,
+  dismissalKind, firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note`
+const isOpenCollision = (e) => e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)
+
+async function holdsByIds (ids) {
+  if (!ids.length) return []
+  const [rows] = await dbUtils.pool.query(`SELECT ${HOLD_COLUMNS} FROM sync_hold WHERE holdId IN (?)`, [ids])
+  const byId = new Map(rows.map(r => [r.holdId, r]))
+  return ids.map(id => byId.get(id))
+}
+
+module.exports.getHolds = async function ({ states = ['open'], personId, lglConstituentId } = {}) {
+  const where = ['state IN (?)']
+  const binds = [states]
+  if (personId != null) { where.push('personId = ?'); binds.push(personId) }
+  if (lglConstituentId != null) { where.push('lglConstituentId = ?'); binds.push(lglConstituentId) }
+  const [rows] = await dbUtils.pool.query(
+    `SELECT ${HOLD_COLUMNS} FROM sync_hold WHERE ${where.join(' AND ')} ORDER BY holdId`, binds)
+  return rows
+}
+
+// Items are inserted one at a time so an open-hold collision names its item.
+module.exports.createHolds = async function (items, userId) {
+  items.forEach((item, i) => {
+    const dismissed = item.state === 'dismissed'
+    if (dismissed && !item.dismissalKind) {
+      throw new SmError.UnprocessableError(`item ${i}: a dismissed hold needs a dismissalKind`)
+    }
+    if (!dismissed && item.dismissalKind) {
+      throw new SmError.UnprocessableError(`item ${i}: dismissalKind is only for a dismissed hold`)
+    }
+  })
+  const ids = await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const created = []
+      for (const [i, item] of items.entries()) {
+        const dismissed = item.state === 'dismissed'
+        try {
+          const [res] = await connection.query(
+            `INSERT INTO sync_hold (lglConstituentId, personId, field, reason, detail, fingerprint, state,
+               dismissalKind, dismissedAt, dismissedUserId, note, firstSeenAt, lastSeenAt)
+             VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ${dismissed ? 'NOW(3)' : 'NULL'}, ?, ?, NOW(3), NOW(3))`,
+            [item.lglConstituentId, item.personId ?? null, item.field ?? null, item.reason,
+              JSON.stringify(item.detail ?? null), item.fingerprint, dismissed ? 'dismissed' : 'open',
+              dismissed ? item.dismissalKind : null, dismissed ? userId : null, item.note ?? null]
+          )
+          created.push(res.insertId)
+        }
+        catch (e) {
+          if (isOpenCollision(e)) {
+            throw new SmError.ConflictError(`item ${i}: an open hold for this constituent, person, field and reason already exists`)
+          }
+          throw e
+        }
+      }
+      return created
+    },
+    statusObj: undefined
+  })
+  return holdsByIds(ids)
+}
+
+// Allowed patch transitions: open -> closed, dismissed -> open.
+module.exports.patchHolds = async function (items) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const ids = items.map(i => i.holdId)
+      const [rows] = await connection.query(
+        'SELECT holdId, state FROM sync_hold WHERE holdId IN (?) FOR UPDATE', [ids])
+      const state = new Map(rows.map(r => [r.holdId, r.state]))
+      for (const [i, item] of items.entries()) {
+        if (!state.has(item.holdId)) throw new SmError.NotFoundError(`item ${i}: no hold ${item.holdId}`)
+      }
+      for (const [i, item] of items.entries()) {
+        const sets = []
+        const binds = []
+        if (item.seen) sets.push('lastSeenAt = NOW(3)')
+        if (item.fingerprint !== undefined) { sets.push('fingerprint = ?'); binds.push(item.fingerprint) }
+        if ('detail' in item) { sets.push('detail = CAST(? AS JSON)'); binds.push(JSON.stringify(item.detail ?? null)) }
+        if (item.state !== undefined) {
+          const from = state.get(item.holdId)
+          if (item.state === 'closed' && from === 'open') {
+            sets.push("state = 'closed'", 'closedAt = NOW(3)')
+          }
+          else if (item.state === 'open' && from === 'dismissed') {
+            sets.push("state = 'open'", 'dismissalKind = NULL', 'dismissedAt = NULL', 'dismissedUserId = NULL', 'note = NULL')
+          }
+          else {
+            throw new SmError.UnprocessableError(`item ${i}: a hold cannot go from ${from} to ${item.state}`)
+          }
+          state.set(item.holdId, item.state)
+        }
+        if (!sets.length) continue
+        try {
+          await connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`, [...binds, item.holdId])
+        }
+        catch (e) {
+          if (isOpenCollision(e)) {
+            throw new SmError.ConflictError(`item ${i}: an open hold for this constituent, person, field and reason already exists`)
+          }
+          throw e
+        }
+      }
+    },
+    statusObj: undefined
+  })
+  return { updated: items.length }
+}
+
+module.exports.dismissHold = async function (holdId, { dismissalKind, note }, userId) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [[row]] = await connection.query('SELECT state FROM sync_hold WHERE holdId = ? FOR UPDATE', [holdId])
+      if (!row) throw new SmError.NotFoundError(`no hold ${holdId}`)
+      if (row.state !== 'open') throw new SmError.UnprocessableError(`only an open hold can be dismissed; this one is ${row.state}`)
+      await connection.query(
+        `UPDATE sync_hold SET state = 'dismissed', dismissalKind = ?, note = ?, dismissedAt = NOW(3), dismissedUserId = ?
+         WHERE holdId = ?`, [dismissalKind, note ?? null, userId, holdId])
+    },
+    statusObj: undefined
+  })
+  return (await holdsByIds([holdId]))[0]
+}
