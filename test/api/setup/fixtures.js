@@ -96,6 +96,13 @@ export const users = {
     userId: 13, name: 'Joe Swanson', username: 'joe.swanson@residents.test',
     grants: [], privileges: [],
   },
+  // The vg-sync service account: role 8 (Sync Service) at federation scope and
+  // nothing else, as granted in production. Proves the role's bundle is enough
+  // for the sync and no more.
+  sync: {
+    userId: 14, name: 'Sync Service Account', username: 'service-account-sync@sync.test',
+    grants: [{ villageId: null, roleId: 8 }], privileges: [],
+  },
 }
 
 // person rows. Each village has a member-person and a volunteer-person, with
@@ -118,7 +125,7 @@ function person (id, villageId, firstName, lastName, street, city, zip, birthDat
 
 // The auto-complete task's actor row (migration 0024). NOT a persona: it holds
 // no grants, gets no token, and status 'unavailable' makes the auth gate refuse
-// it. Its userId is deliberately outside the 1-13 persona range — in production
+// it. Its userId is deliberately outside the 1-14 persona range — in production
 // the row lands at whatever auto-increment the install is at, and nothing may
 // depend on a particular value; the event finds it by taskName.
 export const taskUsers = {
@@ -297,7 +304,7 @@ export const fcvSubmissions = {
 // only defines a `:read` scope). Narrow variants below intentionally omit scopes
 // to exercise per-resource scope enforcement.
 export const scopes = {
-  full: 'vg:service-request vg:village vg:person vg:member vg:volunteer vg:donor vg:friends:read vg:user vg:op vg:read',
+  full: 'vg:service-request vg:village vg:person vg:member vg:volunteer vg:donor vg:sync vg:friends:read vg:user vg:op vg:read',
   readOnly: 'vg:service-request:read vg:village:read vg:person:read',
   noServiceRequest: 'vg:village:read vg:person:read',
 }

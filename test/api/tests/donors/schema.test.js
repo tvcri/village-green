@@ -15,9 +15,13 @@ test('donor table exists with the spec columns', async () => {
   assert.equal(byName.personId.Key, 'UNI')
 })
 
-test('Staff holds donor:read and no role holds donor:write', async () => {
+test('Staff holds donor:read; only Sync Service holds donor:write', async () => {
   const rows = await withDb(async (db) => (await db.query(
     `SELECT r.name, rp.permission FROM role_permission rp JOIN role r USING (roleId)
-     WHERE rp.permission LIKE 'donor:%'`))[0])
-  assert.deepEqual(rows.map(r => ({ ...r })), [{ name: 'Staff', permission: 'donor:read' }])
+     WHERE rp.permission LIKE 'donor:%' ORDER BY r.name, rp.permission`))[0])
+  assert.deepEqual(rows.map(r => ({ ...r })), [
+    { name: 'Staff', permission: 'donor:read' },
+    { name: 'Sync Service', permission: 'donor:read' },
+    { name: 'Sync Service', permission: 'donor:write' },
+  ])
 })

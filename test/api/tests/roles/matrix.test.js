@@ -14,6 +14,8 @@ import { villages, serviceRequests as sr, persons } from '../../setup/fixtures.j
 //     5 Staff — all reads + writes (+ confidential/financial/inactive extras)
 //     6 Board — the six :reads only; sees everything, writes nothing
 //     7 Service Coordinator — reads + member:read_sc_note; sr:write is its ONLY write
+//     8 Sync Service — person read/write, member/volunteer read, donor read/write,
+//       sync read/write; the vg-sync service account, no UI user
 // Writes are federation-only: no village role can write anything.
 
 // serviceDateStart is required; this window spans all SR fixtures (2026-07-10..12).
@@ -145,4 +147,56 @@ test('member:read_financial: role 3 and staff see dues fields; roles 1/2, board,
     assert.equal('quickbooksKey' in json.member, canSeeFinancial,
       `${key}: quickbooksKey ${canSeeFinancial ? 'projected' : 'withheld'}`)
   }
+})
+
+// ---- role 8, Sync Service ----
+// The vg-sync service account must see every person (matching must not miss
+// anyone) and write persons and donors, and nothing beyond that.
+const syncToken = tokens.users.sync
+const uniqName = (s) => `${s}${Date.now()}${Math.round(Math.random() * 1e6)}`
+
+async function donorOnlyPerson () {
+  const lastName = uniqName('SyncRole')
+  const created = await vgCall('createPerson', {}, { token: tokens.users.staff, body: { villageId: null, firstName: 'Dana', lastName } })
+  assert.equal(created.status, 201)
+  const personId = created.json.personId
+  const put = await vgCall('putPersonDonor', { personId }, { token: tokens.users.admin, body: { lglConstituentId: '700001' } })
+  assert.equal(put.status, 200)
+  return { personId, lastName }
+}
+
+test('role 8 reads every person, donor data included', async () => {
+  const { personId, lastName } = await donorOnlyPerson()
+  const res = await vgCall('getPersons', { lastName, projection: ['detail'] }, { token: syncToken })
+  assert.equal(res.status, 200)
+  const row = res.json.find(p => p.personId === personId)
+  assert.ok(row, 'donor-only person is visible to role 8')
+  assert.equal(row.donor?.lglConstituentId, '700001')
+  // member- and volunteer-only fixture persons are visible too
+  const all = await vgCall('getPersons', {}, { token: syncToken })
+  assert.equal(all.status, 200)
+  const ids = new Set(all.json.map(p => p.personId))
+  assert.ok(ids.has(String(persons.quahogMember.id)), 'member person visible')
+  assert.ok(ids.has(String(persons.innsmouthVolunteer.id)), 'volunteer person visible')
+})
+
+test('role 8 writes persons and donors', async () => {
+  const { personId } = await donorOnlyPerson()
+  const patch = await vgCall('patchPerson', { personId }, { token: syncToken, body: { firstName: 'Dina' } })
+  assert.equal(patch.status, 200)
+  const put = await vgCall('putPersonDonor', { personId }, { token: syncToken, body: { lglConstituentId: '700002', lastGiftDate: '2025-06-30' } })
+  assert.equal(put.status, 200)
+  assert.equal(put.json.donor.lglConstituentId, '700002')
+})
+
+test('role 8 cannot write members, service requests or users', async () => {
+  const member = await vgCall('patchPersonMember', { personId: String(persons.quahogMember.id) }, { token: syncToken, body: { memberLevel: 'Full' } })
+  assert.equal(member.status, 403)
+  const sr = await vgCall('createServiceRequest', {}, { token: syncToken, body: {
+    villageId: String(villages.quahog.id), memberPersonId: String(persons.quahogMember.id),
+    serviceName: 'Disposable ride', serviceDate: '2026-07-11',
+  } })
+  assert.equal(sr.status, 403)
+  const user = await vgCall('createUser', {}, { token: syncToken, body: { username: uniqName('nobody'), roleGrants: [] } })
+  assert.equal(user.status, 403)
 })

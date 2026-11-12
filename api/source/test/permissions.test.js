@@ -40,3 +40,10 @@ test('trainings/positions catalog permissions exist and are not elevated', () =>
     assert.equal(catalog[key].requiresElevation, false)
   }
 })
+
+test('sync permissions exist and are not elevated', () => {
+  for (const key of ['sync:read', 'sync:write']) {
+    assert.ok(catalog[key], `missing ${key}`)
+    assert.equal(catalog[key].requiresElevation, false)
+  }
+})
