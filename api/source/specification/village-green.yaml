@@ -3353,8 +3353,70 @@ paths:
       security:
       - oauth:
         - vg:person:read
+  /sync/changes:
+    get:
+      summary: Persons changed after an audit id
+      description: >-
+        The change feed for the vg-sync service (and the later Mailchimp
+        executable, which signs in as the same account). Scans audit_event rows
+        after `after`, in auditId order, up to `limit` rows, skipping rows
+        younger than the settle floor (VG_SYNC_CHANGE_SETTLE_SECONDS, default 5)
+        so a transaction that commits late is not passed by the cursor. Reports
+        person, member, volunteer and donor rows, mapped to the person; member,
+        volunteer and donor rows are mapped through their own table, or the
+        audit snapshot when the row is gone. Every scanned row advances
+        `lastAuditId`, including entity types the feed does not report. Field
+        names only: never values, users or timestamps. Ids are returned for
+        persons the caller might not read under the person association rules;
+        only sync:read holders (Sync Service and Admin, both of which read every
+        association) can call it.
+      tags: [Sync]
+      operationId: getSyncChanges
+      parameters:
+        - { name: after, in: query, required: true, schema: { type: integer, minimum: 0 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 5000, default: 1000 } }
+      responses:
+        '200': { description: Changed persons and the new cursor, content: { application/json: { schema: { $ref: '#/components/schemas/SyncChanges' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync:read ] } ]
 components:
   schemas:
+    SyncChanges:
+      type: object
+      additionalProperties: false
+      required: [lastAuditId, more, persons]
+      properties:
+        lastAuditId:
+          type: integer
+          minimum: 0
+          description: The highest auditId scanned, or `after` when nothing was scanned. Store it as the cursor.
+        more:
+          type: boolean
+          description: True when the scan stopped at `limit` with eligible rows beyond it.
+        persons:
+          type: array
+          items: { $ref: '#/components/schemas/SyncPersonChange' }
+    SyncPersonChange:
+      type: object
+      additionalProperties: false
+      required: [personId, changes]
+      properties:
+        personId: { type: integer }
+        changes:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [entityType, actions, fields]
+            properties:
+              entityType: { type: string, enum: [person, member, volunteer, donor] }
+              actions:
+                type: array
+                items: { type: string, enum: [create, update, delete] }
+              fields:
+                type: array
+                description: Names of changed fields, from update rows only.
+                items: { type: string }
     ApiClassification:
       type: string
       enum:

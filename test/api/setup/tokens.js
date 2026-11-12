@@ -55,6 +55,12 @@ export function buildTokens (oidc) {
     username: fv1.username, name: fv1.name, privileges: [], scope: scopes.noServiceRequest, audience: AUD, expiresIn: '1h',
   })
 
+  // The sync persona without vg:sync -> /sync endpoints are out of scope.
+  tokens.special.syncNoScope = oidc.getToken({
+    username: users.sync.username, name: users.sync.name, privileges: [],
+    scope: scopes.full.replace(' vg:sync', ''), audience: AUD, expiresIn: '1h',
+  })
+
   // aud claim not matching VG_JWT_AUD_VALUE -> 401 JsonWebTokenError.
   tokens.special.wrongAudience = oidc.getToken({
     username: fv1.username, name: fv1.name, privileges: [], scope: scopes.full,
