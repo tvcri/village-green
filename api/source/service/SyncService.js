@@ -1,6 +1,7 @@
 'use strict';
 const dbUtils = require('./utils')
 const config = require('../utils/config')
+const SmError = require('../utils/error')
 
 // Storage and feeds for the vg-sync service (repo tvcri/vg-sync). Nothing
 // here deletes: holds change state, runs are finished, memory is overwritten,
@@ -117,7 +118,6 @@ module.exports.putFields = async function (items) {
 
 // ---- holds (sync_hold) ----
 
-const SmError = require('../utils/error')
 const HOLD_COLUMNS = `holdId, lglConstituentId, personId, field, reason, detail, fingerprint, state,
   dismissalKind, firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note`
 const isOpenCollision = (e) => e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)
@@ -240,4 +240,94 @@ module.exports.dismissHold = async function (holdId, { dismissalKind, note }, us
     statusObj: undefined
   })
   return (await holdsByIds([holdId]))[0]
+}
+
+// ---- runs (sync_run) ----
+
+const RUN_COLUMNS = `runId, kind, startedAt, finishedAt, result, switches, imageRevision, policyHash,
+  counts, lglCursor, vgCursor, error`
+
+async function runById (runId) {
+  const [[row]] = await dbUtils.pool.query(`SELECT ${RUN_COLUMNS} FROM sync_run WHERE runId = ?`, [runId])
+  return row
+}
+
+module.exports.createRun = async function ({ kind, switches, imageRevision, policyHash }) {
+  const [res] = await dbUtils.pool.query(
+    `INSERT INTO sync_run (kind, switches, imageRevision, policyHash, startedAt)
+     VALUES (?, CAST(? AS JSON), ?, ?, NOW(3))`,
+    [kind, JSON.stringify(switches), imageRevision ?? null, policyHash ?? null]
+  )
+  return runById(res.insertId)
+}
+
+module.exports.patchRun = async function (runId, body) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [[row]] = await connection.query('SELECT result FROM sync_run WHERE runId = ? FOR UPDATE', [runId])
+      if (!row) throw new SmError.NotFoundError(`no run ${runId}`)
+      if (row.result !== 'running') throw new SmError.ConflictError(`run ${runId} is already ${row.result}`)
+      const sets = []
+      const binds = []
+      if (body.result !== undefined) { sets.push('result = ?'); binds.push(body.result) }
+      if (body.counts !== undefined) { sets.push('counts = CAST(? AS JSON)'); binds.push(JSON.stringify(body.counts)) }
+      if (body.lglCursor !== undefined) { sets.push('lglCursor = ?'); binds.push(body.lglCursor === null ? null : new Date(body.lglCursor)) }
+      if (body.vgCursor !== undefined) { sets.push('vgCursor = ?'); binds.push(body.vgCursor) }
+      if (body.error !== undefined) { sets.push('error = ?'); binds.push(body.error) }
+      if (body.finished) sets.push('finishedAt = NOW(3)')
+      if (sets.length) await connection.query(`UPDATE sync_run SET ${sets.join(', ')} WHERE runId = ?`, [...binds, runId])
+    },
+    statusObj: undefined
+  })
+  return runById(runId)
+}
+
+module.exports.getRuns = async function ({ kinds, since, limit = 50 } = {}) {
+  const where = []
+  const binds = []
+  if (kinds?.length) { where.push('kind IN (?)'); binds.push(kinds) }
+  if (since) { where.push('startedAt >= ?'); binds.push(new Date(since)) }
+  const [rows] = await dbUtils.pool.query(
+    `SELECT ${RUN_COLUMNS} FROM sync_run ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY runId DESC LIMIT ?`, [...binds, limit])
+  return rows
+}
+
+// ---- the record of writes to LGL (sync_log) ----
+
+// compareCase in SQL (CASE is reserved), `case` in the API.
+const LOG_COLUMNS = `logId, runId, loggedAt, lglConstituentId, personId, field, compareCase AS \`case\`,
+  request, lglEntryId, oldValue, newValue, outcome, responseStatus, note`
+
+module.exports.appendLog = async function (items) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      await connection.query(
+        `INSERT INTO sync_log (runId, lglConstituentId, personId, field, compareCase, request, lglEntryId,
+           oldValue, newValue, outcome, responseStatus, note, loggedAt)
+         VALUES ${items.map(() => '(?, ?, ?, ?, ?, CAST(? AS JSON), ?, CAST(? AS JSON), CAST(? AS JSON), ?, ?, ?, NOW(3))').join(', ')}`,
+        items.flatMap(i => [
+          i.runId ?? null, i.lglConstituentId, i.personId ?? null, i.field ?? null, i.case ?? null,
+          JSON.stringify(i.request), i.lglEntryId ?? null, JSON.stringify(i.oldValue ?? null),
+          JSON.stringify(i.newValue ?? null), i.outcome, i.responseStatus ?? null, i.note ?? null,
+        ])
+      )
+    },
+    statusObj: undefined
+  })
+  return { appended: items.length }
+}
+
+module.exports.getLog = async function ({ personId, lglConstituentId, runId, outcomes, since, limit = 500 } = {}) {
+  const where = []
+  const binds = []
+  if (personId != null) { where.push('personId = ?'); binds.push(personId) }
+  if (lglConstituentId != null) { where.push('lglConstituentId = ?'); binds.push(lglConstituentId) }
+  if (runId != null) { where.push('runId = ?'); binds.push(runId) }
+  if (outcomes?.length) { where.push('outcome IN (?)'); binds.push(outcomes) }
+  if (since) { where.push('loggedAt >= ?'); binds.push(new Date(since)) }
+  const [rows] = await dbUtils.pool.query(
+    `SELECT ${LOG_COLUMNS} FROM sync_log ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY logId DESC LIMIT ?`, [...binds, limit])
+  return rows
 }

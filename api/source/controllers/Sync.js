@@ -69,3 +69,45 @@ module.exports.createSyncHoldDismissal = async function createSyncHoldDismissal 
   }
   catch (err) { next(err) }
 }
+
+module.exports.createSyncRun = async function createSyncRun (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.createRun(req.body))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.patchSyncRun = async function patchSyncRun (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.patchRun(req.params.runId, req.body))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.getSyncRuns = async function getSyncRuns (req, res, next) {
+  try {
+    assertSync(req.userObject, 'read')
+    const { kind, since, limit = 50 } = req.query
+    res.json(await SyncService.getRuns({ kinds: kind, since, limit }))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.createSyncLog = async function createSyncLog (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.appendLog(req.body))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.getSyncLog = async function getSyncLog (req, res, next) {
+  try {
+    assertSync(req.userObject, 'read')
+    const { personId, lglConstituentId, runId, outcome, since, limit = 500 } = req.query
+    res.json(await SyncService.getLog({ personId, lglConstituentId, runId, outcomes: outcome, since, limit }))
+  }
+  catch (err) { next(err) }
+}

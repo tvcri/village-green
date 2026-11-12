@@ -3501,8 +3501,183 @@ paths:
         '200': { description: The dismissed hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:sync ] } ]
+  /sync/runs:
+    get:
+      summary: Recent sync runs, newest first
+      tags: [Sync]
+      operationId: getSyncRuns
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string, enum: [full, vg-check, lgl-check] } }
+        - { name: since, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 1000, default: 50 } }
+      responses:
+        '200': { description: Runs, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncRun' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync:read ] } ]
+    post:
+      summary: Start a run
+      tags: [Sync]
+      operationId: createSyncRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SyncRunNew' }
+      responses:
+        '200': { description: The started run, content: { application/json: { schema: { $ref: '#/components/schemas/SyncRun' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
+  /sync/runs/{runId}:
+    patch:
+      summary: Update or finish a running run
+      description: Only a run whose result is still running can be patched (409 otherwise). finished sets finishedAt.
+      tags: [Sync]
+      operationId: patchSyncRun
+      parameters:
+        - { name: runId, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SyncRunPatch' }
+      responses:
+        '200': { description: The run, content: { application/json: { schema: { $ref: '#/components/schemas/SyncRun' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
+  /sync/log:
+    get:
+      summary: Read the record of writes to LGL, newest first
+      description: >-
+        Writes to VG are in the audit trail; LGL keeps no history of API
+        writes, so this is the only record of what the sync changed in LGL.
+      tags: [Sync]
+      operationId: getSyncLog
+      parameters:
+        - { name: personId, in: query, required: false, schema: { type: integer } }
+        - { name: lglConstituentId, in: query, required: false, schema: { type: string, maxLength: 50 } }
+        - { name: runId, in: query, required: false, schema: { type: integer } }
+        - name: outcome
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string, maxLength: 32 } }
+        - { name: since, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 5000, default: 500 } }
+      responses:
+        '200': { description: Log rows, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncLog' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync:read ] } ]
+    post:
+      summary: Append a batch of LGL write records
+      tags: [Sync]
+      operationId: createSyncLog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/SyncLogNew' } }
+      responses:
+        '200':
+          description: Count of rows appended
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: false, required: [appended], properties: { appended: { type: integer } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
 components:
   schemas:
+    SyncRunNew:
+      type: object
+      additionalProperties: false
+      required: [kind, switches]
+      properties:
+        kind: { type: string, enum: [full, vg-check, lgl-check] }
+        switches: { type: object, description: 'The run''s write switches, e.g. {"writeVg": true, "writeLgl": false}.' }
+        imageRevision: { type: string, maxLength: 64, nullable: true }
+        policyHash: { type: string, maxLength: 64, nullable: true }
+    SyncRunPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        result: { type: string, enum: [running, ok, failed] }
+        counts: { type: object }
+        lglCursor: { type: string, format: date-time, nullable: true }
+        vgCursor: { type: integer, minimum: 0, nullable: true }
+        error: { type: string, maxLength: 1000, nullable: true }
+        finished: { type: boolean }
+    SyncRun:
+      type: object
+      additionalProperties: false
+      required: [runId, kind, startedAt, finishedAt, result, switches, imageRevision, policyHash, counts, lglCursor, vgCursor, error]
+      properties:
+        runId: { type: integer }
+        kind: { type: string, enum: [full, vg-check, lgl-check] }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        result: { type: string, enum: [running, ok, failed] }
+        switches: { type: object }
+        imageRevision: { type: string, nullable: true }
+        policyHash: { type: string, nullable: true }
+        counts: { type: object, nullable: true }
+        lglCursor: { type: string, format: date-time, nullable: true }
+        vgCursor: { type: integer, nullable: true }
+        error: { type: string, nullable: true }
+    SyncLogRequest:
+      type: object
+      additionalProperties: false
+      required: [method, path]
+      description: The LGL call as sent.
+      properties:
+        method: { type: string, maxLength: 10 }
+        path: { type: string, maxLength: 500 }
+        body:
+          description: The request body, any JSON.
+    SyncLogNew:
+      type: object
+      additionalProperties: false
+      required: [lglConstituentId, request, outcome]
+      properties:
+        runId: { type: integer, nullable: true }
+        lglConstituentId: { type: string, minLength: 1, maxLength: 50 }
+        personId: { type: integer, nullable: true }
+        field: { type: string, maxLength: 32, nullable: true }
+        case: { type: string, maxLength: 32, nullable: true, description: The comparison case that led to the write. }
+        request: { $ref: '#/components/schemas/SyncLogRequest' }
+        lglEntryId: { type: string, maxLength: 50, nullable: true }
+        oldValue:
+          description: LGL's value before the write, any JSON.
+        newValue:
+          description: The value written, any JSON.
+        outcome: { type: string, minLength: 1, maxLength: 32 }
+        responseStatus: { type: integer, nullable: true }
+        note: { type: string, maxLength: 1000, nullable: true }
+    SyncLog:
+      type: object
+      additionalProperties: false
+      required: [logId, runId, loggedAt, lglConstituentId, personId, field, case, request, lglEntryId, oldValue, newValue, outcome, responseStatus, note]
+      properties:
+        logId: { type: integer }
+        runId: { type: integer, nullable: true }
+        loggedAt: { type: string, format: date-time }
+        lglConstituentId: { type: string }
+        personId: { type: integer, nullable: true }
+        field: { type: string, nullable: true }
+        case: { type: string, nullable: true }
+        request: { $ref: '#/components/schemas/SyncLogRequest' }
+        lglEntryId: { type: string, nullable: true }
+        oldValue:
+          description: Any JSON, or null.
+        newValue:
+          description: Any JSON, or null.
+        outcome: { type: string }
+        responseStatus: { type: integer, nullable: true }
+        note: { type: string, nullable: true }
     SyncHoldNew:
       type: object
       additionalProperties: false
