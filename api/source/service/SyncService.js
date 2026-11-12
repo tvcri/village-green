@@ -6,7 +6,8 @@ const config = require('../utils/config')
 // here deletes: holds change state, runs are finished, memory is overwritten,
 // and the LGL write log is append-only.
 
-const parseJson = (v) => (typeof v === 'string' ? JSON.parse(v) : v)
+// mysql2 decodes JSON columns already. Never JSON.parse a JSON column's value
+// again: a stored JSON string ("0", "dana@…") would be decoded twice.
 
 // ---- change feed ----
 
@@ -67,7 +68,7 @@ module.exports.getChanges = async function ({ after, limit }) {
     const entry = byType.get(r.entityType)
     if (!entry.actions.includes(r.action)) entry.actions.push(r.action)
     if (r.action === 'update') {
-      for (const f of Object.keys(parseJson(r.changes)?.diff ?? {})) entry.fields.add(f)
+      for (const f of Object.keys(r.changes?.diff ?? {})) entry.fields.add(f)
     }
   }
 
@@ -81,4 +82,35 @@ module.exports.getChanges = async function ({ after, limit }) {
       })),
     })),
   }
+}
+
+// ---- memory (sync_field) ----
+
+const FIELD_COLUMNS = 'personId, field, lglConstituentId, value, lglEntryId, agreedAt'
+
+module.exports.getFields = async function ({ personIds } = {}) {
+  const filter = personIds?.length ? 'WHERE personId IN (?)' : ''
+  const [rows] = await dbUtils.pool.query(
+    `SELECT ${FIELD_COLUMNS} FROM sync_field ${filter} ORDER BY personId, field`,
+    personIds?.length ? [personIds] : []
+  )
+  return rows
+}
+
+// One multi-row upsert. A later item for the same key wins: MySQL applies the
+// rows in order, so the second updates the first.
+module.exports.putFields = async function (items) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      await connection.query(
+        `INSERT INTO sync_field (personId, field, lglConstituentId, value, lglEntryId, agreedAt)
+         VALUES ${items.map(() => '(?, ?, ?, CAST(? AS JSON), ?, NOW(3))').join(', ')} AS new
+         ON DUPLICATE KEY UPDATE lglConstituentId = new.lglConstituentId, value = new.value,
+           lglEntryId = new.lglEntryId, agreedAt = new.agreedAt`,
+        items.flatMap(i => [i.personId, i.field, i.lglConstituentId, JSON.stringify(i.value ?? null), i.lglEntryId ?? null])
+      )
+    },
+    statusObj: undefined
+  })
+  return { upserted: items.length }
 }

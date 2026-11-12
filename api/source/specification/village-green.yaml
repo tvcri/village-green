@@ -3379,8 +3379,70 @@ paths:
         '200': { description: Changed persons and the new cursor, content: { application/json: { schema: { $ref: '#/components/schemas/SyncChanges' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:sync:read ] } ]
+  /sync/fields:
+    get:
+      summary: Read the sync's agreed values
+      description: >-
+        The vg-sync memory: per person and field, the value both systems last
+        agreed on. With no personId filter every row is returned.
+      tags: [Sync]
+      operationId: getSyncFields
+      parameters:
+        - name: personId
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema: { type: array, maxItems: 500, items: { type: integer } }
+      responses:
+        '200': { description: Memory rows, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncField' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync:read ] } ]
+    put:
+      summary: Upsert a batch of agreed values
+      description: >-
+        Upserts on (personId, field) and sets agreedAt to now. All or nothing.
+        A later item for the same key in one batch wins.
+      tags: [Sync]
+      operationId: putSyncFields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/SyncFieldPut' } }
+      responses:
+        '200':
+          description: Count of items upserted
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: false, required: [upserted], properties: { upserted: { type: integer } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
 components:
   schemas:
+    SyncFieldPut:
+      type: object
+      additionalProperties: false
+      required: [personId, field, lglConstituentId, value]
+      properties:
+        personId: { type: integer }
+        field: { type: string, minLength: 1, maxLength: 32 }
+        lglConstituentId: { type: string, minLength: 1, maxLength: 50 }
+        value:
+          description: The agreed value, any JSON (null when both systems are empty).
+        lglEntryId: { type: string, maxLength: 50, nullable: true }
+    SyncField:
+      type: object
+      additionalProperties: false
+      required: [personId, field, lglConstituentId, value, lglEntryId, agreedAt]
+      properties:
+        personId: { type: integer }
+        field: { type: string }
+        lglConstituentId: { type: string }
+        value:
+          description: The agreed value, any JSON.
+        lglEntryId: { type: string, nullable: true }
+        agreedAt: { type: string, format: date-time }
     SyncChanges:
       type: object
       additionalProperties: false

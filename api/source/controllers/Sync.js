@@ -20,3 +20,19 @@ module.exports.getSyncChanges = async function getSyncChanges (req, res, next) {
   }
   catch (err) { next(err) }
 }
+
+module.exports.getSyncFields = async function getSyncFields (req, res, next) {
+  try {
+    assertSync(req.userObject, 'read')
+    res.json(await SyncService.getFields({ personIds: req.query.personId }))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.putSyncFields = async function putSyncFields (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.putFields(req.body))
+  }
+  catch (err) { next(err) }
+}
