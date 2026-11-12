@@ -13,7 +13,7 @@ const switches = { writeVg: true, writeLgl: false }
 test('start returns a running run', async () => {
   const res = await start({ kind: 'full', switches, imageRevision: 'abc1234', policyHash: 'deadbeef' })
   assert.equal(res.status, 200)
-  assert.equal(typeof res.json.runId, 'number')
+  assert.equal(typeof res.json.runId, 'string')
   assert.equal(res.json.result, 'running')
   assert.equal(res.json.kind, 'full')
   assert.deepEqual(res.json.switches, switches)
@@ -49,7 +49,7 @@ test('patching a finished run is 409', async () => {
 })
 
 test('unknown runId is 404', async () => {
-  assert.equal((await patch(2147483000, { result: 'ok' })).status, 404)
+  assert.equal((await patch('2147483000', { result: 'ok' })).status, 404)
 })
 
 test('list filters by kind and since and is newest first', async () => {
@@ -69,5 +69,5 @@ test('staff is refused', async () => {
   const staff = tokens.users.staff
   assert.equal((await list({}, staff)).status, 403)
   assert.equal((await start({ kind: 'full', switches }, staff)).status, 403)
-  assert.equal((await patch(1, { result: 'ok' }, staff)).status, 403)
+  assert.equal((await patch('1', { result: 'ok' }, staff)).status, 403)
 })

@@ -19,7 +19,8 @@ const maxAuditId = async () => withDb(async (db) => {
   return Number(m)
 })
 const feed = (after, extra = {}, token = sync) => vgCall('getSyncChanges', { after, ...extra }, { token })
-const changesFor = (json, personId) => json.persons.find(p => p.personId === Number(personId))?.changes
+// Entity ids are strings, as everywhere in the API; the cursor is an integer.
+const changesFor = (json, personId) => json.persons.find(p => p.personId === String(personId))?.changes
 
 async function makePerson () {
   const res = await vgCall('createPerson', {}, { token: staff, body: { villageId: null, firstName: 'Feed', lastName: uniq('Change') } })
@@ -110,7 +111,8 @@ test('paging with limit covers every row once', async () => {
     pages++
     for (const p of res.json.persons) {
       for (const c of p.changes) {
-        const key = `${p.personId}`
+        assert.equal(typeof p.personId, 'string')
+        const key = p.personId
         seen.set(key, [...(seen.get(key) ?? []), ...c.fields])
       }
     }
@@ -122,8 +124,8 @@ test('paging with limit covers every row once', async () => {
   assert.equal(cursor, last)
   // A firstName edit also changes the generated displayName/fullName columns,
   // which the audit trail records like any other column.
-  assert.deepEqual([...new Set(seen.get(String(Number(a))))].sort(), ['displayName', 'email', 'firstName', 'fullName', 'phone'])
-  assert.deepEqual([...new Set(seen.get(String(Number(b))))].sort(), ['cell', 'displayName', 'firstName', 'fullName'])
+  assert.deepEqual([...new Set(seen.get(String(a)))].sort(), ['displayName', 'email', 'firstName', 'fullName', 'phone'])
+  assert.deepEqual([...new Set(seen.get(String(b)))].sort(), ['cell', 'displayName', 'firstName', 'fullName'])
 })
 
 test('settle floor holds back young rows', async () => {
@@ -160,4 +162,28 @@ test('empty scan returns after as the cursor', async () => {
   const res = await feed(after)
   assert.equal(res.status, 200)
   assert.deepEqual(res.json, { lastAuditId: after, more: false, persons: [] })
+})
+
+test('the cursor never passes a young row, even when an older-stamped row follows it', async () => {
+  const p1 = await makePerson()
+  const p2 = await makePerson()
+  const after = await maxAuditId()
+  const insert = (personId, when) => withDb(async (db) => {
+    const [r] = await db.query(
+      `INSERT INTO audit_event (entityType, entityId, action, userId, changes, createdAt)
+       VALUES ('person', ?, 'update', 10, JSON_OBJECT('diff', JSON_OBJECT('nickname', JSON_OBJECT('old', NULL, 'new', 'y'))), ${when})`,
+      [Number(personId)])
+    return r.insertId
+  })
+  const young = await insert(p1, 'NOW(3) + INTERVAL 1 HOUR')
+  await insert(p2, 'NOW(3) - INTERVAL 1 SECOND')
+  try {
+    const res = await feed(after)
+    assert.equal(res.status, 200)
+    assert.equal(changesFor(res.json, p2), undefined, 'the row behind the young one waits too')
+    assert.ok(res.json.lastAuditId < young, 'cursor stops before the young row')
+    assert.equal(res.json.more, false)
+  } finally {
+    await withDb(db => db.query('UPDATE audit_event SET createdAt = NOW(3) - INTERVAL 1 SECOND WHERE auditId = ?', [young]))
+  }
 })

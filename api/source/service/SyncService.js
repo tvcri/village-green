@@ -41,17 +41,23 @@ async function resolvePersonIds (rows) {
   return out
 }
 
+// The scan STOPS at the first row younger than the settle floor rather than
+// filtering it out: createdAt is not strictly ordered with auditId, and a
+// filter could return a later row and move the cursor past the young one.
 module.exports.getChanges = async function ({ after, limit }) {
   const [scanned] = await dbUtils.pool.query(
-    `SELECT auditId, entityType, entityId, action, changes
+    `SELECT auditId, entityType, entityId, action, changes,
+            createdAt <= NOW(3) - INTERVAL ? SECOND AS settled
      FROM audit_event
-     WHERE auditId > ? AND createdAt <= NOW(3) - INTERVAL ? SECOND
+     WHERE auditId > ?
      ORDER BY auditId
      LIMIT ?`,
-    [after, config.settings.syncChangeSettleSeconds, limit + 1]
+    [config.settings.syncChangeSettleSeconds, after, limit + 1]
   )
-  const more = scanned.length > limit
-  const rows = more ? scanned.slice(0, limit) : scanned
+  const young = scanned.findIndex(r => !r.settled)
+  const settled = young === -1 ? scanned : scanned.slice(0, young)
+  const more = settled.length > limit
+  const rows = more ? settled.slice(0, limit) : settled
   const lastAuditId = rows.length ? Number(rows[rows.length - 1].auditId) : after
 
   const reported = rows.filter(r => FEED_TYPES.includes(r.entityType))
@@ -77,7 +83,7 @@ module.exports.getChanges = async function ({ after, limit }) {
     lastAuditId,
     more,
     persons: [...persons].map(([personId, byType]) => ({
-      personId: Number(personId),
+      personId: String(personId),
       changes: [...byType].map(([entityType, e]) => ({
         entityType, actions: e.actions, fields: [...e.fields].sort(),
       })),
@@ -87,12 +93,13 @@ module.exports.getChanges = async function ({ after, limit }) {
 
 // ---- memory (sync_field) ----
 
-const FIELD_COLUMNS = 'personId, field, lglConstituentId, value, lglEntryId, agreedAt'
+// Entity ids are strings in the API (StringIntId), as everywhere else.
+const FIELD_COLUMNS = 'CAST(personId AS CHAR) AS personId, field, lglConstituentId, value, lglEntryId, agreedAt'
 
 module.exports.getFields = async function ({ personIds } = {}) {
   const filter = personIds?.length ? 'WHERE personId IN (?)' : ''
   const [rows] = await dbUtils.pool.query(
-    `SELECT ${FIELD_COLUMNS} FROM sync_field ${filter} ORDER BY personId, field`,
+    `SELECT ${FIELD_COLUMNS} FROM sync_field ${filter} ORDER BY sync_field.personId, field`,
     personIds?.length ? [personIds] : []
   )
   return rows
@@ -118,15 +125,16 @@ module.exports.putFields = async function (items) {
 
 // ---- holds (sync_hold) ----
 
-const HOLD_COLUMNS = `holdId, lglConstituentId, personId, field, reason, detail, fingerprint, state,
-  dismissalKind, firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note`
+const HOLD_COLUMNS = `CAST(holdId AS CHAR) AS holdId, lglConstituentId, CAST(personId AS CHAR) AS personId,
+  field, reason, detail, fingerprint, state, dismissalKind, firstSeenAt, lastSeenAt, closedAt, dismissedAt,
+  CAST(dismissedUserId AS CHAR) AS dismissedUserId, note`
 const isOpenCollision = (e) => e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)
 
 async function holdsByIds (ids) {
   if (!ids.length) return []
   const [rows] = await dbUtils.pool.query(`SELECT ${HOLD_COLUMNS} FROM sync_hold WHERE holdId IN (?)`, [ids])
   const byId = new Map(rows.map(r => [r.holdId, r]))
-  return ids.map(id => byId.get(id))
+  return ids.map(id => byId.get(String(id)))
 }
 
 module.exports.getHolds = async function ({ states = ['open'], personId, lglConstituentId } = {}) {
@@ -135,7 +143,7 @@ module.exports.getHolds = async function ({ states = ['open'], personId, lglCons
   if (personId != null) { where.push('personId = ?'); binds.push(personId) }
   if (lglConstituentId != null) { where.push('lglConstituentId = ?'); binds.push(lglConstituentId) }
   const [rows] = await dbUtils.pool.query(
-    `SELECT ${HOLD_COLUMNS} FROM sync_hold WHERE ${where.join(' AND ')} ORDER BY holdId`, binds)
+    `SELECT ${HOLD_COLUMNS} FROM sync_hold WHERE ${where.join(' AND ')} ORDER BY sync_hold.holdId`, binds)
   return rows
 }
 
@@ -187,9 +195,9 @@ module.exports.patchHolds = async function (items) {
       const ids = items.map(i => i.holdId)
       const [rows] = await connection.query(
         'SELECT holdId, state FROM sync_hold WHERE holdId IN (?) FOR UPDATE', [ids])
-      const state = new Map(rows.map(r => [r.holdId, r.state]))
+      const state = new Map(rows.map(r => [String(r.holdId), r.state]))
       for (const [i, item] of items.entries()) {
-        if (!state.has(item.holdId)) throw new SmError.NotFoundError(`item ${i}: no hold ${item.holdId}`)
+        if (!state.has(String(item.holdId))) throw new SmError.NotFoundError(`item ${i}: no hold ${item.holdId}`)
       }
       for (const [i, item] of items.entries()) {
         const sets = []
@@ -198,7 +206,7 @@ module.exports.patchHolds = async function (items) {
         if (item.fingerprint !== undefined) { sets.push('fingerprint = ?'); binds.push(item.fingerprint) }
         if ('detail' in item) { sets.push('detail = CAST(? AS JSON)'); binds.push(JSON.stringify(item.detail ?? null)) }
         if (item.state !== undefined) {
-          const from = state.get(item.holdId)
+          const from = state.get(String(item.holdId))
           if (item.state === 'closed' && from === 'open') {
             sets.push("state = 'closed'", 'closedAt = NOW(3)')
           }
@@ -208,7 +216,7 @@ module.exports.patchHolds = async function (items) {
           else {
             throw new SmError.UnprocessableError(`item ${i}: a hold cannot go from ${from} to ${item.state}`)
           }
-          state.set(item.holdId, item.state)
+          state.set(String(item.holdId), item.state)
         }
         if (!sets.length) continue
         try {
@@ -244,7 +252,7 @@ module.exports.dismissHold = async function (holdId, { dismissalKind, note }, us
 
 // ---- runs (sync_run) ----
 
-const RUN_COLUMNS = `runId, kind, startedAt, finishedAt, result, switches, imageRevision, policyHash,
+const RUN_COLUMNS = `CAST(runId AS CHAR) AS runId, kind, startedAt, finishedAt, result, switches, imageRevision, policyHash,
   counts, lglCursor, vgCursor, error`
 
 async function runById (runId) {
@@ -289,14 +297,15 @@ module.exports.getRuns = async function ({ kinds, since, limit = 50 } = {}) {
   if (since) { where.push('startedAt >= ?'); binds.push(new Date(since)) }
   const [rows] = await dbUtils.pool.query(
     `SELECT ${RUN_COLUMNS} FROM sync_run ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     ORDER BY runId DESC LIMIT ?`, [...binds, limit])
+     ORDER BY sync_run.runId DESC LIMIT ?`, [...binds, limit])
   return rows
 }
 
 // ---- the record of writes to LGL (sync_log) ----
 
 // compareCase in SQL (CASE is reserved), `case` in the API.
-const LOG_COLUMNS = `logId, runId, loggedAt, lglConstituentId, personId, field, compareCase AS \`case\`,
+const LOG_COLUMNS = `CAST(logId AS CHAR) AS logId, CAST(runId AS CHAR) AS runId, loggedAt, lglConstituentId,
+  CAST(personId AS CHAR) AS personId, field, compareCase AS \`case\`,
   request, lglEntryId, oldValue, newValue, outcome, responseStatus, note`
 
 module.exports.appendLog = async function (items) {
@@ -328,6 +337,6 @@ module.exports.getLog = async function ({ personId, lglConstituentId, runId, out
   if (since) { where.push('loggedAt >= ?'); binds.push(new Date(since)) }
   const [rows] = await dbUtils.pool.query(
     `SELECT ${LOG_COLUMNS} FROM sync_log ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     ORDER BY logId DESC LIMIT ?`, [...binds, limit])
+     ORDER BY sync_log.logId DESC LIMIT ?`, [...binds, limit])
   return rows
 }

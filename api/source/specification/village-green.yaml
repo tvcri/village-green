@@ -3539,7 +3539,7 @@ paths:
       tags: [Sync]
       operationId: patchSyncRun
       parameters:
-        - { name: runId, in: path, required: true, schema: { type: integer } }
+        - { name: runId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
       requestBody:
         required: true
         content:
@@ -3558,9 +3558,9 @@ paths:
       tags: [Sync]
       operationId: getSyncLog
       parameters:
-        - { name: personId, in: query, required: false, schema: { type: integer } }
+        - { name: personId, in: query, required: false, schema: { $ref: '#/components/schemas/StringIntId' } }
         - { name: lglConstituentId, in: query, required: false, schema: { type: string, maxLength: 50 } }
-        - { name: runId, in: query, required: false, schema: { type: integer } }
+        - { name: runId, in: query, required: false, schema: { $ref: '#/components/schemas/StringIntId' } }
         - name: outcome
           in: query
           required: false
@@ -3616,7 +3616,7 @@ components:
       additionalProperties: false
       required: [runId, kind, startedAt, finishedAt, result, switches, imageRevision, policyHash, counts, lglCursor, vgCursor, error]
       properties:
-        runId: { type: integer }
+        runId: { $ref: '#/components/schemas/StringIntId' }
         kind: { type: string, enum: [full, vg-check, lgl-check] }
         startedAt: { type: string, format: date-time }
         finishedAt: { type: string, format: date-time, nullable: true }
@@ -3643,9 +3643,9 @@ components:
       additionalProperties: false
       required: [lglConstituentId, request, outcome]
       properties:
-        runId: { type: integer, nullable: true }
+        runId: { $ref: '#/components/schemas/StringIntIdNullable' }
         lglConstituentId: { type: string, minLength: 1, maxLength: 50 }
-        personId: { type: integer, nullable: true }
+        personId: { $ref: '#/components/schemas/StringIntIdNullable' }
         field: { type: string, maxLength: 32, nullable: true }
         case: { type: string, maxLength: 32, nullable: true, description: The comparison case that led to the write. }
         request: { $ref: '#/components/schemas/SyncLogRequest' }
@@ -3662,11 +3662,11 @@ components:
       additionalProperties: false
       required: [logId, runId, loggedAt, lglConstituentId, personId, field, case, request, lglEntryId, oldValue, newValue, outcome, responseStatus, note]
       properties:
-        logId: { type: integer }
-        runId: { type: integer, nullable: true }
+        logId: { $ref: '#/components/schemas/StringIntId' }
+        runId: { $ref: '#/components/schemas/StringIntIdNullable' }
         loggedAt: { type: string, format: date-time }
         lglConstituentId: { type: string }
-        personId: { type: integer, nullable: true }
+        personId: { $ref: '#/components/schemas/StringIntIdNullable' }
         field: { type: string, nullable: true }
         case: { type: string, nullable: true }
         request: { $ref: '#/components/schemas/SyncLogRequest' }
@@ -3684,7 +3684,7 @@ components:
       required: [lglConstituentId, reason, fingerprint]
       properties:
         lglConstituentId: { type: string, minLength: 1, maxLength: 50 }
-        personId: { type: integer, nullable: true }
+        personId: { $ref: '#/components/schemas/StringIntIdNullable' }
         field: { type: string, maxLength: 32, nullable: true }
         reason: { type: string, minLength: 1, maxLength: 64 }
         fingerprint: { type: string, minLength: 1, maxLength: 64 }
@@ -3698,7 +3698,7 @@ components:
       additionalProperties: false
       required: [holdId]
       properties:
-        holdId: { type: integer }
+        holdId: { $ref: '#/components/schemas/StringIntId' }
         seen: { type: boolean }
         fingerprint: { type: string, minLength: 1, maxLength: 64 }
         detail:
@@ -3710,9 +3710,9 @@ components:
       required: [holdId, lglConstituentId, personId, field, reason, detail, fingerprint, state, dismissalKind,
         firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note]
       properties:
-        holdId: { type: integer }
+        holdId: { $ref: '#/components/schemas/StringIntId' }
         lglConstituentId: { type: string }
-        personId: { type: integer, nullable: true }
+        personId: { $ref: '#/components/schemas/StringIntIdNullable' }
         field: { type: string, nullable: true }
         reason: { type: string }
         detail:
@@ -3724,14 +3724,14 @@ components:
         lastSeenAt: { type: string, format: date-time }
         closedAt: { type: string, format: date-time, nullable: true }
         dismissedAt: { type: string, format: date-time, nullable: true }
-        dismissedUserId: { type: integer, nullable: true }
+        dismissedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
         note: { type: string, nullable: true }
     SyncFieldPut:
       type: object
       additionalProperties: false
       required: [personId, field, lglConstituentId, value]
       properties:
-        personId: { type: integer }
+        personId: { $ref: '#/components/schemas/StringIntId' }
         field: { type: string, minLength: 1, maxLength: 32 }
         lglConstituentId: { type: string, minLength: 1, maxLength: 50 }
         value:
@@ -3742,7 +3742,7 @@ components:
       additionalProperties: false
       required: [personId, field, lglConstituentId, value, lglEntryId, agreedAt]
       properties:
-        personId: { type: integer }
+        personId: { $ref: '#/components/schemas/StringIntId' }
         field: { type: string }
         lglConstituentId: { type: string }
         value:
@@ -3769,7 +3769,7 @@ components:
       additionalProperties: false
       required: [personId, changes]
       properties:
-        personId: { type: integer }
+        personId: { $ref: '#/components/schemas/StringIntId' }
         changes:
           type: array
           items:

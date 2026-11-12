@@ -14,7 +14,7 @@ const create = (items, token = sync) => vgCall('createSyncHolds', {}, { token, b
 const patch = (items, token = sync) => vgCall('patchSyncHolds', {}, { token, body: items })
 const dismiss = (holdId, body, token = sync) => vgCall('createSyncHoldDismissal', { holdId }, { token, body })
 const list = (query = {}, token = sync) => vgCall('getSyncHolds', query, { token })
-const hold = (extra = {}) => ({ lglConstituentId: uniq('C'), personId: 810001, field: 'address', reason: 'never-agreed', fingerprint: 'fp1', ...extra })
+const hold = (extra = {}) => ({ lglConstituentId: uniq('C'), personId: '810001', field: 'address', reason: 'never-agreed', fingerprint: 'fp1', ...extra })
 const countFor = (lglConstituentId) => withDb(async (db) => {
   const [[{ n }]] = await db.query('SELECT COUNT(*) AS n FROM sync_hold WHERE lglConstituentId = ?', [lglConstituentId])
   return n
@@ -27,7 +27,7 @@ test('open a batch and read it back', async () => {
   assert.equal(res.status, 200)
   assert.equal(res.json.length, 2)
   res.json.forEach((h, i) => {
-    assert.equal(typeof h.holdId, 'number')
+    assert.equal(typeof h.holdId, 'string')
     assert.equal(h.lglConstituentId, items[i].lglConstituentId)
     assert.equal(h.state, 'open')
     assert.equal(h.firstSeenAt, h.lastSeenAt)
@@ -76,7 +76,7 @@ test('insert already dismissed records kind and caller', async () => {
   const [h] = res.json
   assert.equal(h.state, 'dismissed')
   assert.equal(h.dismissalKind, 'staff')
-  assert.equal(h.dismissedUserId, users.sync.userId)
+  assert.equal(h.dismissedUserId, String(users.sync.userId))
   assert.ok(h.dismissedAt)
   assert.equal(h.note, 'import review: skip')
 })
@@ -146,7 +146,7 @@ test('reopen colliding with an open hold is 409', async () => {
 
 test('unknown holdId in a patch is 404 and nothing changes', async () => {
   const [h] = (await create([hold()])).json
-  const res = await patch([{ holdId: h.holdId, state: 'closed' }, { holdId: 2147483000, seen: true }])
+  const res = await patch([{ holdId: h.holdId, state: 'closed' }, { holdId: '2147483000', seen: true }])
   assert.equal(res.status, 404)
   assert.equal((await byId(h.holdId)).state, 'open')
 })
@@ -158,9 +158,9 @@ test('dismiss one records kind, note and caller', async () => {
   assert.equal(res.json.state, 'dismissed')
   assert.equal(res.json.dismissalKind, 'staff')
   assert.equal(res.json.note, 'engineer accepted')
-  assert.equal(res.json.dismissedUserId, users.admin.userId)
+  assert.equal(res.json.dismissedUserId, String(users.admin.userId))
   assert.ok(res.json.dismissedAt)
-  assert.equal((await dismiss(2147483000, { dismissalKind: 'staff' })).status, 404)
+  assert.equal((await dismiss('2147483000', { dismissalKind: 'staff' })).status, 404)
 })
 
 test('state filter', async () => {
@@ -180,6 +180,6 @@ test('staff is refused', async () => {
   const staff = tokens.users.staff
   assert.equal((await list({}, staff)).status, 403)
   assert.equal((await create([hold()], staff)).status, 403)
-  assert.equal((await patch([{ holdId: 1, seen: true }], staff)).status, 403)
-  assert.equal((await dismiss(1, { dismissalKind: 'staff' }, staff)).status, 403)
+  assert.equal((await patch([{ holdId: '1', seen: true }], staff)).status, 403)
+  assert.equal((await dismiss('1', { dismissalKind: 'staff' }, staff)).status, 403)
 })

@@ -8,7 +8,7 @@ import { withDb } from '../../lib/db.js'
 // No FK to person, so tests use person ids no fixture has, unique per test.
 const sync = tokens.users.sync
 let nextId = 800000 + Math.round(Math.random() * 90000) * 10
-const freshPersonId = () => ++nextId
+const freshPersonId = () => String(++nextId)
 
 const put = (items, token = sync) => vgCall('putSyncFields', {}, { token, body: items })
 const get = (query = {}, token = sync) => vgCall('getSyncFields', query, { token })
@@ -73,7 +73,7 @@ test('read all returns every row', async () => {
 })
 
 test('personId filter accepts 500 and refuses 501', async () => {
-  const ids = Array.from({ length: 501 }, (_, i) => 1 + i)
+  const ids = Array.from({ length: 501 }, (_, i) => String(1 + i))
   assert.equal((await get({ personId: ids.slice(0, 500) })).status, 200)
   assert.equal((await get({ personId: ids })).status, 400)
 })

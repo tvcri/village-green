@@ -12,7 +12,7 @@ const append = (items, token = sync) => vgCall('createSyncLog', {}, { token, bod
 const read = (query = {}, token = sync) => vgCall('getSyncLog', query, { token })
 const entry = (extra = {}) => ({
   lglConstituentId: uniq('C'),
-  personId: 820001,
+  personId: '820001',
   field: 'email',
   case: 'vg-changed',
   request: { method: 'PATCH', path: '/email_addresses/555', body: { address: 'new@example.test' } },
@@ -28,17 +28,17 @@ const entry = (extra = {}) => ({
 test('append a batch and read it by person, constituent, run and outcome', async () => {
   const runId = (await vgCall('createSyncRun', {}, { token: sync, body: { kind: 'vg-check', switches: {} } })).json.runId
   const a = entry({ runId })
-  const b = entry({ runId, outcome: 'refused', responseStatus: 422, personId: 820002 })
+  const b = entry({ runId, outcome: 'refused', responseStatus: 422, personId: '820002' })
   const res = await append([a, b])
   assert.equal(res.status, 200)
   assert.deepEqual(res.json, { appended: 2 })
   const byConstituent = (await read({ lglConstituentId: a.lglConstituentId })).json
   assert.equal(byConstituent.length, 1)
   assert.equal(byConstituent[0].runId, runId)
-  assert.equal(typeof byConstituent[0].logId, 'number')
+  assert.equal(typeof byConstituent[0].logId, 'string')
   assert.ok(!Number.isNaN(Date.parse(byConstituent[0].loggedAt)))
   assert.deepEqual((await read({ runId })).json.map(r => r.lglConstituentId).sort(), [a.lglConstituentId, b.lglConstituentId].sort())
-  assert.ok((await read({ personId: 820002 })).json.some(r => r.lglConstituentId === b.lglConstituentId))
+  assert.ok((await read({ personId: '820002' })).json.some(r => r.lglConstituentId === b.lglConstituentId))
   const refused = (await read({ runId, outcome: ['refused'] })).json
   assert.deepEqual(refused.map(r => r.lglConstituentId), [b.lglConstituentId])
 })
