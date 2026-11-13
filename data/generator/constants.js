@@ -9,10 +9,10 @@ export const CAPABILITIES = [
 ]
 
 // role ids are FIXED by the static catalog (20-vg-static.sql) — reference, never insert.
-export const ROLE = { lsc: 1, steering: 2, lead: 3, admin: 4, staff: 5, board: 6, serviceCoordinator: 7 }
+export const ROLE = { lsc: 1, steering: 2, lead: 3, admin: 4, staff: 5, board: 6, serviceCoordinator: 7, syncService: 8 }
 export const ROLE_NAMES = {
   1: 'Local Service Coordinator', 2: 'Steering Committee', 3: 'Village Lead',
-  4: 'Admin', 5: 'Staff', 6: 'Board', 7: 'Service Coordinator',
+  4: 'Admin', 5: 'Staff', 6: 'Board', 7: 'Service Coordinator', 8: 'Sync Service',
 }
 
 // service_request.serviceName values are UI-enforced (serviceNameOptions in
@@ -54,7 +54,18 @@ export const TABLE_ORDER = [
   'village', 'user_data', 'role_grant',
   'privacy_rules', 'privacy_acknowledgement',
   'capability', 'disability', 'vetting_type', 'circle',
+  'member_drop_reason', 'volunteer_drop_reason', 'training', 'position', 'position_training',
   'person', 'member', 'volunteer',
   'volunteer_capability', 'volunteer_vetting', 'person_disability', 'person_circle', 'member_circle_preference',
+  'volunteer_training', 'volunteer_position', 'volunteer_pause', 'donor',
   'service_request', 'notification_event', 'fcv_submission',
 ]
+
+// Tables seed:db never empties: catalogs that migrations own and the
+// generator references by fixed id (role, contact_method, ...), plus the
+// migration ledger. Every other base table is truncated before a seed
+// (seed-sql.js), whether or not the generator fills it. These match the
+// static_data_tables in generateSchema.sh, minus capability and circle,
+// which the generator writes itself.
+export const PRESERVED_TABLES = ['_migrations', 'role', 'role_permission',
+  'gender', 'ethnicity', 'race', 'contact_method', 'language']

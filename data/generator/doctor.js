@@ -59,7 +59,14 @@ export function analyzeDrift (columnMeta, dataset, tables = TABLE_ORDER, baselin
     checkedTables.add(table)
     const byName = new Map(cols.map(c => [c.name, c]))
     const populated = new Set()
-    for (const r of rows) for (const k of Object.keys(r)) populated.add(k)
+    const setCount = {}
+    for (const r of rows) for (const k of Object.keys(r)) { populated.add(k); setCount[k] = (setCount[k] || 0) + 1 }
+    // Both load paths fill a key a row lacks with NULL, which overrides a
+    // column's DEFAULT and fails a NOT NULL one. Builders set every key on
+    // every row (null where there is no value).
+    for (const k of populated) {
+      if (setCount[k] !== rows.length) errors.push(`\`${table}.${k}\` is set on only ${setCount[k]} of ${rows.length} rows — set it on every row (null is fine)`)
+    }
     for (const k of populated) {
       if (!byName.has(k)) errors.push(`\`${table}.${k}\` is set by a builder but missing from the schema (renamed or dropped?)`)
       else if (byName.get(k).generated) errors.push(`\`${table}.${k}\` is a GENERATED column — the DB computes it; remove it from the builder`)

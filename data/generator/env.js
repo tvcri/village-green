@@ -19,6 +19,8 @@ export const config = {
     villages: e.VG_DEMO_VILLAGES || null,          // count ('3') or names ('Arkham,Quahog')
     members: e.VG_DEMO_MEMBERS ? Number(e.VG_DEMO_MEMBERS) : null,
     volunteers: e.VG_DEMO_VOLUNTEERS ? Number(e.VG_DEMO_VOLUNTEERS) : null,
+    // persons given a donor row; unset = ~20% of persons, 0 = no donors
+    donors: e.VG_DEMO_DONORS !== undefined && e.VG_DEMO_DONORS !== '' ? Number(e.VG_DEMO_DONORS) : null,
   },
 }
 

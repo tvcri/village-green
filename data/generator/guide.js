@@ -19,7 +19,8 @@ export function buildLogins (ds) {
   const grantsByUser = {}
   for (const g of ds.role_grant) (grantsByUser[g.userId] ??= []).push(g)
   const vssByUsername = new Set(ds.__meta.plants.vssLogins.map(v => v.username))
-  const logins = ds.user_data.map(u => {
+  // task accounts (user_data.taskName) are system actors, never logins
+  const logins = ds.user_data.filter(u => !u.taskName).map(u => {
     const grants = grantsByUser[u.userId] || []
     const villages = [...new Set(grants.filter(g => g.villageId !== null).map(g => villageName[g.villageId]))]
     const roles = [...new Set(grants.map(g => ROLE_NAMES[g.roleId]))]
@@ -56,26 +57,30 @@ export function buildGuide (ds) {
   for (const l of buildLogins(ds).filter(l => l.featured)) {
     lines.push(`| ${l.username} | ${l.role || '—'} | ${l.villages.join(', ') || '—'} | ${l.demos} |`)
   }
-  lines.push('', `Full roster incl. VSS volunteer logins: see demo-logins.json (${ds.user_data.length} logins).`)
+  lines.push('', `Full roster incl. VSS volunteer logins: see demo-logins.json (${ds.user_data.filter(u => !u.taskName).length} logins).`)
 
   section('Villages')
   const counts = (vid) => {
     const pids = new Set(ds.person.filter(x => x.villageId === vid).map(x => x.id))
     const m = ds.member.filter(x => pids.has(x.personId))
     const v = ds.volunteer.filter(x => pids.has(x.personId))
-    return `${m.length} members (${m.filter(x => x.status !== 'Active').length} inactive), ` +
-      `${v.length} volunteers (${v.filter(x => x.status !== 'Active').length} inactive)`
+    return `${m.length} members (${m.filter(x => x.status !== 'Active').length} Pending or Dropped), ` +
+      `${v.length} volunteers (${v.filter(x => x.status !== 'Active').length} Pending or Dropped)`
   }
   for (const v of ds.village) lines.push(`- **${v.name}** — ${counts(v.id)}`)
 
+  const personById = Object.fromEntries(ds.person.map(x => [x.id, x]))
   section('Planted scenarios')
   const w = (x) => `${x.name} (${x.village})`
   lines.push(
     `- **Dual household:** ${w(p.dualHousehold.primary)} + ${w(p.dualHousehold.secondary)}`,
     `- **Member who also volunteers:** ${w(p.memberAndVolunteer)}`,
     `- **Duplicate email** (${p.duplicateEmail.email}): ${p.duplicateEmail.persons.map(w).join(' and ')}`,
-    `- **Inactive/Dropped members:** ${p.inactiveMembers.map(x => `${w(x)} [${x.status}]`).join(', ')}`,
-    `- **Inactive volunteers:** ${p.inactiveVolunteers.map(w).join(', ')}`,
+    `- **Pending/Dropped members:** ${p.inactiveMembers.map(x => `${w(x)} [${x.status}]`).join(', ')}`,
+    `- **Pending/Dropped volunteers:** ${p.inactiveVolunteers.map(w).join(', ')}`,
+    `- **Passed (deceased):** ${p.deceased.map(id => personById[id]).map(x => `${x.firstName} ${x.lastName}${x.deceasedDate ? ` (${x.deceasedDate})` : ' (date unknown)'}`).join(', ')}`,
+    `- **Service email paused:** ${(ds.volunteer_pause || []).map(vp => { const v = ds.volunteer.find(x => x.id === vp.volunteerId); const x = personById[v.personId]; return `${x.firstName} ${x.lastName} [${vp.scope}${vp.startDate || vp.endDate ? ` ${vp.startDate ?? '…'} to ${vp.endDate ?? '…'}` : ''}]` }).join(', ') || 'none'}`,
+    `- **Donors:** ${(ds.donor || []).length} people (${new Set((ds.donor || []).map(d => d.lglConstituentId)).size} LGL constituents; couples share one)`,
     `- **Service Coordinator notes member (staff-only visibility):** ${w(p.scNotesMember)}`,
     p.flexibleRide ? `- **"No specific times" ride:** request #${p.flexibleRide.id} for ${w(p.flexibleRide.member)}` : null,
     p.outHomeRide ? `- **Ride home from a venue:** request #${p.outHomeRide.id} for ${w(p.outHomeRide.member)}` : null,
@@ -83,7 +88,6 @@ export function buildGuide (ds) {
     `- **Privacy-ack modal:** sign in as ${p.ackModalUsername}`,
   )
   lines.push('', '### Circle participants')
-  const personById = Object.fromEntries(ds.person.map(x => [x.id, x]))
   for (const c of ds.circle) {
     const names = ds.person_circle.filter(pc => pc.circleId === c.id)
       .map(pc => `${personById[pc.personId].firstName} ${personById[pc.personId].lastName} (${villageName[personById[pc.personId].villageId]})`)

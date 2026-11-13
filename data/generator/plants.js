@@ -56,10 +56,10 @@ export function applyPlants (ds, rng) {
   }
   plants.memberAndVolunteer = who(both.personId)
 
-  // >=1 inactive member and >=1 inactive volunteer (5% can round to 0 on tiny configs)
+  // >=1 non-Active member and >=1 non-Active volunteer (5% can round to 0 on tiny configs)
   if (!ds.member.some(m => m.status !== 'Active')) {
     const m = ds.member[ds.member.length - 1]
-    m.status = 'Inactive'; m.dropReason = 'Moved away'
+    m.status = 'Pending'
   }
   if (!ds.volunteer.some(v => v.status !== 'Active')) {
     // VSS identity = active volunteers only — prefer flipping a volunteer with

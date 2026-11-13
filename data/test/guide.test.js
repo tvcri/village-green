@@ -23,7 +23,8 @@ test('guide: markdown names the planted scenarios', () => {
 test('logins roster: every user_data row present with role + blurb; featured personas flagged', () => {
   const ds = buildDataset(content, 20260630)
   const logins = buildLogins(ds)
-  assert.equal(logins.length, ds.user_data.length + 1)
+  // every human user, plus the never-seeded ack-modal login; task accounts are not logins
+  assert.equal(logins.length, ds.user_data.filter(u => !u.taskName).length + 1)
   for (const l of logins) {
     assert.ok(l.username && l.name !== undefined && typeof l.demos === 'string' && l.demos.length > 0)
     assert.ok(Array.isArray(l.villages))
