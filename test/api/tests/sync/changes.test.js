@@ -7,17 +7,28 @@ import { villages, persons } from '../../setup/fixtures.js'
 
 // GET /sync/changes: which persons changed after an audit id, from audit_event.
 // The harness DB is shared across files, so every test starts its window at
-// the current MAX(auditId). The settle floor is 0 in the harness
-// (VG_SYNC_CHANGE_SETTLE_SECONDS); a future createdAt stands in for "too young".
+// the highest auditId ALLOCATED so far (the AUTO_INCREMENT counter), not the
+// highest visible: a rolled-back write elsewhere leaves a gap the feed would
+// otherwise wait on. The gap wait is the default (VG_SYNC_CHANGE_GAP_SECONDS);
+// an old createdAt stands in for "the wait has passed".
 const sync = tokens.users.sync
 const staff = tokens.users.staff
 const admin = tokens.users.admin
 const uniq = (s) => `${s}${Date.now()}${Math.round(Math.random() * 1e6)}`
 
 const maxAuditId = async () => withDb(async (db) => {
-  const [[{ m }]] = await db.query('SELECT COALESCE(MAX(auditId), 0) AS m FROM audit_event')
-  return Number(m)
+  await db.query('SET SESSION information_schema_stats_expiry = 0')
+  const [[{ n }]] = await db.query(
+    `SELECT AUTO_INCREMENT AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_event'`)
+  return Number(n) - 1
 })
+const nickname = (personId, extra = '') => [
+  `INSERT INTO audit_event (entityType, entityId, action, userId, changes${extra ? ', createdAt' : ''})
+   VALUES ('person', ?, 'update', 10, JSON_OBJECT('diff', JSON_OBJECT('nickname', JSON_OBJECT('old', NULL, 'new', 'x')))${extra ? `, ${extra}` : ''})`,
+  [Number(personId)],
+]
+// Age a row past the gap wait, so a gap below it reads as a rollback.
+const age = (auditId) => withDb(db => db.query('UPDATE audit_event SET createdAt = NOW(3) - INTERVAL 1 HOUR WHERE auditId = ?', [auditId]))
 const feed = (after, extra = {}, token = sync) => vgCall('getSyncChanges', { after, ...extra }, { token })
 // Entity ids are strings, as everywhere in the API; the cursor is an integer.
 const changesFor = (json, personId) => json.persons.find(p => p.personId === String(personId))?.changes
@@ -128,23 +139,57 @@ test('paging with limit covers every row once', async () => {
   assert.deepEqual([...new Set(seen.get(String(b)))].sort(), ['cell', 'displayName', 'firstName', 'fullName'])
 })
 
-test('settle floor holds back young rows', async () => {
-  const personId = await makePerson()
+test('the cursor stops below a write that has not committed yet', async () => {
+  const p1 = await makePerson()
+  const p2 = await makePerson()
   const after = await maxAuditId()
-  const auditId = await withDb(async (db) => {
-    const [r] = await db.query(
-      `INSERT INTO audit_event (entityType, entityId, action, userId, changes, createdAt)
-       VALUES ('person', ?, 'update', 10, JSON_OBJECT('diff', JSON_OBJECT('nickname', JSON_OBJECT('old', NULL, 'new', 'x'))),
-               NOW(3) + INTERVAL 1 HOUR)`, [Number(personId)])
-    return r.insertId
+  const open = await withDb(async (db) => {
+    await db.beginTransaction()
+    const [r] = await db.query(...nickname(p1))
+    // A later write commits while the first is still open.
+    const later = await withDb(async (db2) => (await db2.query(...nickname(p2)))[0].insertId)
+    const held = await feed(after)
+    await db.commit()
+    return { auditId: r.insertId, later, held }
   })
-  let res = await feed(after)
-  assert.equal(res.status, 200)
-  assert.equal(changesFor(res.json, personId), undefined)
-  assert.ok(res.json.lastAuditId < auditId, 'cursor stops before the young row')
-  await withDb(db => db.query('UPDATE audit_event SET createdAt = NOW(3) - INTERVAL 1 SECOND WHERE auditId = ?', [auditId]))
-  res = await feed(after)
-  assert.deepEqual(changesFor(res.json, personId), [{ entityType: 'person', actions: ['update'], fields: ['nickname'] }])
+  assert.equal(open.held.status, 200)
+  assert.equal(changesFor(open.held.json, p2), undefined, 'the committed row behind the open one waits')
+  assert.equal(open.held.json.lastAuditId, after, 'cursor stays below the open write')
+  const res = await feed(after)
+  assert.deepEqual(changesFor(res.json, p1), [{ entityType: 'person', actions: ['update'], fields: ['nickname'] }])
+  assert.deepEqual(changesFor(res.json, p2), [{ entityType: 'person', actions: ['update'], fields: ['nickname'] }])
+  assert.equal(res.json.lastAuditId, open.later)
+})
+
+test('a gap is waited on, then passed once the row after it is old', async () => {
+  const p1 = await makePerson()
+  const after = await maxAuditId()
+  await withDb(async (db) => {
+    await db.beginTransaction()
+    await db.query(...nickname(p1))
+    await db.rollback()
+  })
+  const auditId = await withDb(async (db) => (await db.query(...nickname(p1)))[0].insertId)
+  try {
+    let res = await feed(after)
+    assert.equal(changesFor(res.json, p1), undefined, 'a fresh gap may still be an open write')
+    assert.equal(res.json.lastAuditId, after)
+    await age(auditId)
+    res = await feed(after)
+    assert.deepEqual(changesFor(res.json, p1), [{ entityType: 'person', actions: ['update'], fields: ['nickname'] }])
+    assert.equal(res.json.lastAuditId, auditId)
+  } finally {
+    await age(auditId)
+  }
+})
+
+test('rows reach the feed at once when there is no gap', async () => {
+  const p1 = await makePerson()
+  const after = await maxAuditId()
+  const auditId = await withDb(async (db) => (await db.query(...nickname(p1, 'NOW(3) + INTERVAL 1 HOUR')))[0].insertId)
+  const res = await feed(after)
+  assert.deepEqual(changesFor(res.json, p1), [{ entityType: 'person', actions: ['update'], fields: ['nickname'] }])
+  assert.equal(res.json.lastAuditId, auditId)
 })
 
 test('staff is refused, admin is allowed', async () => {
@@ -162,28 +207,4 @@ test('empty scan returns after as the cursor', async () => {
   const res = await feed(after)
   assert.equal(res.status, 200)
   assert.deepEqual(res.json, { lastAuditId: after, more: false, persons: [] })
-})
-
-test('the cursor never passes a young row, even when an older-stamped row follows it', async () => {
-  const p1 = await makePerson()
-  const p2 = await makePerson()
-  const after = await maxAuditId()
-  const insert = (personId, when) => withDb(async (db) => {
-    const [r] = await db.query(
-      `INSERT INTO audit_event (entityType, entityId, action, userId, changes, createdAt)
-       VALUES ('person', ?, 'update', 10, JSON_OBJECT('diff', JSON_OBJECT('nickname', JSON_OBJECT('old', NULL, 'new', 'y'))), ${when})`,
-      [Number(personId)])
-    return r.insertId
-  })
-  const young = await insert(p1, 'NOW(3) + INTERVAL 1 HOUR')
-  await insert(p2, 'NOW(3) - INTERVAL 1 SECOND')
-  try {
-    const res = await feed(after)
-    assert.equal(res.status, 200)
-    assert.equal(changesFor(res.json, p2), undefined, 'the row behind the young one waits too')
-    assert.ok(res.json.lastAuditId < young, 'cursor stops before the young row')
-    assert.equal(res.json.more, false)
-  } finally {
-    await withDb(db => db.query('UPDATE audit_event SET createdAt = NOW(3) - INTERVAL 1 SECOND WHERE auditId = ?', [young]))
-  }
 })

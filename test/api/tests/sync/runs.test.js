@@ -25,7 +25,7 @@ test('finish sets result, counts, cursors and finishedAt', async () => {
   const { json: run } = await start({ kind: 'vg-check', switches })
   const counts = { compared: 12, toVg: 1, holdsOpened: 0, byCase: { same: 11, 'lgl-changed': 1 } }
   const res = await patch(run.runId, {
-    result: 'ok', counts, lglCursor: '2026-11-11T21:04:05.123Z', vgCursor: 9007199254740, finished: true,
+    result: 'ok', counts, lglCursor: '2026-11-11T21:04:05.123Z', vgCursor: 9007199254740,
   })
   assert.equal(res.status, 200)
   assert.equal(res.json.result, 'ok')
@@ -37,15 +37,32 @@ test('finish sets result, counts, cursors and finishedAt', async () => {
 
 test('a failed run keeps its error', async () => {
   const { json: run } = await start({ kind: 'lgl-check', switches })
-  const res = await patch(run.runId, { result: 'failed', error: 'LGL 503 on constituents search', finished: true })
+  const res = await patch(run.runId, { result: 'failed', error: 'LGL 503 on constituents search' })
   assert.equal(res.status, 200)
   assert.equal(res.json.error, 'LGL 503 on constituents search')
 })
 
 test('patching a finished run is 409', async () => {
   const { json: run } = await start({ kind: 'full', switches })
-  assert.equal((await patch(run.runId, { result: 'ok', finished: true })).status, 200)
+  assert.equal((await patch(run.runId, { result: 'ok' })).status, 200)
   assert.equal((await patch(run.runId, { counts: { late: 1 } })).status, 409)
+})
+
+test('a result finishes the run; progress without one does not', async () => {
+  const { json: run } = await start({ kind: 'full', switches })
+  const mid = await patch(run.runId, { counts: { compared: 3 }, vgCursor: 42 })
+  assert.equal(mid.status, 200)
+  assert.equal(mid.json.result, 'running')
+  assert.equal(mid.json.finishedAt, null)
+  const done = await patch(run.runId, { result: 'ok' })
+  assert.equal(done.json.result, 'ok')
+  assert.ok(done.json.finishedAt, 'finishedAt is set with the result')
+})
+
+test('a run cannot be set back to running, and finished is not a field', async () => {
+  const { json: run } = await start({ kind: 'full', switches })
+  assert.equal((await patch(run.runId, { result: 'running' })).status, 400)
+  assert.equal((await patch(run.runId, { finished: true })).status, 400)
 })
 
 test('unknown runId is 404', async () => {

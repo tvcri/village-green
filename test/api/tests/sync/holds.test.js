@@ -97,6 +97,12 @@ test('seen moves lastSeenAt only', async () => {
   assert.equal(after.state, 'open')
 })
 
+test('updated counts only items that changed something', async () => {
+  const [a] = (await create([hold()])).json
+  const [b] = (await create([hold()])).json
+  assert.deepEqual((await patch([{ holdId: a.holdId }, { holdId: b.holdId, seen: true }])).json, { updated: 1 })
+})
+
 test('fingerprint and detail update in place', async () => {
   const [h] = (await create([hold()])).json
   assert.equal((await patch([{ holdId: h.holdId, fingerprint: 'fp9', detail: { lgl: 'x' } }])).status, 200)

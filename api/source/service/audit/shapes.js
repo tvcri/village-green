@@ -39,7 +39,10 @@ const shapes = {
     // enrollment_request/fcv_submission reference person but are their own
     // records, not attributes of the person — deliberately not folded.
     // person_image: images carry no history (Chris Daley, Part 4) — deliberately not folded.
-    relatedTables: ['enrollment_request', 'fcv_submission', 'person_image'],
+    // sync_field/sync_hold/sync_log: the LGL sync's own records about a person
+    // (0033). They carry no FK, so the boot scan never sees them; listed so the
+    // registry still names every table that holds a personId.
+    relatedTables: ['enrollment_request', 'fcv_submission', 'person_image', 'sync_field', 'sync_hold', 'sync_log'],
     sets: {
       circles: {
         kind: 'values',

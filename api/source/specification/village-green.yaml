@@ -3359,9 +3359,11 @@ paths:
       description: >-
         The change feed for the vg-sync service (and the later Mailchimp
         executable, which signs in as the same account). Scans audit_event rows
-        after `after`, in auditId order, up to `limit` rows, skipping rows
-        younger than the settle floor (VG_SYNC_CHANGE_SETTLE_SECONDS, default 5)
-        so a transaction that commits late is not passed by the cursor. Reports
+        after `after`, in auditId order, up to `limit` rows. The scan stops at
+        the first gap in auditId, a write not committed yet, so the cursor
+        never passes it; once the row after a gap is older than
+        VG_SYNC_CHANGE_GAP_SECONDS (default 60) the gap is taken for a rollback
+        and passed. Reports
         person, member, volunteer and donor rows, mapped to the person; member,
         volunteer and donor rows are mapped through their own table, or the
         audit snapshot when the row is gone. Every scanned row advances
@@ -3393,7 +3395,7 @@ paths:
           required: false
           style: form
           explode: true
-          schema: { type: array, maxItems: 500, items: { type: integer } }
+          schema: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/StringIntId' } }
       responses:
         '200': { description: Memory rows, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncField' } } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -3430,7 +3432,7 @@ paths:
           style: form
           explode: true
           schema: { type: array, items: { type: string, enum: [open, closed, dismissed] }, default: [open] }
-        - { name: personId, in: query, required: false, schema: { type: integer } }
+        - { name: personId, in: query, required: false, schema: { $ref: '#/components/schemas/StringIntId' } }
         - { name: lglConstituentId, in: query, required: false, schema: { type: string, maxLength: 50 } }
       responses:
         '200': { description: Holds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncHold' } } } } }
@@ -3485,7 +3487,7 @@ paths:
       tags: [Sync]
       operationId: createSyncHoldDismissal
       parameters:
-        - { name: holdId, in: path, required: true, schema: { type: integer } }
+        - { name: holdId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
       requestBody:
         required: true
         content:
@@ -3535,7 +3537,7 @@ paths:
   /sync/runs/{runId}:
     patch:
       summary: Update or finish a running run
-      description: Only a run whose result is still running can be patched (409 otherwise). finished sets finishedAt.
+      description: Only a run whose result is still running can be patched (409 otherwise). Setting result finishes the run and sets finishedAt; a patch without result records progress.
       tags: [Sync]
       operationId: patchSyncRun
       parameters:
@@ -3605,12 +3607,11 @@ components:
       type: object
       additionalProperties: false
       properties:
-        result: { type: string, enum: [running, ok, failed] }
+        result: { type: string, enum: [ok, failed], description: Finishes the run. }
         counts: { type: object }
         lglCursor: { type: string, format: date-time, nullable: true }
         vgCursor: { type: integer, minimum: 0, nullable: true }
         error: { type: string, maxLength: 1000, nullable: true }
-        finished: { type: boolean }
     SyncRun:
       type: object
       additionalProperties: false

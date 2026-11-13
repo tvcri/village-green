@@ -41,23 +41,35 @@ async function resolvePersonIds (rows) {
   return out
 }
 
-// The scan STOPS at the first row younger than the settle floor rather than
-// filtering it out: createdAt is not strictly ordered with auditId, and a
-// filter could return a later row and move the cursor past the young one.
+// The cursor must never pass a write that has not committed yet. auditId is
+// AUTO_INCREMENT, allocated in order at insert, so every id below a visible
+// row is already allocated: a missing one is either an open transaction or a
+// rollback. The scan therefore stops at the first gap, unless the row after
+// it is older than VG_SYNC_CHANGE_GAP_SECONDS, when the gap is taken for a
+// rollback (a write held open that long is treated as never coming).
+// Only update rows of the reported types carry their diff's field names; the
+// diff values and snapshots are never read.
 module.exports.getChanges = async function ({ after, limit }) {
   const [scanned] = await dbUtils.pool.query(
-    `SELECT auditId, entityType, entityId, action, changes,
-            createdAt <= NOW(3) - INTERVAL ? SECOND AS settled
+    `SELECT auditId, entityType, entityId, action,
+            IF(action = 'update' AND entityType IN (?), JSON_KEYS(changes, '$.diff'), NULL) AS fields,
+            createdAt <= NOW(3) - INTERVAL ? SECOND AS stale
      FROM audit_event
      WHERE auditId > ?
      ORDER BY auditId
      LIMIT ?`,
-    [config.settings.syncChangeSettleSeconds, after, limit + 1]
+    [FEED_TYPES, config.settings.syncChangeGapSeconds, after, limit + 1]
   )
-  const young = scanned.findIndex(r => !r.settled)
-  const settled = young === -1 ? scanned : scanned.slice(0, young)
-  const more = settled.length > limit
-  const rows = more ? settled.slice(0, limit) : settled
+  let expected = after + 1
+  let end = scanned.length
+  for (const [i, r] of scanned.entries()) {
+    const auditId = Number(r.auditId)
+    if (auditId !== expected && !r.stale) { end = i; break }
+    expected = auditId + 1
+  }
+  const visible = scanned.slice(0, end)
+  const more = visible.length > limit
+  const rows = more ? visible.slice(0, limit) : visible
   const lastAuditId = rows.length ? Number(rows[rows.length - 1].auditId) : after
 
   const reported = rows.filter(r => FEED_TYPES.includes(r.entityType))
@@ -74,9 +86,7 @@ module.exports.getChanges = async function ({ after, limit }) {
     if (!byType.has(r.entityType)) byType.set(r.entityType, { actions: [], fields: new Set() })
     const entry = byType.get(r.entityType)
     if (!entry.actions.includes(r.action)) entry.actions.push(r.action)
-    if (r.action === 'update') {
-      for (const f of Object.keys(r.changes?.diff ?? {})) entry.fields.add(f)
-    }
+    for (const f of r.fields ?? []) entry.fields.add(f)
   }
 
   return {
@@ -128,7 +138,19 @@ module.exports.putFields = async function (items) {
 const HOLD_COLUMNS = `CAST(holdId AS CHAR) AS holdId, lglConstituentId, CAST(personId AS CHAR) AS personId,
   field, reason, detail, fingerprint, state, dismissalKind, firstSeenAt, lastSeenAt, closedAt, dismissedAt,
   CAST(dismissedUserId AS CHAR) AS dismissedUserId, note`
-const isOpenCollision = (e) => e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)
+// Runs a write that may hit sync_hold_open, the one-open-hold-per-subject key,
+// and turns that collision into a 409 naming the batch item.
+async function guardOpenCollision (i, write) {
+  try {
+    return await write()
+  }
+  catch (e) {
+    if (e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)) {
+      throw new SmError.ConflictError(`item ${i}: an open hold for this constituent, person, field and reason already exists`)
+    }
+    throw e
+  }
+}
 
 async function holdsByIds (ids) {
   if (!ids.length) return []
@@ -163,23 +185,15 @@ module.exports.createHolds = async function (items, userId) {
       const created = []
       for (const [i, item] of items.entries()) {
         const dismissed = item.state === 'dismissed'
-        try {
-          const [res] = await connection.query(
+        const [res] = await guardOpenCollision(i, () => connection.query(
             `INSERT INTO sync_hold (lglConstituentId, personId, field, reason, detail, fingerprint, state,
                dismissalKind, dismissedAt, dismissedUserId, note, firstSeenAt, lastSeenAt)
              VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ${dismissed ? 'NOW(3)' : 'NULL'}, ?, ?, NOW(3), NOW(3))`,
             [item.lglConstituentId, item.personId ?? null, item.field ?? null, item.reason,
               JSON.stringify(item.detail ?? null), item.fingerprint, dismissed ? 'dismissed' : 'open',
               dismissed ? item.dismissalKind : null, dismissed ? userId : null, item.note ?? null]
-          )
-          created.push(res.insertId)
-        }
-        catch (e) {
-          if (isOpenCollision(e)) {
-            throw new SmError.ConflictError(`item ${i}: an open hold for this constituent, person, field and reason already exists`)
-          }
-          throw e
-        }
+        ))
+        created.push(res.insertId)
       }
       return created
     },
@@ -190,12 +204,13 @@ module.exports.createHolds = async function (items, userId) {
 
 // Allowed patch transitions: open -> closed, dismissed -> open.
 module.exports.patchHolds = async function (items) {
-  await dbUtils.retryOnDeadlock2({
+  const updated = await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
       const ids = items.map(i => i.holdId)
       const [rows] = await connection.query(
         'SELECT holdId, state FROM sync_hold WHERE holdId IN (?) FOR UPDATE', [ids])
       const state = new Map(rows.map(r => [String(r.holdId), r.state]))
+      let count = 0
       for (const [i, item] of items.entries()) {
         if (!state.has(String(item.holdId))) throw new SmError.NotFoundError(`item ${i}: no hold ${item.holdId}`)
       }
@@ -219,20 +234,15 @@ module.exports.patchHolds = async function (items) {
           state.set(String(item.holdId), item.state)
         }
         if (!sets.length) continue
-        try {
-          await connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`, [...binds, item.holdId])
-        }
-        catch (e) {
-          if (isOpenCollision(e)) {
-            throw new SmError.ConflictError(`item ${i}: an open hold for this constituent, person, field and reason already exists`)
-          }
-          throw e
-        }
+        await guardOpenCollision(i, () =>
+          connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`, [...binds, item.holdId]))
+        count++
       }
+      return count
     },
     statusObj: undefined
   })
-  return { updated: items.length }
+  return { updated }
 }
 
 module.exports.dismissHold = async function (holdId, { dismissalKind, note }, userId) {
@@ -277,12 +287,12 @@ module.exports.patchRun = async function (runId, body) {
       if (row.result !== 'running') throw new SmError.ConflictError(`run ${runId} is already ${row.result}`)
       const sets = []
       const binds = []
-      if (body.result !== undefined) { sets.push('result = ?'); binds.push(body.result) }
+      // A result ends the run, so it always comes with finishedAt.
+      if (body.result !== undefined) { sets.push('result = ?', 'finishedAt = NOW(3)'); binds.push(body.result) }
       if (body.counts !== undefined) { sets.push('counts = CAST(? AS JSON)'); binds.push(JSON.stringify(body.counts)) }
       if (body.lglCursor !== undefined) { sets.push('lglCursor = ?'); binds.push(body.lglCursor === null ? null : new Date(body.lglCursor)) }
       if (body.vgCursor !== undefined) { sets.push('vgCursor = ?'); binds.push(body.vgCursor) }
       if (body.error !== undefined) { sets.push('error = ?'); binds.push(body.error) }
-      if (body.finished) sets.push('finishedAt = NOW(3)')
       if (sets.length) await connection.query(`UPDATE sync_run SET ${sets.join(', ')} WHERE runId = ?`, [...binds, runId])
     },
     statusObj: undefined

@@ -25,11 +25,12 @@ const config = {
         // defaults so boundaries match the users' calendar, not the server's.
         civilTimeZone: process.env.VG_CIVIL_TZ || "America/New_York",
         dependencyRetries: process.env.VG_DEPENDENCY_RETRIES || 24,
-        // GET /sync/changes skips audit rows younger than this many seconds, so
-        // a transaction that commits late is not passed by the cursor.
-        syncChangeSettleSeconds: (() => {
-            const val = parseInt(process.env.VG_SYNC_CHANGE_SETTLE_SECONDS)
-            return Number.isInteger(val) && val >= 0 ? val : 5
+        // GET /sync/changes stops at a gap in auditId (a write not committed
+        // yet) until the row after the gap is this many seconds old; then the
+        // gap is taken for a rollback and passed.
+        syncChangeGapSeconds: (() => {
+            const val = parseInt(process.env.VG_SYNC_CHANGE_GAP_SECONDS)
+            return Number.isInteger(val) && val >= 0 ? val : 60
         })()
     },
     client: {

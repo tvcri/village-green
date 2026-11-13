@@ -22,7 +22,7 @@ const catalog = {
   'donor:write':              { description: 'Create/replace/remove donor records (LGL import and integration; no UI)', requiresElevation: false },
   'sync:read':                { description: 'Read the LGL sync\'s memory, holds, runs and log, and the person change feed', requiresElevation: false },
   'sync:write':               { description: 'Write the LGL sync\'s memory, holds, runs and log', requiresElevation: false },
-  'training:admin':          { description: 'Manage the list of volunteer trainings', requiresElevation: false },
+  'training:admin':           { description: 'Manage the list of volunteer trainings', requiresElevation: false },
   'drop_reason:admin':        { description: 'Manage the lists of member and volunteer drop reasons', requiresElevation: false },
   'position:admin':           { description: 'Manage the list of volunteer positions', requiresElevation: false },
   'sr:read':                  { description: 'Read service requests', requiresElevation: false },
