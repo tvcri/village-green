@@ -123,6 +123,8 @@ function startApi () {
     // caps the stall when a handler hits the (absent) Keycloak admin API —
     // e.g. deleteUser — at ~10s instead of 2 minutes per request.
     VG_DEPENDENCY_RETRIES: '2',
+    // The change feed's settle floor would make every feed test wait 5s;
+    // tests stand in for "too young" with a future createdAt instead.
     ...(COVERAGE ? { NODE_V8_COVERAGE: coverageTmp } : {}),
   }
   const child = spawn('node', ['index.js'], { cwd: config.apiSourceDir, env })

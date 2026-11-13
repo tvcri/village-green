@@ -702,6 +702,102 @@ CREATE TABLE `service_request` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `sync_field`
+--
+
+DROP TABLE IF EXISTS `sync_field`;
+CREATE TABLE `sync_field` (
+  `personId` int NOT NULL,
+  `field` varchar(32) NOT NULL,
+  `lglConstituentId` varchar(50) NOT NULL,
+  `value` json DEFAULT NULL,
+  `lglEntryId` varchar(50) DEFAULT NULL,
+  `agreedAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`personId`,`field`),
+  KEY `sync_field_constituent` (`lglConstituentId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `sync_hold`
+--
+
+DROP TABLE IF EXISTS `sync_hold`;
+CREATE TABLE `sync_hold` (
+  `holdId` int NOT NULL AUTO_INCREMENT,
+  `lglConstituentId` varchar(50) NOT NULL,
+  `personId` int DEFAULT NULL,
+  `field` varchar(32) DEFAULT NULL,
+  `reason` varchar(64) NOT NULL,
+  `detail` json DEFAULT NULL,
+  `fingerprint` varchar(64) NOT NULL,
+  `state` enum('open','closed','dismissed') NOT NULL DEFAULT 'open',
+  `dismissalKind` enum('staff','rule') DEFAULT NULL,
+  `firstSeenAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `lastSeenAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `closedAt` datetime(3) DEFAULT NULL,
+  `dismissedAt` datetime(3) DEFAULT NULL,
+  `dismissedUserId` int DEFAULT NULL,
+  `note` varchar(500) DEFAULT NULL,
+  `personKey` int GENERATED ALWAYS AS (ifnull(`personId`,0)) VIRTUAL,
+  `fieldKey` varchar(32) GENERATED ALWAYS AS (ifnull(`field`,_utf8mb4'')) VIRTUAL,
+  `openKey` tinyint GENERATED ALWAYS AS (if((`state` = _utf8mb4'open'),1,NULL)) VIRTUAL,
+  PRIMARY KEY (`holdId`),
+  UNIQUE KEY `sync_hold_open` (`lglConstituentId`,`personKey`,`fieldKey`,`reason`,`openKey`),
+  KEY `sync_hold_state` (`state`),
+  KEY `sync_hold_person` (`personId`),
+  KEY `sync_hold_constituent` (`lglConstituentId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `sync_log`
+--
+
+DROP TABLE IF EXISTS `sync_log`;
+CREATE TABLE `sync_log` (
+  `logId` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `runId` int DEFAULT NULL,
+  `loggedAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `lglConstituentId` varchar(50) NOT NULL,
+  `personId` int DEFAULT NULL,
+  `field` varchar(32) DEFAULT NULL,
+  `compareCase` varchar(32) DEFAULT NULL,
+  `request` json NOT NULL,
+  `lglEntryId` varchar(50) DEFAULT NULL,
+  `oldValue` json DEFAULT NULL,
+  `newValue` json DEFAULT NULL,
+  `outcome` varchar(32) NOT NULL,
+  `responseStatus` smallint DEFAULT NULL,
+  `note` varchar(1000) DEFAULT NULL,
+  PRIMARY KEY (`logId`),
+  KEY `sync_log_person` (`personId`,`loggedAt`),
+  KEY `sync_log_constituent` (`lglConstituentId`,`loggedAt`),
+  KEY `sync_log_run` (`runId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `sync_run`
+--
+
+DROP TABLE IF EXISTS `sync_run`;
+CREATE TABLE `sync_run` (
+  `runId` int NOT NULL AUTO_INCREMENT,
+  `kind` enum('full','vg-check','lgl-check') NOT NULL,
+  `startedAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `finishedAt` datetime(3) DEFAULT NULL,
+  `result` enum('running','ok','failed') NOT NULL DEFAULT 'running',
+  `switches` json NOT NULL,
+  `imageRevision` varchar(64) DEFAULT NULL,
+  `policyHash` varchar(64) DEFAULT NULL,
+  `counts` json DEFAULT NULL,
+  `lglCursor` datetime(3) DEFAULT NULL,
+  `vgCursor` bigint unsigned DEFAULT NULL,
+  `error` varchar(1000) DEFAULT NULL,
+  PRIMARY KEY (`runId`),
+  KEY `sync_run_kind_started` (`kind`,`startedAt`),
+  KEY `sync_run_started` (`startedAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `training`
 --
 
@@ -1058,4 +1154,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-08  1:16:26
+-- Dump completed on 2026-11-12  3:42:10

@@ -16,6 +16,13 @@ check that caught the missing `village:read`.
 > Staff and Service Coordinator both keep it. The table below reflects the
 > post-0025 names.
 
+> **Updated by migration 0033:** role 8, **Sync Service** (federation), the
+> vg-sync service account's role. It holds exactly `person:read`,
+> `person:write`, `member:read`, `volunteer:read`, `donor:read`,
+> `donor:write`, `sync:read` and `sync:write`. `sync:*` gate the `/sync`
+> endpoints and are held by no other role (Admin through `*`). It has no
+> client routes. The table below predates the donor (0032) and sync keys.
+
 | permission | LSC (v) | Steering Cmte (v) | Village Lead (v) | Admin (f) | Staff (f) | Board (f) | Svc Coord (f) |
 |---|---|---|---|---|---|---|---|
 | person:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |

@@ -6,9 +6,9 @@ import { withDb } from '../../lib/db.js'
 import { villages, users } from '../../setup/fixtures.js'
 
 // Donor writes: PUT (create/replace) and DELETE /persons/{id}/donor, gated by
-// donor:write. No role is granted donor:write — Admin holds it through the
-// wildcard, which is how the LGL import runs. Staff reads donors (donor:read)
-// but cannot write them: there is no donor UI.
+// donor:write. Only role 8 (Sync Service, the vg-sync account) is granted
+// donor:write; Admin holds it through the wildcard, which is how the LGL import
+// ran. Staff reads donors (donor:read) but cannot write them: there is no donor UI.
 const staff = tokens.users.staff
 const admin = tokens.users.admin
 const scratch = String(villages.scratch.id)

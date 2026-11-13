@@ -20,6 +20,8 @@ const catalog = {
   'volunteer:read_application': { description: 'See the stored application-form extraction on volunteer records (contains birth-date and demographic answers)', requiresElevation: false },
   'donor:read':               { description: 'Read donor data, and see persons whose only association is donor', requiresElevation: false },
   'donor:write':              { description: 'Create/replace/remove donor records (LGL import and integration; no UI)', requiresElevation: false },
+  'sync:read':                { description: 'Read the LGL sync\'s memory, holds, runs and log, and the person change feed', requiresElevation: false },
+  'sync:write':               { description: 'Write the LGL sync\'s memory, holds, runs and log', requiresElevation: false },
   'training:admin':           { description: 'Manage the list of volunteer trainings', requiresElevation: false },
   'drop_reason:admin':        { description: 'Manage the lists of member and volunteer drop reasons', requiresElevation: false },
   'position:admin':           { description: 'Manage the list of volunteer positions', requiresElevation: false },

@@ -24,7 +24,14 @@ const config = {
         // civil dates in this zone; used to resolve "today" for date-range
         // defaults so boundaries match the users' calendar, not the server's.
         civilTimeZone: process.env.VG_CIVIL_TZ || "America/New_York",
-        dependencyRetries: process.env.VG_DEPENDENCY_RETRIES || 24
+        dependencyRetries: process.env.VG_DEPENDENCY_RETRIES || 24,
+        // GET /sync/changes stops at a gap in auditId (a write not committed
+        // yet) until the row after the gap is this many seconds old; then the
+        // gap is taken for a rollback and passed.
+        syncChangeGapSeconds: (() => {
+            const val = parseInt(process.env.VG_SYNC_CHANGE_GAP_SECONDS)
+            return Number.isInteger(val) && val >= 0 ? val : 60
+        })()
     },
     client: {
         clientId: process.env.VG_CLIENT_ID || "village-green",
