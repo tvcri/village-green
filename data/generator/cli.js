@@ -41,15 +41,32 @@ async function sanity (dataset) {
       (SELECT COUNT(*) FROM service_request) sr,
       (SELECT COUNT(*) FROM service_request WHERE status IN ('Confirmed','Completed') AND volunteerPersonId IS NULL) bad,
       (SELECT COUNT(*) FROM user_data) u,
-      (SELECT COUNT(*) FROM privacy_acknowledgement) pa`)
+      (SELECT COUNT(*) FROM user_data WHERE taskName IS NULL) hu,
+      (SELECT COUNT(*) FROM user_data WHERE taskName = 'auto_complete') task,
+      (SELECT COUNT(*) FROM privacy_acknowledgement) pa,
+      (SELECT COUNT(*) FROM person) p,
+      (SELECT COUNT(*) FROM person WHERE deceased = 1) passed,
+      (SELECT COUNT(*) FROM person WHERE isVeteran = 1) vet,
+      (SELECT COUNT(*) FROM donor) don,
+      (SELECT COUNT(*) FROM volunteer_pause) vp,
+      (SELECT COUNT(*) FROM volunteer_training) vt,
+      (SELECT COUNT(*) FROM volunteer_position) vpos,
+      (SELECT COUNT(*) FROM audit_event) ae`)
     return c
   })
   if (r.v !== dataset.village.length) throw new Error(`expected ${dataset.village.length} villages, got ${r.v}`)
   if (r.m !== dataset.member.length) throw new Error(`expected ${dataset.member.length} members, got ${r.m}`)
   if (r.u !== dataset.user_data.length) throw new Error(`expected ${dataset.user_data.length} users, got ${r.u}`)
   if (r.bad !== 0) throw new Error(`${r.bad} Confirmed/Completed requests have no volunteer`)
-  // every user must have acked the privacy rules or the API's ack gate blocks them
-  if (r.pa !== r.u) throw new Error(`${r.u} users but ${r.pa} privacy acknowledgements`)
+  // every human user must have acked the privacy rules or the API's ack gate blocks them
+  if (r.pa !== r.hu) throw new Error(`${r.hu} users but ${r.pa} privacy acknowledgements`)
+  if (r.task !== 1) throw new Error(`expected the auto_complete task user, found ${r.task}`)
+  const expect = { p: 'person', don: 'donor', vp: 'volunteer_pause', vt: 'volunteer_training', vpos: 'volunteer_position' }
+  for (const [k, t] of Object.entries(expect)) {
+    if (t && r[k] !== (dataset[t] || []).length) throw new Error(`expected ${(dataset[t] || []).length} ${t} rows, got ${r[k]}`)
+  }
+  if (r.passed !== dataset.person.filter(p => p.deceased).length) throw new Error(`deceased count mismatch: ${r.passed}`)
+  if (r.vet !== dataset.person.filter(p => p.isVeteran).length) throw new Error(`isVeteran count mismatch: ${r.vet}`)
   if (!(r.am < r.m) || !(r.avol < r.vol)) throw new Error('active views should filter some rows')
   console.log('sanity OK:', r)
 }

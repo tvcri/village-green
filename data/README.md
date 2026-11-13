@@ -21,7 +21,22 @@ npm install
 npm run seed
 ```
 
-That's it. The SQL seeder writes directly to MySQL and does not need the API running. The **app-data commands** (`seed:api` / `import` / `export` / `roundtrip`) are the exception: they go through the app's `/op/appdata` endpoint, so they need the API up (started with `VG_EXPERIMENTAL_APPDATA=true`) — and the mock OIDC server too, to mint the loader's token (unless you supply one via `VG_DEMO_TOKEN`). Details in the App-data path section below.
+That's it. The SQL seeder writes directly to MySQL and does not need the API running.
+
+**Seeding empties the whole database first.** `seed:db` truncates every base table except the migration-owned catalogs (`_migrations`, `role`, `role_permission`, `gender`, `ethnicity`, `race`, `contact_method`, `language`; see `PRESERVED_TABLES` in `generator/constants.js`), including tables the generator does not fill: `audit_event`, `analytics_events`, `enrollment_request`, the `sync_*` tables. The list comes from the live schema, so a new migration's table is emptied too. Seeding over a restored production snapshot therefore leaves no real rows behind.
+
+### Seeding the local dev database
+
+The dev database (`village-green-orch-db-1`, host port 60001, database `vg`) is not on the generator's default port, and its `vg` account does not use the default password. Use root, with the password read from the container:
+
+```bash
+cd data
+VG_DB_PORT=60001 VG_DB_USER=root \
+VG_DB_PASSWORD="$(docker exec village-green-orch-db-1 printenv MYSQL_ROOT_PASSWORD)" \
+VG_DEMO_DONORS=0 npm run seed
+```
+
+The database must already be at the current migration (start the API against it once, or restore a dump and let the API migrate it). `VG_DEMO_DONORS=0` is what the LGL sync's test harness wants; drop it for a demo with donors. The **app-data commands** (`seed:api` / `import` / `export` / `roundtrip`) are the exception: they go through the app's `/op/appdata` endpoint, so they need the API up (started with `VG_EXPERIMENTAL_APPDATA=true`) — and the mock OIDC server too, to mint the loader's token (unless you supply one via `VG_DEMO_TOKEN`). Details in the App-data path section below.
 
 ## Commands
 
@@ -55,6 +70,7 @@ The commands split into two families: **seed** commands *generate* the dataset a
 | `VG_DEMO_VILLAGES` | _(unset = all 10)_ | Which villages to build: a count (`3` → the first 3 villages in `constants.js`) or a comma-separated name list (`Arkham,Quahog`) |
 | `VG_DEMO_MEMBERS` | _(unset = per-class mix)_ | Uniform member headcount for **every** selected village, overriding the default big/medium/small/tiny × mix split |
 | `VG_DEMO_VOLUNTEERS` | _(unset = per-class mix)_ | Uniform volunteer headcount for **every** selected village, overriding the default split |
+| `VG_DEMO_DONORS` | _(unset = ~20% of people)_ | How many people get a `donor` row. `0` seeds no donors (the LGL sync harness makes its own links, which must point at real records on its LGL account). Must be a whole number; values above the head count are capped |
 
 `VG_DEMO_MEMBERS`/`VG_DEMO_VOLUNTEERS` are both-or-neither in practice — setting one overrides that side per village while the other keeps the mix-based default, which is rarely what you want. A small, fast dataset for local UI work:
 
@@ -85,7 +101,7 @@ vg
 
 Scopes are **prefix-matched** (`validateOauthSecurity` in `api/source/utils/auth.js`), so a granted `vg` satisfies every `vg:*` requirement — longer scopes are restrictions of their shorter parents. Earlier revisions of this README recommended a long explicit scope string; that was never necessary. The playground picker sets `vg` for you.
 
-Grants are drawn from the DB's static 7-role catalog (`role`/`role_grant`; the generator never seeds those catalog tables themselves — only `role_grant` rows against fixed role ids from `generator/constants.js`):
+Grants are drawn from the DB's static role catalog (`role`/`role_grant`; the generator never seeds those catalog tables themselves — only `role_grant` rows against fixed role ids from `generator/constants.js`). Role 8, **Sync Service** (migration 0033), belongs to the LGL sync's service account; no demo persona holds it:
 
 | Role | Scope | Notes |
 |---|---|---|
@@ -128,7 +144,7 @@ Beyond these bespoke personas, a **coverage fill** pass tops up every village so
 
 Every *generating* command (`seed`/`seed:db`, `seed:api`, `emit`, `roundtrip`, `doctor`) writes two files to `data/` before doing anything else:
 
-- **`demo-guide.md`** — a map of the dataset: which login demos which grant, per-village member/volunteer counts, the planted scenarios (dual household, member-who-also-volunteers, duplicate email, inactive members/volunteers, confidential-notes member, flexible-time ride, out→home ride, the longest standing series, the privacy-ack-modal login) and their exact IDs/names, circle-participant rosters, and a full gag-request index (figure → village → request #).
+- **`demo-guide.md`** — a map of the dataset: which login demos which grant, per-village member/volunteer counts, the planted scenarios (dual household, member-who-also-volunteers, duplicate email, Pending/Dropped members and volunteers, people who have passed, paused volunteers, the donor count, confidential-notes member, flexible-time ride, out→home ride, the longest standing series, the privacy-ack-modal login) and their exact IDs/names, circle-participant rosters, and a full gag-request index (figure → village → request #).
 - **`demo-logins.json`** — the complete login roster (every `user_data` row, incl. VSS volunteer accounts), each with role, village(s), and a one-line "demos" blurb. This is the droplist the demo mock-OIDC UI offers (spec §7); a `featured` flag marks the handful surfaced by default (the 8 usernames in `FEATURED` in `generator/guide.js`, plus the first three VSS logins and the privacy-ack-modal login) — not the full bespoke-persona table above, which is larger.
 
 Both are **gitignored** (`data/.gitignore`) and regenerated fresh on every generating run — treat them as build output, not source.
@@ -163,7 +179,17 @@ The loader's machine account (`demo-loader@villagegreen.test`) is pre-seeded **w
 
 ## How the dataset is built
 
-Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows split per-village per the sizing knobs above — volunteer-heavy by default, member-heavy for Quahog/Oldport/Kingsport; ~66% of members get a standing `serviceNotes`, ~40% a staff-only `scNotes`, and every member carries `householdDues` (**monthly**, $0–50, usually $40/mo, with a few cents-y yearly÷12 values like the importer produces); ~5% of each side is inactive, drawn from the invented-descendant filler persons first) **→ service requests + FCV submissions**.
+Everything derives from three content files — `content/people.json` (the figure roster), `content/services.json` (the service catalog + member-note flavor), `content/destinations.json` (real RI places + the invented Miskatonic Health network) — fed through seeded-RNG builders in order: **villages + demo logins → privacy rule + acknowledgements → persons** (figures placed into villages by theme/hint) **→ membership** (member/volunteer rows split per-village per the sizing knobs above — volunteer-heavy by default, member-heavy for Quahog/Oldport/Kingsport; ~66% of members get a standing `serviceNotes`, ~40% a staff-only `scNotes`, and every member carries `householdDues` (**monthly**, $0–50, usually $40/mo, with a few cents-y yearly÷12 values like the importer produces); ~5% of each side is Pending or Dropped, drawn from the invented-descendant filler persons first) **→ service requests + FCV submissions**.
+
+Later passes, each on its own RNG stream (see Determinism):
+
+- **Contacts** (right after persons, so requests copy the final home details): ~40% of people have only a cell, ~35% both phones, ~20% only a landline, a few neither; phones are `401-555-NNNN` (some cells `508`/`774`/`860`). About a fifth have a unit in one of several styles, some carry an ordinary nickname ("Bill", "Peggy") on top of the quirky-name ones, and a few non-member volunteers live just over the line in MA or CT. About 15% have no email, never one a login depends on.
+- **Statuses** follow migrations 0029/0030: members and volunteers are Active, Pending or Dropped (there is no Inactive). Most Dropped rows carry a reason from the seeded `member_drop_reason`/`volunteer_drop_reason` catalogs (one member reason is retired); a few Dropped members carry only the legacy free-text `dropReason`.
+- **Deceased** (`person.deceased`, 0029): ~3% of people, most with a `deceasedDate` after their last request, a few with the date unknown. Nobody who has passed is on an upcoming or open request or has a login. Death never writes a role status, so at least one deceased member still reads Active on the member row and has dropped out of `active_member`.
+- **Service email pauses** (`volunteer_pause`, 0031): ~5% of Active volunteers, cycling through an open-ended pause, one in effect with an end date, an upcoming window, and an expired window. No pause covers a date the volunteer is assigned on.
+- **Trainings and positions** (0028): small invented catalogs from `content/services.json`; trainings follow capabilities (drivers take Driver Safety), each village gets one Steering Committee seat, and ~10% of Active volunteers hold another position, within the scope rules.
+- **Donors** (0032): `VG_DEMO_DONORS` people (default ~20%) get a donor row with an obviously invented `lglConstituentId` (`DEMO-100001`, …); a donor's spouse usually shares the id, as couples often do in LGL. Most have a `lastGiftDate` within three years.
+- **Task user**: the `_task_auto_complete` account that `evt_auto_complete_service_requests` audits as (0024). Seeding truncates `user_data`, so without it the event would silently do nothing. It has no login and no privacy acknowledgement.
 
 Service requests are built in two passes:
 
@@ -183,11 +209,15 @@ The schema is expected to change routinely. Two conventions keep those changes c
 
 After merging schema changes from main: `npm test && npm run roundtrip` exercises the builders, the UI-rule invariants, the live schema, and the `/op/appdata` endpoint in one shot.
 
-**Adding a new table**: add it to `TABLE_ORDER` in `generator/constants.js` (parent-before-child), build its rows in a builder, wire the builder into `generator/data.js`, and extend the `sanity()` counts in `generator/cli.js` plus a test.
+**Adding a new table**: add it to `TABLE_ORDER` in `generator/constants.js` (parent-before-child), build its rows in a builder, wire the builder into `generator/data.js`, and extend the `sanity()` counts in `generator/cli.js` plus a test. A table the generator does not fill needs nothing: seeding empties it anyway. Only a migration-owned catalog the generator references by fixed id belongs in `PRESERVED_TABLES`.
+
+**Every row sets the same keys.** Both load paths fill a key a row lacks with NULL, which overrides the column's DEFAULT (and fails a NOT NULL one). Set the key on every row, with `null` where there is no value; the doctor errors on a column set on only some rows.
 
 ## Determinism
 
-The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). **Same seed + same sizing knobs ⇒ byte-identical output** — every run rebuilds the same persons, households, memberships, service requests (gag bookings, ordinary volume, and standing series alike), notification records, and `demo-guide.md`. The one exception is `demo-logins.json`, whose `generatedAt` stamp is real wall-clock time; its `logins` array is deterministic, and the stamp is written by the emitter rather than a builder, so `emit`'s byte-identical guarantee for `demo-appdata.jsonl` is unaffected. Change `VG_DEMO_SEED` for a different (but equally deterministic) dataset, or the `VG_DEMO_VILLAGES`/`VG_DEMO_MEMBERS`/`VG_DEMO_VOLUNTEERS` knobs for a different (equally deterministic) size.
+The dataset is fully deterministic. The RNG seed defaults to `20260630` (`VG_DEMO_SEED`). **Same seed + same sizing knobs ⇒ byte-identical output** — every run rebuilds the same persons, households, memberships, service requests (gag bookings, ordinary volume, and standing series alike), notification records, and `demo-guide.md`. The one exception is `demo-logins.json`, whose `generatedAt` stamp is real wall-clock time; its `logins` array is deterministic, and the stamp is written by the emitter rather than a builder, so `emit`'s byte-identical guarantee for `demo-appdata.jsonl` is unaffected. Change `VG_DEMO_SEED` for a different (but equally deterministic) dataset, or the `VG_DEMO_VILLAGES`/`VG_DEMO_MEMBERS`/`VG_DEMO_VOLUNTEERS` knobs for a different (equally deterministic) size. `VG_DEMO_DONORS` changes only the `donor` table.
+
+Work added after migration 27 (contacts, drop reasons, deceased, pauses, trainings, donors) draws from separate RNG streams derived from the seed (`stream(k)` in `generator/data.js`), so adding it left the figures, villages and requests of the main stream where they were. Give a new pass its own stream rather than drawing from the main one.
 
 Two invariants hold regardless of seed or sizing: **vettings never expire** (`volunteer_vetting.dateExpired` is always drawn 60–700 days after the generator's fixed clock (`BASE_DATE`, 2026-06-30) — nothing in the demo data is stale-vetting-blocked, though it will eventually age past *today's* real-world date), and **non-Ride requests never carry times** (`timesFlexible: true`, all TIME columns null — times are a Rides-only concept).
 

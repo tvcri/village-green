@@ -89,7 +89,11 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   for (const row of m.member) {
     assert.ok(personIds.has(row.personId))
     assert.equal(typeof row.status, 'string')
-    if (row.status !== 'Active') assert.ok(row.dropReason, 'inactive members need a dropReason')
+    assert.ok(['Active', 'Pending', 'Dropped'].includes(row.status), `member status ${row.status}`)
+    // a reason (catalog id or legacy text) only on Dropped, as the CHECK requires
+    if (row.status !== 'Dropped') assert.ok(row.dropReasonId === null && row.dropReason === null, 'only a Dropped member carries a reason')
+    else assert.ok(row.dropReasonId !== null || row.dropReason, 'a Dropped member carries a reason')
+    if (row.dropReasonId !== null) assert.ok(m.member_drop_reason.some(r => r.id === row.dropReasonId))
   }
   assert.ok(m.member.some(r => r.status === 'Active'))
   assert.ok(m.member.some(r => r.status !== 'Active'))
@@ -97,7 +101,10 @@ test('membership: status/active invariants and <=10% member/volunteer overlap', 
   for (const row of m.volunteer) {
     assert.ok(personIds.has(row.personId))
     assert.ok(['Active', 'Pending', 'Dropped'].includes(row.status))
-    assert.equal(row.dropReasonId ?? null, null, 'drop-reason list starts empty')
+    if (row.dropReasonId !== null) {
+      assert.equal(row.status, 'Dropped', 'a drop reason only on a Dropped volunteer')
+      assert.ok(m.volunteer_drop_reason.some(r => r.id === row.dropReasonId))
+    }
   }
   assert.ok(m.volunteer.some(r => r.status === 'Active') && m.volunteer.some(r => r.status !== 'Active'))
   assert.ok(m.volunteer.some(r => r.status === 'Pending') && m.volunteer.some(r => r.status === 'Dropped'))
@@ -199,8 +206,8 @@ test('requests are attributed to the federation creator pool; every user carries
     assert.ok(creatorIds.has(sr.createdUserId),
       `request ${sr.id} creator ${sr.createdUserId} is not Staff/Service Coordinator`)
   }
-  // every user carries a display-name claim for creator attribution
-  for (const u of ds.user_data) {
+  // every human user carries a display-name claim for creator attribution
+  for (const u of ds.user_data.filter(u => !u.taskName)) {
     const claims = JSON.parse(u.lastClaims)
     assert.ok(claims.name, `user ${u.username} needs a name claim`)
   }
@@ -382,7 +389,8 @@ test('privacy: one published rule, acknowledged by every user (incl. the loader 
   assert.ok(rule.content.length > 100 && rule.modifiedAt > rule.publishedAt)
   // every user has acked the current rule — the API's ack gate 403s anyone who hasn't
   const ackedUsers = new Set(ds.privacy_acknowledgement.map(a => a.userId))
-  assert.equal(ackedUsers.size, ds.user_data.length)
+  // task accounts (user_data.taskName) never sign in and carry no ack
+  assert.equal(ackedUsers.size, ds.user_data.filter(u => !u.taskName).length)
   for (const a of ds.privacy_acknowledgement) {
     assert.equal(a.rulesId, rule.id)
     assert.ok(userIds.has(a.userId))
@@ -401,7 +409,7 @@ test('vss: ~25% of active volunteers get accounts; modifiedUserId is the VSS mar
   const activeVols = ds.volunteer.filter(v => v.status === 'Active').length
   assert.ok(Math.abs(vssUsers.length - activeVols * 0.25) <= activeVols * 0.08)
   // acks cover VSS users too (privacy built after them)
-  assert.equal(ds.privacy_acknowledgement.length, ds.user_data.length)
+  assert.equal(ds.privacy_acknowledgement.length, ds.user_data.filter(u => !u.taskName).length)
   const vssIds = new Set(vssUsers.map(u => u.userId))
   const marked = ds.service_request.filter(sr => sr.modifiedUserId !== null)
   assert.ok(marked.length > 0, 'some requests carry the VSS marker')

@@ -2,10 +2,8 @@
   "_comment": "Columns the generator consciously leaves unset (DB default/NULL applies). The doctor errors on any unset column NOT listed here — when the schema grows a column, either populate it in a builder or acknowledge it here with a reason.",
   "user_data.created": "DB default CURRENT_TIMESTAMP is correct",
   "user_data.lastAccess": "runtime bookkeeping, set by the app on login",
-  "user_data.status": "DB default 'available' is correct",
   "user_data.statusDate": "DB default (created) is correct",
   "user_data.statusUser": "runtime bookkeeping, set by the app",
-  "user_data.taskName": "names a system task account (migration 0024); NULL for the human personas the generator seeds",
   "user_data.webPreferences": "DB default preferences JSON is correct",
   "role_grant.userGroupId": "demo grants are per-user, not per-group",
   "person.emailStatus": "app-managed email verification state",
@@ -24,11 +22,6 @@
   "person.pronouns": "demo figures carry no gender data; random pronouns would misgender recognizable historical figures",
   "person.genderId": "demo figures carry no gender data; random values would misgender recognizable historical figures",
   "person.ethnicityId": "demo figures carry no ethnicity data; invented values on real historical figures would misrepresent them",
-  "person.deceasedDate": "the demo roster is all living people",
   "member.application": "set only by the PDF import wizard; hand-entered members have none (as in prod)",
-  "volunteer.application": "set only by the PDF import wizard; hand-entered volunteers have none (as in prod)",
-  "volunteer.dropReasonId": "the drop-reason catalog starts empty (0030), so a Dropped volunteer has no reason (the CHECK allows it)",
-  "volunteer.statusChangeNotes": "free-text status note; not exercised in demo",
-  "member.dropReasonId": "the member drop-reason catalog starts empty (0029); dropReason text carries the demo flavor",
-  "person.deceased": "DB default 0 is correct; the demo roster is all living people"
+  "volunteer.application": "set only by the PDF import wizard; hand-entered volunteers have none (as in prod)"
 }

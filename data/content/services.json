@@ -212,13 +212,34 @@
     "Moved out of state",
     "Moved to assisted living",
     "Moved in with family",
-    "Deceased",
     "Snowbird — wintering in Florida",
     "No longer needs services",
     "Health declined beyond what the village can support",
     "Financial hardship — unable to continue membership",
     "Unable to reach after repeated attempts",
     "Requested to pause / take a break"
+  ],
+  "volunteerDropReasons": [
+    "Moved away",
+    "Schedule no longer allows it",
+    "No longer driving",
+    "Health reasons",
+    "Unable to reach after repeated attempts",
+    "Volunteering elsewhere"
+  ],
+  "trainings": [
+    { "name": "Volunteer Orientation", "description": "The welcome session every new volunteer attends" },
+    { "name": "Driver Safety", "description": "Defensive driving and passenger assistance for ride volunteers" },
+    { "name": "Confidentiality and Privacy", "description": "Handling member information" },
+    { "name": "Tech Coaching Basics", "description": null },
+    { "name": "Friendly Caller Training", "description": "Preparation for regular check-in calls" }
+  ],
+  "positions": [
+    { "name": "Steering Committee", "scope": "village", "description": null, "trainings": [] },
+    { "name": "Ride Scheduler", "scope": "village", "description": "Matches ride requests with village drivers", "trainings": ["Confidentiality and Privacy"] },
+    { "name": "Circle Facilitator", "scope": "circle", "description": "Hosts a circle's regular gatherings", "trainings": ["Volunteer Orientation"] },
+    { "name": "Hub Office Volunteer", "scope": "federation", "description": "Answers the Hub phone line", "trainings": ["Confidentiality and Privacy"] },
+    { "name": "Newsletter Editor", "scope": "federation", "description": null, "trainings": [] }
   ],
   "vettingTypes": [
     { "type": "Background Check", "flavor": null },

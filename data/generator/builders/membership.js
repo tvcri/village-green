@@ -4,7 +4,10 @@ import { CAPABILITIES } from '../constants.js'
 const isoDate = (d) => d.toISOString().slice(0, 10)
 const addDays = (d, n) => new Date(d.getTime() + n * 86400000)
 
-export function buildMembership (plan, content, rng) {
+// `xrng` is a second, independent stream for decisions added after migration
+// 27 (drop-reason ids, status notes). Drawing those from `rng` would shift
+// every later draw and reshuffle the whole dataset for the same seed.
+export function buildMembership (plan, content, rng, xrng = rng) {
   const { person, byVillage } = plan
   const filler = plan.fillerIds ?? new Set()
   const personById = Object.fromEntries(person.map(p => [p.id, p]))
@@ -13,6 +16,16 @@ export function buildMembership (plan, content, rng) {
   const disability = content.services.disabilities.map((name, i) => ({ id: i + 1, name }))
   const vetting_type = content.services.vettingTypes.map((v, i) => ({ id: i + 1, name: v.type || v }))
   const dropReasons = content.services.memberDropReasons
+  // Drop-reason catalogs (0029, 0030) start empty in a real install; staff own
+  // them. The demo fills both, and retires one member reason so the editor
+  // shows a retired row still attached to old members.
+  const member_drop_reason = dropReasons.map((name, i) => ({
+    id: i + 1, name, description: null, retired: i === dropReasons.length - 1 ? 1 : 0,
+  }))
+  member_drop_reason[0].description = 'Left Rhode Island'
+  const volunteer_drop_reason = (content.services.volunteerDropReasons || []).map((name, i) => ({
+    id: i + 1, name, description: null, retired: 0,
+  }))
   const serviceNotes = content.services.memberServiceNotes || []
   const scNotes = content.services.memberScNotes || []
   const volunteerNotes = content.services.volunteerNotes || []
@@ -37,8 +50,8 @@ export function buildMembership (plan, content, rng) {
         memberNumber: `M-${String(vid).padStart(2, '0')}${String(mId).padStart(4, '0')}`,
         memberType: rng.pick(['Individual', 'Household']), primaryPersonId: null,
         secondaryType: null, joinDate: isoDate(addDays(BASE_DATE, -rng.int(30, 3000))),
-        status: 'Active', // ~5% flip to Inactive/Dropped in the post-pass below
-        dropReason: null,
+        status: 'Active', // ~5% flip to Pending/Dropped in the post-pass below
+        dropReason: null, dropReasonId: null,
         householdSize: rng.int(1, 2),
         // MONTHLY dues (the column's semantics — PR #93): $40/mo for most,
         // some discounted/waived. The cents values mimic rows the importer
@@ -65,6 +78,7 @@ export function buildMembership (plan, content, rng) {
       // ~5% flip to Pending/Dropped in the post-pass below
       volunteer.push({
         id: vId, personId: personId, providerType: rng.pick(['Individual', 'Couple', 'Agency']), status: 'Active',
+        dropReasonId: null, statusChangeNotes: null,
         notes: volunteerNotes.length && rng.bool(0.5) ? rng.pick(volunteerNotes) : null,
       })
       // 1-3 capabilities
@@ -85,13 +99,27 @@ export function buildMembership (plan, content, rng) {
   const fillerFirst = (rows) =>
     [...rng.shuffle(rows.filter(r => filler.has(r.personId))),
       ...rng.shuffle(rows.filter(r => !filler.has(r.personId)))]
+  // Member statuses are Active, Pending, Dropped (0029); there is no Inactive.
+  // A Dropped member mostly carries a catalog reason, as the app now writes;
+  // the rest carry only the legacy free-text dropReason, like rows that
+  // predate the catalog. The CHECKs allow a reason only on a Dropped row.
   for (const r of fillerFirst(member).slice(0, Math.round(member.length * 0.05))) {
-    r.status = rng.pick(['Inactive', 'Dropped'])
-    r.dropReason = rng.pick(dropReasons)
+    r.status = rng.pick(['Pending', 'Dropped'])
+    const legacy = rng.pick(dropReasons)
+    if (r.status !== 'Dropped') continue
+    if (xrng.bool(0.7)) r.dropReasonId = xrng.pick(member_drop_reason).id
+    else r.dropReason = legacy
+  }
+  const volunteerNotesByStatus = {
+    Dropped: ['Asked to be removed from the call list.', 'Returned their badge at the office.'],
+    Pending: ['Application received; waiting on references.', 'Orientation scheduled for next month.'],
   }
   fillerFirst(volunteer).slice(0, Math.round(volunteer.length * 0.05))
-    .forEach((r, i) => { r.status = i % 2 ? 'Dropped' : 'Pending' })
-  // Dropped rows carry no dropReasonId: the drop-reason list starts empty (0030)
+    .forEach((r, i) => {
+      r.status = i % 2 ? 'Dropped' : 'Pending'
+      if (r.status === 'Dropped' && volunteer_drop_reason.length && xrng.bool(0.75)) r.dropReasonId = xrng.pick(volunteer_drop_reason).id
+      if (xrng.bool(0.5)) r.statusChangeNotes = xrng.pick(volunteerNotesByStatus[r.status])
+    })
 
   // ~handful of disabilities across members
   const memberPersonIds = [...new Set(member.map(m => m.personId))]
@@ -103,5 +131,6 @@ export function buildMembership (plan, content, rng) {
     })
   }
 
-  return { member, volunteer, disability, vetting_type, volunteer_capability, volunteer_vetting, person_disability }
+  return { member, volunteer, disability, vetting_type, volunteer_capability, volunteer_vetting, person_disability,
+    member_drop_reason, volunteer_drop_reason }
 }
