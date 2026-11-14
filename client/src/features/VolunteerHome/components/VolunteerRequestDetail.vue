@@ -134,8 +134,9 @@ function formatDateOnly(serviceDate) {
   return formatServiceDate(serviceDate) || null
 }
 
-// Round Trip requests have four distinct legs (start, arrive/apptTime,
-// return, finish); everything else is a single start/finish span. Ported
+// A Round Trip with an Arrive or Return time shows four times (start,
+// arrive/apptTime, return, finish); everything else, including a Round Trip
+// with only Start and Finish, is a single start/finish span. Ported
 // from ServiceRequestDetail.vue's timeDisplay. Times are 'HH:MM:SS' civil
 // strings rendered via timeStringToLabel — never new Date(). timesFlexible
 // means no specific times were set.
@@ -146,7 +147,9 @@ const timeDisplay = computed(() => {
   if (!r.startTime && !r.finishTime) return null
   const start = timeStringToLabel(r.startTime)
   const finish = timeStringToLabel(r.finishTime)
-  if (r.transportationType === 'Round Trip') {
+  // Arrive and Return are optional: with both blank the trip is just Start
+  // to Finish, shown on the one line rather than as rows of dashes.
+  if (r.transportationType === 'Round Trip' && (r.apptTime || r.returnTime)) {
     return [
       { label: 'Start / Arrive', value: [start, timeStringToLabel(r.apptTime)].map(t => t ?? '—').join(' - ') },
       { label: 'Return / Finish', value: [timeStringToLabel(r.returnTime), finish].map(t => t ?? '—').join(' - ') }

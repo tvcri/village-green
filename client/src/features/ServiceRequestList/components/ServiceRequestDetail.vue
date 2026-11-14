@@ -76,7 +76,9 @@ const timeDisplay = computed(() => {
   if (!r.startTime && !r.finishTime) return null
   const start = timeStringToLabel(r.startTime)
   const finish = timeStringToLabel(r.finishTime)
-  if (r.requestNumber == null && r.transportationType === 'Round Trip') {
+  // Arrive and Return are optional: with both blank the trip is just Start
+  // to Finish, shown on the one line rather than as rows of dashes.
+  if (r.requestNumber == null && r.transportationType === 'Round Trip' && (r.apptTime || r.returnTime)) {
     return [
       { label: 'Start / Arrive', value: [start, timeStringToLabel(r.apptTime)].map(t => t ?? '—').join(' - ') },
       { label: 'Return / Finish', value: [timeStringToLabel(r.returnTime), finish].map(t => t ?? '—').join(' - ') }

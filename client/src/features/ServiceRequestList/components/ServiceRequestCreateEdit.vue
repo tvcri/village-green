@@ -642,12 +642,14 @@ for (let mins = 0; mins < 24 * 60; mins += 15) {
   timeSlotOptions.push({ label: minutesToLabel(mins), value: mins })
 }
 
-// Each later time field may only select a slot after the field before it, but
-// the field's own current value is always included so an existing/loaded value
-// renders even if it would otherwise be filtered out (e.g. on edit).
-const slotsAfter = (after, current) => {
-  if (after == null) return timeSlotOptions
-  return timeSlotOptions.filter(o => o.value > after || o.value === current)
+// Each later time field may only select a slot after the nearest filled time
+// before it and, for Arrive and Return, before the nearest filled time after
+// it. The field's own current value is always included so an existing/loaded
+// value renders even if it would otherwise be filtered out (e.g. on edit).
+const slotsBetween = (after, before, current) => {
+  if (after == null && before == null) return timeSlotOptions
+  return timeSlotOptions.filter(o =>
+    ((after == null || o.value > after) && (before == null || o.value < before)) || o.value === current)
 }
 
 // The 15-minute grid is a data-entry aid, not a storage constraint: legacy
@@ -669,48 +671,66 @@ const startOptions = computed(() => withCurrentValue([
   ...timeSlotOptions.filter(o => o.value >= START_OF_DAY),
   ...timeSlotOptions.filter(o => o.value < START_OF_DAY)
 ], form.value.startTime))
-const apptOptions = computed(() => withCurrentValue(slotsAfter(form.value.startTime, form.value.apptTime), form.value.apptTime))
-const returnOptions = computed(() => withCurrentValue(slotsAfter(form.value.apptTime, form.value.returnTime), form.value.returnTime))
-const finishOptions = computed(() =>
-  withCurrentValue(
-    slotsAfter(
-      form.value.transportationType === 'Round Trip'
-        ? form.value.returnTime
-        : form.value.startTime,
-      form.value.finishTime
-    ),
-    form.value.finishTime
-  )
-)
+// The time fields in trip order, with the word each one's error message uses.
+// Only Start and Finish are required: a Round Trip's Arrive and Return are
+// optional, so a coordinator can enter "pick up at 10, home by noon" alone.
+const TIME_LABELS = { startTime: 'Start', apptTime: 'Arrive', returnTime: 'Return', finishTime: 'Finish' }
+const timeFieldOrder = computed(() => form.value.transportationType === 'Round Trip'
+  ? ['startTime', 'apptTime', 'returnTime', 'finishTime']
+  : ['startTime', 'finishTime'])
 
-// When an earlier time field changes, it narrows the option list of later
-// fields (see slotsAfter above). If a later field's current value falls
-// outside its new option list, clear it rather than leaving a selected value
-// that's no longer valid. This never writes a new value into another field —
-// only clears ones that became invalid. Clearing the earlier field itself
-// (val == null) also clears its dependent, since slotsAfter(null, ...)
-// otherwise treats "no earlier value" as "nothing is filtered out".
-const clearIfInvalid = (field, upstreamVal, options) => {
-  const val = form.value[field]
-  if (val == null) return
-  if (upstreamVal == null || !options.some(o => o.value === val)) form.value[field] = null
+// The nearest field before (step -1) or after (step 1) this one that holds a
+// time. A blank optional field in between is skipped, not treated as a
+// boundary.
+const nearestFilledField = (field, step) => {
+  const order = timeFieldOrder.value
+  for (let i = order.indexOf(field) + step; i >= 0 && i < order.length; i += step) {
+    if (form.value[order[i]] != null) return order[i]
+  }
+  return null
+}
+const nearestFilledTime = (field, step) => {
+  const other = nearestFilledField(field, step)
+  return other == null ? null : form.value[other]
 }
 
-watch(() => form.value.startTime, (val) => {
-  if (!formLoaded.value) return
-  clearIfInvalid('apptTime', val, apptOptions.value)
-}, { flush: 'sync' })
+// The first time that is not after the nearest filled time before it, as
+// { field, prev }, or null when every filled time is in order. Save's check
+// (timeOutOfOrder below) reads this; the option lists apply the same rule.
+const firstTimeOutOfOrder = () => {
+  for (const field of timeFieldOrder.value.slice(1)) {
+    const prev = nearestFilledField(field, -1)
+    if (form.value[field] != null && prev != null && form.value[field] <= form.value[prev]) return { field, prev }
+  }
+  return null
+}
 
-watch(() => form.value.apptTime, (val) => {
-  if (!formLoaded.value) return
-  clearIfInvalid('returnTime', val, returnOptions.value)
-}, { flush: 'sync' })
+// Finish has no later time to stop at; Start keeps its own list (startOptions)
+// so a coordinator can still move it past the times after it.
+const optionsFor = (field) => withCurrentValue(
+  slotsBetween(nearestFilledTime(field, -1), field === 'finishTime' ? null : nearestFilledTime(field, 1), form.value[field]),
+  form.value[field]
+)
+const apptOptions = computed(() => optionsFor('apptTime'))
+const returnOptions = computed(() => optionsFor('returnTime'))
+const finishOptions = computed(() => optionsFor('finishTime'))
 
-watch([() => form.value.returnTime, () => form.value.startTime, () => form.value.transportationType], ([returnVal, startVal, transportationType]) => {
-  if (!formLoaded.value) return
-  const upstreamVal = transportationType === 'Round Trip' ? returnVal : startVal
-  clearIfInvalid('finishTime', upstreamVal, finishOptions.value)
-}, { flush: 'sync' })
+// When a coordinator changes a time, any later time that is no longer after it
+// is cleared rather than left holding a value its list no longer offers. Only
+// the times after the edited one are checked, and only against the edited
+// value: a stored request that already held times out of order keeps them
+// until Save reports it, instead of an unrelated edit quietly dropping one.
+// A blank field clears nothing, since Arrive and Return are optional.
+const clearLaterTimes = (field, val) => {
+  if (!formLoaded.value || val == null) return
+  const order = timeFieldOrder.value
+  for (const later of order.slice(order.indexOf(field) + 1)) {
+    if (form.value[later] != null && form.value[later] <= val) form.value[later] = null
+  }
+}
+watch(() => form.value.startTime, (val) => clearLaterTimes('startTime', val), { flush: 'sync' })
+watch(() => form.value.apptTime, (val) => clearLaterTimes('apptTime', val), { flush: 'sync' })
+watch(() => form.value.returnTime, (val) => clearLaterTimes('returnTime', val), { flush: 'sync' })
 
 watch(() => form.value.timesFlexible, (flex) => {
   if (!formLoaded.value || !flex) return
@@ -751,7 +771,7 @@ const rideLacksFirstDestination = computed(() =>
 // blank one, which means "no destination". Hidden blocks can't be fixed and save
 // as [], so they never fail. Beyond the Ride rule above this stays out of
 // isFormValid, so Save can be clicked and explain itself (see the note above
-// timesInOrder).
+// timeOutOfOrder).
 const hasInvalidDestination = computed(() => {
   if (!showLocationFields.value) return false
   const blocks = form.value.destinations
@@ -779,25 +799,19 @@ const isFormValid = computed(() => {
   return true
 })
 
-// Same pairwise relationships slotsAfter uses to filter each field's option
-// list, re-checked at submit time by handleSubmit (not gated here in
+// The same nearest-filled-predecessor rule slotsBetween uses to filter each
+// field's option list, re-checked at submit time by handleSubmit (not gated here in
 // isFormValid, since a disabled Save button can't be clicked to explain
-// itself). clearIfInvalid (above) only runs once the form is loaded, so a
+// itself). The clearing watcher (above) only runs once the form is loaded, so a
 // request edited from stored data with an already inconsistent time
 // sequence (e.g. written before this validation existed, or imported) can
 // render without being auto-cleared — this is what handleSubmit catches.
-const timesInOrder = computed(() => {
-  const f = form.value
-  // apptTime/returnTime are Round-Trip-only. Guard on transportationType so a
-  // stale value left over from switching Round Trip -> One Way can't fail a
-  // valid One Way (whose payload nulls them anyway).
-  if (f.transportationType === 'Round Trip') {
-    if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) return false
-    if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) return false
-  }
-  const finishAfter = f.transportationType === 'Round Trip' ? f.returnTime : f.startTime
-  if (f.finishTime != null && finishAfter != null && f.finishTime <= finishAfter) return false
-  return true
+// apptTime/returnTime are Round-Trip-only: timeFieldOrder leaves them out of a
+// One Way, so a stale value left over from switching Round Trip -> One Way
+// can't fail a valid One Way (whose payload nulls them anyway).
+const timeOutOfOrder = computed(() => {
+  const bad = firstTimeOutOfOrder()
+  return bad && `${TIME_LABELS[bad.field]} time must be after ${TIME_LABELS[bad.prev]} time`
 })
 
 // After creating a request, clear the form for another entry but keep the
@@ -898,33 +912,21 @@ const handleSubmit = async (notify = false) => {
       }
 
       if (!form.value.timesFlexible) {
-        const requiredTimes = form.value.transportationType === 'Round Trip'
-          ? [form.value.startTime, form.value.apptTime, form.value.returnTime, form.value.finishTime]
-          : [form.value.startTime, form.value.finishTime]
-        if (requiredTimes.some((t) => t == null)) {
-          toast.add({ severity: 'error', summary: 'Error', detail: `Enter all times for ${form.value.transportationType}, or check "Times flexible"`, life: 3000 })
+        if (form.value.startTime == null || form.value.finishTime == null) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Enter Start and Finish times, or check "Times flexible"', life: 3000 })
           return
         }
       }
     }
 
-    if (!form.value.timesFlexible && !timesInOrder.value) {
-      const f = form.value
-      const isRoundTrip = f.transportationType === 'Round Trip'
-      if (isRoundTrip && f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time must be after Start time', life: 3000 })
-      } else if (isRoundTrip && f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Return time must be after Arrival time', life: 3000 })
-      } else {
-        const finishAfterLabel = f.transportationType === 'Round Trip' ? 'Return' : 'Start'
-        toast.add({ severity: 'error', summary: 'Error', detail: `Finish time must be after ${finishAfterLabel} time`, life: 3000 })
-      }
+    if (!form.value.timesFlexible && timeOutOfOrder.value) {
+      toast.add({ severity: 'error', summary: 'Error', detail: timeOutOfOrder.value, life: 3000 })
       return
     }
 
     // Mirrors API rule 3: a Completed request must credit a volunteer. Checked
     // here rather than in isFormValid so it can explain itself (see the note
-    // above timesInOrder).
+    // above timeOutOfOrder).
     if (computedStatus.value === 'Completed' && !form.value.volunteerPersonId) {
       toast.add({
         severity: 'error',

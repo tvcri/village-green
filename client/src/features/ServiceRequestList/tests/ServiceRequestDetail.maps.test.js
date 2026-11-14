@@ -82,3 +82,32 @@ describe('ServiceRequestDetail maps', () => {
     expect(getByText('Always Show Maps')).toBeTruthy()
   })
 })
+
+describe('ServiceRequestDetail round trip times', () => {
+  afterEach(() => cleanup())
+
+  async function mountTimes(times) {
+    mockGet.mockResolvedValue({
+      ...base, requestNumber: null, transportationType: 'Round Trip', timesFlexible: false,
+      destinations: [dest('CVS', null, null)], ...times
+    })
+    const utils = render(ServiceRequestDetail, { global: { plugins: [PrimeVue] } })
+    await waitFor(() => utils.getByText(/Ride: Medical/))
+    return utils
+  }
+
+  it('Start and Finish only: one Start / Finish line', async () => {
+    const { queryByText, getByText } = await mountTimes({
+      startTime: '10:00:00', apptTime: null, returnTime: null, finishTime: '12:00:00'
+    })
+    expect(getByText('Start / Finish:')).toBeTruthy()
+    expect(queryByText('Start / Arrive:')).toBeNull()
+  })
+
+  it('with Return set: the two Round Trip lines', async () => {
+    const { getByText } = await mountTimes({
+      startTime: '10:00:00', apptTime: null, returnTime: '11:30:00', finishTime: '12:00:00'
+    })
+    expect(getByText('Start / Arrive:')).toBeTruthy()
+  })
+})

@@ -82,3 +82,37 @@ describe('VolunteerRequestDetail maps', () => {
     expect(container.querySelector('a[href="tel:401-555-0100"]')).toBeNull()
   })
 })
+
+// Arrive and Return are optional on a Round Trip. When both are blank the
+// request is "pick up at Start, home by Finish", so show the one Start / Finish
+// line rather than two rows of dashes that read as missing data.
+describe('VolunteerRequestDetail round trip times', () => {
+  afterEach(() => cleanup())
+
+  async function mountTimes(times) {
+    mockGet.mockResolvedValue({
+      ...base, transportationType: 'Round Trip', timesFlexible: false,
+      destinations: [dest('CVS', null, null)], ...times
+    })
+    const utils = render(VolunteerRequestDetail, { global: { plugins: [PrimeVue, ToastService, ConfirmationService] } })
+    await waitFor(() => utils.getByText(/Ride: Medical/))
+    return utils
+  }
+
+  it('Start and Finish only: one Start / Finish line', async () => {
+    const { queryByText, getByText } = await mountTimes({
+      startTime: '10:00:00', apptTime: null, returnTime: null, finishTime: '12:00:00'
+    })
+    expect(getByText('Start / Finish:')).toBeTruthy()
+    expect(getByText('10:00 AM / 12:00 PM')).toBeTruthy()
+    expect(queryByText('Start / Arrive:')).toBeNull()
+  })
+
+  it('with Arrive set: the two Round Trip lines', async () => {
+    const { getByText } = await mountTimes({
+      startTime: '10:00:00', apptTime: '10:30:00', returnTime: null, finishTime: '12:00:00'
+    })
+    expect(getByText('Start / Arrive:')).toBeTruthy()
+    expect(getByText('Return / Finish:')).toBeTruthy()
+  })
+})

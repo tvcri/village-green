@@ -695,7 +695,7 @@ describe('ServiceRequestCreateEdit start section', () => {
     vm.form.startTime = 840   // 14:00
     vm.form.finishTime = 885  // 14:45
     vm.form.apptTime = 0      // stale 00:00, <= startTime — would falsely fail if not gated
-    await waitFor(() => expect(unref(vm.timesInOrder)).toBe(true))
+    await waitFor(() => expect(unref(vm.timeOutOfOrder)).toBeNull())
   })
 
   it('switching Round Trip -> One Way clears Arrive and Return', async () => {
@@ -1594,20 +1594,20 @@ describe('several destinations on a request', () => {
     await waitFor(() => expect(unref(vm.isFormValid)).toBe(false))
   })
 
-  it('round trip time validation is unchanged with two destinations', async () => {
+  it('round trip time validation is the same with two destinations', async () => {
     const vm = await mountEditAndExpose({ ...stored, timesFlexible: false })
     await waitFor(() => expect(vm.form.destinations).toHaveLength(2))
     vm.form.startTime = 540
-    vm.form.finishTime = 720
 
     await vm.handleSubmit(false)
     expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
-      detail: 'Enter all times for Round Trip, or check "Times flexible"'
+      detail: 'Enter Start and Finish times, or check "Times flexible"'
     }))
     await expectNotSaved()
 
     vm.form.apptTime = 600
     vm.form.returnTime = 660
+    vm.form.finishTime = 720
     const payload = await savedPayload(vm)
     expect(payload).toMatchObject({
       startTime: '09:00:00', apptTime: '10:00:00', returnTime: '11:00:00', finishTime: '12:00:00'
@@ -1628,6 +1628,178 @@ describe('several destinations on a request', () => {
     await savedPayload(vm)
     await waitFor(() => expect(vm.form.destinations).toHaveLength(1))
     expect(vm.form.destinations[0].destination).toBe('')
+  })
+})
+
+// A Round Trip needs only Start and Finish. Arrive and Return are optional, so
+// a coordinator can enter "pick up at 10, home by noon" without inventing the
+// interior times. Each time is checked against the nearest earlier time that is
+// filled in.
+describe('round trip times: Start and Finish required, Arrive and Return optional', () => {
+  const roundTrip = {
+    serviceRequestId: 1, requestNumber: 1, villageId: '1', memberPersonId: '7',
+    serviceName: 'Ride: Medical Appnt', transportationType: 'Round Trip',
+    serviceDate: '2026-08-01', status: 'Open', volunteerPersonId: null,
+    timesFlexible: false,
+    startTime: null, apptTime: null, returnTime: null, finishTime: null,
+    destinations: [{
+      destination: 'Newport Hospital', address: '11 Friendship St', city: 'Newport',
+      state: 'RI', zip: '02840', phone: null
+    }]
+  }
+
+  async function mountRoundTrip (times = {}) {
+    const vm = await mountEditAndExpose({ ...roundTrip, ...times })
+    await waitFor(() => expect(vm.form.destinations).toHaveLength(1))
+    return vm
+  }
+
+  async function submit (vm) {
+    const { apiCall } = await import('../../../shared/api/apiClient.js')
+    apiCall.mockResolvedValue({ serviceRequestId: 1, requestNumber: 1 })
+    await vm.handleSubmit(false)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    return apiCall.mock.calls.at(-1)?.[2] ?? null
+  }
+
+  const optionValues = (opts) => unref(opts).map(o => o.value)
+
+  it('saves with only Start and Finish', async () => {
+    const vm = await mountRoundTrip()
+    vm.form.startTime = 600   // 10:00
+    vm.form.finishTime = 720  // 12:00
+    const payload = await submit(vm)
+    expect(payload).toMatchObject({
+      startTime: '10:00:00', apptTime: null, returnTime: null, finishTime: '12:00:00'
+    })
+  })
+
+  it('saves with Arrive filled and Return blank', async () => {
+    const vm = await mountRoundTrip()
+    vm.form.startTime = 600
+    vm.form.apptTime = 630
+    vm.form.finishTime = 720
+    const payload = await submit(vm)
+    expect(payload).toMatchObject({ apptTime: '10:30:00', returnTime: null })
+  })
+
+  it('still requires Finish', async () => {
+    const vm = await mountRoundTrip()
+    vm.form.startTime = 600
+    vm.form.apptTime = 630
+    vm.form.returnTime = 660
+    expect(await submit(vm)).toBeNull()
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Enter Start and Finish times, or check "Times flexible"'
+    }))
+  })
+
+  it('still requires Start on a One Way', async () => {
+    const vm = await mountRoundTrip({ transportationType: 'One Way' })
+    vm.form.finishTime = 720
+    expect(await submit(vm)).toBeNull()
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Enter Start and Finish times, or check "Times flexible"'
+    }))
+  })
+
+  it('offers Return times after Start when Arrive is blank', async () => {
+    const vm = await mountRoundTrip({ startTime: '10:00:00' })
+    const values = optionValues(vm.returnOptions)
+    expect(Math.min(...values)).toBe(615)
+  })
+
+  it('offers Finish times after Arrive when Return is blank', async () => {
+    const vm = await mountRoundTrip({ startTime: '10:00:00', apptTime: '10:30:00' })
+    const values = optionValues(vm.finishOptions)
+    expect(Math.min(...values)).toBe(645)
+  })
+
+  it('offers Finish times after Start when Arrive and Return are blank', async () => {
+    const vm = await mountRoundTrip({ startTime: '10:00:00' })
+    const values = optionValues(vm.finishOptions)
+    expect(Math.min(...values)).toBe(615)
+  })
+
+  it('changing Start keeps a Finish that is still after it', async () => {
+    const vm = await mountRoundTrip({ startTime: '10:00:00', finishTime: '12:00:00' })
+    vm.form.startTime = 570  // 9:30
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(vm.form.finishTime).toBe(720)
+  })
+
+  it('moving Start past Finish clears Finish', async () => {
+    const vm = await mountRoundTrip({ startTime: '10:00:00', finishTime: '12:00:00' })
+    vm.form.startTime = 750  // 12:30
+    await waitFor(() => expect(vm.form.finishTime).toBeNull())
+  })
+
+  it('clearing Arrive keeps Return and Finish', async () => {
+    const vm = await mountRoundTrip({
+      startTime: '10:00:00', apptTime: '10:30:00', returnTime: '11:30:00', finishTime: '12:00:00'
+    })
+    vm.form.apptTime = null
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(vm.form.returnTime).toBe(690)
+    expect(vm.form.finishTime).toBe(720)
+  })
+
+  it('blocks a Finish that is not after Arrive when Return is blank', async () => {
+    const vm = await mountRoundTrip({
+      startTime: '10:00:00', apptTime: '11:00:00', finishTime: '11:00:00'
+    })
+    expect(await submit(vm)).toBeNull()
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Finish time must be after Arrive time'
+    }))
+  })
+
+  // Entering Start and Finish first, then adding an interior time, is the
+  // workflow this change exists for: the interior lists stop before the next
+  // filled time so the pick can't silently clear it.
+  it('offers Arrive times before Finish when Start and Finish are set', async () => {
+    const vm = await mountRoundTrip({ startTime: '10:00:00', finishTime: '12:00:00' })
+    const values = optionValues(vm.apptOptions)
+    expect(Math.min(...values)).toBe(615)
+    expect(Math.max(...values)).toBe(705)
+  })
+
+  it('offers Return times before Finish', async () => {
+    const vm = await mountRoundTrip({ startTime: '10:00:00', finishTime: '12:00:00' })
+    expect(Math.max(...optionValues(vm.returnOptions))).toBe(705)
+  })
+
+  it('offers Arrive times before Return when Return is set', async () => {
+    const vm = await mountRoundTrip({
+      startTime: '10:00:00', returnTime: '11:30:00', finishTime: '12:00:00'
+    })
+    expect(Math.max(...optionValues(vm.apptOptions))).toBe(675)
+  })
+
+  // A stored or imported request can already hold times out of order. Editing
+  // one time must not quietly clear a different, untouched one; Save's check
+  // names the problem instead.
+  it('editing Finish leaves an untouched out-of-order Arrive for Save to report', async () => {
+    const vm = await mountRoundTrip({
+      startTime: '10:00:00', apptTime: '09:30:00', returnTime: '11:00:00', finishTime: '12:00:00'
+    })
+    vm.form.finishTime = 735
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(vm.form.apptTime).toBe(570)
+    expect(await submit(vm)).toBeNull()
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Arrive time must be after Start time'
+    }))
+  })
+
+  it('blocks a Return that is not after Start when Arrive is blank', async () => {
+    const vm = await mountRoundTrip({
+      startTime: '10:00:00', returnTime: '10:00:00', finishTime: '12:00:00'
+    })
+    expect(await submit(vm)).toBeNull()
+    expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Return time must be after Start time'
+    }))
   })
 })
 
