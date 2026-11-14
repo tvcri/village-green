@@ -206,7 +206,7 @@ export async function seed () {
         [sr.id, sr.requestNumber, sr.villageId, sr.memberPersonId, sr.volunteerPersonId,
           sr.status, sr.serviceName, sr.destination, sr.transportationType ?? null, sr.serviceDate, sr.finishTime],
       )
-      // Mirrors the 0032 backfill, which ran over an empty table: one child row
+      // Mirrors the 0034 backfill, which ran over an empty table: one child row
       // for each request with a destination.
       if (sr.destination) {
         await conn.query(

@@ -6,7 +6,7 @@ import { tokens } from '../../lib/context.js'
 import { serviceRequests as sr, villages, persons } from '../../setup/fixtures.js'
 import { auditRows } from '../audit/lib.js'
 
-// The harness scaffold marks 0032 executed, so its backfill never sees fixture
+// The harness scaffold marks 0034 executed, so its backfill never sees fixture
 // rows; seed.js inserts the child rows the backfill would have. These pin that
 // seeded state (and the shape of the table), not the migration's SQL: the
 // backfill itself is proven against a production dump.
