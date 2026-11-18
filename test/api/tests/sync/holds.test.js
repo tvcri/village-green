@@ -39,6 +39,15 @@ test('open a batch and read it back', async () => {
   assert.ok(res.json.every(h => open.some(o => o.holdId === h.holdId)))
 })
 
+test('a new hold reads back the resolution and closer columns as null', async () => {
+  const [h] = (await create([hold()])).json
+  const got = await byId(h.holdId)
+  assert.equal(got.resolution, null)
+  assert.equal(got.resolvedAt, null)
+  assert.equal(got.resolvedUserId, null)
+  assert.equal(got.closedUserId, null)
+})
+
 test('duplicate open hold is refused with 409 naming the item', async () => {
   const h = hold()
   assert.equal((await create([h])).status, 200)

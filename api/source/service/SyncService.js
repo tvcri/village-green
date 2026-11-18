@@ -137,7 +137,8 @@ module.exports.putFields = async function (items) {
 
 const HOLD_COLUMNS = `CAST(holdId AS CHAR) AS holdId, lglConstituentId, CAST(personId AS CHAR) AS personId,
   field, reason, detail, fingerprint, state, dismissalKind, firstSeenAt, lastSeenAt, closedAt, dismissedAt,
-  CAST(dismissedUserId AS CHAR) AS dismissedUserId, note`
+  CAST(dismissedUserId AS CHAR) AS dismissedUserId, note, resolution, resolvedAt,
+  CAST(resolvedUserId AS CHAR) AS resolvedUserId, CAST(closedUserId AS CHAR) AS closedUserId`
 // Runs a write that may hit sync_hold_open, the one-open-hold-per-subject key,
 // and turns that collision into a 409 naming the batch item.
 async function guardOpenCollision (i, write) {

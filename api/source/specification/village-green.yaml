@@ -3709,7 +3709,8 @@ components:
       type: object
       additionalProperties: false
       required: [holdId, lglConstituentId, personId, field, reason, detail, fingerprint, state, dismissalKind,
-        firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note]
+        firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note, resolution, resolvedAt,
+        resolvedUserId, closedUserId]
       properties:
         holdId: { $ref: '#/components/schemas/StringIntId' }
         lglConstituentId: { type: string }
@@ -3727,6 +3728,13 @@ components:
         dismissedAt: { type: string, format: date-time, nullable: true }
         dismissedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
         note: { type: string, nullable: true }
+        resolution:
+          description: >-
+            The staff answer for an unlinked donor ({kind: link, personId} or
+            {kind: create}), or null. Carried out by the sync.
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        resolvedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        closedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
     SyncFieldPut:
       type: object
       additionalProperties: false
