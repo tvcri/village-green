@@ -172,6 +172,7 @@ const breadcrumbs = computed(() => {
     { label: 'Service Requests', name: 'meta-service-requests' },
     { label: 'Friends', name: 'meta-friends' },
     { label: 'Mailing Labels', name: 'meta-mailing-labels' },
+    { label: 'LGL sync', name: 'meta-sync-holds' },
   ]
   const otherMetaSections = (current) => META_SECTIONS
     .filter(s => s.name !== current)
@@ -244,6 +245,10 @@ const breadcrumbs = computed(() => {
     case 'meta-mailing-labels':
       crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
       crumbs.push({ label: 'Mailing Labels', siblings: otherMetaSections('meta-mailing-labels') })
+      break
+    case 'meta-sync-holds':
+      crumbs.push({ label: 'Hub', route: { name: 'meta' }, siblings: metaSiblings })
+      crumbs.push({ label: 'LGL sync', siblings: otherMetaSections('meta-sync-holds') })
       break
     case 'friends':
       crumbs.push({ label: 'Friends', siblings: getSiblings('friends', { villageId: vId }) })

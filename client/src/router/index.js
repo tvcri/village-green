@@ -231,6 +231,12 @@ const routes = [
     meta: { requiresPermission: 'person:read' },
   },
   {
+    path: '/meta/sync-holds',
+    name: 'meta-sync-holds',
+    component: () => import('../features/SyncHolds/components/SyncHolds.vue'),
+    meta: { requiresPermission: 'sync:read' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: { template: '<div style="padding: 2rem;"><h1>Page not found</h1></div>' },
