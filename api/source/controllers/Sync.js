@@ -41,8 +41,8 @@ module.exports.putSyncFields = async function putSyncFields (req, res, next) {
 module.exports.getSyncHolds = async function getSyncHolds (req, res, next) {
   try {
     assertSync(req.userObject, 'read')
-    const { state, personId, lglConstituentId } = req.query
-    res.json(await SyncService.getHolds({ states: state, personId, lglConstituentId }))
+    const { state, personId, lglConstituentId, projection } = req.query
+    res.json(await SyncService.getHolds({ states: state, personId, lglConstituentId, projection }))
   }
   catch (err) { next(err) }
 }

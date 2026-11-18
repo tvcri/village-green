@@ -206,6 +206,36 @@ test('close refuses other reasons and non-open holds', async () => {
   assert.equal((await byId(other.holdId)).state, 'open')
 })
 
+test('persons projection names the person, candidates and resolution target', async () => {
+  const mk = async () => (await vgCall('createPerson', {}, { token: tokens.users.staff, body: { villageId: null, firstName: 'Proj', lastName: uniq('Ection') } })).json.personId
+  const [a, b, c] = [await mk(), await mk(), await mk()]
+  const [h] = (await create([hold({ personId: null, field: null, reason: 'name-only', detail: { candidates: [a, b, '999999999'] } })])).json
+  await vgCall('createSyncHoldResolution', { holdId: h.holdId }, { token: tokens.users.admin, body: { kind: 'link', personId: c } })
+  const got = (await list({ lglConstituentId: h.lglConstituentId, projection: ['persons'] })).json[0]
+  assert.deepEqual(got.persons.map(p => p.personId), [a, b, c])
+  for (const p of got.persons) {
+    assert.match(p.fullName, /^Ection/)
+    assert.match(p.displayName, /^Proj /)
+    assert.equal(p.isDonor, false)
+  }
+})
+
+test('without the projection there is no persons property', async () => {
+  const [h] = (await create([hold()])).json
+  const got = (await list({ lglConstituentId: h.lglConstituentId })).json[0]
+  assert.equal('persons' in got, false)
+  assert.equal('users' in got, false)
+})
+
+test('users projection names who dismissed', async () => {
+  const [h] = (await create([hold()])).json
+  await dismiss(h.holdId, { dismissalKind: 'staff' }, tokens.users.admin)
+  const got = (await list({ state: ['dismissed'], lglConstituentId: h.lglConstituentId, projection: ['users'] })).json[0]
+  assert.equal(got.users.length, 1)
+  assert.equal(got.users[0].userId, String(users.admin.userId))
+  assert.ok(got.users[0].displayName)
+})
+
 test('state filter', async () => {
   const [o] = (await create([hold()])).json
   const [d] = (await create([hold({ state: 'dismissed', dismissalKind: 'rule' })])).json

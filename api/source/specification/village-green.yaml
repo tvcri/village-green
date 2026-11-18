@@ -3434,6 +3434,17 @@ paths:
           schema: { type: array, items: { type: string, enum: [open, closed, dismissed] }, default: [open] }
         - { name: personId, in: query, required: false, schema: { $ref: '#/components/schemas/StringIntId' } }
         - { name: lglConstituentId, in: query, required: false, schema: { type: string, maxLength: 50 } }
+        - name: projection
+          in: query
+          required: false
+          description: >-
+            persons adds `persons`, the VG people the hold mentions (its person,
+            detail.candidates, the resolution's person; ids not in VG are left
+            out). users adds `users`, the staff who dismissed, resolved or
+            closed it.
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string, enum: [persons, users] }, default: [] }
       responses:
         '200': { description: Holds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncHold' } } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -3792,6 +3803,28 @@ components:
         resolvedAt: { type: string, format: date-time, nullable: true }
         resolvedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
         closedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        persons:
+          description: With projection=persons.
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [personId, fullName, displayName, isDonor]
+            properties:
+              personId: { $ref: '#/components/schemas/StringIntId' }
+              fullName: { type: string }
+              displayName: { type: string }
+              isDonor: { type: boolean }
+        users:
+          description: With projection=users.
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [userId, displayName]
+            properties:
+              userId: { $ref: '#/components/schemas/StringIntId' }
+              displayName: { type: string }
     SyncFieldPut:
       type: object
       additionalProperties: false

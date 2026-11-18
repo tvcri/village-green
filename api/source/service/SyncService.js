@@ -1,4 +1,5 @@
 'use strict';
+const mysql = require('mysql2/promise')
 const dbUtils = require('./utils')
 const config = require('../utils/config')
 const SmError = require('../utils/error')
@@ -160,13 +161,49 @@ async function holdsByIds (ids) {
   return ids.map(id => byId.get(String(id)))
 }
 
-module.exports.getHolds = async function ({ states = ['open'], personId, lglConstituentId } = {}) {
+const NAME_CLAIM_PATH = mysql.escape(`$.${config.oauth.claims.name}`)
+
+// The people a hold mentions, in order: its person, the sync's candidates,
+// the person a resolution links to. Ids not in VG are left out.
+const personIdsOf = (h) => [...new Set([h.personId, ...(h.detail?.candidates ?? []), h.resolution?.personId]
+  .filter(id => id != null).map(String))]
+const userIdsOf = (h) => [...new Set([h.dismissedUserId, h.resolvedUserId, h.closedUserId].filter(id => id != null))]
+
+async function attachPersons (rows) {
+  const ids = [...new Set(rows.flatMap(personIdsOf))].filter(id => /^[0-9]{1,10}$/.test(id))
+  const byId = new Map()
+  if (ids.length) {
+    // Base tables, not the active_* views: a dropped member is still named.
+    const [people] = await dbUtils.pool.query(
+      `SELECT CAST(p.id AS CHAR) AS personId, p.fullName, p.displayName, (d.id IS NOT NULL) AS isDonor
+       FROM person p LEFT JOIN donor d ON d.personId = p.id WHERE p.id IN (?)`, [ids])
+    for (const p of people) byId.set(p.personId, { ...p, isDonor: Boolean(p.isDonor) })
+  }
+  for (const r of rows) r.persons = personIdsOf(r).map(id => byId.get(id)).filter(Boolean)
+}
+
+async function attachUsers (rows) {
+  const ids = [...new Set(rows.flatMap(userIdsOf))]
+  const byId = new Map()
+  if (ids.length) {
+    const [found] = await dbUtils.pool.query(
+      `SELECT CAST(userId AS CHAR) AS userId,
+         COALESCE(JSON_UNQUOTE(JSON_EXTRACT(lastClaims, ${NAME_CLAIM_PATH})), username) AS displayName
+       FROM user_data WHERE userId IN (?)`, [ids])
+    for (const u of found) byId.set(u.userId, u)
+  }
+  for (const r of rows) r.users = userIdsOf(r).map(id => byId.get(id)).filter(Boolean)
+}
+
+module.exports.getHolds = async function ({ states = ['open'], personId, lglConstituentId, projection = [] } = {}) {
   const where = ['state IN (?)']
   const binds = [states]
   if (personId != null) { where.push('personId = ?'); binds.push(personId) }
   if (lglConstituentId != null) { where.push('lglConstituentId = ?'); binds.push(lglConstituentId) }
   const [rows] = await dbUtils.pool.query(
     `SELECT ${HOLD_COLUMNS} FROM sync_hold WHERE ${where.join(' AND ')} ORDER BY sync_hold.holdId`, binds)
+  if (projection.includes('persons')) await attachPersons(rows)
+  if (projection.includes('users')) await attachUsers(rows)
   return rows
 }
 
