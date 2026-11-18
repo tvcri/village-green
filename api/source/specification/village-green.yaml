@@ -3503,6 +3503,38 @@ paths:
         '200': { description: The dismissed hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:sync ] } ]
+  /sync/holds/{holdId}/resolution:
+    post:
+      summary: Answer who an unlinked LGL donor is
+      description: >-
+        Staff record that the donor is an existing VG person (kind link, with
+        personId) or someone new (kind create). The sync carries out the latest
+        answer on its next pass and closes the hold; until then the hold stays
+        open and the answer may be replaced. Only a hold with no personId that
+        is open, or dismissed by staff (which reopens it), can be resolved.
+        Which kinds a hold allows depends on its reason. A link is refused for
+        a person who already has a donor record or is already the answer on
+        another open hold.
+      tags: [Sync]
+      operationId: createSyncHoldResolution
+      parameters:
+        - { name: holdId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [link, create] }
+                personId: { $ref: '#/components/schemas/StringIntId' }
+                note: { type: string, maxLength: 500, nullable: true }
+      responses:
+        '200': { description: The hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
   /sync/runs:
     get:
       summary: Recent sync runs, newest first

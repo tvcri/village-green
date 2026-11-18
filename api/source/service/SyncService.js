@@ -261,6 +261,81 @@ module.exports.dismissHold = async function (holdId, { dismissalKind, note }, us
   return (await holdsByIds([holdId]))[0]
 }
 
+// ---- staff answers on holds ----
+
+// Which answers staff may give for an unlinked donor's hold, by reason. A
+// reason not listed takes none: a create would make an anonymous, deceased,
+// couple-named or last-name-less person, and the fix belongs in LGL. The
+// client mirrors this table (features/SyncHolds/lib/holdReasons.js).
+const RESOLVABLE_KINDS = {
+  'name-only': ['link', 'create'],
+  'multiple-matches': ['link', 'create'],
+  'shared-email-different-name': ['link', 'create'],
+  'same-address-last-name': ['link', 'create'],
+  'duplicate-in-lgl': ['link', 'create'],
+  'import-hold': ['link', 'create'],
+  'import-skip': ['link', 'create'],
+  'resolution-failed': ['link', 'create'],
+  'already-linked-elsewhere': ['link'],
+  'before-horizon': ['link'], // creating would override the sync's horizon policy
+}
+module.exports.RESOLVABLE_KINDS = RESOLVABLE_KINDS
+
+// Records the staff answer for an unlinked donor; the sync carries it out on
+// its next pass and closes the hold. Resolving a staff-dismissed hold reopens
+// it (staff changing their mind). The hold stays open until the sync acts,
+// and the answer may be replaced meanwhile.
+module.exports.resolveHold = async function (holdId, { kind, personId, note }, userId) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [[row]] = await connection.query(
+        'SELECT personId, reason, state, dismissalKind FROM sync_hold WHERE holdId = ? FOR UPDATE', [holdId])
+      if (!row) throw new SmError.NotFoundError(`no hold ${holdId}`)
+      if (row.personId != null) throw new SmError.UnprocessableError('only an unlinked donor\'s hold can be resolved')
+      const reopen = row.state === 'dismissed' && row.dismissalKind === 'staff'
+      if (row.state !== 'open' && !reopen) {
+        throw new SmError.UnprocessableError(`this hold is ${row.state}; only an open or staff-dismissed hold can be resolved`)
+      }
+      if (!(RESOLVABLE_KINDS[row.reason] ?? []).includes(kind)) {
+        throw new SmError.UnprocessableError(`"${kind}" is not available for this donor`)
+      }
+      if (kind === 'link' && personId == null) throw new SmError.UnprocessableError('a link needs a personId')
+      if (kind === 'create' && personId != null) throw new SmError.UnprocessableError('a create takes no personId')
+      if (kind === 'link') {
+        const [[p]] = await connection.query(
+          `SELECT p.displayName, d.lglConstituentId FROM person p LEFT JOIN donor d ON d.personId = p.id
+           WHERE p.id = ?`, [personId])
+        if (!p) throw new SmError.NotFoundError(`no person ${personId}`)
+        if (p.lglConstituentId != null) {
+          throw new SmError.UnprocessableError(`${p.displayName} is already linked to LGL donor ${p.lglConstituentId}`)
+        }
+        const [[other]] = await connection.query(
+          `SELECT lglConstituentId FROM sync_hold
+           WHERE state = 'open' AND holdId <> ? AND resolution->>'$.kind' = 'link' AND resolution->>'$.personId' = ?
+           LIMIT 1`, [holdId, String(personId)])
+        if (other) {
+          throw new SmError.UnprocessableError(`${p.displayName} is already waiting to be linked to LGL donor ${other.lglConstituentId}`)
+        }
+      }
+      const resolution = kind === 'link' ? { kind, personId: String(personId) } : { kind }
+      const sets = ['resolution = CAST(? AS JSON)', 'resolvedAt = NOW(3)', 'resolvedUserId = ?', 'note = COALESCE(?, note)']
+      if (reopen) sets.push("state = 'open'", 'dismissalKind = NULL', 'dismissedAt = NULL', 'dismissedUserId = NULL')
+      try {
+        await connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`,
+          [JSON.stringify(resolution), userId, note ?? null, holdId])
+      }
+      catch (e) {
+        if (e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)) {
+          throw new SmError.ConflictError('the sync has opened this donor\'s hold again; reload and resolve the open one')
+        }
+        throw e
+      }
+    },
+    statusObj: undefined
+  })
+  return (await holdsByIds([holdId]))[0]
+}
+
 // ---- runs (sync_run) ----
 
 const RUN_COLUMNS = `CAST(runId AS CHAR) AS runId, kind, startedAt, finishedAt, result, switches, imageRevision, policyHash,
