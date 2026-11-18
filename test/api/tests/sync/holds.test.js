@@ -178,6 +178,34 @@ test('dismiss one records kind, note and caller', async () => {
   assert.equal((await dismiss('2147483000', { dismissalKind: 'staff' })).status, 404)
 })
 
+const closure = (holdId, body = {}, token = tokens.users.admin) => vgCall('createSyncHoldClosure', { holdId }, { token, body })
+
+test('staff close sets closedAt and closedUserId', async () => {
+  const [h] = (await create([hold({ reason: 'addressee', field: null })])).json
+  const res = await closure(h.holdId, { note: 'fixed the envelope name' })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.state, 'closed')
+  assert.ok(res.json.closedAt)
+  assert.equal(res.json.closedUserId, String(users.admin.userId))
+  assert.equal(res.json.note, 'fixed the envelope name')
+})
+
+test('the sync closing a hold leaves closedUserId null', async () => {
+  const [h] = (await create([hold()])).json
+  await patch([{ holdId: h.holdId, state: 'closed' }])
+  assert.equal((await byId(h.holdId)).closedUserId, null)
+})
+
+test('close refuses other reasons and non-open holds', async () => {
+  const [other] = (await create([hold()])).json
+  assert.equal((await closure(other.holdId)).status, 422)
+  const [done] = (await create([hold({ reason: 'lgl-incomplete', field: null })])).json
+  assert.equal((await closure(done.holdId)).status, 200)
+  assert.equal((await closure(done.holdId)).status, 422)
+  assert.equal((await closure('2147483000')).status, 404)
+  assert.equal((await byId(other.holdId)).state, 'open')
+})
+
 test('state filter', async () => {
   const [o] = (await create([hold()])).json
   const [d] = (await create([hold({ state: 'dismissed', dismissalKind: 'rule' })])).json
@@ -197,4 +225,5 @@ test('staff is refused', async () => {
   assert.equal((await create([hold()], staff)).status, 403)
   assert.equal((await patch([{ holdId: '1', seen: true }], staff)).status, 403)
   assert.equal((await dismiss('1', { dismissalKind: 'staff' }, staff)).status, 403)
+  assert.equal((await closure('1', {}, staff)).status, 403)
 })

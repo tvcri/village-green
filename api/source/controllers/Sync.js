@@ -79,6 +79,14 @@ module.exports.createSyncHoldResolution = async function createSyncHoldResolutio
   catch (err) { next(err) }
 }
 
+module.exports.createSyncHoldClosure = async function createSyncHoldClosure (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.closeHoldByStaff(req.params.holdId, req.body ?? {}, req.userObject.userId))
+  }
+  catch (err) { next(err) }
+}
+
 module.exports.createSyncRun = async function createSyncRun (req, res, next) {
   try {
     assertSync(req.userObject, 'write')

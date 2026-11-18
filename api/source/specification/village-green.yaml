@@ -3482,8 +3482,10 @@ paths:
     post:
       summary: Dismiss one open hold
       description: >-
-        Records who dismissed it and how. A staff dismissal is permanent; a rule
-        dismissal is reconsidered by the sync when its facts change.
+        Records who dismissed it and how. A dismissed field hold reopens when
+        either value changes. A staff-dismissed unlinked donor is never matched
+        again unless staff resolve it. A dismissal loaded from the import's
+        review stays dismissed.
       tags: [Sync]
       operationId: createSyncHoldDismissal
       parameters:
@@ -3533,6 +3535,29 @@ paths:
                 note: { type: string, maxLength: 500, nullable: true }
       responses:
         '200': { description: The hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
+  /sync/holds/{holdId}/closure:
+    post:
+      summary: Close a hold a person finished in LGL
+      description: >-
+        Only for the reasons the sync never closes itself (addressee,
+        lgl-incomplete), and only while open. Records who closed it.
+      tags: [Sync]
+      operationId: createSyncHoldClosure
+      parameters:
+        - { name: holdId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: string, maxLength: 500, nullable: true }
+      responses:
+        '200': { description: The closed hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:sync ] } ]
   /sync/runs:

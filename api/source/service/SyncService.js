@@ -336,6 +336,27 @@ module.exports.resolveHold = async function (holdId, { kind, personId, note }, u
   return (await holdsByIds([holdId]))[0]
 }
 
+// Reasons the sync never closes itself: a person closes them after doing
+// something in LGL.
+const STAFF_CLOSED_REASONS = ['addressee', 'lgl-incomplete']
+module.exports.STAFF_CLOSED_REASONS = STAFF_CLOSED_REASONS
+
+module.exports.closeHoldByStaff = async function (holdId, { note } = {}, userId) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [[row]] = await connection.query('SELECT reason, state FROM sync_hold WHERE holdId = ? FOR UPDATE', [holdId])
+      if (!row) throw new SmError.NotFoundError(`no hold ${holdId}`)
+      if (row.state !== 'open') throw new SmError.UnprocessableError(`only an open hold can be closed; this one is ${row.state}`)
+      if (!STAFF_CLOSED_REASONS.includes(row.reason)) throw new SmError.UnprocessableError('the sync closes this kind of hold itself')
+      await connection.query(
+        `UPDATE sync_hold SET state = 'closed', closedAt = NOW(3), closedUserId = ?, note = COALESCE(?, note)
+         WHERE holdId = ?`, [userId, note ?? null, holdId])
+    },
+    statusObj: undefined
+  })
+  return (await holdsByIds([holdId]))[0]
+}
+
 // ---- runs (sync_run) ----
 
 const RUN_COLUMNS = `CAST(runId AS CHAR) AS runId, kind, startedAt, finishedAt, result, switches, imageRevision, policyHash,
