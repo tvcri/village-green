@@ -40,6 +40,12 @@ const props = defineProps({
   donor: {
     type: Object,
     default: null
+  },
+  // Open LGL sync holds on this person (Hub person page, sync:read only).
+  // Shown as a hint in the Donor section linking to the LGL sync screen.
+  syncHoldCount: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -442,6 +448,10 @@ const copyEmail = async (email) => {
         <div class="detail-field">
           <a :href="lglConstituentUrl(donor.lglConstituentId)" target="_blank" rel="noopener">Open in LGL</a>
         </div>
+        <div v-if="syncHoldCount > 0" class="sync-hint">
+          <span>{{ syncHoldCount }} {{ syncHoldCount === 1 ? 'detail differs' : 'details differ' }} from LGL.</span>
+          <router-link :to="{ name: 'meta-sync-holds', query: { personId: String(person.personId) } }">Review in LGL sync</router-link>
+        </div>
       </div>
 
       <!-- Emergency Contact Section -->
@@ -533,6 +543,19 @@ const copyEmail = async (email) => {
   font-size: 0.9rem;
   flex-shrink: 0;
 }
+
+.sync-hint {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+  background: var(--p-amber-50);
+  color: var(--p-amber-900);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+.sync-hint a { font-weight: 600; }
 
 .donor-tag {
   background: var(--tag-donor-bg);
