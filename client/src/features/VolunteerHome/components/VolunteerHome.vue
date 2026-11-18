@@ -16,6 +16,7 @@ import { serviceDateToDate, timeStringToLabel } from '../../ServiceRequestList/l
 import { getVolunteerRequests, getVolunteerRequestVillages } from '../api/volunteerRequestApi.js'
 import { getUser } from '../../../shared/api/userApi.js'
 import { SERVICE_CATEGORIES } from '../lib/serviceCategories.js'
+import { summarize } from '../../ServiceRequestList/lib/destinations.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -296,7 +297,9 @@ function goToDetail(row) {
             <Column field="serviceDate" header="When" sortable>
               <template #body="{ data }">{{ formatWhen(data) }}</template>
             </Column>
-            <Column field="destination" header="Destination" />
+            <Column header="Destination">
+              <template #body="{ data }">{{ summarize(data.destinations, 'destination') }}</template>
+            </Column>
           </DataTable>
 
           <!-- Mobile Card List -->
@@ -316,8 +319,8 @@ function goToDetail(row) {
               <div class="card-row"><span class="label">When</span>{{ formatWhen(request) }}</div>
               <div class="card-row"><span class="label">Village</span>{{ request.villageName }}</div>
               <div class="card-row"><span class="label">Member</span>{{ memberLabel(request) }}</div>
-              <div v-if="request.destination" class="card-row">
-                <span class="label">Destination</span>{{ request.destination }}
+              <div v-if="request.destinations?.length" class="card-row">
+                <span class="label">Destination</span>{{ summarize(request.destinations, 'destination') }}
               </div>
             </div>
           </div>

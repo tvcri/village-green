@@ -561,3 +561,23 @@ test('plants: guarantees survive a tiny config', () => {
   assert.ok(ds.member.some(m => m.status !== 'Active'), 'forced inactive member')
   assert.ok(ds.volunteer.some(v => v.status !== 'Active'), 'forced inactive volunteer')
 })
+
+test('every service_request with a destination has a matching service_request_destination row', () => {
+  const ds = buildDataset(fullContentWithDest(), 1, {})
+  const rows = ds.service_request_destination
+  assert.ok(Array.isArray(rows) && rows.length > 0, 'dataset carries service_request_destination rows')
+  const bySr = new Map()
+  for (const r of rows) bySr.set(r.serviceRequestId, [...(bySr.get(r.serviceRequestId) || []), r])
+  const flat = ['destination', 'address', 'city', 'state', 'zip', 'phone']
+  let withDest = 0
+  for (const sr of ds.service_request) {
+    const has = flat.some(k => sr[k] != null && sr[k] !== '')
+    const got = bySr.get(sr.id) || []
+    if (!has) { assert.equal(got.length, 0, `SR ${sr.id} has no destination, so no row`); continue }
+    withDest += 1
+    assert.equal(got.length, 1, `SR ${sr.id} has exactly one destination row`)
+    for (const k of flat) assert.equal(got[0][k], sr[k], `SR ${sr.id} ${k} matches the final flat value`)
+  }
+  assert.ok(withDest > 0)
+  assert.equal(new Set(rows.map(r => r.id)).size, rows.length, 'destination ids are unique')
+})

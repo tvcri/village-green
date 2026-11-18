@@ -702,6 +702,25 @@ CREATE TABLE `service_request` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `service_request_destination`
+--
+
+DROP TABLE IF EXISTS `service_request_destination`;
+CREATE TABLE `service_request_destination` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `serviceRequestId` int NOT NULL,
+  `destination` text,
+  `address` text,
+  `city` varchar(100) DEFAULT NULL,
+  `state` varchar(50) DEFAULT NULL,
+  `zip` varchar(20) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `service_request_destination_sr_idx` (`serviceRequestId`),
+  CONSTRAINT `service_request_destination_sr_fk` FOREIGN KEY (`serviceRequestId`) REFERENCES `service_request` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `sync_field`
 --
 
@@ -1154,4 +1173,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-12  3:42:10
+-- Dump completed on 2026-11-14 23:25:03

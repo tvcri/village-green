@@ -431,6 +431,13 @@ module.exports.jsonArrayAgg = function ({value, orderBy = '', distinct = false})
   return `cast(concat('[', group_concat(${distinct ? 'distinct ' : ''}${value} ${orderBy ? `order by ${orderBy}` : ''}), ']') as json)`
 }
 
+// A service request's destinations as a JSON array in entry order, [] when none.
+// Ids are not exposed: they are reissued on every save.
+module.exports.srDestinationsJson = function (srAlias) {
+  const value = `JSON_OBJECT('destination', d.destination, 'address', d.address, 'city', d.city, 'state', d.state, 'zip', d.zip, 'phone', d.phone)`
+  return `COALESCE((SELECT ${module.exports.jsonArrayAgg({ value, orderBy: 'd.id' })} FROM service_request_destination d WHERE d.serviceRequestId = ${srAlias}.id), JSON_ARRAY())`
+}
+
 // The closed category <-> serviceName vocabulary. Single source of truth for:
 //  - VolunteerRequestService.buildCapabilityPrefixCase (capability -> prefix)
 //  - metrics byCategory derivation (serviceName -> category)
@@ -447,6 +454,12 @@ module.exports.SERVICE_CATEGORIES = [
   { category: 'Home Help',    capability: 'Home Help',    match: { exact: 'Household Chores/Handy Help' } },
   { category: 'Tech Support', capability: 'Tech Support', match: { exact: 'Tech Support' } },
 ]
+
+// True when serviceName is in the Rides category (the `Ride:` prefix vocabulary).
+module.exports.isRide = function (serviceName) {
+  const { prefix } = module.exports.SERVICE_CATEGORIES.find(c => c.category === 'Rides').match
+  return typeof serviceName === 'string' && serviceName.startsWith(prefix)
+}
 
 // serviceName -> category as a SQL CASE over `colExpr`. Vocabulary values are
 // developer-controlled literals (closed set), not user input — safe to inline.

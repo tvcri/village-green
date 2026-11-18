@@ -32,6 +32,7 @@ const EXPECTED_COLUMNS = {
   volunteer_capability: ['volunteerId', 'capabilityId'],
   service_request: ['id', 'requestNumber', 'villageId', 'memberPersonId', 'volunteerPersonId',
     'status', 'serviceName', 'destination', 'transportationType', 'createdAt', 'serviceDate', 'finishTime'],
+  service_request_destination: ['serviceRequestId', 'destination'],
   fcv_submission: ['id', 'villageId', 'volunteerPersonId', 'memberPersonId', 'visitDate',
     'timeSpentMinutes', 'contactType', 'activityTypes', 'notes', 'submittedAt'],
 }
@@ -205,6 +206,14 @@ export async function seed () {
         [sr.id, sr.requestNumber, sr.villageId, sr.memberPersonId, sr.volunteerPersonId,
           sr.status, sr.serviceName, sr.destination, sr.transportationType ?? null, sr.serviceDate, sr.finishTime],
       )
+      // Mirrors the 0034 backfill, which ran over an empty table: one child row
+      // for each request with a destination.
+      if (sr.destination) {
+        await conn.query(
+          'INSERT INTO service_request_destination (serviceRequestId, destination) VALUES (?, ?)',
+          [sr.id, sr.destination],
+        )
+      }
     }
 
     for (const f of Object.values(fcvSubmissions)) {

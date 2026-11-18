@@ -16,6 +16,9 @@ import { getVolunteerRequest, signUpVolunteerRequest, releaseVolunteerRequest } 
 import { getUser } from '../../../shared/api/userApi.js'
 import { filterQualifying } from '../lib/serviceCategories.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
+import DestinationDetails from '../../../components/DestinationDetails.vue'
+import { useRequestDestinations } from '../../ServiceRequestList/composables/useRequestDestinations.js'
+import DestinationMaps from '../../../components/DestinationMaps.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,11 +119,7 @@ const mapOrigin = computed(() => {
   return [mem.address, mem.city, mem.state, mem.zip].filter(Boolean).join(', ')
 })
 
-const mapDestination = computed(() => {
-  const r = request.value
-  if (!r || (!r.address && !r.city)) return ''
-  return [r.address, r.city, r.state].filter(Boolean).join(', ')
-})
+const { destinations, isMulti, mappedPlaces, mapDestination, showMapSection } = useRequestDestinations(request, mapOrigin)
 
 const mapWaypoint = computed(() => {
   if (!volunteerAddressString.value) return ''
@@ -135,8 +134,9 @@ function formatDateOnly(serviceDate) {
   return formatServiceDate(serviceDate) || null
 }
 
-// Round Trip requests have four distinct legs (start, arrive/apptTime,
-// return, finish); everything else is a single start/finish span. Ported
+// A Round Trip with an Arrive or Return time shows four times (start,
+// arrive/apptTime, return, finish); everything else, including a Round Trip
+// with only Start and Finish, is a single start/finish span. Ported
 // from ServiceRequestDetail.vue's timeDisplay. Times are 'HH:MM:SS' civil
 // strings rendered via timeStringToLabel — never new Date(). timesFlexible
 // means no specific times were set.
@@ -147,7 +147,9 @@ const timeDisplay = computed(() => {
   if (!r.startTime && !r.finishTime) return null
   const start = timeStringToLabel(r.startTime)
   const finish = timeStringToLabel(r.finishTime)
-  if (r.transportationType === 'Round Trip') {
+  // Arrive and Return are optional: with both blank the trip is just Start
+  // to Finish, shown on the one line rather than as rows of dashes.
+  if (r.transportationType === 'Round Trip' && (r.apptTime || r.returnTime)) {
     return [
       { label: 'Start / Arrive', value: [start, timeStringToLabel(r.apptTime)].map(t => t ?? '—').join(' - ') },
       { label: 'Return / Finish', value: [timeStringToLabel(r.returnTime), finish].map(t => t ?? '—').join(' - ') }
@@ -378,38 +380,33 @@ async function doRelease() {
             <span class="label">Transportation Type:</span>
             <span class="value">{{ request.transportationType }}</span>
           </div>
-          <div v-if="request.destination" class="detail-field">
-            <span class="label">Destination:</span>
-            <span class="value">{{ request.destination }}</span>
-          </div>
-          <div v-if="request.address" class="detail-field">
-            <span class="label">Address:</span>
-            <span class="value">{{ request.address }}</span>
-          </div>
-          <div v-if="request.city || request.state" class="detail-field">
-            <span class="label">City/State:</span>
-            <span class="value">{{ [request.city, request.state].filter(Boolean).join(', ') }}</span>
-          </div>
+          <DestinationDetails :destinations="destinations" />
+
           <div v-if="request.instructions" class="detail-field">
             <span class="label">Instructions:</span>
             <span class="value">{{ request.instructions }}</span>
           </div>
         </div>
 
-        <div v-if="mapOrigin && mapDestination" class="map-section">
+        <div v-if="showMapSection" class="map-section">
           <button class="map-toggle" @click="toggleMap">
             {{ showMap ? 'Always Hide Maps' : 'Always Show Maps' }}
           </button>
           <template v-if="showMap">
-            <p class="map-route-label">
-              <template v-if="volunteerAddressString">You <span class="arrow">➜</span> Member <span class="arrow">➜</span> Destination</template>
-              <template v-else>Member <span class="arrow">➜</span> Destination</template>
-            </p>
-            <ServiceRequestMap
-              :origin="mapOrigin"
-              :destination="mapDestination"
-              :waypoint="mapWaypoint"
-            />
+            <template v-if="isMulti">
+              <DestinationMaps :places="mappedPlaces" />
+            </template>
+            <template v-else>
+              <p class="map-route-label">
+                <template v-if="volunteerAddressString">You <span class="arrow">➜</span> Member <span class="arrow">➜</span> Destination</template>
+                <template v-else>Member <span class="arrow">➜</span> Destination</template>
+              </p>
+              <ServiceRequestMap
+                :origin="mapOrigin"
+                :destination="mapDestination"
+                :waypoint="mapWaypoint"
+              />
+            </template>
           </template>
         </div>
 
@@ -562,13 +559,13 @@ async function doRelease() {
   padding-bottom: 0.75rem;
 }
 
-.detail-field {
+:deep(.detail-field) {
   display: flex;
   flex-direction: column;
   margin-bottom: 0;
 }
 
-.detail-field .label {
+:deep(.detail-field .label) {
   font-weight: 600;
   color: var(--color-text-dim);
   font-size: 0.85rem;
@@ -577,7 +574,7 @@ async function doRelease() {
   margin-bottom: 0.25rem;
 }
 
-.detail-field .value {
+:deep(.detail-field .value) {
   color: var(--color-text-primary);
   font-size: 1rem;
   font-weight: 600;

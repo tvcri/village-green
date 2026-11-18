@@ -82,12 +82,7 @@ function baseColumns() {
     "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.instructions AS instructions',
     'sr.description AS description',
-    'sr.destination AS destination',
-    'sr.address AS address',
-    'sr.city AS city',
-    'sr.state AS state',
-    'sr.zip AS zip',
-    'sr.phone AS phone',
+    `${dbUtils.srDestinationsJson('sr')} AS destinations`,
     `IF(sr.memberPersonId IS NOT NULL, JSON_OBJECT(
       'fullName', mp.fullName,
       'displayName', mp.displayName,

@@ -58,7 +58,7 @@ export const TABLE_ORDER = [
   'person', 'member', 'volunteer',
   'volunteer_capability', 'volunteer_vetting', 'person_disability', 'person_circle', 'member_circle_preference',
   'volunteer_training', 'volunteer_position', 'volunteer_pause', 'donor',
-  'service_request', 'notification_event', 'fcv_submission',
+  'service_request', 'service_request_destination', 'notification_event', 'fcv_submission',
 ]
 
 // Tables seed:db never empties: catalogs that migrations own and the

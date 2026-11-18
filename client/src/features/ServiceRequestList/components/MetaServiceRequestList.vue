@@ -21,6 +21,7 @@ import { useServiceRequestWindow, ALL_STATUSES } from '../composables/useService
 import { getVillages } from '../../VillageList/api/villageApi.js'
 import { setPendingHighlight, consumePendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import { toCsv, downloadCsv, withLocalDateTimeColumns } from '../../../shared/lib/csvUtils.js'
+import { withDestinationColumns } from '../lib/destinations.js'
 import { createSheet } from '../../../shared/services/googleSheetsService.js'
 defineOptions({ name: 'MetaServiceRequestList' })
 
@@ -178,14 +179,14 @@ const columnsForCsv = [
 const DATE_TIME_CSV_KEYS = ['createdAt']
 
 const handleDownloadCsv = async () => {
-  const csv = toCsv(withLocalDateTimeColumns(filteredRequests.value, DATE_TIME_CSV_KEYS), columnsForCsv)
+  const csv = toCsv(withLocalDateTimeColumns(withDestinationColumns(filteredRequests.value), DATE_TIME_CSV_KEYS), columnsForCsv)
   downloadCsv(csv, 'service-requests.csv')
 }
 
 async function handleCreateSheet() {
   try {
     isCreatingSheet.value = true
-    const result = await createSheet(withLocalDateTimeColumns(filteredRequests.value, DATE_TIME_CSV_KEYS), columnsForCsv, 'Village Green Service Requests')
+    const result = await createSheet(withLocalDateTimeColumns(withDestinationColumns(filteredRequests.value), DATE_TIME_CSV_KEYS), columnsForCsv, 'Village Green Service Requests')
     const sheetUrl = result.url || result
     if (result.popupBlocked) {
       if (toast) {

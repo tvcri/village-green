@@ -7,6 +7,9 @@ import { useAsyncState } from '../../../shared/composables/useAsyncState.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { getServiceRequest } from '../api/serviceRequestApi.js'
 import ServiceRequestMap from '../../../components/ServiceRequestMap.vue'
+import DestinationDetails from '../../../components/DestinationDetails.vue'
+import { useRequestDestinations } from '../composables/useRequestDestinations.js'
+import DestinationMaps from '../../../components/DestinationMaps.vue'
 import NotificationHistoryList from './NotificationHistoryList.vue'
 import { formatServiceDate, timeStringToLabel } from '../lib/timeFields.js'
 
@@ -51,11 +54,7 @@ const mapOrigin = computed(() => {
   return startAddress.value
 })
 
-const mapDestination = computed(() => {
-  const r = request.value
-  if (!r || (!r.address && !r.city)) return ''
-  return [r.address, r.city, r.state].filter(Boolean).join(', ')
-})
+const { destinations, isMulti, mappedPlaces, mapDestination, showMapSection } = useRequestDestinations(request, mapOrigin)
 
 const mapWaypoint = computed(() => {
   // Pickup = the start leg, meaningful as a waypoint only when a volunteer
@@ -77,7 +76,9 @@ const timeDisplay = computed(() => {
   if (!r.startTime && !r.finishTime) return null
   const start = timeStringToLabel(r.startTime)
   const finish = timeStringToLabel(r.finishTime)
-  if (r.requestNumber == null && r.transportationType === 'Round Trip') {
+  // Arrive and Return are optional: with both blank the trip is just Start
+  // to Finish, shown on the one line rather than as rows of dashes.
+  if (r.requestNumber == null && r.transportationType === 'Round Trip' && (r.apptTime || r.returnTime)) {
     return [
       { label: 'Start / Arrive', value: [start, timeStringToLabel(r.apptTime)].map(t => t ?? '—').join(' - ') },
       { label: 'Return / Finish', value: [timeStringToLabel(r.returnTime), finish].map(t => t ?? '—').join(' - ') }
@@ -251,30 +252,7 @@ const timeDisplay = computed(() => {
             </div>
           </template>
 
-          <div v-if="request.destination" class="detail-field">
-            <span class="label">Destination:</span>
-            <span class="value">{{ request.destination }}</span>
-          </div>
-
-          <div v-if="request.address" class="detail-field">
-            <span class="label">Address:</span>
-            <span class="value">{{ request.address }}</span>
-          </div>
-
-          <div v-if="request.city || request.state" class="detail-field">
-            <span class="label">City/State:</span>
-            <span class="value">{{ [request.city, request.state].filter(Boolean).join(', ') }}</span>
-          </div>
-
-          <div v-if="request.phone" class="detail-field">
-            <span class="label">Phone:</span>
-            <div class="phone-numbers">
-              <a :href="`tel:${request.phone}`" class="phone-item">
-                <i class="pi pi-phone"></i>
-                <span class="phone-number">{{ request.phone }}</span>
-              </a>
-            </div>
-          </div>
+          <DestinationDetails :destinations="destinations" show-phone />
 
           <div v-if="request.createdAt" class="detail-field">
             <span class="label">Created At:</span>
@@ -286,20 +264,25 @@ const timeDisplay = computed(() => {
             <span class="value">{{ request.requestNumber }}</span>
           </div>
         </div>
-        <div v-if="mapOrigin && mapDestination" class="map-section">
+        <div v-if="showMapSection" class="map-section">
           <button class="map-toggle" @click="toggleMap">
             {{ showMap ? 'Always Hide Maps' : 'Always Show Maps' }}
           </button>
           <template v-if="showMap">
-            <p class="map-route-label">
-              <template v-if="volunteerAddress">Volunteer <span class="arrow">➜</span> Start <span class="arrow">➜</span> Destination</template>
-              <template v-else>Start <span class="arrow">➜</span> Destination</template>
-            </p>
-            <ServiceRequestMap
-              :origin="mapOrigin"
-              :destination="mapDestination"
-              :waypoint="mapWaypoint"
-            />
+            <template v-if="isMulti">
+              <DestinationMaps :places="mappedPlaces" />
+            </template>
+            <template v-else>
+              <p class="map-route-label">
+                <template v-if="volunteerAddress">Volunteer <span class="arrow">➜</span> Start <span class="arrow">➜</span> Destination</template>
+                <template v-else>Start <span class="arrow">➜</span> Destination</template>
+              </p>
+              <ServiceRequestMap
+                :origin="mapOrigin"
+                :destination="mapDestination"
+                :waypoint="mapWaypoint"
+              />
+            </template>
           </template>
         </div>
 
@@ -377,7 +360,7 @@ const timeDisplay = computed(() => {
   display: block;
 }
 
-.detail-field {
+:deep(.detail-field) {
   display: flex;
   flex-direction: column;
   padding-bottom: 0;
@@ -385,7 +368,7 @@ const timeDisplay = computed(() => {
   border-bottom: none;
 }
 
-.detail-field .label {
+:deep(.detail-field .label) {
   font-weight: 600;
   color: var(--color-text-dim);
   font-size: 0.85rem;
@@ -394,7 +377,7 @@ const timeDisplay = computed(() => {
   margin-bottom: 0.5rem;
 }
 
-.detail-field .value {
+:deep(.detail-field .value) {
   color: var(--color-text-primary);
   font-size: 1rem;
   font-weight: 600;

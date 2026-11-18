@@ -223,3 +223,52 @@ describe('ServiceRequestTable secondary date ordering', () => {
     expect(lastOf('.request-cards .request-card')).toContain('unassigned')
   })
 })
+
+describe('ServiceRequestTable destination summary', () => {
+  const dest = (city, destination = null) => ({ destination, address: null, city, state: 'RI', zip: null, phone: null })
+  const ROWS = [
+    { serviceRequestId: '1', displayNumber: 'two', status: 'Open', serviceDate: '2026-08-01', destinations: [dest('Wakefield'), dest('Kingston')] },
+    { serviceRequestId: '2', displayNumber: 'one', status: 'Open', serviceDate: '2026-08-02', destinations: [dest('Westerly')] },
+    { serviceRequestId: '3', displayNumber: 'first-a', status: 'Open', serviceDate: '2026-08-03', destinations: [dest('Anytown'), dest('Zed')] }
+  ]
+  const renderTable = () => render(ServiceRequestTable, {
+    props: { rows: ROWS, isLoading: false, hasLoadedOnce: true, error: null },
+    global: { plugins: [PrimeVue] }
+  })
+
+  beforeEach(() => {
+    window.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} })
+  })
+  afterEach(() => { cleanup() })
+
+  it('Destination cell shows "Wakefield +1" for two destinations', () => {
+    const { container } = renderTable()
+    expect(container.querySelector('.desktop-only tbody').textContent).toContain('Wakefield +1')
+  })
+
+  it('Destination cell shows "Westerly" for one', () => {
+    const { container } = renderTable()
+    const text = container.querySelector('.desktop-only tbody').textContent
+    expect(text).toContain('Westerly')
+    expect(text).not.toContain('Westerly +')
+  })
+
+  it("sorting Destination orders by the first destination's city", async () => {
+    const { container, getByText } = renderTable()
+    getByText('Destination').click()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const order = Array.from(container.querySelectorAll('.desktop-only tbody tr'))
+      .map(tr => ['first-a', 'two', 'one'].find(n => tr.textContent.includes(n)))
+    // Anytown, Wakefield, Westerly
+    expect(order).toEqual(['first-a', 'two', 'one'])
+  })
+
+  it("the mobile card's City row shows the same summary", () => {
+    const { container } = renderTable()
+    const cards = Array.from(container.querySelectorAll('.request-cards .card-row'))
+      .filter(r => r.textContent.startsWith('City:'))
+      .map(r => r.textContent)
+    expect(cards).toContain('City:Wakefield +1')
+    expect(cards).toContain('City:Westerly')
+  })
+})

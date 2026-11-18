@@ -1,7 +1,7 @@
 <script setup>
 defineProps({
-  origin: { type: String, required: true },
-  destination: { type: String, required: true },
+  origin: { type: String, default: '' },
+  destination: { type: String, default: '' },
   waypoint: { type: String, default: '' }
 })
 

@@ -20,6 +20,21 @@ import { buildDonors } from './builders/donors.js'
 // the INSERT in 0024-task-user-attribution.js and generateSchema.sh.
 const TASK_USERS = [{ username: '_task_auto_complete', taskName: 'auto_complete' }]
 
+const DEST_FIELDS = ['destination', 'address', 'city', 'state', 'zip', 'phone']
+
+function deriveDestinations (serviceRequests) {
+  const rows = []
+  for (const sr of serviceRequests) {
+    if (!DEST_FIELDS.some(k => sr[k] != null && sr[k] !== '')) continue
+    rows.push({
+      id: rows.length + 1,
+      serviceRequestId: sr.id,
+      ...Object.fromEntries(DEST_FIELDS.map(k => [k, sr[k] ?? null])),
+    })
+  }
+  return rows
+}
+
 export function buildDataset (content, seed, sizing = {}) {
   const rng = makeRng(seed)
   // Work added after migration 27 draws from its own streams, so it leaves
@@ -66,6 +81,10 @@ export function buildDataset (content, seed, sizing = {}) {
   }
 
   const plants = applyPlants(dataset, rng)
+  // Derived after the plants: they edit the flat destination fields in place.
+  // Same rule as migration 0034's backfill: a request with any non-empty
+  // destination field gets one row, in request order.
+  dataset.service_request_destination = deriveDestinations(dataset.service_request)
   dataset.__meta = { plants, villagesList, gagIndex: requests.gagIndex }
 
   // After the plants: these must agree with the finished requests and logins.

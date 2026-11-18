@@ -7,6 +7,7 @@ import TableFooter from '../../../components/TableFooter.vue'
 import { useAnalytics } from '../../../shared/composables/useAnalytics.js'
 import { useStatusSeverity } from '../../../shared/composables/useStatusSeverity.js'
 import { formatServiceDate, serviceDateTimeSortKey } from '../lib/timeFields.js'
+import { summarize } from '../lib/destinations.js'
 
 defineOptions({ name: 'ServiceRequestTable' })
 
@@ -73,9 +74,7 @@ const compareDateTime = (a, b) =>
 // DataTable: PrimeVue's sort() substitutes nullSortOrder whenever either side
 // is empty, so the table relocates empty values on its own. Without this guard
 // the cards keep them mid-list and the two views disagree.
-const compareField = (field, dir) => (a, b) => {
-  const av = a?.[field]
-  const bv = b?.[field]
+const compareValues = (av, bv, dir) => {
   if (av == null && bv == null) return 0
   if (av == null) return 1
   if (bv == null) return -1
@@ -83,6 +82,16 @@ const compareField = (field, dir) => (a, b) => {
     ? av - bv
     : String(av).localeCompare(String(bv))
   return dir * result
+}
+
+// The Destination column sorts on the first destination's city, which the API
+// no longer sends as a flat field; read it through an accessor.
+const sortAccessors = {
+  firstCity: (row) => row.destinations?.[0]?.city
+}
+const compareField = (field, dir) => {
+  const read = sortAccessors[field] ?? ((row) => row?.[field])
+  return (a, b) => compareValues(read(a), read(b), dir)
 }
 
 const sortedRows = computed(() => {
@@ -165,7 +174,9 @@ const rowClass = computed(() => {
       </Column>
       <Column field="memberFullName" header="Member" sortable style="width: 15%"></Column>
       <Column field="volunteerFullName" header="Volunteer" sortable style="width: 15%"></Column>
-      <Column field="city" header="Destination" sortable style="width: 13%"></Column>
+      <Column field="firstCity" header="Destination" sortable style="width: 13%">
+        <template #body="slotProps">{{ summarize(slotProps.data.destinations, 'city') }}</template>
+      </Column>
       <Column field="displayNumber" header="#" sortable style="width: 6%;">
           
         <template #body="slotProps">{{ slotProps.data.displayNumber ?? '—' }}</template>
@@ -195,7 +206,7 @@ const rowClass = computed(() => {
         <div class="card-row"><span class="label">Member:</span><span>{{ request.memberFullName ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Volunteer:</span><span>{{ request.volunteerFullName ?? '—' }}</span></div>
         <div class="card-row"><span class="label">Start:</span><span>{{ formatServiceDate(request.serviceDate, { weekday: true }) || '—' }}</span></div>
-        <div class="card-row"><span class="label">City:</span><span>{{ request.city ?? '—' }}</span></div>
+        <div class="card-row"><span class="label">City:</span><span>{{ summarize(request.destinations, 'city') || '—' }}</span></div>
       </div>
     </div>
   </div>

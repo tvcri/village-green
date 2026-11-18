@@ -24,7 +24,9 @@ import { getPerson, geocodeTown } from '../../PersonList/api/personApi.js'
 import { getVillageVolunteers, getVolunteers } from '../../VolunteerList/api/volunteerApi.js'
 import { setPendingHighlight } from '../../../shared/lib/pendingHighlight.js'
 import PersonDetailDialog from '../../../shared/components/PersonDetailDialog.vue'
+import DestinationBlock from './DestinationBlock.vue'
 import DestinationLookupDialog from './DestinationLookupDialog.vue'
+import { destinationsForSave, emptyDestination, isBlankDestination, stateOptions } from '../lib/destinations.js'
 import {
   minutesToTimeString, timeStringToMinutes,
   dateToServiceDate, serviceDateToDate
@@ -83,11 +85,7 @@ const form = ref({
   finishTime: null,
   apptTime: null,
   returnTime: null,
-  state: '',
-  city: '',
-  zip: '',
-  address: '',
-  phone: '',
+  destinations: [emptyDestination()],
   start: '',
   startAddress: '',
   startCity: '',
@@ -95,8 +93,7 @@ const form = ref({
   startZip: '',
   startPhone: '',
   instructions: '',
-  description: '',
-  destination: ''
+  description: ''
 })
 
 const isSubmitting = ref(false)
@@ -107,6 +104,17 @@ const cancelPopover = ref(null)
 // isRideService watcher does not overwrite the API's transportationType.
 // Starts true in create mode (no load needed); starts false in edit mode.
 const formLoaded = ref(!isEdit.value)
+
+// Copies, with nulls turned to '' as the form's other fields are: the form edits
+// these objects, and existingRequest must keep what was actually loaded.
+function blocksFromRequest (destinations) {
+  if (!destinations?.length) return [emptyDestination()]
+  return destinations.map((d) => {
+    const block = emptyDestination()
+    for (const field of Object.keys(block)) block[field] = d[field] || ''
+    return block
+  })
+}
 
 watch(existingRequest, async (val) => {
   if (val && isEdit.value) {
@@ -133,11 +141,7 @@ watch(existingRequest, async (val) => {
       finishTime: timeStringToMinutes(val.finishTime),
       apptTime: timeStringToMinutes(val.apptTime),
       returnTime: timeStringToMinutes(val.returnTime),
-      state: val.state || '',
-      city: val.city || '',
-      zip: val.zip || '',
-      address: val.address || '',
-      phone: val.phone || '',
+      destinations: blocksFromRequest(val.destinations),
       start: val.start || '',
       startAddress: val.startAddress || '',
       startCity: val.startCity || '',
@@ -145,8 +149,7 @@ watch(existingRequest, async (val) => {
       startZip: val.startZip || '',
       startPhone: val.startPhone || '',
       instructions: val.instructions || '',
-      description: val.description || '',
-      destination: val.destination || ''
+      description: val.description || ''
     }
     await nextTick()
     formLoaded.value = true
@@ -247,6 +250,9 @@ const selectedMemberCoords = ref(null)
 //               says why, rather than offering a choice it cannot honour.
 const memberCoordsStatus = ref('idle')
 const lookupVisible = ref(false)
+// Which destination block the lookup dialog fills. One dialog serves them all,
+// and it is modal, so this can't change while the dialog is open.
+const lookupIndex = ref(0)
 const startLookupVisible = ref(false)
 
 // The selected member's service coordinator notes, from the same fetch as the home
@@ -338,15 +344,17 @@ function applyMemberHomeToStart () {
   form.value.startPhone = h.phone
 }
 
-function applyMemberHomeToDestination () {
+function applyMemberHomeToDestination (i) {
   const h = selectedMemberHome.value
   if (!h) return
-  form.value.destination = MEMBER_HOME_LABEL
-  form.value.address = h.address
-  form.value.city = h.city
-  form.value.state = h.state
-  form.value.zip = h.zip
-  form.value.phone = h.phone
+  form.value.destinations[i] = {
+    destination: MEMBER_HOME_LABEL,
+    address: h.address,
+    city: h.city,
+    state: h.state,
+    zip: h.zip,
+    phone: h.phone
+  }
 }
 
 // Fill the start leg from a place chosen in the lookup dialog. A ride does not
@@ -367,16 +375,23 @@ function applyPlaceToStart (place) {
   form.value.startPhone = ''
 }
 
-// Fill the destination leg from a place chosen in the lookup dialog. Phone is
-// cleared rather than populated — see applyPlaceToStart.
+function openDestinationLookup (i) {
+  lookupIndex.value = i
+  lookupVisible.value = true
+}
+
+// Fill the block that opened the lookup dialog from the place chosen there.
+// Phone is cleared rather than populated — see applyPlaceToStart.
 function applyPlaceToDestination (place) {
   if (!place) return
-  form.value.destination = place.name
-  form.value.address = place.address
-  form.value.city = place.city
-  form.value.state = place.state
-  form.value.zip = place.zip
-  form.value.phone = ''
+  form.value.destinations[lookupIndex.value] = {
+    destination: place.name,
+    address: place.address,
+    city: place.city,
+    state: place.state,
+    zip: place.zip,
+    phone: ''
+  }
 }
 
 // Whether a leg currently holds the given member's home, rather than a real
@@ -406,13 +421,16 @@ function clearStart () {
   form.value.startPhone = ''
 }
 
-function clearDestination () {
-  form.value.destination = ''
-  form.value.address = ''
-  form.value.city = ''
-  form.value.state = ''
-  form.value.zip = ''
-  form.value.phone = ''
+function clearDestination (i) {
+  form.value.destinations[i] = emptyDestination()
+}
+
+function addDestination () {
+  form.value.destinations.push(emptyDestination())
+}
+
+function removeDestination (i) {
+  form.value.destinations.splice(i, 1)
 }
 
 const startIsEmpty = computed(() =>
@@ -439,10 +457,11 @@ const filterVolunteers = (event) => {
 // survive a member change and be submitted against the new member.
 //
 // The Start leg is member-derived by construction (it auto-fills with the
-// member's home), so it always clears. The Destination usually is not — it is
-// the doctor's office the coordinator typed or looked up — so it clears only
-// when it actually holds the outgoing member's home, the "Use member's home"
-// case for a return trip.
+// member's home), so it always clears. A destination usually is not — it is
+// the doctor's office the coordinator typed or looked up — so a block clears
+// only when it actually holds the outgoing member's home, the "Use member's
+// home" case for a return trip. A cleared block stays on the form, so
+// the coordinator sees what went.
 //
 // Must run BEFORE selectedMemberHome is replaced: it needs the outgoing home
 // to recognise it.
@@ -453,10 +472,9 @@ function clearOutgoingMemberLocations () {
     { address: form.value.startAddress, city: form.value.startCity, zip: form.value.startZip },
     outgoing
   )) clearStart()
-  if (legHoldsHome(
-    { address: form.value.address, city: form.value.city, zip: form.value.zip },
-    outgoing
-  )) clearDestination()
+  form.value.destinations.forEach((block, i) => {
+    if (legHoldsHome(block, outgoing)) clearDestination(i)
+  })
 }
 
 watch(selectedMember, (val) => {
@@ -609,12 +627,6 @@ const serviceNameOptions = [
   'Errand: Other'
 ]
 
-const stateOptions = [
-  'RI',
-  'CT',
-  'MA'
-]
-
 // Times are stored as minutes-since-midnight (0..1425) so the Select value
 // always reflects the chosen slot and is trivial to seed/convert.
 const minutesToLabel = (mins) => {
@@ -630,12 +642,14 @@ for (let mins = 0; mins < 24 * 60; mins += 15) {
   timeSlotOptions.push({ label: minutesToLabel(mins), value: mins })
 }
 
-// Each later time field may only select a slot after the field before it, but
-// the field's own current value is always included so an existing/loaded value
-// renders even if it would otherwise be filtered out (e.g. on edit).
-const slotsAfter = (after, current) => {
-  if (after == null) return timeSlotOptions
-  return timeSlotOptions.filter(o => o.value > after || o.value === current)
+// Each later time field may only select a slot after the nearest filled time
+// before it and, for Arrive and Return, before the nearest filled time after
+// it. The field's own current value is always included so an existing/loaded
+// value renders even if it would otherwise be filtered out (e.g. on edit).
+const slotsBetween = (after, before, current) => {
+  if (after == null && before == null) return timeSlotOptions
+  return timeSlotOptions.filter(o =>
+    ((after == null || o.value > after) && (before == null || o.value < before)) || o.value === current)
 }
 
 // The 15-minute grid is a data-entry aid, not a storage constraint: legacy
@@ -657,48 +671,66 @@ const startOptions = computed(() => withCurrentValue([
   ...timeSlotOptions.filter(o => o.value >= START_OF_DAY),
   ...timeSlotOptions.filter(o => o.value < START_OF_DAY)
 ], form.value.startTime))
-const apptOptions = computed(() => withCurrentValue(slotsAfter(form.value.startTime, form.value.apptTime), form.value.apptTime))
-const returnOptions = computed(() => withCurrentValue(slotsAfter(form.value.apptTime, form.value.returnTime), form.value.returnTime))
-const finishOptions = computed(() =>
-  withCurrentValue(
-    slotsAfter(
-      form.value.transportationType === 'Round Trip'
-        ? form.value.returnTime
-        : form.value.startTime,
-      form.value.finishTime
-    ),
-    form.value.finishTime
-  )
-)
+// The time fields in trip order, with the word each one's error message uses.
+// Only Start and Finish are required: a Round Trip's Arrive and Return are
+// optional, so a coordinator can enter "pick up at 10, home by noon" alone.
+const TIME_LABELS = { startTime: 'Start', apptTime: 'Arrive', returnTime: 'Return', finishTime: 'Finish' }
+const timeFieldOrder = computed(() => form.value.transportationType === 'Round Trip'
+  ? ['startTime', 'apptTime', 'returnTime', 'finishTime']
+  : ['startTime', 'finishTime'])
 
-// When an earlier time field changes, it narrows the option list of later
-// fields (see slotsAfter above). If a later field's current value falls
-// outside its new option list, clear it rather than leaving a selected value
-// that's no longer valid. This never writes a new value into another field —
-// only clears ones that became invalid. Clearing the earlier field itself
-// (val == null) also clears its dependent, since slotsAfter(null, ...)
-// otherwise treats "no earlier value" as "nothing is filtered out".
-const clearIfInvalid = (field, upstreamVal, options) => {
-  const val = form.value[field]
-  if (val == null) return
-  if (upstreamVal == null || !options.some(o => o.value === val)) form.value[field] = null
+// The nearest field before (step -1) or after (step 1) this one that holds a
+// time. A blank optional field in between is skipped, not treated as a
+// boundary.
+const nearestFilledField = (field, step) => {
+  const order = timeFieldOrder.value
+  for (let i = order.indexOf(field) + step; i >= 0 && i < order.length; i += step) {
+    if (form.value[order[i]] != null) return order[i]
+  }
+  return null
+}
+const nearestFilledTime = (field, step) => {
+  const other = nearestFilledField(field, step)
+  return other == null ? null : form.value[other]
 }
 
-watch(() => form.value.startTime, (val) => {
-  if (!formLoaded.value) return
-  clearIfInvalid('apptTime', val, apptOptions.value)
-}, { flush: 'sync' })
+// The first time that is not after the nearest filled time before it, as
+// { field, prev }, or null when every filled time is in order. Save's check
+// (timeOutOfOrder below) reads this; the option lists apply the same rule.
+const firstTimeOutOfOrder = () => {
+  for (const field of timeFieldOrder.value.slice(1)) {
+    const prev = nearestFilledField(field, -1)
+    if (form.value[field] != null && prev != null && form.value[field] <= form.value[prev]) return { field, prev }
+  }
+  return null
+}
 
-watch(() => form.value.apptTime, (val) => {
-  if (!formLoaded.value) return
-  clearIfInvalid('returnTime', val, returnOptions.value)
-}, { flush: 'sync' })
+// Finish has no later time to stop at; Start keeps its own list (startOptions)
+// so a coordinator can still move it past the times after it.
+const optionsFor = (field) => withCurrentValue(
+  slotsBetween(nearestFilledTime(field, -1), field === 'finishTime' ? null : nearestFilledTime(field, 1), form.value[field]),
+  form.value[field]
+)
+const apptOptions = computed(() => optionsFor('apptTime'))
+const returnOptions = computed(() => optionsFor('returnTime'))
+const finishOptions = computed(() => optionsFor('finishTime'))
 
-watch([() => form.value.returnTime, () => form.value.startTime, () => form.value.transportationType], ([returnVal, startVal, transportationType]) => {
-  if (!formLoaded.value) return
-  const upstreamVal = transportationType === 'Round Trip' ? returnVal : startVal
-  clearIfInvalid('finishTime', upstreamVal, finishOptions.value)
-}, { flush: 'sync' })
+// When a coordinator changes a time, any later time that is no longer after it
+// is cleared rather than left holding a value its list no longer offers. Only
+// the times after the edited one are checked, and only against the edited
+// value: a stored request that already held times out of order keeps them
+// until Save reports it, instead of an unrelated edit quietly dropping one.
+// A blank field clears nothing, since Arrive and Return are optional.
+const clearLaterTimes = (field, val) => {
+  if (!formLoaded.value || val == null) return
+  const order = timeFieldOrder.value
+  for (const later of order.slice(order.indexOf(field) + 1)) {
+    if (form.value[later] != null && form.value[later] <= val) form.value[later] = null
+  }
+}
+watch(() => form.value.startTime, (val) => clearLaterTimes('startTime', val), { flush: 'sync' })
+watch(() => form.value.apptTime, (val) => clearLaterTimes('apptTime', val), { flush: 'sync' })
+watch(() => form.value.returnTime, (val) => clearLaterTimes('returnTime', val), { flush: 'sync' })
 
 watch(() => form.value.timesFlexible, (flex) => {
   if (!formLoaded.value || !flex) return
@@ -727,6 +759,26 @@ const showLocationFields = computed(() => {
   return !noLocationServices.includes(form.value.serviceName)
 })
 
+// Trimmed, because destinationsForSave trims and the API refuses a nameless
+// destination.
+const hasDestinationName = (block) => !!block.destination?.trim()
+
+// The one destination rule that disables Save, as it always has.
+const rideLacksFirstDestination = computed(() =>
+  isRideService.value && !hasDestinationName(form.value.destinations[0]))
+
+// The full rule, checked by handleSubmit. Every block needs a name except a lone
+// blank one, which means "no destination". Hidden blocks can't be fixed and save
+// as [], so they never fail. Beyond the Ride rule above this stays out of
+// isFormValid, so Save can be clicked and explain itself (see the note above
+// timeOutOfOrder).
+const hasInvalidDestination = computed(() => {
+  if (!showLocationFields.value) return false
+  const blocks = form.value.destinations
+  if (blocks.length === 1 && isBlankDestination(blocks[0]) && !rideLacksFirstDestination.value) return false
+  return !blocks.every(hasDestinationName)
+})
+
 const availableTransportationTypes = computed(() => {
   return isRideService.value ? ['Round Trip', 'One Way'] : ['None']
 })
@@ -740,32 +792,26 @@ const isFormValid = computed(() => {
 
   // Ride-specific requirements
   if (isRideService.value) {
-    if (!f.destination) return false
+    if (rideLacksFirstDestination.value) return false
     if (!['Round Trip', 'One Way'].includes(f.transportationType)) return false
   }
 
   return true
 })
 
-// Same pairwise relationships slotsAfter uses to filter each field's option
-// list, re-checked at submit time by handleSubmit (not gated here in
+// The same nearest-filled-predecessor rule slotsBetween uses to filter each
+// field's option list, re-checked at submit time by handleSubmit (not gated here in
 // isFormValid, since a disabled Save button can't be clicked to explain
-// itself). clearIfInvalid (above) only runs once the form is loaded, so a
+// itself). The clearing watcher (above) only runs once the form is loaded, so a
 // request edited from stored data with an already inconsistent time
 // sequence (e.g. written before this validation existed, or imported) can
 // render without being auto-cleared — this is what handleSubmit catches.
-const timesInOrder = computed(() => {
-  const f = form.value
-  // apptTime/returnTime are Round-Trip-only. Guard on transportationType so a
-  // stale value left over from switching Round Trip -> One Way can't fail a
-  // valid One Way (whose payload nulls them anyway).
-  if (f.transportationType === 'Round Trip') {
-    if (f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) return false
-    if (f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) return false
-  }
-  const finishAfter = f.transportationType === 'Round Trip' ? f.returnTime : f.startTime
-  if (f.finishTime != null && finishAfter != null && f.finishTime <= finishAfter) return false
-  return true
+// apptTime/returnTime are Round-Trip-only: timeFieldOrder leaves them out of a
+// One Way, so a stale value left over from switching Round Trip -> One Way
+// can't fail a valid One Way (whose payload nulls them anyway).
+const timeOutOfOrder = computed(() => {
+  const bad = firstTimeOutOfOrder()
+  return bad && `${TIME_LABELS[bad.field]} time must be after ${TIME_LABELS[bad.prev]} time`
 })
 
 // After creating a request, clear the form for another entry but keep the
@@ -788,11 +834,7 @@ const resetForNewRequest = () => {
     finishTime: null,
     apptTime: null,
     returnTime: null,
-    state: '',
-    city: '',
-    zip: '',
-    address: '',
-    phone: '',
+    destinations: [emptyDestination()],
     start: '',
     startAddress: '',
     startCity: '',
@@ -800,8 +842,7 @@ const resetForNewRequest = () => {
     startZip: '',
     startPhone: '',
     instructions: '',
-    description: '',
-    destination: ''
+    description: ''
   }
 }
 
@@ -854,44 +895,38 @@ const handleSubmit = async (notify = false) => {
       return
     }
 
+    if (hasInvalidDestination.value) {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: rideLacksFirstDestination.value ? 'Destination is required for ride services' : 'Each destination needs a name',
+        life: 3000
+      })
+      return
+    }
+
     if (isRideService.value) {
-      if (!form.value.destination) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Destination is required for ride services', life: 3000 })
-        return
-      }
       if (!form.value.transportationType || !['Round Trip', 'One Way'].includes(form.value.transportationType)) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Transportation type is required for ride services', life: 3000 })
         return
       }
 
       if (!form.value.timesFlexible) {
-        const requiredTimes = form.value.transportationType === 'Round Trip'
-          ? [form.value.startTime, form.value.apptTime, form.value.returnTime, form.value.finishTime]
-          : [form.value.startTime, form.value.finishTime]
-        if (requiredTimes.some((t) => t == null)) {
-          toast.add({ severity: 'error', summary: 'Error', detail: `Enter all times for ${form.value.transportationType}, or check "Times flexible"`, life: 3000 })
+        if (form.value.startTime == null || form.value.finishTime == null) {
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Enter Start and Finish times, or check "Times flexible"', life: 3000 })
           return
         }
       }
     }
 
-    if (!form.value.timesFlexible && !timesInOrder.value) {
-      const f = form.value
-      const isRoundTrip = f.transportationType === 'Round Trip'
-      if (isRoundTrip && f.apptTime != null && f.startTime != null && f.apptTime <= f.startTime) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Arrival time must be after Start time', life: 3000 })
-      } else if (isRoundTrip && f.returnTime != null && f.apptTime != null && f.returnTime <= f.apptTime) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Return time must be after Arrival time', life: 3000 })
-      } else {
-        const finishAfterLabel = f.transportationType === 'Round Trip' ? 'Return' : 'Start'
-        toast.add({ severity: 'error', summary: 'Error', detail: `Finish time must be after ${finishAfterLabel} time`, life: 3000 })
-      }
+    if (!form.value.timesFlexible && timeOutOfOrder.value) {
+      toast.add({ severity: 'error', summary: 'Error', detail: timeOutOfOrder.value, life: 3000 })
       return
     }
 
     // Mirrors API rule 3: a Completed request must credit a volunteer. Checked
     // here rather than in isFormValid so it can explain itself (see the note
-    // above timesInOrder).
+    // above timeOutOfOrder).
     if (computedStatus.value === 'Completed' && !form.value.volunteerPersonId) {
       toast.add({
         severity: 'error',
@@ -933,11 +968,7 @@ const handleSubmit = async (notify = false) => {
         ? minutesToTimeString(form.value.apptTime) : null,
       returnTime: (!form.value.timesFlexible && isRideService.value && form.value.transportationType === 'Round Trip')
         ? minutesToTimeString(form.value.returnTime) : null,
-      state: form.value.state || null,
-      city: form.value.city || null,
-      zip: form.value.zip || null,
-      address: form.value.address || null,
-      phone: form.value.phone || null,
+      destinations: showLocationFields.value ? destinationsForSave(form.value.destinations) : [],
       start: form.value.start || null,
       startAddress: form.value.startAddress || null,
       startCity: form.value.startCity || null,
@@ -945,8 +976,7 @@ const handleSubmit = async (notify = false) => {
       startZip: form.value.startZip || null,
       startPhone: form.value.startPhone || null,
       instructions: form.value.instructions || null,
-      description: form.value.description || null,
-      destination: form.value.destination || null
+      description: form.value.description || null
     }
 
     if (isEdit.value) {
@@ -1506,82 +1536,27 @@ const openPersonDialog = (personId) => {
 
             </template>
 
-            <!-- Destination Section -->
-            <div style="display: flex; align-items: center; gap: 1rem; border-bottom: 2px solid var(--color-border-default); margin-bottom: 0.5rem; padding-bottom: 0.75rem;">
-              <h3 style="margin: 0; font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--p-primary-600);">Destination</h3>
-              <!-- The lookup is about the destination, not the ride: every
-                   service with a destination gets it, and so does Clear
-                   fields — a lookup that can fill has to be undoable.
-                   "Use member's home" stays Rides-only: an Errand's
-                   destination is a shop, not the member's house. -->
-              <div style="display: flex; gap: 0.5rem;">
-                <Button v-if="isRideService" type="button" class="use-home-btn" size="small" outlined label="Use member's home" :disabled="!selectedMemberHome" @click="applyMemberHomeToDestination" />
-                <Button type="button" size="small" outlined icon="pi pi-search" label="Look up…" aria-label="Look up destination" @click="lookupVisible = true" />
-                <Button type="button" size="small" text severity="secondary" label="Clear fields" aria-label="Clear destination" @click="clearDestination" />
-              </div>
-            </div>
-
-            <!-- Destination / Address Row -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Destination<span v-if="isRideService" class="req">*</span></label>
-                <InputText
-                  v-model="form.destination"
-                  placeholder="Enter destination"
-                  style="width: 100%;"
-                />
-              </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Address</label>
-                <InputText
-                  v-model="form.address"
-                  placeholder="Enter address"
-                  style="width: 100%;"
-                />
-              </div>
-            </div>
-
-            <!-- City / State / Zip / Phone Row -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr; gap: 1rem;">
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">City</label>
-                <InputText
-                  v-model="form.city"
-                  placeholder="City"
-                  style="width: 100%;"
-                />
-              </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">State</label>
-                <Select
-                  v-model="form.state"
-                  :options="stateOptions.map(s => ({ label: s, value: s }))"
-                  option-label="label"
-                  option-value="value"
-                  placeholder="State"
-                  style="width: 100%;"
-                />
-              </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Zip</label>
-                <InputText
-                  v-model="form.zip"
-                  placeholder="Zip"
-                  style="width: 100%;"
-                />
-              </div>
-
-              <div>
-                <label style="display: block; font-weight: 500; margin-bottom: 0.5rem;">Phone</label>
-                <InputText
-                  v-model="form.phone"
-                  placeholder="Phone"
-                  style="width: 100%;"
-                />
-              </div>
+            <!-- Destinations. Keyed by position: a block holds no state of its
+                 own, so after a removal each one simply redraws from the list.
+                 The write goes back through form.destinations[i] because a
+                 v-for variable can't be assigned to: replacing `block` would
+                 only change the local name, not the list. -->
+            <DestinationBlock
+              v-for="(block, i) in form.destinations"
+              :key="i"
+              :model-value="block"
+              :index="i"
+              :total="form.destinations.length"
+              :is-ride="isRideService"
+              :home-disabled="!selectedMemberHome"
+              @update:model-value="form.destinations[i] = $event"
+              @remove="removeDestination(i)"
+              @lookup="openDestinationLookup(i)"
+              @use-home="applyMemberHomeToDestination(i)"
+              @clear="clearDestination(i)"
+            />
+            <div>
+              <Button type="button" icon="pi pi-plus" outlined size="small" label="Add another destination" @click="addDestination" />
             </div>
           </template>
 
