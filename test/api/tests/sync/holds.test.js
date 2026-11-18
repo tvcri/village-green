@@ -217,6 +217,7 @@ test('persons projection names the person, candidates and resolution target', as
     assert.match(p.fullName, /^Ection/)
     assert.match(p.displayName, /^Proj /)
     assert.equal(p.isDonor, false)
+    assert.ok('town' in p && 'email' in p, 'persons carry town and email to tell namesakes apart')
   }
 })
 

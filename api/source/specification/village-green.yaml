@@ -3809,12 +3809,14 @@ components:
           items:
             type: object
             additionalProperties: false
-            required: [personId, fullName, displayName, isDonor]
+            required: [personId, fullName, displayName, isDonor, town, email]
             properties:
               personId: { $ref: '#/components/schemas/StringIntId' }
               fullName: { type: string }
               displayName: { type: string }
               isDonor: { type: boolean }
+              town: { type: string, nullable: true, description: 'Municipality, to tell namesakes apart.' }
+              email: { type: string, nullable: true }
         users:
           description: With projection=users.
           type: array

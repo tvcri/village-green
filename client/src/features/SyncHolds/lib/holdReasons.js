@@ -162,7 +162,8 @@ export function actionsFor (hold) {
   }
   const out = []
   if (kinds.includes('link')) out.push('link')
-  if (kinds.includes('create') && !hold.resolution) out.push('create')
+  // A pending link can still become "New person"; only a pending create hides it.
+  if (kinds.includes('create') && hold.resolution?.kind !== 'create') out.push('create')
   if (kinds.includes('create')) out.push('dontAdd')
   else if (STAFF_CLOSED_REASONS.includes(hold.reason)) out.push('doneInLgl')
   else if (groupFor(hold) !== ENGINEER) out.push('seen')

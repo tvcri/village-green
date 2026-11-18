@@ -175,7 +175,7 @@ async function attachPersons (rows) {
   if (ids.length) {
     // Base tables, not the active_* views: a dropped member is still named.
     const [people] = await dbUtils.pool.query(
-      `SELECT CAST(p.id AS CHAR) AS personId, p.fullName, p.displayName, (d.id IS NOT NULL) AS isDonor
+      `SELECT CAST(p.id AS CHAR) AS personId, p.fullName, p.displayName, p.town, p.email, (d.id IS NOT NULL) AS isDonor
        FROM person p LEFT JOIN donor d ON d.personId = p.id WHERE p.id IN (?)`, [ids])
     for (const p of people) byId.set(p.personId, { ...p, isDonor: Boolean(p.isDonor) })
   }

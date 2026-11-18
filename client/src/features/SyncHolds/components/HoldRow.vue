@@ -42,6 +42,15 @@ const pendingTarget = computed(() => {
 })
 
 const fmtWhen = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : ''
+// Who set a hold aside. The sync's own dismissals and the import review's
+// skips are made under the sync's service account; staff should not read
+// that account's name as a colleague's.
+const setAside = computed(() => {
+  const h = props.hold
+  if (h.reason === 'import-skip') return 'Skipped at the import review'
+  if (h.dismissalKind === 'rule') return 'Set aside by the sync'
+  return `Marked as seen by ${whoDid(h.dismissedUserId, 'a staff member')}`
+})
 const whoDid = (userId, fallback) => userId == null ? fallback : (userById.value.get(userId)?.displayName ?? 'a staff member')
 
 const actions = computed(() => props.canWrite ? actionsFor(props.hold) : [])
@@ -108,8 +117,8 @@ async function run (action, payload) {
         </ul>
       </template>
       <p v-if="hold.state === 'dismissed'" class="say">
-        <span class="pill seen">Marked as seen</span>
-        by {{ whoDid(hold.dismissedUserId, 'a rule') }}, {{ fmtWhen(hold.dismissedAt) }}
+        <span class="pill seen">{{ setAside }}</span>
+        {{ fmtWhen(hold.dismissedAt) }}
       </p>
       <p v-if="hold.state === 'closed'" class="say">
         <span class="pill done">Closed</span>

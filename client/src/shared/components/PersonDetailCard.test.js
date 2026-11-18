@@ -275,16 +275,16 @@ describe('PersonDetailCard — LGL sync hint', () => {
     global: { plugins: [PrimeVue], stubs: { RouterLink: RouterLinkStub } },
   })
 
-  it('says how many details differ and links to the person’s holds', () => {
+  it('says how many items wait and links to the person’s holds', () => {
     mountDonor(2)
-    expect(screen.getByText('2 details differ from LGL.')).toBeInTheDocument()
+    expect(screen.getByText('2 items from the LGL sync to review.')).toBeInTheDocument()
     const link = screen.getByText('Review in LGL sync')
     expect(JSON.parse(link.getAttribute('data-to'))).toEqual({ name: 'meta-sync-holds', query: { personId: '5' } })
   })
 
   it('uses the singular for one', () => {
     mountDonor(1)
-    expect(screen.getByText('1 detail differs from LGL.')).toBeInTheDocument()
+    expect(screen.getByText('1 item from the LGL sync to review.')).toBeInTheDocument()
   })
 
   it('shows nothing when there are none', () => {

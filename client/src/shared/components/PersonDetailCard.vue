@@ -449,7 +449,7 @@ const copyEmail = async (email) => {
           <a :href="lglConstituentUrl(donor.lglConstituentId)" target="_blank" rel="noopener">Open in LGL</a>
         </div>
         <div v-if="syncHoldCount > 0" class="sync-hint">
-          <span>{{ syncHoldCount }} {{ syncHoldCount === 1 ? 'detail differs' : 'details differ' }} from LGL.</span>
+          <span>{{ syncHoldCount }} {{ syncHoldCount === 1 ? 'item' : 'items' }} from the LGL sync to review.</span>
           <router-link :to="{ name: 'meta-sync-holds', query: { personId: String(person.personId) } }">Review in LGL sync</router-link>
         </div>
       </div>

@@ -53,8 +53,11 @@ describe('actionsFor', () => {
   it('offers only mark-as-seen for anonymous donors', () => {
     expect(actionsFor(open('anonymous'))).toEqual(['seen'])
   })
-  it('hides New person while a resolution is pending', () => {
-    expect(actionsFor(open('name-only', { resolution: { kind: 'link', personId: '5' } }))).toEqual(['link', 'dontAdd'])
+  it('keeps New person available while a link is pending', () => {
+    expect(actionsFor(open('name-only', { resolution: { kind: 'link', personId: '5' } }))).toEqual(['link', 'create', 'dontAdd'])
+  })
+  it('hides New person once it is the pending answer', () => {
+    expect(actionsFor(open('name-only', { resolution: { kind: 'create' } }))).toEqual(['link', 'dontAdd'])
   })
   it('lets staff undo a staff-dismissed unlinked donor', () => {
     expect(actionsFor({ ...open('import-skip'), state: 'dismissed', dismissalKind: 'staff' })).toEqual(['link', 'create'])

@@ -44,7 +44,13 @@ const others = computed(() => results.value
     // PersonSummary carries no displayName; the toast falls back to fullName.
     displayName: p.displayName ?? null,
     isDonor: Boolean(p.donor),
+    // PersonSummary has no municipality; its village tells namesakes apart instead.
+    place: p.village?.name ?? null,
+    email: p.email ?? null,
   })))
+
+// What tells two people with the same name apart.
+const metaOf = (p) => [p.place ?? p.town, p.email, p.isDonor ? 'already a donor' : null].filter(Boolean).join(' · ')
 </script>
 
 <template>
@@ -57,7 +63,7 @@ const others = computed(() => results.value
         <li class="head">Suggested by the sync</li>
         <li v-for="p in candidates" :key="p.personId">
           <button type="button" :disabled="busy" @click="emit('choose', p)">
-            <span>{{ p.fullName }}</span><span v-if="p.isDonor" class="meta">already a donor</span>
+            <span>{{ p.fullName }}</span><span v-if="metaOf(p)" class="meta">{{ metaOf(p) }}</span>
           </button>
         </li>
       </template>
@@ -65,7 +71,7 @@ const others = computed(() => results.value
         <li class="head">Search results</li>
         <li v-for="p in others" :key="p.personId">
           <button type="button" :disabled="busy" @click="emit('choose', p)">
-            <span>{{ p.fullName }}</span><span v-if="p.isDonor" class="meta">already a donor</span>
+            <span>{{ p.fullName }}</span><span v-if="metaOf(p)" class="meta">{{ metaOf(p) }}</span>
           </button>
         </li>
         <li v-if="!others.length" class="none">No other matches</li>

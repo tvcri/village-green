@@ -29,8 +29,8 @@ const donorLgl = (name) => ({ name, email: `${name.split(' ')[0].toLowerCase()}@
 const HOLDS = [
   { ...base, holdId: '1', lglConstituentId: '88214', personId: null, reason: 'name-only',
     detail: { candidates: ['101', '102'], lgl: donorLgl('Ann Sousa') },
-    persons: [{ personId: '101', fullName: 'Sousa, Ann', displayName: 'Ann Sousa', isDonor: false },
-      { personId: '102', fullName: 'Sousa, Annemarie', displayName: 'Annemarie Sousa', isDonor: false }] },
+    persons: [{ personId: '101', fullName: 'Sousa, Ann', displayName: 'Ann Sousa', isDonor: false, town: 'Bristol', email: 'ann@example.org' },
+      { personId: '102', fullName: 'Sousa, Annemarie', displayName: 'Annemarie Sousa', isDonor: false, town: 'Warren', email: null }] },
   { ...base, holdId: '2', lglConstituentId: '77302', personId: null, reason: 'import-hold', detail: { importReason: 'Not confirmed on the Work list' } },
   { ...base, holdId: '3', lglConstituentId: '500', personId: '103', field: 'nickname', reason: 'never-agreed', detail: { vg: null, lgl: 'Dan' },
     persons: [{ personId: '103', fullName: 'Okafor, Daniel', displayName: 'Daniel Okafor', isDonor: true }] },
@@ -141,11 +141,36 @@ describe('SyncHolds', () => {
     }
   })
 
+  it('tells namesakes apart in the picker by municipality and email', async () => {
+    const { container, findByText, findByRole } = setup()
+    await findByText('Ann Sousa')
+    await fireEvent.click(within(groupEl(container, 'maybe')).getAllByRole('button', { name: 'This is\u2026' })[0])
+    expect(await findByRole('button', { name: /Sousa, Ann\b.*Bristol.*ann@example\.org/ })).toBeInTheDocument()
+    expect(await findByRole('button', { name: /Sousa, Annemarie.*Warren/ })).toBeInTheDocument()
+  })
+
+  it('says who set a hold aside: the sync, the import review, or a person', async () => {
+    vi.mocked(getSyncHolds).mockResolvedValue([
+      { ...base, holdId: '20', lglConstituentId: '600', personId: null, reason: 'before-horizon', state: 'dismissed', dismissalKind: 'rule',
+        dismissedUserId: '9', dismissedAt: '2026-11-17T12:00:00Z', users: [{ userId: '9', displayName: 'Sync Service' }] },
+      { ...base, holdId: '21', lglConstituentId: '601', personId: null, reason: 'import-skip', state: 'dismissed', dismissalKind: 'staff',
+        dismissedUserId: '9', dismissedAt: '2026-11-17T12:00:00Z', users: [{ userId: '9', displayName: 'Sync Service' }] },
+      { ...base, holdId: '22', lglConstituentId: '602', personId: null, reason: 'name-only', state: 'dismissed', dismissalKind: 'staff',
+        dismissedUserId: '3', dismissedAt: '2026-11-17T12:00:00Z', users: [{ userId: '3', displayName: 'Gabriel R.' }] },
+    ])
+    const { findByText, queryByText } = setup()
+    expect(await findByText(/Set aside by the sync/)).toBeInTheDocument()
+    expect(await findByText('Skipped at the import review', { selector: '.pill' })).toBeInTheDocument()
+    expect(await findByText(/by Gabriel R\./)).toBeInTheDocument()
+    expect(queryByText(/Sync Service/)).toBeNull()
+  })
+
   it('shows a pending answer as waiting for the sync', async () => {
     vi.mocked(getSyncHolds).mockResolvedValue([{ ...HOLDS[0], resolution: { kind: 'link', personId: '101' } }])
-    const { findByText, queryByRole } = setup()
+    const { findByText, findByRole } = setup()
     expect(await findByText('Waiting for the next sync run')).toBeInTheDocument()
     expect(await findByText(/will link to/)).toHaveTextContent('will link to Sousa, Ann')
-    expect(queryByRole('button', { name: 'New person' })).toBeNull()
+    // the answer can still change to a new person
+    expect(await findByRole('button', { name: 'New person' })).toBeInTheDocument()
   })
 })
