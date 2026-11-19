@@ -101,6 +101,13 @@ export function formatValue (field, value) {
     return parts.join(' · ') || null
   }
   if (field === 'deceased') return value.flag ? `Deceased${value.date ? ` ${value.date}` : ''}` : 'Not deceased'
+  if (field === 'address') {
+    // In mailing order. MySQL's JSON type stores keys shortest first, so the
+    // object's own key order is zip, city, state, unit, street.
+    const cityLine = [value.city, [value.state, value.zip].filter(v => !isEmpty(v)).join(' ')]
+    const parts = [value.street, value.unit, ...cityLine].filter(v => !isEmpty(v)).map(String)
+    return parts.join(', ') || null
+  }
   const parts = Object.values(value).filter(v => !isEmpty(v) && typeof v !== 'object').map(String)
   return parts.join(', ') || null
 }

@@ -81,7 +81,11 @@ describe('actionsFor', () => {
 
 describe('values', () => {
   it('joins an address\'s non-empty parts', () => {
-    expect(formatValue('address', { street: '1 Elm', unit: null, city: 'Bristol', state: 'RI', zip: '02809' })).toBe('1 Elm, Bristol, RI, 02809')
+    expect(formatValue('address', { street: '1 Elm', unit: null, city: 'Bristol', state: 'RI', zip: '02809' })).toBe('1 Elm, Bristol, RI 02809')
+    // MySQL's JSON type returns keys shortest first; the order must not follow it.
+    expect(formatValue('address', { zip: '02818', city: 'East Greenwich', unit: 'Apt 2', state: 'RI', street: '295 Gilbert Stuart Drive' }))
+      .toBe('295 Gilbert Stuart Drive, Apt 2, East Greenwich, RI 02818')
+    expect(formatValue('address', { zip: '02910', city: 'Cranston', state: 'RI', street: 'PO Box 10009' })).toBe('PO Box 10009, Cranston, RI 02910')
   })
   it('labels phones', () => {
     expect(formatValue('phones', { phone: '401-555-0142', cell: null })).toBe('Phone 401-555-0142')
