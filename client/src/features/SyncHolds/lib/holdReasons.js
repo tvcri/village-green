@@ -25,8 +25,8 @@ export const GROUPS = [
   {
     key: 'finish',
     title: 'To finish in LGL',
-    what: 'The sync changed LGL but left one thing for a person to check there.',
-    reasons: ['addressee', 'lgl-incomplete', 'po-box'],
+    what: 'Something in LGL needs a person. Fix it there and the sync picks it up on its next run.',
+    reasons: ['addressee', 'lgl-incomplete', 'po-box', 'unclean', 'ambiguous'],
   },
   {
     key: 'status',
@@ -50,7 +50,7 @@ export const GROUPS = [
     key: 'engineer',
     title: 'For the engineer',
     what: 'Nothing for staff to do. The engineer is told about these.',
-    reasons: ['unclean', 'ambiguous', 'vg-refused', 'lgl-refused', 'flapping', 'create-unfinished'],
+    reasons: ['vg-refused', 'lgl-refused', 'flapping', 'create-unfinished'],
   },
 ]
 
@@ -112,6 +112,14 @@ export function formatValue (field, value) {
   return parts.join(', ') || null
 }
 
+// What is wrong with an LGL value the sync read but cannot use (clean.js and
+// fields.js in vg-sync decide), and what staff do about it.
+const UNCLEAN = {
+  email: 'LGL’s email isn’t a valid address. Correct it in LGL.',
+  address: 'LGL’s address is missing a city, state or 5-digit ZIP, or isn’t a US address. Correct it in LGL, or mark it as seen if it is right.',
+  phones: 'One of LGL’s numbers isn’t a 10-digit US number. Correct it in LGL.',
+}
+
 // The plain sentence a row leads with.
 export function sentenceFor (hold) {
   const d = hold.detail ?? {}
@@ -148,8 +156,8 @@ export function sentenceFor (hold) {
     case 'no-longer-donor': return 'LGL no longer counts them as a donor. VG still shows the Donor tag.'
     case 'unlinked': return 'The sync removed this person’s link to LGL.'
     case 'lgl-missing': return 'The LGL record this person was linked to is gone from LGL, perhaps merged into another.'
-    case 'unclean': return 'The value in LGL could not be read.'
-    case 'ambiguous': return 'LGL has more than one entry that could be the current one.'
+    case 'unclean': return UNCLEAN[hold.field] ?? `LGL’s ${f} isn’t in a form the sync can use. Correct it in LGL.`
+    case 'ambiguous': return `LGL has more than one current ${f} and can’t tell which is the main one. Mark one as preferred in LGL.`
     case 'vg-refused': return 'VG refused a change the sync tried to make.'
     case 'lgl-refused': return 'LGL refused a change the sync tried to make.'
     case 'flapping': return 'This keeps changing back and forth between the two systems.'

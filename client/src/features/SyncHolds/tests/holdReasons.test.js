@@ -5,11 +5,11 @@ const EXPECTED_GROUPS = {
   maybe: ['name-only', 'multiple-matches', 'shared-email-different-name', 'same-address-last-name', 'already-linked-elsewhere', 'duplicate-in-lgl', 'import-hold', 'resolution-failed'],
   differ: ['never-agreed', 'both-changed', 'lgl-cleared', 'vg-cleared', 'lost-nickname', 'deceased-removed', 'phones-no-slot'],
   couple: ['couple'],
-  finish: ['addressee', 'lgl-incomplete', 'po-box'],
+  finish: ['addressee', 'lgl-incomplete', 'po-box', 'unclean', 'ambiguous'],
   status: ['no-longer-donor', 'unlinked', 'lgl-missing'],
   wont: ['anonymous', 'deceased-in-lgl', 'couple-name', 'no-last-name', 'before-horizon'],
   skipped: ['import-skip'],
-  engineer: ['unclean', 'ambiguous', 'vg-refused', 'lgl-refused', 'flapping', 'create-unfinished'],
+  engineer: ['vg-refused', 'lgl-refused', 'flapping', 'create-unfinished'],
 }
 
 const open = (reason, extra = {}) => ({ reason, state: 'open', personId: null, field: null, detail: null, resolution: null, ...extra })
@@ -41,6 +41,14 @@ describe('sentenceFor', () => {
     expect(sentenceFor(open('import-hold', { detail: { importReason: 'Not confirmed on the Work list' } })))
       .toBe('Held at the November import review: Not confirmed on the Work list.')
   })
+  it('says what to fix in LGL for a value the sync cannot use', () => {
+    expect(sentenceFor(open('unclean', { personId: '1', field: 'email' }))).toBe('LGL’s email isn’t a valid address. Correct it in LGL.')
+    expect(sentenceFor(open('unclean', { personId: '1', field: 'address' })))
+      .toBe('LGL’s address is missing a city, state or 5-digit ZIP, or isn’t a US address. Correct it in LGL, or mark it as seen if it is right.')
+    expect(sentenceFor(open('unclean', { personId: '1', field: 'phones' }))).toBe('One of LGL’s numbers isn’t a 10-digit US number. Correct it in LGL.')
+    expect(sentenceFor(open('ambiguous', { personId: '1', field: 'email' })))
+      .toBe('LGL has more than one current email and can’t tell which is the main one. Mark one as preferred in LGL.')
+  })
   it('falls back to the raw code', () => {
     expect(sentenceFor(open('brand-new'))).toBe('brand-new')
   })
@@ -67,8 +75,12 @@ describe('actionsFor', () => {
     expect(actionsFor(open('addressee', { personId: '1' }))).toEqual(['doneInLgl'])
     expect(actionsFor(open('po-box', { personId: '1', field: 'address' }))).toEqual(['seen'])
   })
+  it('lets staff mark an LGL value they have checked as seen', () => {
+    expect(actionsFor(open('unclean', { personId: '1', field: 'address' }))).toEqual(['seen'])
+    expect(actionsFor(open('ambiguous', { personId: '1', field: 'email' }))).toEqual(['seen'])
+  })
   it('gives the engineer\'s reasons no action', () => {
-    expect(actionsFor(open('unclean', { personId: '1', field: 'phones' }))).toEqual([])
+    expect(actionsFor(open('vg-refused', { personId: '1', field: 'phones' }))).toEqual([])
   })
   it('offers nothing on a closed hold', () => {
     expect(actionsFor({ ...open('name-only'), state: 'closed' })).toEqual([])
