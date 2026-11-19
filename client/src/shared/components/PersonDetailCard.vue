@@ -550,8 +550,8 @@ const copyEmail = async (email) => {
   flex-wrap: wrap;
   gap: 0.25rem 0.75rem;
   align-items: center;
-  background: var(--p-amber-50);
-  color: var(--p-amber-900);
+  background: var(--sync-hint-bg);
+  color: var(--sync-hint-fg);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
 }

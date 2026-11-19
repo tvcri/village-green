@@ -2,6 +2,7 @@
 import { render, cleanup, fireEvent, waitFor, within } from '@testing-library/vue'
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { defineComponent, h, KeepAlive, ref } from 'vue'
 import PrimeVue from 'primevue/config'
 import SyncHolds from '../components/SyncHolds.vue'
 import { getSyncHolds, dismissSyncHold, resolveSyncHold, closeSyncHold } from '../api/syncHoldApi.js'
@@ -172,5 +173,29 @@ describe('SyncHolds', () => {
     expect(await findByText(/will link to/)).toHaveTextContent('will link to Sousa, Ann')
     // the answer can still change to a new person
     expect(await findByRole('button', { name: 'New person' })).toBeInTheDocument()
+  })
+
+  /* eslint-disable vue/one-component-per-file -- a host and a stand-in page, local to this test */
+  it('keeps collapsed groups when the page is kept alive, and refetches on return', async () => {
+    const shown = ref(true)
+    const Elsewhere = defineComponent({ name: 'PersonPageStandIn', render: () => h('p', 'person page') })
+    const Host = defineComponent({
+      render: () => h(KeepAlive, { include: 'SyncHolds' }, [shown.value ? h(SyncHolds) : h(Elsewhere)]),
+    })
+    const { container, findByText } = render(Host, { global: { plugins: [PrimeVue] } })
+    await findByText('Ann Sousa')
+    const maybe = groupEl(container, 'maybe')
+    expect(maybe.open).toBe(true)
+    await fireEvent.click(maybe.querySelector('summary'))
+    maybe.open = false
+    await fireEvent(maybe, new Event('toggle'))
+    expect(getSyncHolds).toHaveBeenCalledTimes(1)
+
+    shown.value = false
+    await findByText('person page')
+    shown.value = true
+    await waitFor(() => expect(getSyncHolds).toHaveBeenCalledTimes(2))
+    expect(groupEl(container, 'maybe').open).toBe(false)
+    expect(groupEl(container, 'differ').open).toBe(true)
   })
 })

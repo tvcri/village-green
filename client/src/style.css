@@ -15,6 +15,9 @@
      is #FFA000, unreadable on any amber. */
   --tag-donor-bg: var(--p-amber-300);
   --tag-donor-fg: var(--p-amber-950);
+  /* The LGL sync hint on a donor's person page. */
+  --sync-hint-bg: var(--p-amber-50);
+  --sync-hint-fg: var(--p-amber-900);
 
   /* Brand Colors */
   --color-primary: #6366f1; /* Indigo-500 */
@@ -210,6 +213,8 @@ textarea:focus {
   /* Donor tag colours, dark pair (see :root). */
   --tag-donor-bg: color-mix(in srgb, var(--p-amber-500), transparent 84%);
   --tag-donor-fg: var(--p-amber-200);
+  --sync-hint-bg: color-mix(in srgb, var(--p-amber-500), transparent 88%);
+  --sync-hint-fg: var(--p-amber-200);
 }
 
 :root.app-dark body {

@@ -157,7 +157,7 @@ async function run (action, payload) {
 
 <style scoped>
 .row {
-  border-top: 1px solid var(--p-surface-200);
+  border-top: 1px solid var(--p-content-border-color);
   padding: 0.75rem 1rem 0.75rem 2.25rem;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) auto;
@@ -178,15 +178,15 @@ async function run (action, payload) {
 .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; align-items: center; }
 .lgl-link { font-size: 0.85rem; white-space: nowrap; }
 .pill { display: inline-block; border-radius: 4px; padding: 0.1rem 0.5rem; font-size: 0.85rem; }
-.pill.wait { background: var(--p-amber-100); color: var(--p-amber-900); }
-.pill.fail { background: var(--p-red-100); color: var(--p-red-800); }
-.pill.seen { background: var(--p-surface-100); color: var(--p-text-muted-color); }
-.pill.done { background: var(--p-green-100); color: var(--p-green-900); }
-.error { color: var(--p-red-700); margin: 0; }
+.pill.wait { background: var(--hold-wait-bg); color: var(--hold-wait-fg); }
+.pill.fail { background: var(--hold-fail-bg); color: var(--hold-fail-fg); }
+.pill.seen { background: var(--p-content-hover-background); color: var(--p-text-muted-color); }
+.pill.done { background: var(--hold-done-bg); color: var(--hold-done-fg); }
+.error { color: var(--hold-error-fg); margin: 0; }
 .confirm {
   grid-column: 1 / -1;
-  background: var(--p-surface-50);
-  border: 1px solid var(--p-surface-200);
+  background: var(--p-content-hover-background);
+  border: 1px solid var(--p-content-border-color);
   border-radius: 6px;
   padding: 0.75rem;
 }

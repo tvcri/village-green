@@ -50,7 +50,7 @@ onMounted(() => {
 
     <main class="app-main">
       <router-view v-if="!needsAck" v-slot="{ Component }">
-        <keep-alive include="MetaServiceRequestList,VillageServiceRequestList,MemberList,VolunteerList,PersonList,UserList">
+        <keep-alive include="MetaServiceRequestList,VillageServiceRequestList,MemberList,VolunteerList,PersonList,UserList,SyncHolds">
           <component :is="Component" />
         </keep-alive>
       </router-view>

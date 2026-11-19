@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
@@ -8,6 +8,9 @@ import HoldRow from './HoldRow.vue'
 import { GROUPS, groupFor } from '../lib/holdReasons.js'
 import { closeSyncHold, dismissSyncHold, getSyncHolds, resolveSyncHold } from '../api/syncHoldApi.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
+import { useScrollRestore } from '../../../shared/composables/useScrollRestore.js'
+
+defineOptions({ name: 'SyncHolds' })
 
 // The LGL sync screen: what the sync between VG and LGL left for a person,
 // grouped into the situations staff recognise (VG-202611-521). The sync
@@ -18,6 +21,10 @@ const router = useRouter()
 const toast = useToast()
 const { hasPermission } = useCurrentUser()
 const canWrite = computed(() => hasPermission('sync:write'))
+
+// App.vue keeps this page alive while staff open a person from it, so the
+// view, search, collapsed groups and scroll position survive Back.
+useScrollRestore('meta-sync-holds', 'meta-person-detail')
 
 const STATES = [
   { value: 'open', label: 'Open' },
@@ -54,6 +61,13 @@ async function load () {
 }
 onMounted(load)
 watch(state, load)
+// Re-fetch on return, so what was done on the person page shows (the first
+// activation is the initial load).
+let activatedOnce = false
+onActivated(() => {
+  if (activatedOnce) load()
+  activatedOnce = true
+})
 
 const textOf = (h) => [
   ...(h.persons ?? []).map(p => p.fullName),
@@ -73,6 +87,12 @@ const groups = computed(() => GROUPS
   .filter(g => g.holds.length))
 
 const startsOpen = (key) => Boolean(personFilter.value) || !['wont', 'engineer'].includes(key)
+// Groups staff opened or closed keep that state across reloads; a new person
+// filter starts from the defaults again.
+const openGroups = ref({})
+const isOpen = (key) => openGroups.value[key] ?? startsOpen(key)
+const onToggle = (key, event) => { openGroups.value[key] = event.target.open }
+watch(personFilter, () => { openGroups.value = {} })
 
 const donorName = (h) => h.detail?.lgl?.name || `LGL donor ${h.lglConstituentId}`
 
@@ -131,7 +151,7 @@ const clearPerson = () => router.replace({ query: {} })
     </div>
 
     <details v-for="g in groups" :key="g.key" class="group" :class="{ engineer: g.key === 'engineer' }"
-      :data-group="g.key" :open="startsOpen(g.key)">
+      :data-group="g.key" :open="isOpen(g.key)" @toggle="onToggle(g.key, $event)">
       <summary>
         <h2>{{ g.title }}</h2>
         <span class="count">{{ g.holds.length }}</span>
@@ -144,6 +164,27 @@ const clearPerson = () => router.replace({ query: {} })
 </template>
 
 <style scoped>
+/* Status colours for the rows (HoldRow, ResolvePersonPanel inherit them).
+   Light/dark pairs as PersonList's tags; html.app-dark out-specifies the
+   scoped light rule. */
+.sync-holds {
+  --hold-wait-bg: var(--p-amber-100);
+  --hold-wait-fg: var(--p-amber-900);
+  --hold-fail-bg: var(--p-red-100);
+  --hold-fail-fg: var(--p-red-800);
+  --hold-done-bg: var(--p-green-100);
+  --hold-done-fg: var(--p-green-900);
+  --hold-error-fg: var(--p-red-700);
+}
+:global(html.app-dark .sync-holds) {
+  --hold-wait-bg: color-mix(in srgb, var(--p-amber-500), transparent 84%);
+  --hold-wait-fg: var(--p-amber-300);
+  --hold-fail-bg: color-mix(in srgb, var(--p-red-500), transparent 84%);
+  --hold-fail-fg: var(--p-red-300);
+  --hold-done-bg: color-mix(in srgb, var(--p-green-500), transparent 84%);
+  --hold-done-fg: var(--p-green-300);
+  --hold-error-fg: var(--p-red-400);
+}
 .sync-holds {
   padding: 2rem;
   display: flex;
@@ -160,8 +201,8 @@ h1 { margin: 0; color: var(--color-text-primary); }
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  background: var(--p-primary-50);
-  color: var(--p-primary-700);
+  background: var(--p-highlight-background);
+  color: var(--p-highlight-color);
   border-radius: 999px;
   padding: 0.2rem 0.25rem 0.2rem 0.75rem;
 }
@@ -170,10 +211,10 @@ h1 { margin: 0; color: var(--color-text-primary); }
   padding: 2rem 1rem;
   text-align: center;
   color: var(--p-text-muted-color);
-  border: 1px dashed var(--p-surface-300);
+  border: 1px dashed var(--p-content-border-color);
   border-radius: 8px;
 }
-.group { background: var(--p-surface-0); border: 1px solid var(--p-surface-200); border-radius: 8px; }
+.group { background: var(--p-content-background); color: var(--p-content-color); border: 1px solid var(--p-content-border-color); border-radius: 8px; }
 .group > summary {
   list-style: none;
   cursor: pointer;
@@ -189,7 +230,7 @@ h1 { margin: 0; color: var(--color-text-primary); }
 .group h2 { font-size: 1rem; font-weight: 600; margin: 0; }
 .group.engineer h2 { color: var(--p-text-muted-color); }
 .count {
-  border: 1px solid var(--p-surface-200);
+  border: 1px solid var(--p-content-border-color);
   border-radius: 999px;
   padding: 0 0.55rem;
   font-size: 0.8rem;

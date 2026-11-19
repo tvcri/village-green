@@ -86,8 +86,8 @@ const metaOf = (p) => [p.place ?? p.town, p.email, p.isDonor ? 'already a donor'
 <style scoped>
 .resolve-panel {
   grid-column: 1 / -1;
-  background: var(--p-surface-50);
-  border: 1px solid var(--p-surface-200);
+  background: var(--p-content-hover-background);
+  border: 1px solid var(--p-content-border-color);
   border-radius: 6px;
   padding: 0.75rem;
   display: flex;
@@ -95,7 +95,7 @@ const metaOf = (p) => [p.place ?? p.town, p.email, p.isDonor ? 'already a donor'
   gap: 0.5rem;
 }
 .ask, .error { margin: 0; }
-.error { color: var(--p-red-700); }
+.error { color: var(--hold-error-fg, var(--p-red-700)); }
 .search { max-width: 22rem; }
 .pick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; max-height: 16rem; overflow: auto; }
 .pick-list .head { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--p-text-muted-color); font-weight: 600; padding-top: 0.25rem; }
@@ -107,8 +107,9 @@ const metaOf = (p) => [p.place ?? p.town, p.email, p.isDonor ? 'already a donor'
   gap: 1rem;
   text-align: left;
   font: inherit;
-  background: var(--p-surface-0);
-  border: 1px solid var(--p-surface-200);
+  background: var(--p-content-background);
+  color: var(--p-content-color);
+  border: 1px solid var(--p-content-border-color);
   border-radius: 6px;
   padding: 0.4rem 0.65rem;
   cursor: pointer;
