@@ -55,7 +55,8 @@ describe('PersonDetail — LGL sync hint', () => {
   it('counts the donor’s open holds for the card', async () => {
     setup()
     await waitFor(() => expect(cardProps.last?.syncHoldCount).toBe(2))
-    expect(getSyncHolds).toHaveBeenCalledWith({ state: ['open'], personId: '5' })
+    // a count needs no names, so no projection
+    expect(getSyncHolds).toHaveBeenCalledWith({ state: ['open'], personId: '5', projection: [] })
   })
 
   it('does not ask without sync:read', async () => {

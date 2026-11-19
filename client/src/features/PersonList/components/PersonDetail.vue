@@ -43,12 +43,13 @@ const { state: person, execute: refresh } = useAsyncState(
 
 // Open LGL sync holds on a donor, for the hint in the card's Donor section.
 // A failure only hides the hint.
+// A count needs no names, so no projection.
 const syncHoldCount = ref(0)
 watch(person, async (p) => {
   syncHoldCount.value = 0
   if (!p?.donor || !canReadSync.value) return
   try {
-    syncHoldCount.value = ((await getSyncHolds({ state: ['open'], personId: String(p.personId ?? personId.value) })) ?? []).length
+    syncHoldCount.value = ((await getSyncHolds({ state: ['open'], personId: String(p.personId ?? personId.value), projection: [] })) ?? []).length
   }
   catch { /* hint stays hidden */ }
 })

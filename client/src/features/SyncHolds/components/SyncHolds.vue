@@ -46,17 +46,24 @@ const filterPerson = computed(() => {
   return null
 })
 
+// Only the latest request is shown: a slow earlier load (another view, or a
+// reload after an action) must not replace it.
+let loadSeq = 0
 async function load () {
+  const seq = ++loadSeq
   loading.value = true
   try {
-    holds.value = await getSyncHolds({ state: [state.value] }) ?? []
+    const rows = await getSyncHolds({ state: [state.value] }) ?? []
+    if (seq === loadSeq) holds.value = rows
   }
   catch {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Could not load the LGL sync list', life: 4000 })
+    if (seq === loadSeq) toast.add({ severity: 'error', summary: 'Error', detail: 'Could not load the LGL sync list', life: 4000 })
   }
   finally {
-    loading.value = false
-    loaded.value = true
+    if (seq === loadSeq) {
+      loading.value = false
+      loaded.value = true
+    }
   }
 }
 onMounted(load)
@@ -77,8 +84,8 @@ const textOf = (h) => [
 const visible = computed(() => {
   const q = search.value.trim().toLowerCase()
   return holds.value
-    .filter(h => !personFilter.value || h.personId === personFilter.value ||
-      (h.detail?.candidates ?? []).map(String).includes(personFilter.value))
+    // Holds about the person, as the person page counts them.
+    .filter(h => !personFilter.value || h.personId === personFilter.value)
     .filter(h => !q || textOf(h).includes(q))
 })
 
@@ -141,7 +148,7 @@ const clearPerson = () => router.replace({ query: {} })
       </div>
       <InputText v-model="search" placeholder="Search by name or email" aria-label="Search by name or email" class="search" />
       <span v-if="personFilter" class="chip">
-        Only {{ filterPerson?.fullName ?? `person ${personFilter}` }}
+        Only {{ filterPerson?.displayName ?? `person ${personFilter}` }}
         <button type="button" aria-label="Show everyone" @click="clearPerson">×</button>
       </span>
     </div>

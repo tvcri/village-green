@@ -84,6 +84,7 @@ describe('SyncHolds', () => {
     const { findByText, queryByText, getByRole } = setup()
     await findByText('Only LGL has a nickname.')
     expect(queryByText('Ann Sousa')).toBeNull()
+    expect(await findByText(/Only Daniel Okafor/)).toBeInTheDocument()
     await fireEvent.click(getByRole('button', { name: 'Show everyone' }))
     expect(routerReplace).toHaveBeenCalledWith({ query: {} })
   })
@@ -166,11 +167,32 @@ describe('SyncHolds', () => {
     expect(queryByText(/Sync Service/)).toBeNull()
   })
 
+  it('filters to holds about the person, not holds that only suggest them', async () => {
+    route.query = { personId: '101' } // a candidate on hold 1, the subject of none
+    const { findByText, queryByText } = setup()
+    expect(await findByText(/Nothing waiting/)).toBeInTheDocument()
+    expect(queryByText('Ann Sousa')).toBeNull()
+  })
+
+  it('shows the view last asked for when an earlier load finishes late', async () => {
+    let finishOpen
+    vi.mocked(getSyncHolds)
+      .mockImplementationOnce(() => new Promise(resolve => { finishOpen = resolve }))
+      .mockResolvedValueOnce([{ ...HOLDS[3], state: 'closed', closedAt: '2026-11-19T10:00:00Z' }])
+    const { findByText, getByRole, queryByText } = setup()
+    await fireEvent.click(getByRole('button', { name: 'Closed' }))
+    await findByText('Brennan, Margaret')
+    finishOpen(HOLDS)
+    await new Promise(r => setTimeout(r, 20))
+    expect(queryByText('Ann Sousa')).toBeNull()
+    expect(getByRole('button', { name: 'Closed' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('shows a pending answer as waiting for the sync', async () => {
     vi.mocked(getSyncHolds).mockResolvedValue([{ ...HOLDS[0], resolution: { kind: 'link', personId: '101' } }])
     const { findByText, findByRole } = setup()
     expect(await findByText('Waiting for the next sync run')).toBeInTheDocument()
-    expect(await findByText(/will link to/)).toHaveTextContent('will link to Sousa, Ann')
+    expect(await findByText(/will link to/)).toHaveTextContent('will link to Ann Sousa')
     // the answer can still change to a new person
     expect(await findByRole('button', { name: 'New person' })).toBeInTheDocument()
   })

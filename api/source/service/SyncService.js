@@ -141,18 +141,17 @@ const HOLD_COLUMNS = `CAST(holdId AS CHAR) AS holdId, lglConstituentId, CAST(per
   CAST(dismissedUserId AS CHAR) AS dismissedUserId, note, resolution, resolvedAt,
   CAST(resolvedUserId AS CHAR) AS resolvedUserId, CAST(closedUserId AS CHAR) AS closedUserId`
 // Runs a write that may hit sync_hold_open, the one-open-hold-per-subject key,
-// and turns that collision into a 409 naming the batch item.
-async function guardOpenCollision (i, write) {
+// and turns that collision into a 409 with the given message.
+async function guardOpenCollision (message, write) {
   try {
     return await write()
   }
   catch (e) {
-    if (e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)) {
-      throw new SmError.ConflictError(`item ${i}: an open hold for this constituent, person, field and reason already exists`)
-    }
+    if (e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)) throw new SmError.ConflictError(message)
     throw e
   }
 }
+const itemCollision = (i) => `item ${i}: an open hold for this constituent, person, field and reason already exists`
 
 async function holdsByIds (ids) {
   if (!ids.length) return []
@@ -223,7 +222,7 @@ module.exports.createHolds = async function (items, userId) {
       const created = []
       for (const [i, item] of items.entries()) {
         const dismissed = item.state === 'dismissed'
-        const [res] = await guardOpenCollision(i, () => connection.query(
+        const [res] = await guardOpenCollision(itemCollision(i), () => connection.query(
             `INSERT INTO sync_hold (lglConstituentId, personId, field, reason, detail, fingerprint, state,
                dismissalKind, dismissedAt, dismissedUserId, note, firstSeenAt, lastSeenAt)
              VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ${dismissed ? 'NOW(3)' : 'NULL'}, ?, ?, NOW(3), NOW(3))`,
@@ -272,7 +271,7 @@ module.exports.patchHolds = async function (items) {
           state.set(String(item.holdId), item.state)
         }
         if (!sets.length) continue
-        await guardOpenCollision(i, () =>
+        await guardOpenCollision(itemCollision(i), () =>
           connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`, [...binds, item.holdId]))
         count++
       }
@@ -290,7 +289,9 @@ module.exports.dismissHold = async function (holdId, { dismissalKind, note }, us
       if (!row) throw new SmError.NotFoundError(`no hold ${holdId}`)
       if (row.state !== 'open') throw new SmError.UnprocessableError(`only an open hold can be dismissed; this one is ${row.state}`)
       await connection.query(
-        `UPDATE sync_hold SET state = 'dismissed', dismissalKind = ?, note = ?, dismissedAt = NOW(3), dismissedUserId = ?
+        // A pending staff answer is dropped: a dismissal is the newer decision.
+        `UPDATE sync_hold SET state = 'dismissed', dismissalKind = ?, note = COALESCE(?, note), dismissedAt = NOW(3),
+           dismissedUserId = ?, resolution = NULL, resolvedAt = NULL, resolvedUserId = NULL
          WHERE holdId = ?`, [dismissalKind, note ?? null, userId, holdId])
     },
     statusObj: undefined
@@ -339,9 +340,11 @@ module.exports.resolveHold = async function (holdId, { kind, personId, note }, u
       if (kind === 'link' && personId == null) throw new SmError.UnprocessableError('a link needs a personId')
       if (kind === 'create' && personId != null) throw new SmError.UnprocessableError('a create takes no personId')
       if (kind === 'link') {
+        // Locks the person, so two links to one person run one after the other
+        // and the second sees the first in the check below.
         const [[p]] = await connection.query(
           `SELECT p.displayName, d.lglConstituentId FROM person p LEFT JOIN donor d ON d.personId = p.id
-           WHERE p.id = ?`, [personId])
+           WHERE p.id = ? FOR UPDATE`, [personId])
         if (!p) throw new SmError.NotFoundError(`no person ${personId}`)
         if (p.lglConstituentId != null) {
           throw new SmError.UnprocessableError(`${p.displayName} is already linked to LGL donor ${p.lglConstituentId}`)
@@ -349,7 +352,7 @@ module.exports.resolveHold = async function (holdId, { kind, personId, note }, u
         const [[other]] = await connection.query(
           `SELECT lglConstituentId FROM sync_hold
            WHERE state = 'open' AND holdId <> ? AND resolution->>'$.kind' = 'link' AND resolution->>'$.personId' = ?
-           LIMIT 1`, [holdId, String(personId)])
+           LIMIT 1 FOR SHARE`, [holdId, String(personId)])
         if (other) {
           throw new SmError.UnprocessableError(`${p.displayName} is already waiting to be linked to LGL donor ${other.lglConstituentId}`)
         }
@@ -357,16 +360,9 @@ module.exports.resolveHold = async function (holdId, { kind, personId, note }, u
       const resolution = kind === 'link' ? { kind, personId: String(personId) } : { kind }
       const sets = ['resolution = CAST(? AS JSON)', 'resolvedAt = NOW(3)', 'resolvedUserId = ?', 'note = COALESCE(?, note)']
       if (reopen) sets.push("state = 'open'", 'dismissalKind = NULL', 'dismissedAt = NULL', 'dismissedUserId = NULL')
-      try {
-        await connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`,
-          [JSON.stringify(resolution), userId, note ?? null, holdId])
-      }
-      catch (e) {
-        if (e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)) {
-          throw new SmError.ConflictError('the sync has opened this donor\'s hold again; reload and resolve the open one')
-        }
-        throw e
-      }
+      await guardOpenCollision('the sync has opened this donor\'s hold again; reload and resolve the open one', () =>
+        connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`,
+          [JSON.stringify(resolution), userId, note ?? null, holdId]))
     },
     statusObj: undefined
   })

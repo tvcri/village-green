@@ -1,11 +1,12 @@
 import { apiCall } from '../../../shared/api/apiClient.js'
 
-// The LGL sync's holds, with the people and staff they mention. state is an
-// array (open, dismissed, closed), sent as a repeated param.
-export const getSyncHolds = ({ state = ['open'], personId } = {}) =>
+// The LGL sync's holds, by default with the people and staff they mention
+// (projection: [] for a bare count). state is an array (open, dismissed,
+// closed), sent as a repeated param.
+export const getSyncHolds = ({ state = ['open'], personId, projection = ['persons', 'users'] } = {}) =>
   apiCall('getSyncHolds', {
     state,
-    projection: ['persons', 'users'],
+    ...(projection.length && { projection }),
     ...(personId != null && { personId }),
   })
 

@@ -119,3 +119,15 @@ test('resolving a dismissed hold onto an open twin is 409', async () => {
 test('staff without sync:write is refused', async () => {
   assert.equal((await resolve('1', { kind: 'create' }, tokens.users.staff)).status, 403)
 })
+
+test('dismissing a hold drops its pending answer and keeps the note', async () => {
+  const h = await openHold()
+  await resolve(h.holdId, { kind: 'link', personId: await makePerson(), note: 'same address' })
+  const res = await vgCall('createSyncHoldDismissal', { holdId: h.holdId }, { token: admin, body: { dismissalKind: 'staff' } })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.state, 'dismissed')
+  assert.equal(res.json.resolution, null)
+  assert.equal(res.json.resolvedAt, null)
+  assert.equal(res.json.resolvedUserId, null)
+  assert.equal(res.json.note, 'same address')
+})

@@ -38,7 +38,7 @@ const pendingTarget = computed(() => {
   const r = props.hold.resolution
   if (props.hold.state !== 'open' || !r) return null
   if (r.kind === 'create') return 'will add them as a new person'
-  return `will link to ${personById.value.get(String(r.personId))?.fullName ?? `person ${r.personId}`}`
+  return `will link to ${personById.value.get(String(r.personId))?.displayName ?? `person ${r.personId}`}`
 })
 
 const fmtWhen = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : ''
