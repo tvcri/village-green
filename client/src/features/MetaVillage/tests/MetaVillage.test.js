@@ -27,12 +27,12 @@ describe('Hub page', () => {
     expect(screen.getByText(/record trainings and positions/)).toBeInTheDocument()
   })
 
-  it('offers LGL under Integrations, not Constituents', () => {
+  it('offers LGL sync under Integrations, not Constituents', () => {
     renderHub()
     const integrations = screen.getByRole('heading', { level: 2, name: 'Integrations' }).closest('section')
-    expect(integrations).toHaveTextContent('LGL')
+    expect(integrations).toHaveTextContent('LGL sync')
     const constituents = screen.getByRole('heading', { level: 2, name: 'Constituents' }).closest('section')
-    expect(constituents).not.toHaveTextContent('LGL')
+    expect(constituents).not.toHaveTextContent('LGL sync')
   })
 
   it('announces nothing that has not shipped', () => {
@@ -45,7 +45,7 @@ describe('Hub page', () => {
     granted.has = (p) => p !== 'sync:read'
     renderHub()
     expect(screen.queryByRole('heading', { name: 'Integrations' })).toBeNull()
-    expect(screen.queryByText('LGL')).toBeNull()
+    expect(screen.queryByText('LGL sync')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Reporting' })).toBeInTheDocument()
   })
 })

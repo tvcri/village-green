@@ -50,7 +50,7 @@ const sections = [
     icon: 'pi-arrow-right-arrow-left',
     heading: 'Integrations',
     blurb: 'Keep Village Green in step with the other systems TVCRI uses.',
-    actions: [{ label: 'LGL', route: 'meta-sync-holds', permission: 'sync:read' }],
+    actions: [{ label: 'LGL sync', route: 'meta-sync-holds', permission: 'sync:read' }],
   },
 ]
 
