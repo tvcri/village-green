@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
@@ -17,6 +17,7 @@ import { PAUSE_TIME_ZONE, pauseState } from '../../../shared/lib/volunteerPause.
 import { todayCivilDateIn } from '../../../shared/lib/civilDate.js'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
 import { setCrumbPerson } from '../../../shared/lib/crumbPerson.js'
+import { getSyncHolds } from '../../SyncHolds/api/syncHoldApi.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,6 +28,7 @@ const canWritePerson = computed(() => hasPermission('person:write'))
 const canWriteMember = computed(() => hasPermission('member:write'))
 const canWriteVolunteer = computed(() => hasPermission('volunteer:write'))
 const canReadDonor = computed(() => hasPermission('donor:read'))
+const canReadSync = computed(() => hasPermission('sync:read'))
 const personId = computed(() => route.params.personId)
 
 const { state: person, execute: refresh } = useAsyncState(
@@ -38,6 +40,19 @@ const { state: person, execute: refresh } = useAsyncState(
     .then(p => { setCrumbPerson(p); return p }),
   { immediate: true }
 )
+
+// Open LGL sync holds on a donor, for the hint in the card's Donor section.
+// A failure only hides the hint.
+// A count needs no names, so no projection.
+const syncHoldCount = ref(0)
+watch(person, async (p) => {
+  syncHoldCount.value = 0
+  if (!p?.donor || !canReadSync.value) return
+  try {
+    syncHoldCount.value = ((await getSyncHolds({ state: ['open'], personId: String(p.personId ?? personId.value), projection: [] })) ?? []).length
+  }
+  catch { /* hint stays hidden */ }
+})
 
 const isMember = computed(() => (person.value?.activeAs ?? []).includes('member'))
 const isVolunteer = computed(() => (person.value?.activeAs ?? []).includes('volunteer'))
@@ -56,8 +71,11 @@ const hasVolunteerDetail = computed(() => !!person.value?.volunteer)
 
 // Any role row blocks the delete, whatever its status. activeAs can't tell:
 // it reads the active_* views, which omit Dropped, Pending and deceased.
-const canDelete = computed(() => !hasMemberDetail.value && !hasVolunteerDetail.value)
-const deleteBlockedTip = computed(() => person.value?.deceased
+// A donor record blocks it too: whether a person is a donor is decided in LGL.
+const canDelete = computed(() => !hasMemberDetail.value && !hasVolunteerDetail.value && !person.value?.donor)
+const deleteBlockedTip = computed(() => person.value?.donor && !hasMemberDetail.value && !hasVolunteerDetail.value
+  ? 'Donor links come from LGL and cannot be removed in VG.'
+  : person.value?.deceased
   ? 'Untick Deceased on the person form to change their roles, then remove them before deleting.'
   : 'Remove member and volunteer roles before deleting this person')
 
@@ -113,8 +131,9 @@ function removePerson () {
         toast.add({ severity: 'success', summary: 'Deleted', detail: 'Person deleted', life: 2000 })
         router.push({ name: 'meta-persons' })
       }
-      catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete person', life: 3000 })
+      catch (err) {
+        // The API says why (a role or donor record, or still named on service requests).
+        toast.add({ severity: 'error', summary: 'Error', detail: err?.body?.detail || 'Failed to delete person', life: 5000 })
       }
     }
   })
@@ -147,6 +166,7 @@ function removePerson () {
       :has-member-detail="hasMemberDetail"
       :has-volunteer-detail="hasVolunteerDetail"
       :donor="canReadDonor ? (person?.donor ?? null) : null"
+      :sync-hold-count="syncHoldCount"
     >
       <!-- Pencil shortcuts to the same editors as the top buttons. Each
            section renders only when its role record exists, so these are

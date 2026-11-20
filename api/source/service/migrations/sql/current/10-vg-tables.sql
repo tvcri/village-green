@@ -757,6 +757,10 @@ CREATE TABLE `sync_hold` (
   `dismissedAt` datetime(3) DEFAULT NULL,
   `dismissedUserId` int DEFAULT NULL,
   `note` varchar(500) DEFAULT NULL,
+  `resolution` json DEFAULT NULL,
+  `resolvedAt` datetime(3) DEFAULT NULL,
+  `resolvedUserId` int DEFAULT NULL,
+  `closedUserId` int DEFAULT NULL,
   `personKey` int GENERATED ALWAYS AS (ifnull(`personId`,0)) VIRTUAL,
   `fieldKey` varchar(32) GENERATED ALWAYS AS (ifnull(`field`,_utf8mb4'')) VIRTUAL,
   `openKey` tinyint GENERATED ALWAYS AS (if((`state` = _utf8mb4'open'),1,NULL)) VIRTUAL,
@@ -1173,4 +1177,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-14 23:25:03
+-- Dump completed on 2026-11-19 16:14:30

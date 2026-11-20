@@ -4,8 +4,9 @@ const SyncService = require('../service/SyncService')
 const SmError = require('../utils/error')
 const { hasPermission } = require('../utils/authz')
 
-// /sync: the vg-sync service account's endpoints. No UI calls them. Checked
-// federation-wide: the sync is not village-scoped.
+// /sync: the vg-sync service account's endpoints, plus the staff actions on
+// holds (dismissal, resolution, closure) that the LGL sync screen calls.
+// Checked federation-wide: the sync is not village-scoped.
 function assertSync (userObject, access) {
   if (!hasPermission(userObject, access === 'write' ? 'sync:write' : 'sync:read')) {
     throw new SmError.PrivilegeError()
@@ -40,8 +41,8 @@ module.exports.putSyncFields = async function putSyncFields (req, res, next) {
 module.exports.getSyncHolds = async function getSyncHolds (req, res, next) {
   try {
     assertSync(req.userObject, 'read')
-    const { state, personId, lglConstituentId } = req.query
-    res.json(await SyncService.getHolds({ states: state, personId, lglConstituentId }))
+    const { state, personId, lglConstituentId, projection } = req.query
+    res.json(await SyncService.getHolds({ states: state, personId, lglConstituentId, projection }))
   }
   catch (err) { next(err) }
 }
@@ -66,6 +67,22 @@ module.exports.createSyncHoldDismissal = async function createSyncHoldDismissal 
   try {
     assertSync(req.userObject, 'write')
     res.json(await SyncService.dismissHold(req.params.holdId, req.body, req.userObject.userId))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.createSyncHoldResolution = async function createSyncHoldResolution (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.resolveHold(req.params.holdId, req.body, req.userObject.userId))
+  }
+  catch (err) { next(err) }
+}
+
+module.exports.createSyncHoldClosure = async function createSyncHoldClosure (req, res, next) {
+  try {
+    assertSync(req.userObject, 'write')
+    res.json(await SyncService.closeHoldByStaff(req.params.holdId, req.body ?? {}, req.userObject.userId))
   }
   catch (err) { next(err) }
 }

@@ -39,6 +39,15 @@ test('open a batch and read it back', async () => {
   assert.ok(res.json.every(h => open.some(o => o.holdId === h.holdId)))
 })
 
+test('a new hold reads back the resolution and closer columns as null', async () => {
+  const [h] = (await create([hold()])).json
+  const got = await byId(h.holdId)
+  assert.equal(got.resolution, null)
+  assert.equal(got.resolvedAt, null)
+  assert.equal(got.resolvedUserId, null)
+  assert.equal(got.closedUserId, null)
+})
+
 test('duplicate open hold is refused with 409 naming the item', async () => {
   const h = hold()
   assert.equal((await create([h])).status, 200)
@@ -169,6 +178,65 @@ test('dismiss one records kind, note and caller', async () => {
   assert.equal((await dismiss('2147483000', { dismissalKind: 'staff' })).status, 404)
 })
 
+const closure = (holdId, body = {}, token = tokens.users.admin) => vgCall('createSyncHoldClosure', { holdId }, { token, body })
+
+test('staff close sets closedAt and closedUserId', async () => {
+  const [h] = (await create([hold({ reason: 'addressee', field: null })])).json
+  const res = await closure(h.holdId, { note: 'fixed the envelope name' })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.state, 'closed')
+  assert.ok(res.json.closedAt)
+  assert.equal(res.json.closedUserId, String(users.admin.userId))
+  assert.equal(res.json.note, 'fixed the envelope name')
+})
+
+test('the sync closing a hold leaves closedUserId null', async () => {
+  const [h] = (await create([hold()])).json
+  await patch([{ holdId: h.holdId, state: 'closed' }])
+  assert.equal((await byId(h.holdId)).closedUserId, null)
+})
+
+test('close refuses other reasons and non-open holds', async () => {
+  const [other] = (await create([hold()])).json
+  assert.equal((await closure(other.holdId)).status, 422)
+  const [done] = (await create([hold({ reason: 'lgl-incomplete', field: null })])).json
+  assert.equal((await closure(done.holdId)).status, 200)
+  assert.equal((await closure(done.holdId)).status, 422)
+  assert.equal((await closure('2147483000')).status, 404)
+  assert.equal((await byId(other.holdId)).state, 'open')
+})
+
+test('persons projection names the person, candidates and resolution target', async () => {
+  const mk = async () => (await vgCall('createPerson', {}, { token: tokens.users.staff, body: { villageId: null, firstName: 'Proj', lastName: uniq('Ection') } })).json.personId
+  const [a, b, c] = [await mk(), await mk(), await mk()]
+  const [h] = (await create([hold({ personId: null, field: null, reason: 'name-only', detail: { candidates: [a, b, '999999999'] } })])).json
+  await vgCall('createSyncHoldResolution', { holdId: h.holdId }, { token: tokens.users.admin, body: { kind: 'link', personId: c } })
+  const got = (await list({ lglConstituentId: h.lglConstituentId, projection: ['persons'] })).json[0]
+  assert.deepEqual(got.persons.map(p => p.personId), [a, b, c])
+  for (const p of got.persons) {
+    assert.match(p.fullName, /^Ection/)
+    assert.match(p.displayName, /^Proj /)
+    assert.equal(p.isDonor, false)
+    assert.ok('town' in p && 'email' in p, 'persons carry town and email to tell namesakes apart')
+  }
+})
+
+test('without the projection there is no persons property', async () => {
+  const [h] = (await create([hold()])).json
+  const got = (await list({ lglConstituentId: h.lglConstituentId })).json[0]
+  assert.equal('persons' in got, false)
+  assert.equal('users' in got, false)
+})
+
+test('users projection names who dismissed', async () => {
+  const [h] = (await create([hold()])).json
+  await dismiss(h.holdId, { dismissalKind: 'staff' }, tokens.users.admin)
+  const got = (await list({ state: ['dismissed'], lglConstituentId: h.lglConstituentId, projection: ['users'] })).json[0]
+  assert.equal(got.users.length, 1)
+  assert.equal(got.users[0].userId, String(users.admin.userId))
+  assert.ok(got.users[0].displayName)
+})
+
 test('state filter', async () => {
   const [o] = (await create([hold()])).json
   const [d] = (await create([hold({ state: 'dismissed', dismissalKind: 'rule' })])).json
@@ -188,4 +256,5 @@ test('staff is refused', async () => {
   assert.equal((await create([hold()], staff)).status, 403)
   assert.equal((await patch([{ holdId: '1', seen: true }], staff)).status, 403)
   assert.equal((await dismiss('1', { dismissalKind: 'staff' }, staff)).status, 403)
+  assert.equal((await closure('1', {}, staff)).status, 403)
 })

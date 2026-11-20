@@ -3434,6 +3434,17 @@ paths:
           schema: { type: array, items: { type: string, enum: [open, closed, dismissed] }, default: [open] }
         - { name: personId, in: query, required: false, schema: { $ref: '#/components/schemas/StringIntId' } }
         - { name: lglConstituentId, in: query, required: false, schema: { type: string, maxLength: 50 } }
+        - name: projection
+          in: query
+          required: false
+          description: >-
+            persons adds `persons`, the VG people the hold mentions (its person,
+            detail.candidates, the resolution's person; ids not in VG are left
+            out). users adds `users`, the staff who dismissed, resolved or
+            closed it.
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string, enum: [persons, users] }, default: [] }
       responses:
         '200': { description: Holds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SyncHold' } } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -3482,8 +3493,10 @@ paths:
     post:
       summary: Dismiss one open hold
       description: >-
-        Records who dismissed it and how. A staff dismissal is permanent; a rule
-        dismissal is reconsidered by the sync when its facts change.
+        Records who dismissed it and how. A dismissed field hold reopens when
+        either value changes. A staff-dismissed unlinked donor is never matched
+        again unless staff resolve it. A dismissal loaded from the import's
+        review stays dismissed.
       tags: [Sync]
       operationId: createSyncHoldDismissal
       parameters:
@@ -3501,6 +3514,61 @@ paths:
                 note: { type: string, maxLength: 500, nullable: true }
       responses:
         '200': { description: The dismissed hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
+  /sync/holds/{holdId}/resolution:
+    post:
+      summary: Answer who an unlinked LGL donor is
+      description: >-
+        Staff record that the donor is an existing VG person (kind link, with
+        personId) or someone new (kind create). The sync carries out the latest
+        answer on its next pass and closes the hold; until then the hold stays
+        open and the answer may be replaced. Only a hold with no personId that
+        is open, or dismissed by staff (which reopens it), can be resolved.
+        Which kinds a hold allows depends on its reason. A link is refused for
+        a person who already has a donor record or is already the answer on
+        another open hold.
+      tags: [Sync]
+      operationId: createSyncHoldResolution
+      parameters:
+        - { name: holdId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [link, create] }
+                personId: { $ref: '#/components/schemas/StringIntId' }
+                note: { type: string, maxLength: 500, nullable: true }
+      responses:
+        '200': { description: The hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:sync ] } ]
+  /sync/holds/{holdId}/closure:
+    post:
+      summary: Close a hold a person finished in LGL
+      description: >-
+        Only for the reasons the sync never closes itself (addressee,
+        lgl-incomplete), and only while open. Records who closed it.
+      tags: [Sync]
+      operationId: createSyncHoldClosure
+      parameters:
+        - { name: holdId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: string, maxLength: 500, nullable: true }
+      responses:
+        '200': { description: The closed hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:sync ] } ]
   /sync/runs:
@@ -3709,7 +3777,8 @@ components:
       type: object
       additionalProperties: false
       required: [holdId, lglConstituentId, personId, field, reason, detail, fingerprint, state, dismissalKind,
-        firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note]
+        firstSeenAt, lastSeenAt, closedAt, dismissedAt, dismissedUserId, note, resolution, resolvedAt,
+        resolvedUserId, closedUserId]
       properties:
         holdId: { $ref: '#/components/schemas/StringIntId' }
         lglConstituentId: { type: string }
@@ -3727,6 +3796,37 @@ components:
         dismissedAt: { type: string, format: date-time, nullable: true }
         dismissedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
         note: { type: string, nullable: true }
+        resolution:
+          description: >-
+            The staff answer for an unlinked donor ({kind: link, personId} or
+            {kind: create}), or null. Carried out by the sync.
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        resolvedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        closedUserId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        persons:
+          description: With projection=persons.
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [personId, fullName, displayName, isDonor, town, email]
+            properties:
+              personId: { $ref: '#/components/schemas/StringIntId' }
+              fullName: { type: string }
+              displayName: { type: string }
+              isDonor: { type: boolean }
+              town: { type: string, nullable: true, description: 'Municipality, to tell namesakes apart.' }
+              email: { type: string, nullable: true }
+        users:
+          description: With projection=users.
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [userId, displayName]
+            properties:
+              userId: { $ref: '#/components/schemas/StringIntId' }
+              displayName: { type: string }
     SyncFieldPut:
       type: object
       additionalProperties: false

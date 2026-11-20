@@ -1,0 +1,223 @@
+// @vitest-environment jsdom
+import { render, cleanup, fireEvent, waitFor, within } from '@testing-library/vue'
+import '@testing-library/jest-dom/vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { defineComponent, h, KeepAlive, ref } from 'vue'
+import PrimeVue from 'primevue/config'
+import SyncHolds from '../components/SyncHolds.vue'
+import { getSyncHolds, dismissSyncHold, resolveSyncHold, closeSyncHold } from '../api/syncHoldApi.js'
+
+const toastAdd = vi.fn()
+vi.mock('primevue/usetoast', () => ({ useToast: () => ({ add: toastAdd }) }))
+const perms = vi.hoisted(() => ({ denied: new Set() }))
+vi.mock('../../../shared/composables/useCurrentUser.js', () => ({
+  useCurrentUser: () => ({ hasPermission: (p) => !perms.denied.has(p) })
+}))
+const route = vi.hoisted(() => ({ query: {} }))
+const routerReplace = vi.fn()
+vi.mock('vue-router', () => ({
+  useRoute: () => route,
+  useRouter: () => ({ replace: routerReplace, push: vi.fn(), afterEach: () => () => {} }),
+  RouterLink: { props: ['to'], template: '<a><slot /></a>' },
+}))
+vi.mock('../api/syncHoldApi.js', () => ({
+  getSyncHolds: vi.fn(), dismissSyncHold: vi.fn(), resolveSyncHold: vi.fn(), closeSyncHold: vi.fn(),
+}))
+vi.mock('../../PersonList/api/personApi.js', () => ({ getPersons: vi.fn().mockResolvedValue([]) }))
+
+const base = { state: 'open', field: null, detail: null, resolution: null, dismissalKind: null, persons: [], users: [] }
+const donorLgl = (name) => ({ name, email: `${name.split(' ')[0].toLowerCase()}@example.org`, address: '1 Elm St, Bristol RI', lastGiftDate: '2026-09-02' })
+const HOLDS = [
+  { ...base, holdId: '1', lglConstituentId: '88214', personId: null, reason: 'name-only',
+    detail: { candidates: ['101', '102'], lgl: donorLgl('Ann Sousa') },
+    persons: [{ personId: '101', fullName: 'Sousa, Ann', displayName: 'Ann Sousa', isDonor: false, town: 'Bristol', email: 'ann@example.org' },
+      { personId: '102', fullName: 'Sousa, Annemarie', displayName: 'Annemarie Sousa', isDonor: false, town: 'Warren', email: null }] },
+  { ...base, holdId: '2', lglConstituentId: '77302', personId: null, reason: 'import-hold', detail: { importReason: 'Not confirmed on the Work list' } },
+  { ...base, holdId: '3', lglConstituentId: '500', personId: '103', field: 'nickname', reason: 'never-agreed', detail: { vg: null, lgl: 'Dan' },
+    persons: [{ personId: '103', fullName: 'Okafor, Daniel', displayName: 'Daniel Okafor', isDonor: true }] },
+  { ...base, holdId: '4', lglConstituentId: '501', personId: '104', field: null, reason: 'addressee', detail: null,
+    persons: [{ personId: '104', fullName: 'Brennan, Margaret', displayName: 'Margaret Brennan', isDonor: true }] },
+  { ...base, holdId: '5', lglConstituentId: '502', personId: '105', field: 'phones', reason: 'brand-new-reason', detail: null, persons: [] },
+]
+
+function setup () {
+  return render(SyncHolds, { global: { plugins: [PrimeVue] } })
+}
+
+beforeEach(() => {
+  perms.denied = new Set()
+  route.query = {}
+  vi.mocked(getSyncHolds).mockReset().mockResolvedValue(HOLDS)
+  for (const f of [dismissSyncHold, resolveSyncHold, closeSyncHold]) vi.mocked(f).mockReset().mockResolvedValue({})
+  toastAdd.mockReset()
+  window.matchMedia = window.matchMedia || (() => ({ matches: false, addEventListener () {}, removeEventListener () {} }))
+})
+afterEach(() => cleanup())
+
+const groupEl = (container, key) => container.querySelector(`[data-group="${key}"]`)
+
+describe('SyncHolds', () => {
+  it('groups the holds in staff terms, with counts', async () => {
+    const { container, findByText } = setup()
+    await findByText('LGL donors who may already be in VG')
+    expect(within(groupEl(container, 'maybe')).getByText('2')).toBeInTheDocument()
+    expect(within(groupEl(container, 'differ')).getByText('Only LGL has a nickname.')).toBeInTheDocument()
+    expect(within(groupEl(container, 'finish')).getByRole('button', { name: 'Done in LGL' })).toBeInTheDocument()
+    // unknown reason: with the engineer, raw code as text
+    expect(within(groupEl(container, 'engineer')).getByText('brand-new-reason')).toBeInTheDocument()
+  })
+
+  it('names an unlinked donor from detail.lgl, and falls back to the LGL id', async () => {
+    const { findByText, getByText } = setup()
+    await findByText('Ann Sousa')
+    expect(getByText('LGL donor 77302')).toBeInTheDocument()
+    expect(getByText('Held at the November import review: Not confirmed on the Work list.')).toBeInTheDocument()
+  })
+
+  it('says when a person a hold names is no longer in VG', async () => {
+    const { findByText } = setup()
+    expect(await findByText('Person no longer in VG')).toBeInTheDocument()
+  })
+
+  it('filters to one person from the query and shows a removable chip', async () => {
+    route.query = { personId: '103' }
+    const { findByText, queryByText, getByRole } = setup()
+    await findByText('Only LGL has a nickname.')
+    expect(queryByText('Ann Sousa')).toBeNull()
+    expect(await findByText(/Only Daniel Okafor/)).toBeInTheDocument()
+    await fireEvent.click(getByRole('button', { name: 'Show everyone' }))
+    expect(routerReplace).toHaveBeenCalledWith({ query: {} })
+  })
+
+  it('marks a hold as seen and reloads', async () => {
+    const { container, findByText } = setup()
+    await findByText('Only LGL has a nickname.')
+    await fireEvent.click(within(groupEl(container, 'differ')).getByRole('button', { name: 'Mark as seen' }))
+    await waitFor(() => expect(dismissSyncHold).toHaveBeenCalledWith('3'))
+    await waitFor(() => expect(getSyncHolds).toHaveBeenCalledTimes(2))
+  })
+
+  it('asks before not adding a donor', async () => {
+    const { container, findByText, getByRole } = setup()
+    await findByText('Ann Sousa')
+    const maybe = groupEl(container, 'maybe')
+    await fireEvent.click(within(maybe).getAllByRole('button', { name: 'Don’t add this donor' })[0])
+    expect(dismissSyncHold).not.toHaveBeenCalled()
+    await fireEvent.click(getByRole('button', { name: 'Don’t add' }))
+    await waitFor(() => expect(dismissSyncHold).toHaveBeenCalledWith('1'))
+  })
+
+  it('links a donor to a suggested person', async () => {
+    const { container, findByText, findByRole } = setup()
+    await findByText('Ann Sousa')
+    await fireEvent.click(within(groupEl(container, 'maybe')).getAllByRole('button', { name: 'This is…' })[0])
+    await fireEvent.click(await findByRole('button', { name: /Sousa, Annemarie/ }))
+    await waitFor(() => expect(resolveSyncHold).toHaveBeenCalledWith('1', { kind: 'link', personId: '102' }))
+    await waitFor(() => expect(toastAdd).toHaveBeenCalledWith(expect.objectContaining({
+      detail: 'Saved. The next sync run links Ann Sousa to Annemarie Sousa.' })))
+  })
+
+  it('shows the API’s reason when a link is refused', async () => {
+    vi.mocked(resolveSyncHold).mockRejectedValue(Object.assign(new Error('HTTP 422'), {
+      status: 422, body: { detail: 'Annemarie Sousa is already linked to LGL donor 9' } }))
+    const { container, findByText, findByRole } = setup()
+    await findByText('Ann Sousa')
+    await fireEvent.click(within(groupEl(container, 'maybe')).getAllByRole('button', { name: 'This is…' })[0])
+    await fireEvent.click(await findByRole('button', { name: /Sousa, Annemarie/ }))
+    expect(await findByText('Annemarie Sousa is already linked to LGL donor 9')).toBeInTheDocument()
+  })
+
+  it('closes an LGL-finish hold with Done in LGL', async () => {
+    const { container, findByText } = setup()
+    await findByText('Ann Sousa')
+    await fireEvent.click(within(groupEl(container, 'finish')).getByRole('button', { name: 'Done in LGL' }))
+    await waitFor(() => expect(closeSyncHold).toHaveBeenCalledWith('4'))
+  })
+
+  it('shows no actions without sync:write', async () => {
+    perms.denied = new Set(['sync:write'])
+    const { findByText, queryByRole } = setup()
+    await findByText('Ann Sousa')
+    for (const name of ['Mark as seen', 'Done in LGL', 'This is…', 'New person']) {
+      expect(queryByRole('button', { name })).toBeNull()
+    }
+  })
+
+  it('tells namesakes apart in the picker by municipality and email', async () => {
+    const { container, findByText, findByRole } = setup()
+    await findByText('Ann Sousa')
+    await fireEvent.click(within(groupEl(container, 'maybe')).getAllByRole('button', { name: 'This is\u2026' })[0])
+    expect(await findByRole('button', { name: /Sousa, Ann\b.*Bristol.*ann@example\.org/ })).toBeInTheDocument()
+    expect(await findByRole('button', { name: /Sousa, Annemarie.*Warren/ })).toBeInTheDocument()
+  })
+
+  it('says who set a hold aside: the sync, the import review, or a person', async () => {
+    vi.mocked(getSyncHolds).mockResolvedValue([
+      { ...base, holdId: '20', lglConstituentId: '600', personId: null, reason: 'before-horizon', state: 'dismissed', dismissalKind: 'rule',
+        dismissedUserId: '9', dismissedAt: '2026-11-17T12:00:00Z', users: [{ userId: '9', displayName: 'Sync Service' }] },
+      { ...base, holdId: '21', lglConstituentId: '601', personId: null, reason: 'import-skip', state: 'dismissed', dismissalKind: 'staff',
+        dismissedUserId: '9', dismissedAt: '2026-11-17T12:00:00Z', users: [{ userId: '9', displayName: 'Sync Service' }] },
+      { ...base, holdId: '22', lglConstituentId: '602', personId: null, reason: 'name-only', state: 'dismissed', dismissalKind: 'staff',
+        dismissedUserId: '3', dismissedAt: '2026-11-17T12:00:00Z', users: [{ userId: '3', displayName: 'Gabriel R.' }] },
+    ])
+    const { findByText, queryByText } = setup()
+    expect(await findByText(/Set aside by the sync/)).toBeInTheDocument()
+    expect(await findByText('Skipped at the import review', { selector: '.pill' })).toBeInTheDocument()
+    expect(await findByText(/by Gabriel R\./)).toBeInTheDocument()
+    expect(queryByText(/Sync Service/)).toBeNull()
+  })
+
+  it('filters to holds about the person, not holds that only suggest them', async () => {
+    route.query = { personId: '101' } // a candidate on hold 1, the subject of none
+    const { findByText, queryByText } = setup()
+    expect(await findByText(/Nothing waiting/)).toBeInTheDocument()
+    expect(queryByText('Ann Sousa')).toBeNull()
+  })
+
+  it('shows the view last asked for when an earlier load finishes late', async () => {
+    let finishOpen
+    vi.mocked(getSyncHolds)
+      .mockImplementationOnce(() => new Promise(resolve => { finishOpen = resolve }))
+      .mockResolvedValueOnce([{ ...HOLDS[3], state: 'closed', closedAt: '2026-11-19T10:00:00Z' }])
+    const { findByText, getByRole, queryByText } = setup()
+    await fireEvent.click(getByRole('button', { name: 'Closed' }))
+    await findByText('Brennan, Margaret')
+    finishOpen(HOLDS)
+    await new Promise(r => setTimeout(r, 20))
+    expect(queryByText('Ann Sousa')).toBeNull()
+    expect(getByRole('button', { name: 'Closed' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('shows a pending answer as waiting for the sync', async () => {
+    vi.mocked(getSyncHolds).mockResolvedValue([{ ...HOLDS[0], resolution: { kind: 'link', personId: '101' } }])
+    const { findByText, findByRole } = setup()
+    expect(await findByText('Waiting for the next sync run')).toBeInTheDocument()
+    expect(await findByText(/will link to/)).toHaveTextContent('will link to Ann Sousa')
+    // the answer can still change to a new person
+    expect(await findByRole('button', { name: 'New person' })).toBeInTheDocument()
+  })
+
+  /* eslint-disable vue/one-component-per-file -- a host and a stand-in page, local to this test */
+  it('keeps collapsed groups when the page is kept alive, and refetches on return', async () => {
+    const shown = ref(true)
+    const Elsewhere = defineComponent({ name: 'PersonPageStandIn', render: () => h('p', 'person page') })
+    const Host = defineComponent({
+      render: () => h(KeepAlive, { include: 'SyncHolds' }, [shown.value ? h(SyncHolds) : h(Elsewhere)]),
+    })
+    const { container, findByText } = render(Host, { global: { plugins: [PrimeVue] } })
+    await findByText('Ann Sousa')
+    const maybe = groupEl(container, 'maybe')
+    expect(maybe.open).toBe(true)
+    await fireEvent.click(maybe.querySelector('summary'))
+    maybe.open = false
+    await fireEvent(maybe, new Event('toggle'))
+    expect(getSyncHolds).toHaveBeenCalledTimes(1)
+
+    shown.value = false
+    await findByText('person page')
+    shown.value = true
+    await waitFor(() => expect(getSyncHolds).toHaveBeenCalledTimes(2))
+    expect(groupEl(container, 'maybe').open).toBe(false)
+    expect(groupEl(container, 'differ').open).toBe(true)
+  })
+})

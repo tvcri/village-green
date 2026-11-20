@@ -17,6 +17,7 @@ const sections = [
       { label: 'Persons', route: 'meta-persons' },
       { label: 'Trainings', route: 'meta-trainings', permission: 'volunteer:read' },
       { label: 'Positions', route: 'meta-positions', permission: 'volunteer:read' },
+      { label: 'LGL sync', route: 'meta-sync-holds', permission: 'sync:read' },
     ],
   },
   {

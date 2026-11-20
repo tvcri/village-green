@@ -1,4 +1,5 @@
 'use strict';
+const mysql = require('mysql2/promise')
 const dbUtils = require('./utils')
 const config = require('../utils/config')
 const SmError = require('../utils/error')
@@ -137,20 +138,20 @@ module.exports.putFields = async function (items) {
 
 const HOLD_COLUMNS = `CAST(holdId AS CHAR) AS holdId, lglConstituentId, CAST(personId AS CHAR) AS personId,
   field, reason, detail, fingerprint, state, dismissalKind, firstSeenAt, lastSeenAt, closedAt, dismissedAt,
-  CAST(dismissedUserId AS CHAR) AS dismissedUserId, note`
+  CAST(dismissedUserId AS CHAR) AS dismissedUserId, note, resolution, resolvedAt,
+  CAST(resolvedUserId AS CHAR) AS resolvedUserId, CAST(closedUserId AS CHAR) AS closedUserId`
 // Runs a write that may hit sync_hold_open, the one-open-hold-per-subject key,
-// and turns that collision into a 409 naming the batch item.
-async function guardOpenCollision (i, write) {
+// and turns that collision into a 409 with the given message.
+async function guardOpenCollision (message, write) {
   try {
     return await write()
   }
   catch (e) {
-    if (e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)) {
-      throw new SmError.ConflictError(`item ${i}: an open hold for this constituent, person, field and reason already exists`)
-    }
+    if (e.code === 'ER_DUP_ENTRY' && /sync_hold_open/.test(e.message)) throw new SmError.ConflictError(message)
     throw e
   }
 }
+const itemCollision = (i) => `item ${i}: an open hold for this constituent, person, field and reason already exists`
 
 async function holdsByIds (ids) {
   if (!ids.length) return []
@@ -159,13 +160,49 @@ async function holdsByIds (ids) {
   return ids.map(id => byId.get(String(id)))
 }
 
-module.exports.getHolds = async function ({ states = ['open'], personId, lglConstituentId } = {}) {
+const NAME_CLAIM_PATH = mysql.escape(`$.${config.oauth.claims.name}`)
+
+// The people a hold mentions, in order: its person, the sync's candidates,
+// the person a resolution links to. Ids not in VG are left out.
+const personIdsOf = (h) => [...new Set([h.personId, ...(h.detail?.candidates ?? []), h.resolution?.personId]
+  .filter(id => id != null).map(String))]
+const userIdsOf = (h) => [...new Set([h.dismissedUserId, h.resolvedUserId, h.closedUserId].filter(id => id != null))]
+
+async function attachPersons (rows) {
+  const ids = [...new Set(rows.flatMap(personIdsOf))].filter(id => /^[0-9]{1,10}$/.test(id))
+  const byId = new Map()
+  if (ids.length) {
+    // Base tables, not the active_* views: a dropped member is still named.
+    const [people] = await dbUtils.pool.query(
+      `SELECT CAST(p.id AS CHAR) AS personId, p.fullName, p.displayName, p.town, p.email, (d.id IS NOT NULL) AS isDonor
+       FROM person p LEFT JOIN donor d ON d.personId = p.id WHERE p.id IN (?)`, [ids])
+    for (const p of people) byId.set(p.personId, { ...p, isDonor: Boolean(p.isDonor) })
+  }
+  for (const r of rows) r.persons = personIdsOf(r).map(id => byId.get(id)).filter(Boolean)
+}
+
+async function attachUsers (rows) {
+  const ids = [...new Set(rows.flatMap(userIdsOf))]
+  const byId = new Map()
+  if (ids.length) {
+    const [found] = await dbUtils.pool.query(
+      `SELECT CAST(userId AS CHAR) AS userId,
+         COALESCE(JSON_UNQUOTE(JSON_EXTRACT(lastClaims, ${NAME_CLAIM_PATH})), username) AS displayName
+       FROM user_data WHERE userId IN (?)`, [ids])
+    for (const u of found) byId.set(u.userId, u)
+  }
+  for (const r of rows) r.users = userIdsOf(r).map(id => byId.get(id)).filter(Boolean)
+}
+
+module.exports.getHolds = async function ({ states = ['open'], personId, lglConstituentId, projection = [] } = {}) {
   const where = ['state IN (?)']
   const binds = [states]
   if (personId != null) { where.push('personId = ?'); binds.push(personId) }
   if (lglConstituentId != null) { where.push('lglConstituentId = ?'); binds.push(lglConstituentId) }
   const [rows] = await dbUtils.pool.query(
     `SELECT ${HOLD_COLUMNS} FROM sync_hold WHERE ${where.join(' AND ')} ORDER BY sync_hold.holdId`, binds)
+  if (projection.includes('persons')) await attachPersons(rows)
+  if (projection.includes('users')) await attachUsers(rows)
   return rows
 }
 
@@ -185,7 +222,7 @@ module.exports.createHolds = async function (items, userId) {
       const created = []
       for (const [i, item] of items.entries()) {
         const dismissed = item.state === 'dismissed'
-        const [res] = await guardOpenCollision(i, () => connection.query(
+        const [res] = await guardOpenCollision(itemCollision(i), () => connection.query(
             `INSERT INTO sync_hold (lglConstituentId, personId, field, reason, detail, fingerprint, state,
                dismissalKind, dismissedAt, dismissedUserId, note, firstSeenAt, lastSeenAt)
              VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ${dismissed ? 'NOW(3)' : 'NULL'}, ?, ?, NOW(3), NOW(3))`,
@@ -234,7 +271,7 @@ module.exports.patchHolds = async function (items) {
           state.set(String(item.holdId), item.state)
         }
         if (!sets.length) continue
-        await guardOpenCollision(i, () =>
+        await guardOpenCollision(itemCollision(i), () =>
           connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`, [...binds, item.holdId]))
         count++
       }
@@ -252,8 +289,101 @@ module.exports.dismissHold = async function (holdId, { dismissalKind, note }, us
       if (!row) throw new SmError.NotFoundError(`no hold ${holdId}`)
       if (row.state !== 'open') throw new SmError.UnprocessableError(`only an open hold can be dismissed; this one is ${row.state}`)
       await connection.query(
-        `UPDATE sync_hold SET state = 'dismissed', dismissalKind = ?, note = ?, dismissedAt = NOW(3), dismissedUserId = ?
+        // A pending staff answer is dropped: a dismissal is the newer decision.
+        `UPDATE sync_hold SET state = 'dismissed', dismissalKind = ?, note = COALESCE(?, note), dismissedAt = NOW(3),
+           dismissedUserId = ?, resolution = NULL, resolvedAt = NULL, resolvedUserId = NULL
          WHERE holdId = ?`, [dismissalKind, note ?? null, userId, holdId])
+    },
+    statusObj: undefined
+  })
+  return (await holdsByIds([holdId]))[0]
+}
+
+// ---- staff answers on holds ----
+
+// Which answers staff may give for an unlinked donor's hold, by reason. A
+// reason not listed takes none: a create would make an anonymous, deceased,
+// couple-named or last-name-less person, and the fix belongs in LGL. The
+// client mirrors this table (features/SyncHolds/lib/holdReasons.js).
+const RESOLVABLE_KINDS = {
+  'name-only': ['link', 'create'],
+  'multiple-matches': ['link', 'create'],
+  'shared-email-different-name': ['link', 'create'],
+  'same-address-last-name': ['link', 'create'],
+  'duplicate-in-lgl': ['link', 'create'],
+  'import-hold': ['link', 'create'],
+  'import-skip': ['link', 'create'],
+  'resolution-failed': ['link', 'create'],
+  'already-linked-elsewhere': ['link'],
+  'before-horizon': ['link'], // creating would override the sync's horizon policy
+}
+module.exports.RESOLVABLE_KINDS = RESOLVABLE_KINDS
+
+// Records the staff answer for an unlinked donor; the sync carries it out on
+// its next pass and closes the hold. Resolving a staff-dismissed hold reopens
+// it (staff changing their mind). The hold stays open until the sync acts,
+// and the answer may be replaced meanwhile.
+module.exports.resolveHold = async function (holdId, { kind, personId, note }, userId) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [[row]] = await connection.query(
+        'SELECT personId, reason, state, dismissalKind FROM sync_hold WHERE holdId = ? FOR UPDATE', [holdId])
+      if (!row) throw new SmError.NotFoundError(`no hold ${holdId}`)
+      if (row.personId != null) throw new SmError.UnprocessableError('only an unlinked donor\'s hold can be resolved')
+      const reopen = row.state === 'dismissed' && row.dismissalKind === 'staff'
+      if (row.state !== 'open' && !reopen) {
+        throw new SmError.UnprocessableError(`this hold is ${row.state}; only an open or staff-dismissed hold can be resolved`)
+      }
+      if (!(RESOLVABLE_KINDS[row.reason] ?? []).includes(kind)) {
+        throw new SmError.UnprocessableError(`"${kind}" is not available for this donor`)
+      }
+      if (kind === 'link' && personId == null) throw new SmError.UnprocessableError('a link needs a personId')
+      if (kind === 'create' && personId != null) throw new SmError.UnprocessableError('a create takes no personId')
+      if (kind === 'link') {
+        // Locks the person, so two links to one person run one after the other
+        // and the second sees the first in the check below.
+        const [[p]] = await connection.query(
+          `SELECT p.displayName, d.lglConstituentId FROM person p LEFT JOIN donor d ON d.personId = p.id
+           WHERE p.id = ? FOR UPDATE`, [personId])
+        if (!p) throw new SmError.NotFoundError(`no person ${personId}`)
+        if (p.lglConstituentId != null) {
+          throw new SmError.UnprocessableError(`${p.displayName} is already linked to LGL donor ${p.lglConstituentId}`)
+        }
+        const [[other]] = await connection.query(
+          `SELECT lglConstituentId FROM sync_hold
+           WHERE state = 'open' AND holdId <> ? AND resolution->>'$.kind' = 'link' AND resolution->>'$.personId' = ?
+           LIMIT 1 FOR SHARE`, [holdId, String(personId)])
+        if (other) {
+          throw new SmError.UnprocessableError(`${p.displayName} is already waiting to be linked to LGL donor ${other.lglConstituentId}`)
+        }
+      }
+      const resolution = kind === 'link' ? { kind, personId: String(personId) } : { kind }
+      const sets = ['resolution = CAST(? AS JSON)', 'resolvedAt = NOW(3)', 'resolvedUserId = ?', 'note = COALESCE(?, note)']
+      if (reopen) sets.push("state = 'open'", 'dismissalKind = NULL', 'dismissedAt = NULL', 'dismissedUserId = NULL')
+      await guardOpenCollision('the sync has opened this donor\'s hold again; reload and resolve the open one', () =>
+        connection.query(`UPDATE sync_hold SET ${sets.join(', ')} WHERE holdId = ?`,
+          [JSON.stringify(resolution), userId, note ?? null, holdId]))
+    },
+    statusObj: undefined
+  })
+  return (await holdsByIds([holdId]))[0]
+}
+
+// Reasons the sync never closes itself: a person closes them after doing
+// something in LGL.
+const STAFF_CLOSED_REASONS = ['addressee', 'lgl-incomplete']
+module.exports.STAFF_CLOSED_REASONS = STAFF_CLOSED_REASONS
+
+module.exports.closeHoldByStaff = async function (holdId, { note } = {}, userId) {
+  await dbUtils.retryOnDeadlock2({
+    transactionFn: async (connection) => {
+      const [[row]] = await connection.query('SELECT reason, state FROM sync_hold WHERE holdId = ? FOR UPDATE', [holdId])
+      if (!row) throw new SmError.NotFoundError(`no hold ${holdId}`)
+      if (row.state !== 'open') throw new SmError.UnprocessableError(`only an open hold can be closed; this one is ${row.state}`)
+      if (!STAFF_CLOSED_REASONS.includes(row.reason)) throw new SmError.UnprocessableError('the sync closes this kind of hold itself')
+      await connection.query(
+        `UPDATE sync_hold SET state = 'closed', closedAt = NOW(3), closedUserId = ?, note = COALESCE(?, note)
+         WHERE holdId = ?`, [userId, note ?? null, holdId])
     },
     statusObj: undefined
   })
