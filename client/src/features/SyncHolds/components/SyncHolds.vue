@@ -164,8 +164,10 @@ const clearPerson = () => router.replace({ query: {} })
         <span class="count">{{ g.holds.length }}</span>
         <span class="what">{{ g.what }}</span>
       </summary>
-      <HoldRow v-for="h in g.holds" :key="h.holdId" :hold="h" :can-write="canWrite"
-        :act="(action, payload) => act(h, action, payload)" />
+      <div class="rows">
+        <HoldRow v-for="h in g.holds" :key="h.holdId" :hold="h" :can-write="canWrite"
+          :act="(action, payload) => act(h, action, payload)" />
+      </div>
     </details>
   </div>
 </template>
@@ -234,6 +236,13 @@ h1 { margin: 0; color: var(--color-text-primary); }
 .group > summary::-webkit-details-marker { display: none; }
 .group > summary::before { content: '▸'; color: var(--p-text-muted-color); width: 0.75rem; transition: transform 0.15s; }
 .group[open] > summary::before { transform: rotate(90deg); }
+/* The group owns the row columns and each HoldRow is a subgrid of them, so
+   every row in a group lines up: the button column is as wide as the widest
+   set of buttons in the group, not each row's own. */
+.rows { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) auto; }
+@media (max-width: 760px) {
+  .rows { grid-template-columns: minmax(0, 1fr); }
+}
 .group h2 { font-size: 1rem; font-weight: 600; margin: 0; }
 .group.engineer h2 { color: var(--p-text-muted-color); }
 .count {

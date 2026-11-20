@@ -160,7 +160,9 @@ async function run (action, payload) {
   border-top: 1px solid var(--p-content-border-color);
   padding: 0.75rem 1rem 0.75rem 2.25rem;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) auto;
+  /* The columns are the group's (SyncHolds .rows), shared by every row in it. */
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   gap: 0.5rem 1.25rem;
   align-items: start;
 }
@@ -193,7 +195,7 @@ async function run (action, payload) {
 .confirm p { margin: 0 0 0.5rem; }
 .bar { display: flex; gap: 0.5rem; }
 @media (max-width: 760px) {
-  .row { grid-template-columns: minmax(0, 1fr); padding-left: 1rem; }
+  .row { padding-left: 1rem; }
   .actions { justify-content: flex-start; }
 }
 </style>
