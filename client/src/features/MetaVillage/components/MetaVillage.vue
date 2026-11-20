@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useCurrentUser } from '../../../shared/composables/useCurrentUser.js'
@@ -17,7 +18,6 @@ const sections = [
       { label: 'Persons', route: 'meta-persons' },
       { label: 'Trainings', route: 'meta-trainings', permission: 'volunteer:read' },
       { label: 'Positions', route: 'meta-positions', permission: 'volunteer:read' },
-      { label: 'LGL sync', route: 'meta-sync-holds', permission: 'sync:read' },
     ],
   },
   {
@@ -36,7 +36,6 @@ const sections = [
     icon: 'pi-envelope',
     heading: 'Office',
     blurb: 'Correspondence and print output for members and volunteers.',
-    upcoming: 'Mail merge joins this soon.',
     actions: [{ label: 'Mailing Labels', route: 'meta-mailing-labels' }],
   },
   {
@@ -44,19 +43,25 @@ const sections = [
     icon: 'pi-chart-bar',
     heading: 'Reporting',
     blurb: 'Service activity over a date range you choose.',
-    upcoming: 'Roster snapshots join this soon.',
     actions: [{ label: 'Metrics', route: 'meta-metrics' }],
   },
   {
-    key: 'advocacy',
-    icon: 'pi-megaphone',
-    heading: 'Advocacy',
-    blurb:
-      'Engaging civic leaders with evidence of TVCRI’s impact on the people it serves.',
-    upcoming: 'Coming soon.',
-    actions: [],
+    key: 'integrations',
+    icon: 'pi-arrow-right-arrow-left',
+    heading: 'Integrations',
+    blurb: 'Keep Village Green in step with the other systems TVCRI uses.',
+    actions: [{ label: 'LGL sync', route: 'meta-sync-holds', permission: 'sync:read' }],
   },
 ]
+
+// A card shows only the buttons this user may use, and a card left with none
+// is dropped rather than shown empty.
+const visibleSections = computed(() => sections
+  .map(section => ({
+    ...section,
+    actions: section.actions.filter(a => !a.permission || hasPermission(a.permission)),
+  }))
+  .filter(section => section.actions.length))
 </script>
 
 <template>
@@ -65,20 +70,18 @@ const sections = [
 
     <div class="sections">
       <section
-        v-for="section in sections"
+        v-for="section in visibleSections"
         :key="section.key"
         class="section-card"
-        :class="{ 'is-placeholder': !section.actions.length }"
       >
         <h2>
           <i :class="['pi', section.icon]" aria-hidden="true"></i>
           {{ section.heading }}
         </h2>
         <p class="blurb">{{ section.blurb }}</p>
-        <p v-if="section.upcoming" class="upcoming">{{ section.upcoming }}</p>
-        <div v-if="section.actions.length" class="actions">
+        <div class="actions">
           <Button
-            v-for="action in section.actions.filter(a => !a.permission || hasPermission(a.permission))"
+            v-for="action in section.actions"
             :key="action.route"
             :label="action.label"
             @click="router.push({ name: action.route })"
@@ -133,20 +136,10 @@ h1 {
   color: var(--color-primary);
 }
 
-.is-placeholder h2 .pi {
-  color: var(--color-text-dim);
-}
-
 .blurb {
   margin: 0;
   color: var(--color-text-primary);
   line-height: 1.5;
-}
-
-.upcoming {
-  margin: 0;
-  color: var(--color-text-dim);
-  font-style: italic;
 }
 
 .actions {
@@ -156,10 +149,5 @@ h1 {
   gap: 0.75rem;
   margin-top: auto;
   padding-top: 0.25rem;
-}
-
-.is-placeholder {
-  background-color: var(--color-background-subtle);
-  box-shadow: none;
 }
 </style>
