@@ -67,6 +67,17 @@ describe('SyncHolds', () => {
     expect(within(groupEl(container, 'engineer')).getByText('brand-new-reason')).toBeInTheDocument()
   })
 
+  it('puts a group\'s rows in one shared column grid, so their columns line up', async () => {
+    // jsdom does no layout; the alignment comes from the rows being subgrid
+    // children of one container per group (checked by eye in the browser).
+    const { container, findByText } = setup()
+    await findByText('LGL donors who may already be in VG')
+    const rows = groupEl(container, 'maybe').querySelectorAll('[data-hold]')
+    expect(rows).toHaveLength(2)
+    const parents = new Set([...rows].map(r => r.parentElement))
+    expect(parents.size).toBe(1)
+    expect([...parents][0]).toHaveClass('rows')
+  })
   it('names an unlinked donor from detail.lgl, and falls back to the LGL id', async () => {
     const { findByText, getByText } = setup()
     await findByText('Ann Sousa')
