@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { users, villages } from '../../setup/fixtures.js'
+import { withDb } from '../../lib/db.js'
 
 // User / grant management (post-#56 RBAC): every op — the getUsers LIST
 // included — requires user:admin / grant:admin (held only via Admin's
@@ -212,4 +213,27 @@ test('user grants: create -> list -> delete', async () => {
   assert.equal(del.status, 200)
   const after = await vgCall('getUserGrants', { userId: scratchId, ...E }, admin)
   assert.ok(!after.json.some(g => g.village?.villageId === scratchVillage), 'grant removed')
+})
+
+// Every catalog role must be grantable through the API. The OAS RoleId schema
+// carries a hardcoded maximum, and a migration that adds a role without
+// raising it leaves the role ungrantable in the admin UI (role 9, 0036). The
+// persona fixtures insert grants straight into the DB, so only this test
+// exercises the request path. The catalog is read from the DB, not getRoles,
+// so a new role is covered without editing this test.
+test('every catalog role can be granted through the API', async () => {
+  const [roles] = await withDb(c => c.query('SELECT roleId, scope FROM role ORDER BY roleId'))
+  assert.ok(roles.length > 0)
+  for (const { roleId, scope } of roles) {
+    const villageId = scope === 'village' ? scratchVillage : null
+    const created = await vgCall('createUserGrant', { userId: scratchId, ...E }, {
+      ...admin, body: [{ villageId, roleId }],
+    })
+    assert.equal(created.status, 201, `role ${roleId} (${scope}) is grantable`)
+    const listed = await vgCall('getUserGrants', { userId: scratchId, ...E }, admin)
+    const mine = listed.json.find(g => g.roleId === roleId && (g.village?.villageId ?? null) === villageId)
+    assert.ok(mine, `role ${roleId} grant is listed`)
+    const del = await vgCall('deleteUserGrant', { userId: scratchId, grantId: mine.grantId, ...E }, admin)
+    assert.equal(del.status, 200)
+  }
 })

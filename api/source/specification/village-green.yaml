@@ -5431,7 +5431,7 @@ components:
       - volunteer
       - both
     RoleId:
-      maximum: 8
+      maximum: 9
       minimum: 1
       type: integer
     Role:
