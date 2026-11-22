@@ -7424,6 +7424,12 @@ components:
         instructions:
           type: string
           nullable: true
+        memberServiceNotes:
+          description: >-
+            The member's standing service notes. Present on Open requests
+            too; the request emails already send them to every volunteer.
+          type: string
+          nullable: true
         transportationType:
           type: string
           nullable: true

@@ -361,6 +361,14 @@ async function doRelease() {
           </div>
         </div>
 
+        <!-- Same section as staff ServiceRequestDetail; shown on Open
+             requests too (the request emails already send these notes). -->
+        <div class="section description-section">
+          <h3 class="section-header">Service Notes</h3>
+          <p v-if="request.memberServiceNotes" class="description-text">{{ request.memberServiceNotes }}</p>
+          <p v-else class="description-text service-notes-empty">There are no service notes for this member</p>
+        </div>
+
         <div v-if="request.description" class="section description-section">
           <h3 class="section-header">Description</h3>
           <p class="description-text">{{ request.description }}</p>
@@ -593,6 +601,11 @@ async function doRelease() {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.service-notes-empty {
+  font-style: italic;
+  color: var(--color-text-dim);
 }
 
 .map-section {
