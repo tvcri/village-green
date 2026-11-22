@@ -103,6 +103,12 @@ export const users = {
     userId: 14, name: 'Sync Service Account', username: 'service-account-sync@sync.test',
     grants: [{ villageId: null, roleId: 8 }], privileges: [],
   },
+  // The vg-sync Mailchimp service account: role 9 (Mailchimp Sync) at
+  // federation scope and nothing else. Read-only: persons and donors.
+  mailchimp: {
+    userId: 15, name: 'Mailchimp Sync Account', username: 'service-account-mailchimp@sync.test',
+    grants: [{ villageId: null, roleId: 9 }], privileges: [],
+  },
 }
 
 // person rows. Each village has a member-person and a volunteer-person, with
@@ -125,7 +131,7 @@ function person (id, villageId, firstName, lastName, street, city, zip, birthDat
 
 // The auto-complete task's actor row (migration 0024). NOT a persona: it holds
 // no grants, gets no token, and status 'unavailable' makes the auth gate refuse
-// it. Its userId is deliberately outside the 1-14 persona range — in production
+// it. Its userId is deliberately outside the 1-15 persona range — in production
 // the row lands at whatever auto-increment the install is at, and nothing may
 // depend on a particular value; the event finds it by taskName.
 export const taskUsers = {
