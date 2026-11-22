@@ -16,6 +16,8 @@ import { villages, serviceRequests as sr, persons } from '../../setup/fixtures.j
 //     7 Service Coordinator — reads + member:read_sc_note; sr:write is its ONLY write
 //     8 Sync Service — person read/write, member/volunteer read, donor read/write,
 //       sync read/write; the vg-sync service account, no UI user
+//     9 Mailchimp Sync — person/member/volunteer/donor :read only; the Mailchimp
+//       service account (see mailchimp-sync.test.js)
 // Writes are federation-only: no village role can write anything.
 
 // serviceDateStart is required; this window spans all SR fixtures (2026-07-10..12).

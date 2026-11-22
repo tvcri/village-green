@@ -15,11 +15,12 @@ test('donor table exists with the spec columns', async () => {
   assert.equal(byName.personId.Key, 'UNI')
 })
 
-test('Staff holds donor:read; only Sync Service holds donor:write', async () => {
+test('Staff, Sync Service and Mailchimp Sync hold donor:read; only Sync Service holds donor:write', async () => {
   const rows = await withDb(async (db) => (await db.query(
     `SELECT r.name, rp.permission FROM role_permission rp JOIN role r USING (roleId)
      WHERE rp.permission LIKE 'donor:%' ORDER BY r.name, rp.permission`))[0])
   assert.deepEqual(rows.map(r => ({ ...r })), [
+    { name: 'Mailchimp Sync', permission: 'donor:read' },
     { name: 'Staff', permission: 'donor:read' },
     { name: 'Sync Service', permission: 'donor:read' },
     { name: 'Sync Service', permission: 'donor:write' },

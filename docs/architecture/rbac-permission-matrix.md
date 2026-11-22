@@ -23,6 +23,13 @@ check that caught the missing `village:read`.
 > endpoints and are held by no other role (Admin through `*`). It has no
 > client routes. The table below predates the donor (0032) and sync keys.
 
+> **Updated by migration 0036:** role 9, **Mailchimp Sync** (federation), the
+> vg-sync Mailchimp service account's role. Read-only: it holds exactly
+> `person:read`, `member:read`, `volunteer:read` and `donor:read` (the member
+> and volunteer reads because a person is hidden from a caller who can read
+> none of their associations). It lacks the `_inactive` reads and every write.
+> It has no client routes.
+
 | permission | LSC (v) | Steering Cmte (v) | Village Lead (v) | Admin (f) | Staff (f) | Board (f) | Svc Coord (f) |
 |---|---|---|---|---|---|---|---|
 | person:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |
