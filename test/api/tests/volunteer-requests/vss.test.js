@@ -131,6 +131,40 @@ test('scope=open omits the volunteer-only columns', async () => {
   }
 })
 
+// The member's service notes are NOT volunteer-only: the Open broadcast email
+// already sends them ("Members Special Instructions"), so scope=open and the
+// single GET of an Open request both carry them, to a volunteer who owns nothing.
+test('memberServiceNotes reaches volunteers on Open requests (list and single GET)', async () => {
+  const notes = 'Uses a walker; ring the side door.'
+  const memberPersonId = persons.quahogMember.id
+  const [[{ serviceNotes: original }]] = await withDb(c =>
+    c.query('SELECT serviceNotes FROM member WHERE personId = ?', [memberPersonId]))
+  await withDb(c => c.query('UPDATE member SET serviceNotes = ? WHERE personId = ?', [notes, memberPersonId]))
+  try {
+    const id = await openRequest()
+
+    const list = await vgCall('getVolunteerRequests', { scope: 'open' }, { token: vssJoe })
+    assert.equal(list.status, 200)
+    const row = list.json.find(r => String(r.serviceRequestId) === id)
+    assert.ok(row, 'the open request is listed')
+    assert.equal(row.memberServiceNotes, notes)
+
+    const single = await vgCall('getVolunteerRequest', { serviceRequestId: id }, { token: vssJoe })
+    assert.equal(single.status, 200)
+    assert.equal(single.json.memberServiceNotes, notes)
+  } finally {
+    await withDb(c => c.query('UPDATE member SET serviceNotes = ? WHERE personId = ?', [original, memberPersonId]))
+  }
+})
+
+test('memberServiceNotes is null, not missing, when the member has none', async () => {
+  const id = await openRequest({ villageId: villages.innsmouth.id })
+  const { status, json } = await vgCall('getVolunteerRequest', { serviceRequestId: id }, { token: vssJoe })
+  assert.equal(status, 200)
+  assert.ok('memberServiceNotes' in json)
+  assert.equal(json.memberServiceNotes, null)
+})
+
 // ---- sign-up (GREEN) ----
 
 test('sign-up on a capability-mismatched request -> 404 (no existence leak)', async () => {

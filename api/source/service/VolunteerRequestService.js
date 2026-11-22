@@ -82,6 +82,10 @@ function baseColumns() {
     "CAST(IF(sr.timesFlexible, 'true', 'false') AS JSON) AS timesFlexible",
     'sr.instructions AS instructions',
     'sr.description AS description',
+    // The member's standing service notes. Not gated by ownership: every
+    // request email, including the Open broadcast, already carries them as
+    // "Members Special Instructions" (vg-email-sidecar templates.js).
+    'm.serviceNotes AS memberServiceNotes',
     `${dbUtils.srDestinationsJson('sr')} AS destinations`,
     `IF(sr.memberPersonId IS NOT NULL, JSON_OBJECT(
       'fullName', mp.fullName,
@@ -128,6 +132,7 @@ function baseJoins() {
     'service_request sr',
     'JOIN village v ON sr.villageId = v.id',
     'LEFT JOIN person mp ON sr.memberPersonId = mp.id',
+    'LEFT JOIN member m ON sr.memberPersonId = m.personId',
     'LEFT JOIN person vp ON sr.volunteerPersonId = vp.id',
   ])
 }

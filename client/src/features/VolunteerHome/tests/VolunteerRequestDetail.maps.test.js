@@ -116,3 +116,28 @@ describe('VolunteerRequestDetail round trip times', () => {
     expect(getByText('Return / Finish:')).toBeTruthy()
   })
 })
+
+// Service notes show on every request a volunteer can see, Open included: the
+// request emails already send them as "Members Special Instructions".
+describe('VolunteerRequestDetail service notes', () => {
+  afterEach(() => cleanup())
+
+  async function mountNotes(memberServiceNotes) {
+    mockGet.mockResolvedValue({ ...base, destinations: [dest('CVS', null, null)], memberServiceNotes })
+    const utils = render(VolunteerRequestDetail, { global: { plugins: [PrimeVue, ToastService, ConfirmationService] } })
+    await waitFor(() => utils.getByText(/Ride: Medical/))
+    return utils
+  }
+
+  it('shows the member\'s notes under a Service Notes heading', async () => {
+    const { getByText } = await mountNotes('Uses a walker; ring the side door.')
+    expect(getByText('Service Notes')).toBeTruthy()
+    expect(getByText('Uses a walker; ring the side door.')).toBeTruthy()
+  })
+
+  it('says so when the member has none', async () => {
+    const { getByText } = await mountNotes(null)
+    expect(getByText('Service Notes')).toBeTruthy()
+    expect(getByText('There are no service notes for this member')).toBeTruthy()
+  })
+})
