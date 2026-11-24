@@ -70,6 +70,8 @@ const canFilterVeteran = computed(() => hasPermission('person:read_demographics'
 // The API sends `donor` only to holders of donor:read; every donor element
 // here is gated on the same grant.
 const canReadDonor = computed(() => hasPermission('donor:read'))
+// Likewise `memberJoinDate` and member:read.
+const canReadMember = computed(() => hasPermission('member:read'))
 
 const filtersCollapsed = ref(false)
 const matchOptions = [
@@ -190,6 +192,7 @@ const columnsForCsv = computed(() => [
   { header: 'Name', key: 'fullName' },
   { header: 'Village', key: 'villageName' },
   { header: 'Member Status', key: 'memberStatus' },
+  ...(canReadMember.value ? [{ header: 'Join Date', key: 'memberJoinDate' }] : []),
   { header: 'Volunteer Status', key: 'volunteerStatus' },
   ...(canReadDonor.value
     ? [{ header: 'Donor', key: 'donor' }, { header: 'Last Gift Date', key: 'lastGiftDate' }, { header: 'LGL', key: 'lgl' }]
@@ -205,6 +208,7 @@ function detailRowForCsv(p) {
     fullName: p.fullName,
     villageName: p.village?.name ?? '',
     memberStatus: p.memberStatus,
+    memberJoinDate: p.memberJoinDate ?? '',
     volunteerStatus: p.volunteerStatus,
     // Absent without donor:read, and the columns are then not in the export.
     donor: p.donor ? 'Yes' : '',
@@ -230,7 +234,7 @@ async function fetchRowsForExport() {
     const byId = new Map(detail.map(p => [p.personId, p]))
     return (sortedPersons.value ?? [])
       .filter(p => byId.has(p.personId))
-      .map(p => detailRowForCsv({ ...byId.get(p.personId), memberStatus: p.memberStatus, volunteerStatus: p.volunteerStatus, donor: p.donor }))
+      .map(p => detailRowForCsv({ ...byId.get(p.personId), memberStatus: p.memberStatus, memberJoinDate: p.memberJoinDate, volunteerStatus: p.volunteerStatus, donor: p.donor }))
   } finally {
     isFetchingExport.value = false
   }

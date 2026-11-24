@@ -347,6 +347,38 @@ describe('PersonList grid', () => {
       expect(cells[headers.indexOf('Volunteer Status')]).toBe('')
     })
 
+    async function download (rows) {
+      getPersons.mockImplementation(async (params) =>
+        params?.projection?.includes('detail') ? rows.map(p => ({ ...p, detail: {} })) : rows)
+      await renderList()
+      await fireEvent.click(screen.getByRole('button', { name: /Export|Download/ }))
+      await fireEvent.click(await screen.findByText('Download'))
+      await waitFor(() => expect(downloadCsv).toHaveBeenCalled())
+      return downloadCsv.mock.calls[0][0].split('\n')
+    }
+
+    it('with member:read exports Join Date after Member Status, blank for a non-member', async () => {
+      const [head, l1, l2] = await download([
+        row({ personId: 1, fullName: 'Alpha, Ann', memberStatus: 'Active', memberJoinDate: '2026-03-04' }),
+        row({ personId: 2, fullName: 'Beta, Bob', memberJoinDate: null })
+      ])
+      const headers = head.split(',')
+      const i = headers.indexOf('Join Date')
+      expect(i).toBe(headers.indexOf('Member Status') + 1)
+      expect(cellsOf(l1)[i]).toBe('2026-03-04')
+      expect(cellsOf(l2)[i]).toBe('')
+    })
+
+    it('without member:read the export has no Join Date column', async () => {
+      perms.denied.add('member:read')
+      try {
+        const [head] = await download([row({ personId: 1, fullName: 'Alpha, Ann' })])
+        expect(head.split(',')).not.toContain('Join Date')
+      } finally {
+        perms.denied.delete('member:read')
+      }
+    })
+
     it('a deceased Active member exports Active', async () => {
       const summary = [row({ personId: 3, fullName: 'Gamma, Gus', memberStatus: 'Active', deceased: true })]
       getPersons.mockImplementation(async (params) =>

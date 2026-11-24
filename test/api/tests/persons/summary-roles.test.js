@@ -103,6 +103,16 @@ test('pause and circles ride along', async () => {
   assert.deepEqual(bare.circles, [])
 })
 
+test('memberJoinDate follows memberStatus', async () => {
+  const p = await makePerson()
+  assert.equal((await putMember(p.personId, 'Pending')).status, 200)
+  assert.strictEqual((await rowFor(staff, p)).memberJoinDate, '2026-01-15')
+  assert.strictEqual((await rowFor(sc, p)).memberJoinDate, null)
+  assert.equal((await vgCall('patchPersonMember', { personId: p.personId }, { token: staff, body: { status: 'Active' } })).status, 200)
+  assert.strictEqual((await rowFor(sc, p)).memberJoinDate, '2026-01-15')
+  assert.strictEqual((await rowFor(staff, await makePerson())).memberJoinDate, null)
+})
+
 test('isVeteran is gated', async () => {
   const p = await makePerson({ isVeteran: true })
   assert.strictEqual((await rowFor(staff, p)).isVeteran, true)

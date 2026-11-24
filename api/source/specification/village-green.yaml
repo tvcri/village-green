@@ -5001,6 +5001,11 @@ components:
           type: string
           nullable: true
           enum: [Active, Pending, Dropped, null]
+        memberJoinDate:
+          # Omitted without member:read; null whenever memberStatus is null.
+          type: string
+          format: date
+          nullable: true
         volunteerStatus:
           type: string
           nullable: true
