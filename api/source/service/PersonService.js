@@ -440,6 +440,7 @@ function associationReadsFor (userObject, opts) {
 //   application       - { member, volunteer } read_application gates (root object; base tables, never active_* views)
 //   donor             - include the donor projection (donor:read)
 //   summaryDonor      - summary rows carry `donor` { lglConstituentId, lastGiftDate } or null (donor:read)
+//   summaryJoinDate   - summary rows carry `memberJoinDate`, null whenever memberStatus is (member:read)
 //   associationReads  - { member, volunteer, donor } read keys the caller
 //                       holds; applies the association visibility rule. null
 //                       (internal callers with no user) skips it.
@@ -453,7 +454,7 @@ function associationReadsFor (userObject, opts) {
 async function queryPersons (inPredicates = {}, inOptions = {}) {
   const {
     summary = false, detail = false, member = null, volunteer = null, application = null, donor = false,
-    associationReads = null, summaryDonor = false,
+    associationReads = null, summaryDonor = false, summaryJoinDate = false,
     birthDate = false, demographics = false, openRequestCount = false,
     memberNoncurrent = false, volunteerNoncurrent = false
   } = inOptions
@@ -466,6 +467,7 @@ async function queryPersons (inPredicates = {}, inOptions = {}) {
       VILLAGE_COLUMN,
       ACTIVE_AS_COLUMN,
       `${memberNoncurrent ? 'mb' : 'm'}.status AS memberStatus`,
+      ...(summaryJoinDate ? [`DATE_FORMAT(${memberNoncurrent ? 'mb' : 'm'}.joinDate, '%Y-%m-%d') AS memberJoinDate`] : []),
       `${volunteerNoncurrent ? 'vb' : 'vol'}.status AS volunteerStatus`,
       `${pauseJsonSql(volunteerNoncurrent ? 'vb' : 'vol')} AS volunteerPause`,
       ...(summaryDonor ? [SUMMARY_DONOR_COLUMN] : []),
@@ -699,6 +701,7 @@ module.exports.getPersons = async function ({ villageIdsGranted, villageId, firs
     {
       summary: true,
       summaryDonor: associationReads.donor,
+      summaryJoinDate: associationReads.member,
       detail: projection?.includes('detail'),
       birthDate: keyForVillages(userObject, 'person:read_birth_date', villageId),
       demographics: keyForVillages(userObject, 'person:read_demographics', villageId),
