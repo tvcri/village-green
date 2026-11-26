@@ -148,7 +148,8 @@ module.exports.putHolds = async function (items) {
 module.exports.resolveHold = async function (holdId, body, userId) {
   await dbUtils.retryOnDeadlock2({
     transactionFn: async (connection) => {
-      const [[hold]] = await connection.query('SELECT * FROM fcv_hold WHERE holdId = ? FOR UPDATE', [holdId])
+      const [[hold]] = await connection.query(`SELECT holdId, kind, role, nameKey, villageId, ${idStr('submissionId')} AS submissionId, state
+         FROM fcv_hold WHERE holdId = ? FOR UPDATE`, [holdId])
       if (!hold) throw new SmError.NotFoundError(`no hold ${holdId}`)
       if (hold.state !== 'open') throw new SmError.ConflictError('this hold is closed')
       const answer = validateResolution(hold, body)

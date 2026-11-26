@@ -12,7 +12,8 @@ const jf = tokens.users.jotform
 const admin = tokens.users.admin
 let seq = 0
 const uniq = (s) => `${s}${Date.now()}${++seq}`
-const newId = () => String(8_000_000_000 + Date.now() % 1_000_000 * 100 + ++seq)
+// 19 digits, above 2^53, like a real JotForm submission id
+const newId = () => `64${String(Date.now()).padStart(13, '0')}${String(++seq).padStart(4, '0')}`
 
 const putSub = (id, body, token = jf) => vgCall('putFcvSyncSubmission', { submissionId: id }, { token, body })
 const getSubs = (token = jf) => vgCall('getFcvSyncSubmissions', {}, { token })
@@ -85,6 +86,23 @@ test('delete removes the row; a second delete is 404', async () => {
   assert.equal((await del()).status, 204)
   assert.equal(await subById(id), undefined)
   assert.equal((await del()).status, 404)
+})
+
+test('a date hold on a submission id above 2^53 resolves without losing digits', async () => {
+  const id = '6412345678901234567'
+  assert.ok(BigInt(id) > BigInt(Number.MAX_SAFE_INTEGER))
+  await vgCall('deleteFcvSyncSubmission', { submissionId: id }, { token: jf })
+  assert.equal((await putSub(id, { ...fullRow(id), held: 'date' })).status, 200)
+  const h = { kind: 'date', role: null, nameKey: null, villageId: null, rawName: null, submissionId: id, detail: null }
+  assert.equal((await putHolds([h])).status, 200)
+  const open = await openOf(h)
+  assert.equal(open.submissionId, id)
+  const res = await resolve(open.holdId, { ignore: true })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.submissionId, id)
+  assert.equal((await subById(id)).dateDecision, 'ignore')
+  await putHolds([])
+  await vgCall('deleteFcvSyncSubmission', { submissionId: id }, { token: jf })
 })
 
 test('put with an invalid body is 422', async () => {

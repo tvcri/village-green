@@ -3614,7 +3614,7 @@ paths:
       tags: [FcvSync]
       operationId: putFcvSyncSubmission
       parameters:
-        - { name: submissionId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+        - { name: submissionId, in: path, required: true, schema: { $ref: '#/components/schemas/FcvBigId' } }
       requestBody:
         required: true
         content:
@@ -3629,7 +3629,7 @@ paths:
       tags: [FcvSync]
       operationId: deleteFcvSyncSubmission
       parameters:
-        - { name: submissionId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+        - { name: submissionId, in: path, required: true, schema: { $ref: '#/components/schemas/FcvBigId' } }
       responses:
         '204': { description: Deleted }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -3981,12 +3981,21 @@ components:
             properties:
               userId: { $ref: '#/components/schemas/StringIntId' }
               displayName: { type: string }
+    FcvBigId:
+      description: A JotForm submission id (a 19-digit number), as a string.
+      type: string
+      pattern: ^[0-9]{1,20}$
+    FcvBigIdNullable:
+      description: A JotForm submission id, or null.
+      type: string
+      nullable: true
+      pattern: ^[0-9]{1,20}$
     FcvSyncSubmissionPut:
       type: object
       additionalProperties: false
       required: [submittedAt]
       properties:
-        id: { $ref: '#/components/schemas/StringIntId' }
+        id: { $ref: '#/components/schemas/FcvBigId' }
         submittedAt: { type: string, description: 'YYYY-MM-DD HH:MM:SS, no time zone' }
         jotformUpdatedAt: { type: string, nullable: true, description: 'YYYY-MM-DD HH:MM:SS' }
         villageId: { $ref: '#/components/schemas/StringIntIdNullable' }
@@ -4029,7 +4038,7 @@ components:
         nameKey: { type: string, maxLength: 200, nullable: true }
         villageId: { $ref: '#/components/schemas/StringIntIdNullable' }
         rawName: { type: string, maxLength: 200, nullable: true }
-        submissionId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        submissionId: { $ref: '#/components/schemas/FcvBigIdNullable' }
         detail:
           description: Any JSON, or null.
     FcvSyncHold:
@@ -4043,7 +4052,7 @@ components:
         nameKey: { type: string, nullable: true }
         villageId: { $ref: '#/components/schemas/StringIntIdNullable' }
         rawName: { type: string, nullable: true }
-        submissionId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        submissionId: { $ref: '#/components/schemas/FcvBigIdNullable' }
         detail:
           description: Any JSON, or null.
         state: { type: string, enum: [open, closed] }
