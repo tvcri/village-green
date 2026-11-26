@@ -54,6 +54,14 @@ function validateSubmission(body, id) {
       !(Array.isArray(row.activityTypes) && row.activityTypes.every(t => typeof t === 'string'))) {
     throw new UnprocessableError('activityTypes must be an array of strings or null')
   }
+  if (row.held !== 'unreadable') {
+    for (const col of ['visitDate', 'timeSpentMinutes', 'contactType']) {
+      if (row[col] === null) throw new UnprocessableError(`${col} is required unless the report is held as unreadable`)
+    }
+  }
+  if (row.timeSpentMinutes !== null && !(Number.isInteger(row.timeSpentMinutes) && row.timeSpentMinutes >= 0)) {
+    throw new UnprocessableError('timeSpentMinutes must be a whole number of minutes, 0 or more')
+  }
   return row
 }
 

@@ -1,6 +1,7 @@
 'use strict'
 const dbUtils = require('./utils')
 const SmError = require('../utils/error')
+const AuditService = require('./audit/AuditService')
 const { holdSubjectKey, validateSubmission, validateResolution } = require('./fcvSyncRules')
 
 // Storage for the JotForm sync (repo tvcri/vg-sync): Friendly Calls & Visits
@@ -153,21 +154,34 @@ module.exports.resolveHold = async function (holdId, body, userId) {
       if (!hold) throw new SmError.NotFoundError(`no hold ${holdId}`)
       if (hold.state !== 'open') throw new SmError.ConflictError('this hold is closed')
       const answer = validateResolution(hold, body)
+      let before
+      let after
       if (hold.kind === 'name') {
         if (answer.kind === 'match') {
           const [[p]] = await connection.query('SELECT id FROM person WHERE id = ?', [answer.personId])
           if (!p) throw new SmError.UnprocessableError(`no person ${answer.personId}`)
         }
+        const villageId = hold.villageId ?? 0
+        const [[prior]] = await connection.query(
+          `SELECT ${idStr('personId')} AS personId, \`ignore\` AS ignored FROM fcv_name_match
+           WHERE role = ? AND nameKey = ? AND villageId = ? FOR UPDATE`, [hold.role, hold.nameKey, villageId])
         await connection.query(
           'REPLACE INTO fcv_name_match (role, nameKey, villageId, personId, `ignore`, createdUserId) VALUES (?, ?, ?, ?, ?, ?)',
-          [hold.role, hold.nameKey, hold.villageId ?? 0, answer.kind === 'match' ? answer.personId : null,
+          [hold.role, hold.nameKey, villageId, answer.kind === 'match' ? answer.personId : null,
             answer.kind === 'ignore' ? 1 : 0, userId])
+        before = { matchPersonId: prior ? prior.personId : null, matchIgnore: prior ? Boolean(prior.ignored) : null }
+        after = { matchPersonId: answer.kind === 'match' ? answer.personId : null, matchIgnore: answer.kind === 'ignore' }
       } else {
-        const [res] = await connection.query(
+        const [[prior]] = await connection.query(
+          'SELECT dateDecision FROM fcv_submission WHERE id = ? FOR UPDATE', [hold.submissionId])
+        if (!prior) throw new SmError.NotFoundError(`no report ${hold.submissionId}`)
+        await connection.query(
           'UPDATE fcv_submission SET dateDecision = ?, dateDecidedAt = NOW(3), dateDecidedUserId = ? WHERE id = ?',
           [answer.kind, userId, hold.submissionId])
-        if (!res.affectedRows) throw new SmError.NotFoundError(`no report ${hold.submissionId}`)
+        before = { dateDecision: prior.dateDecision }
+        after = { dateDecision: answer.kind }
       }
+      await AuditService.record(connection, { entityType: 'fcvHold', entityId: holdId, action: 'update', userId, before, after })
     },
     statusObj: undefined
   })

@@ -4,7 +4,7 @@ const { shapes, assertShapeInvariants } = require('../service/audit/shapes')
 const { buildRowSql, shadowedAliases, unaccountedReferencingTables, requiredSetAlias, setColumnGaps } = require('../service/audit/AuditService')
 
 test('registry declares exactly the audited entity types', () => {
-  assert.deepEqual(Object.keys(shapes).sort(), ['donor', 'member', 'member_drop_reason', 'person', 'position', 'serviceRequest', 'training', 'user', 'volunteer', 'volunteer_drop_reason'])
+  assert.deepEqual(Object.keys(shapes).sort(), ['donor', 'fcvHold', 'member', 'member_drop_reason', 'person', 'position', 'serviceRequest', 'training', 'user', 'volunteer', 'volunteer_drop_reason'])
 })
 
 test('every registry entry passes its own invariants', () => {
@@ -91,7 +91,7 @@ test('unaccountedReferencingTables buckets FK-referencing tables correctly', () 
 })
 
 test('relatedTables carry the deliberate non-folds as data', () => {
-  for (const t of ['enrollment_request', 'fcv_submission']) {
+  for (const t of ['enrollment_request', 'fcv_hold', 'fcv_name_match', 'fcv_submission']) {
     assert.ok(shapes.person.relatedTables.includes(t), `person relatedTables misses ${t}`)
   }
   for (const t of ['privacy_acknowledgement', 'privacy_rules', 'user_group']) {

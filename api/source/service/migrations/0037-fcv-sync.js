@@ -95,12 +95,9 @@ const upMigration = [
 ]
 
 // Restoring NOT NULL fails if any report was stored with a missing value; that
-// is deliberate, nothing is deleted or invented to make the rollback pass.
+// is deliberate, nothing is deleted or invented to make the rollback pass. The
+// ALTER runs first so that failure leaves the tables and role intact.
 const downMigration = [
-  `DELETE FROM role_permission WHERE roleId = ${ROLE_ID}`,
-  `DELETE FROM role WHERE roleId = ${ROLE_ID}`,
-  `DROP TABLE fcv_hold`,
-  `DROP TABLE fcv_name_match`,
   `ALTER TABLE fcv_submission
      DROP KEY idx_held,
      DROP COLUMN dateDecidedUserId,
@@ -120,7 +117,11 @@ const downMigration = [
      MODIFY timeSpentMinutes int NOT NULL,
      MODIFY visitDate date NOT NULL,
      ADD COLUMN fuzzyMemberName varchar(200) NULL,
-     ADD COLUMN fuzzyVolunteerName varchar(200) NULL`
+     ADD COLUMN fuzzyVolunteerName varchar(200) NULL`,
+  `DELETE FROM role_permission WHERE roleId = ${ROLE_ID}`,
+  `DELETE FROM role WHERE roleId = ${ROLE_ID}`,
+  `DROP TABLE fcv_hold`,
+  `DROP TABLE fcv_name_match`
 ]
 
 const migrationHandler = new MigrationHandler(upMigration, downMigration)

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict')
 const { holdSubjectKey, validateSubmission, validateResolution } = require('../service/fcvSyncRules')
 
 const unprocessable = (e) => e.status === 422
+const ok = { visitDate: '2026-01-02', timeSpentMinutes: 30, contactType: 'phone' }
 
 test('holdSubjectKey: name holds', () => {
   assert.equal(holdSubjectKey({ kind: 'name', role: 'volunteer', villageId: '3', nameKey: 'jane doe' }), 'name:volunteer:3:jane doe')
@@ -25,7 +26,7 @@ test('holdSubjectKey: unknown kind or missing fields throw 422', () => {
 })
 
 test('validateSubmission: strips dateDecision*, unknown keys; absent keys become null', () => {
-  const row = validateSubmission({ held: 'date', dateDecision: 'accept', dateDecidedAt: 'x', dateDecidedUserId: 1, bogus: 1, villageId: '3' }, '6001')
+  const row = validateSubmission({ ...ok, held: 'date', dateDecision: 'accept', dateDecidedAt: 'x', dateDecidedUserId: 1, bogus: 1, villageId: '3' }, '6001')
   assert.equal('dateDecision' in row, false)
   assert.equal('dateDecidedAt' in row, false)
   assert.equal('dateDecidedUserId' in row, false)
@@ -38,30 +39,30 @@ test('validateSubmission: strips dateDecision*, unknown keys; absent keys become
 })
 
 test('validateSubmission: body.id must equal the path id', () => {
-  assert.equal(validateSubmission({ id: '6001' }, '6001').id, '6001')
-  assert.throws(() => validateSubmission({ id: '6002' }, '6001'), unprocessable)
+  assert.equal(validateSubmission({ ...ok, id: '6001' }, '6001').id, '6001')
+  assert.throws(() => validateSubmission({ ...ok, id: '6002' }, '6001'), unprocessable)
 })
 
 test('validateSubmission: held and match enums', () => {
-  for (const h of [null, 'name', 'date', 'ignored', 'unreadable']) assert.equal(validateSubmission({ held: h }, '1').held, h)
+  for (const h of [null, 'name', 'date', 'ignored', 'unreadable']) assert.equal(validateSubmission({ ...ok, held: h }, '1').held, h)
   for (const m of [null, 'remembered', 'email', 'name-village', 'name-elsewhere']) {
-    assert.equal(validateSubmission({ volunteerMatch: m, memberMatch: m }, '1').memberMatch, m)
+    assert.equal(validateSubmission({ ...ok, volunteerMatch: m, memberMatch: m }, '1').memberMatch, m)
   }
-  assert.throws(() => validateSubmission({ held: 'maybe' }, '6001'), unprocessable)
-  assert.throws(() => validateSubmission({ volunteerMatch: 'fuzzy' }, '6001'), unprocessable)
-  assert.throws(() => validateSubmission({ memberMatch: 'fuzzy' }, '6001'), unprocessable)
+  assert.throws(() => validateSubmission({ ...ok, held: 'maybe' }, '6001'), unprocessable)
+  assert.throws(() => validateSubmission({ ...ok, volunteerMatch: 'fuzzy' }, '6001'), unprocessable)
+  assert.throws(() => validateSubmission({ ...ok, memberMatch: 'fuzzy' }, '6001'), unprocessable)
 })
 
 test('validateSubmission: activityTypes is an array of strings or null', () => {
-  assert.deepEqual(validateSubmission({ activityTypes: ['a', 'b'] }, '1').activityTypes, ['a', 'b'])
-  assert.equal(validateSubmission({ activityTypes: null }, '1').activityTypes, null)
-  assert.throws(() => validateSubmission({ activityTypes: 'a' }, '1'), unprocessable)
-  assert.throws(() => validateSubmission({ activityTypes: [1] }, '1'), unprocessable)
+  assert.deepEqual(validateSubmission({ ...ok, activityTypes: ['a', 'b'] }, '1').activityTypes, ['a', 'b'])
+  assert.equal(validateSubmission({ ...ok, activityTypes: null }, '1').activityTypes, null)
+  assert.throws(() => validateSubmission({ ...ok, activityTypes: 'a' }, '1'), unprocessable)
+  assert.throws(() => validateSubmission({ ...ok, activityTypes: [1] }, '1'), unprocessable)
 })
 
 test('validateSubmission: ids are strings or null; body must be an object', () => {
-  assert.throws(() => validateSubmission({ villageId: {} }, '1'), unprocessable)
-  assert.throws(() => validateSubmission({ volunteerPersonId: [] }, '1'), unprocessable)
+  assert.throws(() => validateSubmission({ ...ok, villageId: {} }, '1'), unprocessable)
+  assert.throws(() => validateSubmission({ ...ok, volunteerPersonId: [] }, '1'), unprocessable)
   assert.throws(() => validateSubmission(null, '1'), unprocessable)
   assert.throws(() => validateSubmission([], '1'), unprocessable)
 })
@@ -88,4 +89,20 @@ test('validateResolution: unreadable and unknown holds take nothing', () => {
   assert.throws(() => validateResolution({ kind: 'unreadable' }, { ignore: true }), unprocessable)
   assert.throws(() => validateResolution({ kind: 'unreadable' }, {}), unprocessable)
   assert.throws(() => validateResolution({ kind: 'zzz' }, { ignore: true }), unprocessable)
+})
+
+test('validateSubmission: visitDate, timeSpentMinutes, contactType are required unless held unreadable', () => {
+  for (const col of ['visitDate', 'timeSpentMinutes', 'contactType']) {
+    assert.throws(() => validateSubmission({ ...ok, [col]: null }, '1'), unprocessable)
+    assert.throws(() => validateSubmission({ ...ok, [col]: null, held: 'date' }, '1'), unprocessable)
+    assert.equal(validateSubmission({ ...ok, [col]: null, held: 'unreadable' }, '1')[col], null)
+  }
+  assert.throws(() => validateSubmission({}, '1'), unprocessable)
+  assert.equal(validateSubmission({ held: 'unreadable' }, '1').visitDate, null)
+})
+
+test('validateSubmission: timeSpentMinutes is 0 or more', () => {
+  assert.equal(validateSubmission({ ...ok, timeSpentMinutes: 0 }, '1').timeSpentMinutes, 0)
+  assert.throws(() => validateSubmission({ ...ok, timeSpentMinutes: -1 }, '1'), unprocessable)
+  assert.throws(() => validateSubmission({ held: 'unreadable', timeSpentMinutes: -5 }, '1'), unprocessable)
 })

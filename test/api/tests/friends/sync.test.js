@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
 import { tokens } from '../../lib/context.js'
 import { users, persons, villages } from '../../setup/fixtures.js'
+import { auditRows } from '../audit/lib.js'
 
 // /friends/sync/*: the JotForm sync's endpoints (reports, remembered names,
 // holds) and the staff resolution of a hold. Reads and the sync's writes are
@@ -66,8 +67,12 @@ test('put ignores dateDecision in the body', async () => {
   await putHolds([])
 })
 
-test('state cursor is the latest of submittedAt and jotformUpdatedAt', async () => {
+test('state cursor is the latest of submittedAt and jotformUpdatedAt', async (t) => {
   const a = newId(); const b = newId()
+  // 2099-dated rows would hold the cursor for every later test: always remove them
+  t.after(async () => {
+    for (const id of [a, b]) await vgCall('deleteFcvSyncSubmission', { submissionId: id }, { token: jf })
+  })
   await putSub(a, { ...fullRow(a), submittedAt: '2099-01-01 00:00:00', jotformUpdatedAt: null })
   assert.equal((await vgCall('getFcvSyncState', {}, { token: jf })).json.cursor, '2099-01-01 00:00:00')
   await putSub(b, { ...fullRow(b), submittedAt: '2098-01-01 00:00:00', jotformUpdatedAt: '2099-03-05 06:07:08' })
@@ -76,7 +81,6 @@ test('state cursor is the latest of submittedAt and jotformUpdatedAt', async () 
   assert.equal(res.json.cursor, '2099-03-05 06:07:08')
   assert.equal(typeof res.json.count, 'number')
   assert.ok(res.json.count >= 2)
-  for (const id of [a, b]) await vgCall('deleteFcvSyncSubmission', { submissionId: id }, { token: jf })
 })
 
 test('delete removes the row; a second delete is 404', async () => {
@@ -109,6 +113,26 @@ test('put with an invalid body is 422', async () => {
   const id = newId()
   assert.equal((await putSub(id, { ...fullRow(id), held: 'bogus' })).status, 422)
   assert.equal((await putSub(id, { ...fullRow(id), id: '1' })).status, 422)
+})
+
+test('put with a malformed timestamp or date is 400, not 500', async () => {
+  const id = newId()
+  for (const patch of [{ submittedAt: '2026-10-01T09:15:30Z' }, { submittedAt: 'yesterday' }, { jotformUpdatedAt: '2026-10-02' },
+    { visitDate: '30/09/2026' }, { reportingTag: '2026-10-1' }]) {
+    assert.equal((await putSub(id, { ...fullRow(id), ...patch })).status, 400, JSON.stringify(patch))
+  }
+  assert.equal((await putSub(id, { ...fullRow(id), jotformUpdatedAt: null })).status, 200)
+  await vgCall('deleteFcvSyncSubmission', { submissionId: id }, { token: jf })
+})
+
+test('put without visitDate, timeSpentMinutes or contactType is 422 unless held unreadable', async () => {
+  const id = newId()
+  for (const col of ['visitDate', 'timeSpentMinutes', 'contactType']) {
+    assert.equal((await putSub(id, { ...fullRow(id), [col]: null })).status, 422, col)
+    assert.equal((await putSub(id, { ...fullRow(id), [col]: null, held: 'unreadable' })).status, 200, col)
+  }
+  assert.equal((await putSub(id, { ...fullRow(id), timeSpentMinutes: -1 })).status, 400)
+  await vgCall('deleteFcvSyncSubmission', { submissionId: id }, { token: jf })
 })
 
 test('put holds twice with the same subject keeps one open hold', async () => {
@@ -168,6 +192,51 @@ test('resolution on a name hold writes fcv_name_match and is returned by name-ma
   // then ignore
   assert.equal((await resolve(open.holdId, { ignore: true })).status, 200)
   assert.deepEqual(await find(), { role: 'volunteer', nameKey: h.nameKey, villageId: h.villageId, personId: null, ignore: true })
+})
+
+test('a resolution is audited under the hold, naming the acting user', async () => {
+  const h = nameHold()
+  await putHolds([h])
+  const open = await openOf(h)
+  const p1 = String(persons.quahogMember.id)
+  const p2 = String(persons.innsmouthMember.id)
+  assert.equal((await resolve(open.holdId, { personId: p1 })).status, 200)
+  assert.equal((await resolve(open.holdId, { personId: p2 })).status, 200)
+  assert.equal((await resolve(open.holdId, { ignore: true })).status, 200)
+  assert.equal((await resolve(open.holdId, { ignore: true })).status, 200) // no change: no row
+  const rows = await auditRows('fcvHold', open.holdId)
+  assert.equal(rows.length, 3)
+  for (const r of rows) { assert.equal(r.userId, users.admin.userId); assert.equal(r.action, 'update') }
+  assert.deepEqual(rows[0].changes.diff, { matchPersonId: { old: null, new: p1 }, matchIgnore: { old: null, new: false } })
+  assert.deepEqual(rows[1].changes.diff, { matchPersonId: { old: p1, new: p2 } })
+  assert.deepEqual(rows[2].changes.diff, { matchPersonId: { old: p2, new: null }, matchIgnore: { old: false, new: true } })
+  await putHolds([])
+})
+
+test('a date resolution is audited as a dateDecision change', async () => {
+  const id = newId()
+  await putSub(id, { ...fullRow(id), held: 'date' })
+  const h = { kind: 'date', role: null, nameKey: null, villageId: null, rawName: null, submissionId: id, detail: null }
+  await putHolds([h])
+  const open = await openOf(h)
+  assert.equal((await resolve(open.holdId, { accept: true })).status, 200)
+  assert.equal((await resolve(open.holdId, { ignore: true })).status, 200)
+  const rows = await auditRows('fcvHold', open.holdId)
+  assert.deepEqual(rows.map(r => [r.userId, r.changes.diff]), [
+    [users.admin.userId, { dateDecision: { old: null, new: 'accept' } }],
+    [users.admin.userId, { dateDecision: { old: 'accept', new: 'ignore' } }],
+  ])
+  await putHolds([])
+  await vgCall('deleteFcvSyncSubmission', { submissionId: id }, { token: jf })
+})
+
+test('a rejected resolution writes no audit row', async () => {
+  const h = nameHold()
+  await putHolds([h])
+  const open = await openOf(h)
+  assert.equal((await resolve(open.holdId, { personId: '2000000000' })).status, 422)
+  assert.equal((await auditRows('fcvHold', open.holdId)).length, 0)
+  await putHolds([])
 })
 
 test('name match for an unknown village is returned with villageId null', async () => {
