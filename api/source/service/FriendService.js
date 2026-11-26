@@ -31,7 +31,9 @@ module.exports.getFriends = async function ({ villageIdsGranted, villageId, volu
     'LEFT JOIN person pv ON pv.id = fcv.volunteerPersonId',
     'LEFT JOIN person pm ON pm.id = fcv.memberPersonId'
   ])
-  const predicates = { statements: [], binds: [] }
+  // A report the JotForm sync is holding (fcv_submission.held set) is not a
+  // Friends row until staff resolve the hold; this applies to every caller.
+  const predicates = { statements: ['fcv.held IS NULL'], binds: [] }
 
   if (villageIdsGranted !== null) {
     // Non-federation caller: restrict to the villages they were granted

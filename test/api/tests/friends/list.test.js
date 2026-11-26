@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { vgCall } from '../../lib/ops.js'
+import { withDb } from '../../lib/db.js'
 import { tokens } from '../../lib/context.js'
 import { villages, persons, fcvSubmissions as fcv } from '../../setup/fixtures.js'
 
@@ -98,4 +99,41 @@ test('multi-value villageId returns both selected (granted) villages', async () 
   assert.ok(ids.includes(String(fcv.fcvV1.id)), 'includes the Quahog submission')
   assert.ok(ids.includes(String(fcv.fcvV2.id)), 'includes the Innsmouth submission')
   assert.ok(!ids.includes(String(fcv.fcvV3.id)), 'still excludes ungranted Miskatonic')
+})
+
+// ---- held reports (the JotForm sync's holds) never reach a Friends read ----
+
+test('a held report is hidden from staff, village scope and every filter', async (t) => {
+  const stamp = String(Date.now())
+  const mk = (n, held) => ({
+    id: `64${stamp.padStart(13, '0')}${n}`, submittedAt: '2026-10-01 09:15:30', jotformUpdatedAt: '2026-10-01 09:15:30',
+    villageId: quahog, villageName: 'Quahog',
+    volunteerFirst: 'Jane', volunteerLast: 'Doe', rawVolunteerName: 'Jane Doe', volunteerEmail: null,
+    volunteerPersonId: String(persons.quahogVolunteer.id), volunteerMatch: 'name-village',
+    memberFirst: 'John', memberLast: 'Roe', rawMemberName: 'John Roe',
+    memberPersonId: String(persons.quahogMember.id), memberMatch: 'name-village',
+    visitDate: '2026-09-30', timeSpentMinutes: 45, contactType: 'Phone',
+    activityTypes: ['Phone call'], activityOther: null, notes: 'Held test', reportingTag: '2026-10-01', held,
+  })
+  const shown = mk('0001', null)
+  const held = mk('0002', 'name')
+  t.after(() => withDb(c => c.query('DELETE FROM fcv_submission WHERE id IN (?, ?)', [shown.id, held.id])))
+  for (const row of [shown, held]) {
+    const put = await vgCall('putFcvSyncSubmission', { submissionId: row.id }, { token: tokens.users.jotform, body: row })
+    assert.equal(put.status, 200)
+  }
+  const calls = [
+    ['staff', {}, tokens.users.staff],
+    ['village scope', { villageId: [quahog] }, tokens.users.full_v1],
+    ['volunteer filter', { volunteerPersonId: String(persons.quahogVolunteer.id) }, tokens.users.staff],
+    ['member filter', { memberPersonId: String(persons.quahogMember.id) }, tokens.users.staff],
+    ['date filter', { dateStart: '2026-09-30', dateEnd: '2026-09-30' }, tokens.users.staff],
+  ]
+  for (const [label, query, token] of calls) {
+    const { status, json } = await vgCall('getFriends', query, { token })
+    assert.equal(status, 200, label)
+    const ids = idsOf(json)
+    assert.ok(ids.includes(shown.id), `${label}: the unheld report is listed`)
+    assert.ok(!ids.includes(held.id), `${label}: the held report is not`)
+  }
 })
