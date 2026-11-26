@@ -177,7 +177,7 @@ test('resolution on a name hold writes fcv_name_match and is returned by name-ma
   const h = nameHold()
   await putHolds([h])
   const open = await openOf(h)
-  const p1 = String(persons.quahogMember.id)
+  const p1 = String(persons.quahogVolunteer.id)
   const res = await resolve(open.holdId, { personId: p1 })
   assert.equal(res.status, 200)
   assert.equal(res.json.holdId, open.holdId)
@@ -186,7 +186,7 @@ test('resolution on a name hold writes fcv_name_match and is returned by name-ma
     .find(m => m.nameKey === h.nameKey)
   assert.deepEqual(await find(), { role: 'volunteer', nameKey: h.nameKey, villageId: h.villageId, personId: p1, ignore: false })
   // again: replaces the person
-  const p2 = String(persons.innsmouthMember.id)
+  const p2 = String(persons.innsmouthVolunteer.id)
   assert.equal((await resolve(open.holdId, { personId: p2 })).status, 200)
   assert.equal((await find()).personId, p2)
   // then ignore
@@ -198,8 +198,8 @@ test('a resolution is audited under the hold, naming the acting user', async () 
   const h = nameHold()
   await putHolds([h])
   const open = await openOf(h)
-  const p1 = String(persons.quahogMember.id)
-  const p2 = String(persons.innsmouthMember.id)
+  const p1 = String(persons.quahogVolunteer.id)
+  const p2 = String(persons.innsmouthVolunteer.id)
   assert.equal((await resolve(open.holdId, { personId: p1 })).status, 200)
   assert.equal((await resolve(open.holdId, { personId: p2 })).status, 200)
   assert.equal((await resolve(open.holdId, { ignore: true })).status, 200)
@@ -237,6 +237,47 @@ test('a rejected resolution writes no audit row', async () => {
   assert.equal((await resolve(open.holdId, { personId: '2000000000' })).status, 422)
   assert.equal((await auditRows('fcvHold', open.holdId)).length, 0)
   await putHolds([])
+})
+
+test('a resolution must name a person who holds the hold\'s role', async () => {
+  const h = nameHold() // a volunteer-name hold
+  await putHolds([h])
+  const open = await openOf(h)
+  // quahogMember has a member record only
+  const res = await resolve(open.holdId, { personId: String(persons.quahogMember.id) })
+  assert.equal(res.status, 422)
+  assert.match(JSON.stringify(res.json), /not a volunteer/)
+  const matches = (await vgCall('getFcvSyncNameMatches', {}, { token: jf })).json
+  assert.equal(matches.filter(m => m.nameKey === h.nameKey).length, 0)
+  assert.equal((await auditRows('fcvHold', open.holdId)).length, 0)
+  // a member hold is the other way round
+  const mh = nameHold({ role: 'member' })
+  await putHolds([mh])
+  const mopen = await openOf(mh)
+  assert.equal((await resolve(mopen.holdId, { personId: String(persons.quahogVolunteer.id) })).status, 422)
+  assert.equal((await resolve(mopen.holdId, { personId: String(persons.quahogMember.id) })).status, 200)
+  await putHolds([])
+})
+
+test('a Dropped volunteer or member record still satisfies the role', async () => {
+  const h = nameHold()
+  const mh = nameHold({ role: 'member' })
+  await putHolds([h, mh])
+  const open = await openOf(h)
+  const mopen = await openOf(mh)
+  assert.equal((await resolve(open.holdId, { personId: String(persons.quahogDroppedVolunteer.id) })).status, 200)
+  assert.equal((await resolve(mopen.holdId, { personId: String(persons.quahogDroppedMember.id) })).status, 200)
+  await putHolds([])
+})
+
+test('a put naming a person or village that does not exist is 422 naming the column', async () => {
+  for (const [col, val] of [['memberPersonId', '999999999'], ['volunteerPersonId', '999999999'], ['villageId', '999999999']]) {
+    const id = newId()
+    const res = await putSub(id, { ...fullRow(id), [col]: val })
+    assert.equal(res.status, 422, col)
+    assert.match(JSON.stringify(res.json), new RegExp(col))
+    assert.equal(await subById(id), undefined)
+  }
 })
 
 test('name match for an unknown village is returned with villageId null', async () => {

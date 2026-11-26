@@ -43,16 +43,29 @@ const SUBMISSION_WRITE = [
   'volunteerMatch', 'memberMatch', 'held'
 ]
 
+const FK_COLUMNS = { fk_fcv_volunteer: 'volunteerPersonId', fk_fcv_member: 'memberPersonId', fk_fcv_village: 'villageId' }
+
 // Upserts the sync's columns only: dateDecision* are never in the statement.
 module.exports.putSubmission = async function (submissionId, body) {
   const row = validateSubmission(body, submissionId)
   if (row.submittedAt === null) throw new SmError.UnprocessableError('submittedAt is required')
   const values = SUBMISSION_WRITE.map(c => c === 'activityTypes' && row[c] !== null ? JSON.stringify(row[c]) : row[c])
   const placeholders = SUBMISSION_WRITE.map(c => c === 'activityTypes' ? 'CAST(? AS JSON)' : '?')
-  await dbUtils.pool.query(
-    `INSERT INTO fcv_submission (id, ${SUBMISSION_WRITE.join(', ')}) VALUES (?, ${placeholders.join(', ')})
-     ON DUPLICATE KEY UPDATE ${SUBMISSION_WRITE.map(c => `${c} = VALUES(${c})`).join(', ')}`,
-    [submissionId, ...values])
+  try {
+    await dbUtils.pool.query(
+      `INSERT INTO fcv_submission (id, ${SUBMISSION_WRITE.join(', ')}) VALUES (?, ${placeholders.join(', ')})
+       ON DUPLICATE KEY UPDATE ${SUBMISSION_WRITE.map(c => `${c} = VALUES(${c})`).join(', ')}`,
+      [submissionId, ...values])
+  }
+  catch (err) {
+    // A person or village deleted since staff matched it: name the column
+    // instead of a raw 500 that would repeat on every sync pass.
+    if (err.code === 'ER_NO_REFERENCED_ROW_2') {
+      const column = Object.entries(FK_COLUMNS).find(([fk]) => String(err.sqlMessage ?? err.message).includes(fk))?.[1]
+      throw new SmError.UnprocessableError(`${column ?? 'a referenced record'} does not exist in Village Green`)
+    }
+    throw err
+  }
   const [[stored]] = await dbUtils.pool.query(`SELECT ${SUBMISSION_COLUMNS} FROM fcv_submission WHERE id = ?`, [submissionId])
   return stored
 }
@@ -160,6 +173,10 @@ module.exports.resolveHold = async function (holdId, body, userId) {
         if (answer.kind === 'match') {
           const [[p]] = await connection.query('SELECT id FROM person WHERE id = ?', [answer.personId])
           if (!p) throw new SmError.UnprocessableError(`no person ${answer.personId}`)
+          // The person must hold the hold's role; a Dropped record counts.
+          const [[held]] = await connection.query(
+            `SELECT 1 AS ok FROM ${hold.role === 'member' ? 'member' : 'volunteer'} WHERE personId = ? LIMIT 1`, [answer.personId])
+          if (!held) throw new SmError.UnprocessableError(`person ${answer.personId} is not a ${hold.role}`)
         }
         const villageId = hold.villageId ?? 0
         const [[prior]] = await connection.query(

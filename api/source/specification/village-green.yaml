@@ -3622,6 +3622,7 @@ paths:
             schema: { $ref: '#/components/schemas/FcvSyncSubmissionPut' }
       responses:
         '200': { description: The stored report, content: { application/json: { schema: { $ref: '#/components/schemas/FcvSyncSubmission' } } } }
+        '422': { description: A named person or village does not exist (or the body is invalid), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:friends:sync ] } ]
     delete:

@@ -167,6 +167,8 @@ export const persons = {
   // A former member: status Dropped, so only a caller holding member:read_inactive
   // sees it as a member (the JotForm sync must match names against these).
   quahogDroppedMember: person(8, villages.quahog.id, 'Jane', 'Doe', '35 Spooner St', 'Quahog', '02860', '1950-04-04'),
+  // A former volunteer: status Dropped (a resolution may still name this person).
+  quahogDroppedVolunteer: person(9, villages.quahog.id, 'Mary', 'Roe', '37 Spooner St', 'Quahog', '02860', '1955-06-06'),
 }
 
 // status 'Active' so the active_member / active_volunteer views
@@ -183,6 +185,7 @@ export const volunteers = {
   innsmouth: { id: 2, personId: persons.innsmouthVolunteer.id, status: 'Active' },
   miskatonic: { id: 3, personId: persons.miskatonicVolunteer.id, status: 'Active' },
   vssSibling: { id: 4, personId: persons.vssHouseholdSibling.id, status: 'Active' },
+  quahogDropped: { id: 5, personId: persons.quahogDroppedVolunteer.id, status: 'Dropped' },
 }
 
 // capabilityId values come from the scaffold's static catalog
