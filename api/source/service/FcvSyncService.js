@@ -6,8 +6,10 @@ const { holdSubjectKey, validateSubmission, validateResolution } = require('./fc
 
 // Storage for the JotForm sync (repo tvcri/vg-sync): Friendly Calls & Visits
 // reports, remembered name matches and holds (migration 0037). Like
-// SyncService, these writes are not audited: the tables are the sync's own
-// records, carry no foreign keys, and the audit layer reads none of them.
+// SyncService, the sync's own writes (reports and holds) are not audited: the
+// tables are the sync's own records and carry no foreign keys. A staff
+// resolution of a hold (resolveHold) is audited, as an fcvHold update with
+// the remembered answer or the date decision before and after.
 //
 // Times leave the database as 'YYYY-MM-DD HH:MM:SS' strings (DATE_FORMAT),
 // with no time zone conversion, and go in the same way.

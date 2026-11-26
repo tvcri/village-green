@@ -16,6 +16,11 @@ const MigrationHandler = require('./lib/MigrationHandler')
 // - fcv_hold: questions only a person can answer. At most one OPEN hold per
 //   subjectKey (openKey is NULL once closed, and NULLs never collide in a
 //   unique key; the sync_hold pattern from 0033).
+// - The name keys (fcv_name_match role and nameKey, fcv_hold subjectKey,
+//   openKey and nameKey) are utf8mb4_bin. The sync already lowercases them
+//   and strips accents, but keeps letters such as ø and ß; the table default
+//   utf8mb4_0900_ai_ci would equate "løe" with "loe" and "ß" with "ss", so two
+//   names the sync keeps apart would collide on the unique keys.
 // - Role 10, JotForm Sync: exactly the permissions the sync needs. The
 //   member and volunteer reads (including _inactive) are there because a
 //   person is hidden from a caller who cannot read any of the person's
@@ -58,8 +63,8 @@ const upMigration = [
      ADD KEY idx_held (held)`,
 
   `CREATE TABLE fcv_name_match (
-    role varchar(16) NOT NULL,
-    nameKey varchar(200) NOT NULL,
+    role varchar(16) COLLATE utf8mb4_bin NOT NULL,
+    nameKey varchar(200) COLLATE utf8mb4_bin NOT NULL,
     villageId int NOT NULL DEFAULT 0,
     personId int DEFAULT NULL,
     \`ignore\` tinyint(1) NOT NULL DEFAULT 0,
@@ -72,7 +77,7 @@ const upMigration = [
     holdId int NOT NULL AUTO_INCREMENT,
     kind varchar(16) NOT NULL,
     role varchar(16) DEFAULT NULL,
-    nameKey varchar(200) DEFAULT NULL,
+    nameKey varchar(200) COLLATE utf8mb4_bin DEFAULT NULL,
     villageId int DEFAULT NULL,
     rawName varchar(200) DEFAULT NULL,
     submissionId bigint unsigned DEFAULT NULL,
@@ -81,8 +86,8 @@ const upMigration = [
     firstSeenAt datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
     lastSeenAt datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
     closedAt datetime(3) DEFAULT NULL,
-    subjectKey varchar(255) NOT NULL,
-    openKey varchar(255) GENERATED ALWAYS AS (IF(state = 'open', subjectKey, NULL)) STORED,
+    subjectKey varchar(255) COLLATE utf8mb4_bin NOT NULL,
+    openKey varchar(255) COLLATE utf8mb4_bin GENERATED ALWAYS AS (IF(state = 'open', subjectKey, NULL)) STORED,
     PRIMARY KEY (holdId),
     UNIQUE KEY fcv_hold_open (openKey),
     KEY fcv_hold_subject (subjectKey)

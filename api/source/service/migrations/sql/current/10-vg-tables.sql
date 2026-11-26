@@ -225,7 +225,7 @@ CREATE TABLE `fcv_hold` (
   `holdId` int NOT NULL AUTO_INCREMENT,
   `kind` varchar(16) NOT NULL,
   `role` varchar(16) DEFAULT NULL,
-  `nameKey` varchar(200) DEFAULT NULL,
+  `nameKey` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   `villageId` int DEFAULT NULL,
   `rawName` varchar(200) DEFAULT NULL,
   `submissionId` bigint unsigned DEFAULT NULL,
@@ -234,8 +234,8 @@ CREATE TABLE `fcv_hold` (
   `firstSeenAt` datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
   `lastSeenAt` datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
   `closedAt` datetime(3) DEFAULT NULL,
-  `subjectKey` varchar(255) NOT NULL,
-  `openKey` varchar(255) GENERATED ALWAYS AS (if((`state` = _utf8mb4'open'),`subjectKey`,NULL)) STORED,
+  `subjectKey` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `openKey` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin GENERATED ALWAYS AS (if((`state` = _utf8mb4'open'),`subjectKey`,NULL)) STORED,
   PRIMARY KEY (`holdId`),
   UNIQUE KEY `fcv_hold_open` (`openKey`),
   KEY `fcv_hold_subject` (`subjectKey`)
@@ -247,8 +247,8 @@ CREATE TABLE `fcv_hold` (
 
 DROP TABLE IF EXISTS `fcv_name_match`;
 CREATE TABLE `fcv_name_match` (
-  `role` varchar(16) NOT NULL,
-  `nameKey` varchar(200) NOT NULL,
+  `role` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `nameKey` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
   `villageId` int NOT NULL DEFAULT '0',
   `personId` int DEFAULT NULL,
   `ignore` tinyint(1) NOT NULL DEFAULT '0',
@@ -1230,4 +1230,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-26 20:34:05
+-- Dump completed on 2026-11-26 23:42:35

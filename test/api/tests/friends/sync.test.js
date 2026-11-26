@@ -149,6 +149,33 @@ test('put holds twice with the same subject keeps one open hold', async () => {
   assert.deepEqual(open[0].detail, { candidates: [], n: 2 })
 })
 
+test('name keys that differ only by a letter the sync keeps (ø, ß) are distinct holds and answers', async () => {
+  // The sync lowercases and strips accents but keeps ø and ß; MySQL's
+  // utf8mb4_0900_ai_ci would equate them with o and ss.
+  const tail = uniq(' ')
+  const hØ = nameHold({ nameKey: `jane løe${tail}` })
+  const hO = nameHold({ nameKey: `jane loe${tail}` })
+  const hß = nameHold({ nameKey: `jane straße${tail}` })
+  const hSs = nameHold({ nameKey: `jane strasse${tail}` })
+  const res = await putHolds([hØ, hO, hß, hSs])
+  assert.equal(res.status, 200)
+  assert.equal(res.json.opened, 4)
+  const again = await putHolds([hØ, hO, hß, hSs])
+  assert.equal(again.status, 200)
+  assert.deepEqual([again.json.opened, again.json.updated], [0, 4])
+  const open = (await getHolds({ state: 'open' })).json.filter(x => x.nameKey.endsWith(tail))
+  assert.equal(open.length, 4)
+
+  const oØ = await openOf(hØ); const oO = await openOf(hO)
+  const p1 = String(persons.quahogVolunteer.id); const p2 = String(persons.innsmouthVolunteer.id)
+  assert.equal((await resolve(oØ.holdId, { personId: p1 })).status, 200)
+  assert.equal((await resolve(oO.holdId, { personId: p2 })).status, 200)
+  const matches = (await vgCall('getFcvSyncNameMatches', {}, { token: jf })).json.filter(m => m.nameKey.endsWith(tail))
+  assert.deepEqual(matches.map(m => [m.nameKey, m.personId]).sort(),
+    [[hO.nameKey, p2], [hØ.nameKey, p1]].sort())
+  await putHolds([])
+})
+
 test('a subject left out of the body is closed', async () => {
   const keep = nameHold(); const drop = nameHold()
   await putHolds([keep, drop])
