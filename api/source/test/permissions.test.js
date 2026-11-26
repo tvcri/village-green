@@ -28,6 +28,7 @@ test('expected non-elevated permissions exist', () => {
     'volunteer:read', 'volunteer:write',
     'sr:read', 'sr:write', 'friend:read', 'friend:write',
     'village:read', 'village:write',
+    'fcv_sync:read', 'fcv_sync:write', 'fcv_sync:resolve',
   ]) {
     assert.ok(catalog[key], `missing ${key}`)
     assert.equal(catalog[key].requiresElevation, false)

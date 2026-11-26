@@ -9,10 +9,10 @@ export const CAPABILITIES = [
 ]
 
 // role ids are FIXED by the static catalog (20-vg-static.sql) — reference, never insert.
-export const ROLE = { lsc: 1, steering: 2, lead: 3, admin: 4, staff: 5, board: 6, serviceCoordinator: 7, syncService: 8, mailchimpSync: 9 }
+export const ROLE = { lsc: 1, steering: 2, lead: 3, admin: 4, staff: 5, board: 6, serviceCoordinator: 7, syncService: 8, mailchimpSync: 9, jotformSync: 10 }
 export const ROLE_NAMES = {
   1: 'Local Service Coordinator', 2: 'Steering Committee', 3: 'Village Lead',
-  4: 'Admin', 5: 'Staff', 6: 'Board', 7: 'Service Coordinator', 8: 'Sync Service', 9: 'Mailchimp Sync',
+  4: 'Admin', 5: 'Staff', 6: 'Board', 7: 'Service Coordinator', 8: 'Sync Service', 9: 'Mailchimp Sync', 10: 'JotForm Sync',
 }
 
 // service_request.serviceName values are UI-enforced (serviceNameOptions in

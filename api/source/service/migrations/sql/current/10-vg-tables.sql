@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.4.10, for Linux (x86_64)
+-- MySQL dump 10.13  Distrib 8.4.11, for Linux (x86_64)
 --
--- Host: 127.0.0.1    Database: vg_test
+-- Host: 127.0.0.1    Database: vg
 -- ------------------------------------------------------
--- Server version	8.4.10
+-- Server version	8.4.11
 
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
@@ -217,6 +217,47 @@ CREATE TABLE `ethnicity` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
+-- Table structure for table `fcv_hold`
+--
+
+DROP TABLE IF EXISTS `fcv_hold`;
+CREATE TABLE `fcv_hold` (
+  `holdId` int NOT NULL AUTO_INCREMENT,
+  `kind` varchar(16) NOT NULL,
+  `role` varchar(16) DEFAULT NULL,
+  `nameKey` varchar(200) DEFAULT NULL,
+  `villageId` int DEFAULT NULL,
+  `rawName` varchar(200) DEFAULT NULL,
+  `submissionId` bigint unsigned DEFAULT NULL,
+  `detail` json DEFAULT NULL,
+  `state` varchar(8) NOT NULL DEFAULT 'open',
+  `firstSeenAt` datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
+  `lastSeenAt` datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
+  `closedAt` datetime(3) DEFAULT NULL,
+  `subjectKey` varchar(255) NOT NULL,
+  `openKey` varchar(255) GENERATED ALWAYS AS (if((`state` = _utf8mb4'open'),`subjectKey`,NULL)) STORED,
+  PRIMARY KEY (`holdId`),
+  UNIQUE KEY `fcv_hold_open` (`openKey`),
+  KEY `fcv_hold_subject` (`subjectKey`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Table structure for table `fcv_name_match`
+--
+
+DROP TABLE IF EXISTS `fcv_name_match`;
+CREATE TABLE `fcv_name_match` (
+  `role` varchar(16) NOT NULL,
+  `nameKey` varchar(200) NOT NULL,
+  `villageId` int NOT NULL DEFAULT '0',
+  `personId` int DEFAULT NULL,
+  `ignore` tinyint(1) NOT NULL DEFAULT '0',
+  `createdAt` datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
+  `createdUserId` int DEFAULT NULL,
+  PRIMARY KEY (`role`,`nameKey`,`villageId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
 -- Table structure for table `fcv_submission`
 --
 
@@ -227,21 +268,33 @@ CREATE TABLE `fcv_submission` (
   `villageName` varchar(200) DEFAULT NULL,
   `volunteerPersonId` int DEFAULT NULL,
   `rawVolunteerName` varchar(200) DEFAULT NULL,
-  `fuzzyVolunteerName` varchar(200) DEFAULT NULL,
   `memberPersonId` int DEFAULT NULL,
   `rawMemberName` varchar(200) DEFAULT NULL,
-  `fuzzyMemberName` varchar(200) DEFAULT NULL,
-  `visitDate` date NOT NULL,
-  `timeSpentMinutes` int NOT NULL,
-  `contactType` varchar(50) NOT NULL,
+  `visitDate` date DEFAULT NULL,
+  `timeSpentMinutes` int DEFAULT NULL,
+  `contactType` varchar(50) DEFAULT NULL,
   `activityTypes` json DEFAULT NULL,
   `activityOther` varchar(500) DEFAULT NULL,
   `notes` text,
   `submittedAt` datetime NOT NULL,
+  `jotformUpdatedAt` datetime DEFAULT NULL,
+  `volunteerFirst` varchar(100) DEFAULT NULL,
+  `volunteerLast` varchar(100) DEFAULT NULL,
+  `volunteerEmail` varchar(254) DEFAULT NULL,
+  `memberFirst` varchar(100) DEFAULT NULL,
+  `memberLast` varchar(100) DEFAULT NULL,
+  `reportingTag` date DEFAULT NULL,
+  `volunteerMatch` varchar(16) DEFAULT NULL,
+  `memberMatch` varchar(16) DEFAULT NULL,
+  `held` varchar(16) DEFAULT NULL,
+  `dateDecision` varchar(8) DEFAULT NULL,
+  `dateDecidedAt` datetime(3) DEFAULT NULL,
+  `dateDecidedUserId` int DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_village` (`villageId`),
   KEY `idx_volunteer` (`volunteerPersonId`),
   KEY `idx_member` (`memberPersonId`),
+  KEY `idx_held` (`held`),
   CONSTRAINT `fk_fcv_member` FOREIGN KEY (`memberPersonId`) REFERENCES `person` (`id`),
   CONSTRAINT `fk_fcv_village` FOREIGN KEY (`villageId`) REFERENCES `village` (`id`),
   CONSTRAINT `fk_fcv_volunteer` FOREIGN KEY (`volunteerPersonId`) REFERENCES `person` (`id`)
@@ -1064,7 +1117,7 @@ CREATE TABLE `volunteer_village_associate` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
--- Dumping events for database 'vg_test'
+-- Dumping events for database 'vg'
 --
 /*!50106 SET @save_time_zone= @@TIME_ZONE */ ;
 /*!50106 DROP EVENT IF EXISTS `evt_auto_complete_service_requests` */;
@@ -1145,7 +1198,7 @@ DELIMITER ;
 /*!50106 SET TIME_ZONE= @save_time_zone */ ;
 
 --
--- Dumping routines for database 'vg_test'
+-- Dumping routines for database 'vg'
 --
 
 --
@@ -1177,4 +1230,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-22  0:31:29
+-- Dump completed on 2026-11-26 20:34:05
