@@ -3571,6 +3571,160 @@ paths:
         '200': { description: The closed hold, content: { application/json: { schema: { $ref: '#/components/schemas/SyncHold' } } } }
         default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
       security: [ { oauth: [ vg:sync ] } ]
+  /friends/sync/state:
+    get:
+      summary: Where the JotForm sync stands
+      description: >-
+        cursor is the latest of submittedAt and jotformUpdatedAt over every
+        stored report (null when there are none), as YYYY-MM-DD HH:MM:SS with
+        no time zone conversion. count is the number of stored reports.
+      tags: [FcvSync]
+      operationId: getFcvSyncState
+      responses:
+        '200':
+          description: The cursor and the count
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [cursor, count]
+                properties:
+                  cursor: { type: string, nullable: true }
+                  count: { type: integer }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:friends:sync:read ] } ]
+  /friends/sync/submissions:
+    get:
+      summary: Every stored Friendly Calls & Visits report, as the sync keeps it
+      tags: [FcvSync]
+      operationId: getFcvSyncSubmissions
+      responses:
+        '200': { description: Reports, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/FcvSyncSubmission' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:friends:sync:read ] } ]
+  /friends/sync/submissions/{submissionId}:
+    put:
+      summary: Store a report, replacing the sync's columns
+      description: >-
+        Inserts or updates the report by its JotForm submission id. Only the
+        sync's columns are written; a date decision made by staff is never
+        touched, and dateDecision in the body is ignored. A column left out of
+        the body is stored as null.
+      tags: [FcvSync]
+      operationId: putFcvSyncSubmission
+      parameters:
+        - { name: submissionId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FcvSyncSubmissionPut' }
+      responses:
+        '200': { description: The stored report, content: { application/json: { schema: { $ref: '#/components/schemas/FcvSyncSubmission' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:friends:sync ] } ]
+    delete:
+      summary: Delete a report JotForm no longer has
+      tags: [FcvSync]
+      operationId: deleteFcvSyncSubmission
+      parameters:
+        - { name: submissionId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+      responses:
+        '204': { description: Deleted }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:friends:sync ] } ]
+  /friends/sync/name-matches:
+    get:
+      summary: The names staff have matched to a person, or told the sync to ignore
+      tags: [FcvSync]
+      operationId: getFcvSyncNameMatches
+      responses:
+        '200':
+          description: Name matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [role, nameKey, villageId, personId, ignore]
+                  properties:
+                    role: { type: string }
+                    nameKey: { type: string }
+                    villageId: { $ref: '#/components/schemas/StringIntIdNullable' }
+                    personId: { $ref: '#/components/schemas/StringIntIdNullable' }
+                    ignore: { type: boolean }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:friends:sync:read ] } ]
+  /friends/sync/holds:
+    get:
+      summary: The reports the JotForm sync is leaving alone
+      description: Newest first. With no state, the open holds.
+      tags: [FcvSync]
+      operationId: getFcvSyncHolds
+      parameters:
+        - { name: state, in: query, required: false, schema: { type: string, enum: [open, closed], default: open } }
+      responses:
+        '200': { description: Holds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/FcvSyncHold' } } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:friends:sync:read ] } ]
+    put:
+      summary: Set the open holds to exactly this list
+      description: >-
+        In one transaction: opens or refreshes each hold (one open hold per
+        subject), then closes every open hold whose subject is not in the
+        body. An empty list closes every open hold.
+      tags: [FcvSync]
+      operationId: putFcvSyncHolds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, maxItems: 5000, items: { $ref: '#/components/schemas/FcvSyncHoldPut' } }
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [opened, updated, closed]
+                properties:
+                  opened: { type: integer }
+                  updated: { type: integer }
+                  closed: { type: integer }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:friends:sync ] } ]
+  /friends/sync/holds/{holdId}/resolution:
+    post:
+      summary: Answer a hold
+      description: >-
+        A name hold takes { personId } (match the name to that person) or
+        { ignore: true }; a date hold takes { accept: true } or
+        { ignore: true }. The answer is remembered and the hold stays open
+        until the sync carries it out and closes it. A closed hold is a 409.
+      tags: [FcvSync]
+      operationId: createFcvSyncHoldResolution
+      parameters:
+        - { name: holdId, in: path, required: true, schema: { $ref: '#/components/schemas/StringIntId' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                personId: { $ref: '#/components/schemas/StringIntId' }
+                ignore: { type: boolean }
+                accept: { type: boolean }
+      responses:
+        '200': { description: The hold, content: { application/json: { schema: { $ref: '#/components/schemas/FcvSyncHold' } } } }
+        default: { description: error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+      security: [ { oauth: [ vg:friends:sync ] } ]
   /sync/runs:
     get:
       summary: Recent sync runs, newest first
@@ -3827,6 +3981,86 @@ components:
             properties:
               userId: { $ref: '#/components/schemas/StringIntId' }
               displayName: { type: string }
+    FcvSyncSubmissionPut:
+      type: object
+      additionalProperties: false
+      required: [submittedAt]
+      properties:
+        id: { $ref: '#/components/schemas/StringIntId' }
+        submittedAt: { type: string, description: 'YYYY-MM-DD HH:MM:SS, no time zone' }
+        jotformUpdatedAt: { type: string, nullable: true, description: 'YYYY-MM-DD HH:MM:SS' }
+        villageId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        villageName: { type: string, maxLength: 200, nullable: true }
+        volunteerFirst: { type: string, maxLength: 100, nullable: true }
+        volunteerLast: { type: string, maxLength: 100, nullable: true }
+        rawVolunteerName: { type: string, maxLength: 200, nullable: true }
+        volunteerEmail: { type: string, maxLength: 254, nullable: true }
+        volunteerPersonId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        volunteerMatch: { type: string, maxLength: 16, nullable: true }
+        memberFirst: { type: string, maxLength: 100, nullable: true }
+        memberLast: { type: string, maxLength: 100, nullable: true }
+        rawMemberName: { type: string, maxLength: 200, nullable: true }
+        memberPersonId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        memberMatch: { type: string, maxLength: 16, nullable: true }
+        visitDate: { type: string, format: date, nullable: true }
+        timeSpentMinutes: { type: integer, nullable: true }
+        contactType: { type: string, maxLength: 50, nullable: true }
+        activityTypes: { type: array, nullable: true, items: { type: string } }
+        activityOther: { type: string, maxLength: 500, nullable: true }
+        notes: { type: string, nullable: true }
+        reportingTag: { type: string, format: date, nullable: true }
+        held: { type: string, maxLength: 16, nullable: true }
+        dateDecision: { type: string, nullable: true, description: Ignored. Staff set it through the resolution endpoint. }
+    FcvSyncSubmission:
+      allOf:
+        - $ref: '#/components/schemas/FcvSyncSubmissionPut'
+        - type: object
+          required: [id, submittedAt, jotformUpdatedAt, villageId, villageName, volunteerFirst, volunteerLast,
+            rawVolunteerName, volunteerEmail, volunteerPersonId, volunteerMatch, memberFirst, memberLast,
+            rawMemberName, memberPersonId, memberMatch, visitDate, timeSpentMinutes, contactType, activityTypes,
+            activityOther, notes, reportingTag, held, dateDecision]
+    FcvSyncHoldPut:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [name, date, unreadable] }
+        role: { type: string, enum: [volunteer, member, null], nullable: true }
+        nameKey: { type: string, maxLength: 200, nullable: true }
+        villageId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        rawName: { type: string, maxLength: 200, nullable: true }
+        submissionId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        detail:
+          description: Any JSON, or null.
+    FcvSyncHold:
+      type: object
+      additionalProperties: false
+      required: [holdId, kind, role, nameKey, villageId, rawName, submissionId, detail, state, firstSeenAt, lastSeenAt, closedAt, persons]
+      properties:
+        holdId: { $ref: '#/components/schemas/StringIntId' }
+        kind: { type: string }
+        role: { type: string, nullable: true }
+        nameKey: { type: string, nullable: true }
+        villageId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        rawName: { type: string, nullable: true }
+        submissionId: { $ref: '#/components/schemas/StringIntIdNullable' }
+        detail:
+          description: Any JSON, or null.
+        state: { type: string, enum: [open, closed] }
+        firstSeenAt: { type: string }
+        lastSeenAt: { type: string }
+        closedAt: { type: string, nullable: true }
+        persons:
+          description: The people named in detail.candidates, ids not in VG left out.
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [personId, displayName, village]
+            properties:
+              personId: { $ref: '#/components/schemas/StringIntId' }
+              displayName: { type: string }
+              village: { type: string, nullable: true }
     SyncFieldPut:
       type: object
       additionalProperties: false
