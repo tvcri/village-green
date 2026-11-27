@@ -72,9 +72,14 @@ What this means for the page:
   but first name differs, 50; surname not in VG, 33; fits someone with no
   member record, 8. Both mockups lead with "Possibly: …"; in practice
   **searching for a person is the main path**, not a fallback. Search
-  should reach Dropped members and volunteers too (old reports name them),
-  and should only offer people with the hold's role (VG refuses others
-  with 422).
+  should reach every village, not just the form's, and Dropped members and
+  volunteers too (old reports name them). It should only offer people with
+  the hold's role (VG refuses others with 422). A real example: a surname
+  typed with two letters swapped, on a form naming one village, for a
+  member who lives in another. No rule can match it; staff can, and VG
+  accepts the answer. The answer is remembered for that typed name and
+  the form's village only, so the same misspelling on a form naming
+  another village holds again.
 - **Most date holds are a backlog.** 48 of 55 are reports filed more than
   90 days after the visit, mostly a June catch-up. The customer has not yet
   said whether to accept these as they are (go-live handoff, question 1).
@@ -167,6 +172,16 @@ These **must ship with the page**:
    reports as they are, one by one, all at once, or by a wider window.
 3. **Junk names** (question 3): drop the whole report, or only the
    junk side.
+4. **Which village a visit counts for** when the person matched lives in
+   another village. A report keeps the form's village, whoever it is
+   matched to. So a visit whose member lives in another village shows on
+   the form's village's Friends page and under that village in the Hub,
+   not on the member's own village's page. The form village's staff see
+   the other village's member by name (and the notes, under card
+   VG-202611-530's rule). The sync already does this for every match in
+   another village (5 members and 18 volunteers in the real run), and
+   staff can do it on this page. Nothing breaks either way; the answer
+   matters most for the village summaries (cards VG-202611-531 and 532).
 
 ## Not this page
 
