@@ -109,6 +109,13 @@ export const users = {
     userId: 15, name: 'Mailchimp Sync Account', username: 'service-account-mailchimp@sync.test',
     grants: [{ villageId: null, roleId: 9 }], privileges: [],
   },
+  // The vg-sync JotForm service account: role 10 (JotForm Sync) at federation
+  // scope and nothing else. Reads persons (inactive members and volunteers
+  // included) and writes Friendly Calls & Visits reports.
+  jotform: {
+    userId: 16, name: 'JotForm Sync Account', username: 'service-account-jotform@sync.test',
+    grants: [{ villageId: null, roleId: 10 }], privileges: [],
+  },
 }
 
 // person rows. Each village has a member-person and a volunteer-person, with
@@ -131,7 +138,7 @@ function person (id, villageId, firstName, lastName, street, city, zip, birthDat
 
 // The auto-complete task's actor row (migration 0024). NOT a persona: it holds
 // no grants, gets no token, and status 'unavailable' makes the auth gate refuse
-// it. Its userId is deliberately outside the 1-15 persona range — in production
+// it. Its userId is deliberately outside the 1-16 persona range — in production
 // the row lands at whatever auto-increment the install is at, and nothing may
 // depend on a particular value; the event finds it by taskName.
 export const taskUsers = {
@@ -157,6 +164,11 @@ export const persons = {
   // household outcomes (selectionRequired / alreadyOwnAccount / account-wide
   // release). Different village on purpose: VSS is village-independent.
   vssHouseholdSibling: person(7, villages.innsmouth.id, 'Joe', 'Swanson', '5 Marsh St', 'Innsmouth', '02882', '1962-12-12'),
+  // A former member: status Dropped, so only a caller holding member:read_inactive
+  // sees it as a member (the JotForm sync must match names against these).
+  quahogDroppedMember: person(8, villages.quahog.id, 'Jane', 'Doe', '35 Spooner St', 'Quahog', '02860', '1950-04-04'),
+  // A former volunteer: status Dropped (a resolution may still name this person).
+  quahogDroppedVolunteer: person(9, villages.quahog.id, 'Mary', 'Roe', '37 Spooner St', 'Quahog', '02860', '1955-06-06'),
 }
 
 // status 'Active' so the active_member / active_volunteer views
@@ -165,6 +177,7 @@ export const members = {
   quahog: { id: 1, personId: persons.quahogMember.id, memberNumber: 'Q-1001', status: 'Active' },
   innsmouth: { id: 2, personId: persons.innsmouthMember.id, memberNumber: 'I-2001', status: 'Active' },
   miskatonic: { id: 3, personId: persons.miskatonicMember.id, memberNumber: 'M-3001', status: 'Active' },
+  quahogDropped: { id: 4, personId: persons.quahogDroppedMember.id, memberNumber: 'Q-1002', status: 'Dropped' },
 }
 
 export const volunteers = {
@@ -172,6 +185,7 @@ export const volunteers = {
   innsmouth: { id: 2, personId: persons.innsmouthVolunteer.id, status: 'Active' },
   miskatonic: { id: 3, personId: persons.miskatonicVolunteer.id, status: 'Active' },
   vssSibling: { id: 4, personId: persons.vssHouseholdSibling.id, status: 'Active' },
+  quahogDropped: { id: 5, personId: persons.quahogDroppedVolunteer.id, status: 'Dropped' },
 }
 
 // capabilityId values come from the scaffold's static catalog
@@ -310,7 +324,7 @@ export const fcvSubmissions = {
 // only defines a `:read` scope). Narrow variants below intentionally omit scopes
 // to exercise per-resource scope enforcement.
 export const scopes = {
-  full: 'vg:service-request vg:village vg:person vg:member vg:volunteer vg:donor vg:sync vg:friends:read vg:user vg:op vg:read',
+  full: 'vg:service-request vg:village vg:person vg:member vg:volunteer vg:donor vg:sync vg:friends:read vg:friends:sync vg:user vg:op vg:read',
   readOnly: 'vg:service-request:read vg:village:read vg:person:read',
   noServiceRequest: 'vg:village:read vg:person:read',
 }

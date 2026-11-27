@@ -30,6 +30,16 @@ check that caught the missing `village:read`.
 > none of their associations). It lacks the `_inactive` reads and every write.
 > It has no client routes.
 
+> **Updated by migration 0037:** role 10, **JotForm Sync** (federation), the
+> vg-sync JotForm service account's role. It holds exactly `person:read`,
+> `member:read`, `member:read_inactive`, `volunteer:read`,
+> `volunteer:read_inactive`, `village:read`, `fcv_sync:read` and
+> `fcv_sync:write` (the inactive reads because Friendly Calls & Visits reports
+> name former members and volunteers). It has no client routes. Two new keys,
+> `fcv_sync:read` and `fcv_sync:resolve`, gate staff-facing holds endpoints.
+> No seeded staff role holds them: only Admin (through `*`) can open the LGL
+> sync page today, so there is no existing grant to mirror.
+
 | permission | LSC (v) | Steering Cmte (v) | Village Lead (v) | Admin (f) | Staff (f) | Board (f) | Svc Coord (f) |
 |---|---|---|---|---|---|---|---|
 | person:read | ✓ | ✓ | ✓ | * | ✓ | ✓ | ✓ |

@@ -9,7 +9,7 @@ import { villages, users, taskUsers, persons, members, volunteers, volunteerCapa
 const TABLES = [
   'audit_event',
   'enrollment_request',
-  'notification_event', 'service_request', 'fcv_submission', 'volunteer_vetting',
+  'notification_event', 'service_request', 'fcv_submission', 'fcv_hold', 'fcv_name_match', 'volunteer_vetting',
   'volunteer_training', 'volunteer_position', 'training', 'position',
   'volunteer_capability', 'volunteer_village_associate', 'volunteer_pause', 'volunteer', 'member_circle_preference', 'member',
   'person_image', 'person_contact', 'person_language', 'person_race', 'person_circle',

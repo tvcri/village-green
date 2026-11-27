@@ -39,10 +39,12 @@ const shapes = {
     // enrollment_request/fcv_submission reference person but are their own
     // records, not attributes of the person — deliberately not folded.
     // person_image: images carry no history (Chris Daley, Part 4) — deliberately not folded.
+    // fcv_name_match/fcv_hold: the JotForm sync's remembered name matches and
+    // holds (0037); no FK, like the sync_* tables.
     // sync_field/sync_hold/sync_log: the LGL sync's own records about a person
     // (0033). They carry no FK, so the boot scan never sees them; listed so the
     // registry still names every table that holds a personId.
-    relatedTables: ['enrollment_request', 'fcv_submission', 'person_image', 'sync_field', 'sync_hold', 'sync_log'],
+    relatedTables: ['enrollment_request', 'fcv_hold', 'fcv_name_match', 'fcv_submission', 'person_image', 'sync_field', 'sync_hold', 'sync_log'],
     sets: {
       circles: {
         kind: 'values',
@@ -237,6 +239,17 @@ const shapes = {
               WHERE m.userId = ?`,
       },
     },
+  },
+
+  // A staff answer to a JotForm sync hold (FcvSyncService.resolveHold). The
+  // entity is the hold; the row is never read back through readShape: the
+  // service records a hand-built before/after of what the answer changed
+  // (the remembered name match, or the report's dateDecision).
+  fcvHold: {
+    table: 'fcv_hold',
+    idColumn: 'holdId',
+    relatedTables: [],
+    sets: {},
   },
 
   serviceRequest: {
